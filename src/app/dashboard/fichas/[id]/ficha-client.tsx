@@ -1072,37 +1072,6 @@ export function FichaClient({
               </Link>
             </CardContent>
           </Card>
-
-          {/* Card Ficha */}
-          <Card>
-            <CardContent className="pt-5 space-y-3">
-              <SectionLabel>Ficha</SectionLabel>
-
-              <div>
-                <p className="font-sans text-sm text-brand-black">{dentista.nome}</p>
-                {dentista.especialidade && (
-                  <p className="font-mono text-xs text-brand-muted">{dentista.especialidade}</p>
-                )}
-              </div>
-
-              <p className="font-mono text-xs text-brand-muted">{dataFormatada}</p>
-
-              <div className="relative inline-flex" title="Clique para alterar o status">
-                <Badge variant={ficha.status === "aberta" ? "warning" : "success"}>
-                  {ficha.status === "aberta" ? "Aberta" : "Concluída"}
-                </Badge>
-                <select
-                  value={ficha.status}
-                  onChange={(e) => void handleAlterarStatusFicha(e.target.value as "aberta" | "concluida")}
-                  className="absolute inset-0 w-full opacity-0 cursor-pointer"
-                  disabled={concluindoFicha}
-                >
-                  <option value="aberta">Aberta</option>
-                  <option value="concluida">Concluída</option>
-                </select>
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         {/* ════════════════════════
@@ -1442,7 +1411,7 @@ export function FichaClient({
 
             {/* ══════════════════════════════
                 TAB: PLANEJAMENTO
-            ══════════════════════════════ */}
+            ═════════════════��════════════ */}
             <TabsContent value="planejamento" className="mt-0 space-y-4">
 
               {/* ── Etapas do Procedimento ── */}
@@ -1959,7 +1928,7 @@ export function FichaClient({
         </div>
       )}
 
-      {/* ════════════════════════════════════════════════════════════
+      {/* ══════════════════════════════���═════════════════════════════
           MODO APRESENTAÇÃO — por etapas, z-[9999] fullscreen
       ════════════════════════════════════════════════════════════ */}
       {apresentacaoOpen && etapas[apresentacaoIndex] && (
