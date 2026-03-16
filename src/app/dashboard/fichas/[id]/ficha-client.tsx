@@ -1025,59 +1025,7 @@ export function FichaClient({
       </div>
 
       {/* ── Layout duas colunas: 280px | 1fr ── */}
-      <div className="grid gap-6" style={{ gridTemplateColumns: "280px 1fr" }}>
-
-        {/* ════════════════════════
-            COLUNA ESQUERDA — sticky
-        ════════════════════════ */}
-        <div className="space-y-4 sticky top-6 self-start">
-
-          {/* Card Paciente */}
-          <Card>
-            <CardContent className="pt-5 space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-teal/10 font-mono text-sm font-medium text-teal select-none">
-                  {iniciais(paciente.nome)}
-                </div>
-                <p className="font-serif text-[1.05rem] leading-tight text-brand-black truncate">
-                  {paciente.nome}
-                </p>
-              </div>
-
-              {paciente.telefone && (
-                <div className="flex items-center gap-2">
-                  <Phone size={13} className="text-brand-muted shrink-0" />
-                  <span className="font-mono text-sm text-brand-muted">{paciente.telefone}</span>
-                </div>
-              )}
-
-              {paciente.whatsapp && (
-                <div className="flex items-center gap-2">
-                  <MessageCircle size={13} className="text-teal shrink-0" />
-                  <a
-                    href={`https://wa.me/55${paciente.whatsapp.replace(/\D/g, "")}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-mono text-sm text-teal hover:underline"
-                  >
-                    {paciente.whatsapp}
-                  </a>
-                </div>
-              )}
-
-              <Link href={`/dashboard/pacientes/${paciente.id}`}>
-                <Button variant="ghost" size="sm" className="w-full text-xs">
-                  Ver perfil completo
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* ════════════════════════
-            COLUNA DIREITA — Tabs
-        ════════════════════════ */}
-        <div>
+      <div>
           <Tabs value={activeTab} onValueChange={(tab) => {
             setActiveTab(tab);
             if (tab === "orcamento") void handleAbrirAbaOrcamento();
@@ -1811,7 +1759,6 @@ export function FichaClient({
               )}
             </TabsContent>
           </Tabs>
-        </div>
       </div>
 
       {/* ════════════════════════════════════════════════════════════
