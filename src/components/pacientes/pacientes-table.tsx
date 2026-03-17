@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/dentai";
-import type { Paciente } from "@/types/database";
+import type { PacienteComUltimoAtendimento } from "@/app/dashboard/pacientes/_components/pacientes-list";
 
 function getIniciais(nome: string): string {
   const partes = nome.trim().split(/\s+/).filter(Boolean);
@@ -22,8 +22,17 @@ function getIniciais(nome: string): string {
   return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase();
 }
 
+function formatarData(data: string | null): string {
+  if (!data) return "Nenhum atendimento";
+  return new Date(data).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+}
+
 interface PacientesTableProps {
-  pacientes: Paciente[];
+  pacientes: PacienteComUltimoAtendimento[];
 }
 
 export function PacientesTable({ pacientes }: PacientesTableProps): React.JSX.Element {
@@ -78,16 +87,7 @@ export function PacientesTable({ pacientes }: PacientesTableProps): React.JSX.El
                 Nome
               </th>
               <th className="text-left px-4 py-3 font-mono text-[0.65rem] uppercase tracking-widest text-muted-foreground">
-                CPF
-              </th>
-              <th className="text-left px-4 py-3 font-mono text-[0.65rem] uppercase tracking-widest text-muted-foreground hidden md:table-cell">
-                Telefone
-              </th>
-              <th className="text-left px-4 py-3 font-mono text-[0.65rem] uppercase tracking-widest text-muted-foreground hidden lg:table-cell">
-                WhatsApp
-              </th>
-              <th className="text-left px-4 py-3 font-mono text-[0.65rem] uppercase tracking-widest text-muted-foreground hidden lg:table-cell">
-                Cidade
+                Último Atendimento
               </th>
               <th className="text-right px-4 py-3 font-mono text-[0.65rem] uppercase tracking-widest text-muted-foreground">
                 Ações
@@ -97,7 +97,7 @@ export function PacientesTable({ pacientes }: PacientesTableProps): React.JSX.El
           <tbody>
             {pacientesFiltrados.length === 0 ? (
               <tr>
-                <td colSpan={6} className="h-52 text-center">
+                <td colSpan={3} className="h-52 text-center">
                   <div className="flex flex-col items-center gap-3">
                     <Users size={40} className="text-muted-foreground/30" />
                     <div className="space-y-1">
@@ -139,26 +139,9 @@ export function PacientesTable({ pacientes }: PacientesTableProps): React.JSX.El
                     </div>
                   </td>
 
-                  {/* CPF */}
+                  {/* Último Atendimento */}
                   <td className="px-4 py-3 font-mono text-sm text-muted-foreground">
-                    {paciente.cpf ?? "—"}
-                  </td>
-
-                  {/* Telefone */}
-                  <td className="px-4 py-3 font-mono text-sm text-muted-foreground hidden md:table-cell">
-                    {paciente.telefone ?? "—"}
-                  </td>
-
-                  {/* WhatsApp */}
-                  <td className="px-4 py-3 font-mono text-sm text-muted-foreground hidden lg:table-cell">
-                    {paciente.whatsapp ?? "—"}
-                  </td>
-
-                  {/* Cidade */}
-                  <td className="px-4 py-3 font-sans text-sm text-muted-foreground hidden lg:table-cell">
-                    {paciente.cidade && paciente.estado
-                      ? `${paciente.cidade} / ${paciente.estado}`
-                      : (paciente.cidade ?? "—")}
+                    {formatarData(paciente.ultimo_atendimento)}
                   </td>
 
                   {/* Ações — aparecem no hover */}
