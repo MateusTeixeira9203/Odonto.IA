@@ -117,18 +117,27 @@ function etapaStatusClassName(status: EtapaStatus): string {
   return "bg-amber-500/15 text-amber-600 dark:text-amber-400";
 }
 
-// ── Linha de item do orçamento (cálculo automático) ───────────────────────────
+// ── Linha de item do orçamento ────────────────────────────────────────────────
 
 interface OrcamentoItemRowProps {
   etapa: PlanejamentoEtapa;
+  item: OrcamentoItem | undefined;
   onStatusChange: (etapa: PlanejamentoEtapa, status: EtapaStatus) => void;
+  onPrecoSalvo: (etapaId: string, itemId: string, preco: number | null) => void;
 }
 
-function OrcamentoItemRow({ etapa, onStatusChange }: OrcamentoItemRowProps): React.JSX.Element {
+function OrcamentoItemRow({ etapa, item, onStatusChange, onPrecoSalvo }: OrcamentoItemRowProps): React.JSX.Element {
+  const [preco, setPreco] = useState(item?.preco_unitario != null ? String(item.preco_unitario) : "");
   const s = (etapa.status as EtapaStatus) ?? "aberto";
-  const qtdDentes = (etapa.dentes ?? []).length || 1;
-  const precoUnitario = etapa.preco_unitario ?? 0;
-  const valorTotal = precoUnitario * qtdDentes;
+
+  function handleBlur(): void {
+    if (!item) return;
+    const valor = preco.trim() === "" ? null : Number(preco);
+    const atual = item.preco_unitario;
+    // Só salva se mudou
+    if ((valor === null && atual === null) || valor === atual) return;
+    onPrecoSalvo(etapa.id, item.id, valor);
+  }
 
   return (
     <div
@@ -163,12 +172,23 @@ function OrcamentoItemRow({ etapa, onStatusChange }: OrcamentoItemRowProps): Rea
               .join(", ")
           : "—"}
       </p>
-      {/* Valor calculado automaticamente (preço unitário × quantidade de dentes) */}
-      <p className="font-mono text-sm text-brand-black text-right">
-        {valorTotal > 0
-          ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valorTotal)
-          : "—"}
-      </p>
+      <div className="flex items-center justify-end">
+        <div className="relative">
+          <span className="absolute left-2 top-1/2 -translate-y-1/2 font-mono text-xs text-brand-muted">
+            R$
+          </span>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={preco}
+            onChange={(e) => setPreco(e.target.value)}
+            onBlur={handleBlur}
+            placeholder="0,00"
+            className="w-24 rounded border border-brand-border bg-white pl-7 pr-2 py-1.5 font-mono text-xs text-brand-black text-right focus:border-teal focus:outline-none"
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -660,6 +680,29 @@ export function FichaClient({
   async function handleAbrirAbaOrcamento(): Promise<void> {
     const orc = await getOrCreateOrcamento();
     if (orc) await syncEtapasToItens(orc);
+  }
+
+  // Salva preço de um item ao sair do campo
+  async function handlePrecoSalvo(etapaId: string, itemId: string, preco: number | null): Promise<void> {
+    const precoTotal = preco; // quantidade === 1
+    await supabase
+      .from("orcamento_itens")
+      .update({ preco_unitario: preco, preco_total: precoTotal })
+      .eq("id", itemId);
+
+    const novosItens = orcamentoItens.map((i) =>
+      i.id === itemId ? { ...i, preco_unitario: preco, preco_total: precoTotal } : i
+    );
+    setOrcamentoItens(novosItens);
+
+    // Recalcula total do orçamento
+    if (orcamento) {
+      const total = novosItens
+        .filter((i) => i.preco_total != null)
+        .reduce((acc, i) => acc + (i.preco_total ?? 0), 0);
+      await supabase.from("orcamentos").update({ total }).eq("id", orcamento.id);
+      setOrcamento((o) => (o ? { ...o, total } : o));
+    }
   }
 
   // Muda status do orçamento
@@ -1669,30 +1712,27 @@ export function FichaClient({
                       <span>Dentes</span>
                       <span className="text-right">Valor (R$)</span>
                     </div>
-                    {/* Itens - calculados automaticamente do Planejamento */}
+                    {/* Itens */}
                     {etapas.map((etapa) => (
                       <OrcamentoItemRow
                         key={etapa.id}
                         etapa={etapa}
+                        item={orcamentoItens.find((i) => i.etapa_id === etapa.id)}
                         onStatusChange={handleSetStatus}
+                        onPrecoSalvo={handlePrecoSalvo}
                       />
                     ))}
-                    {/* Total do Tratamento */}
-                    <div className="flex items-center justify-between pt-4 mt-2 border-t border-brand-border">
-                      <p className="font-serif text-base font-medium text-brand-black">
-                        Total do Tratamento
+                    {/* Total */}
+                    <div className="flex items-center justify-between pt-3 border-t border-brand-border">
+                      <p className="font-mono text-xs text-brand-muted">
+                        {orcamentoItens.some((i) => i.preco_total == null)
+                          ? "Preencha os valores para calcular o total"
+                          : "Total calculado automaticamente"}
                       </p>
-                      <p className="font-mono text-lg font-bold text-brand-black">
-                        {(() => {
-                          const total = etapas.reduce((acc, etapa) => {
-                            const qtdDentes = (etapa.dentes ?? []).length || 1;
-                            const precoUnitario = etapa.preco_unitario ?? 0;
-                            return acc + (precoUnitario * qtdDentes);
-                          }, 0);
-                          return total > 0
-                            ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(total)
-                            : "—";
-                        })()}
+                      <p className="font-mono text-sm font-semibold text-brand-black">
+                        {orcamento?.total != null
+                          ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(orcamento.total)
+                          : "—"}
                       </p>
                     </div>
                   </CardContent>

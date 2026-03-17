@@ -196,7 +196,6 @@ export interface PlanejamentoEtapa {
   descricao_simples: string | null;
   status: "aberto" | "pendente" | "concluido";
   imagem_arquivo_id: string | null;
-  preco_unitario: number | null;
   created_at: string;
   updated_at: string;
 }
