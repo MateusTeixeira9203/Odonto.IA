@@ -123,21 +123,17 @@ interface OrcamentoItemRowProps {
   etapa: PlanejamentoEtapa;
   item: OrcamentoItem | undefined;
   onStatusChange: (etapa: PlanejamentoEtapa, status: EtapaStatus) => void;
-  onPrecoSalvo: (etapaId: string, itemId: string, preco: number | null) => void;
 }
 
-function OrcamentoItemRow({ etapa, item, onStatusChange, onPrecoSalvo }: OrcamentoItemRowProps): React.JSX.Element {
-  const [preco, setPreco] = useState(item?.preco_unitario != null ? String(item.preco_unitario) : "");
+function OrcamentoItemRow({ etapa, item, onStatusChange }: OrcamentoItemRowProps): React.JSX.Element {
   const s = (etapa.status as EtapaStatus) ?? "aberto";
+  const qtdDentes = (etapa.dentes ?? []).length || 1;
+  const precoUnitario = item?.preco_unitario ?? 0;
+  const valorTotal = precoUnitario * qtdDentes;
 
-  function handleBlur(): void {
-    if (!item) return;
-    const valor = preco.trim() === "" ? null : Number(preco);
-    const atual = item.preco_unitario;
-    // Só salva se mudou
-    if ((valor === null && atual === null) || valor === atual) return;
-    onPrecoSalvo(etapa.id, item.id, valor);
-  }
+  const formatCurrency = (value: number): string => {
+    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+  };
 
   return (
     <div
@@ -172,23 +168,9 @@ function OrcamentoItemRow({ etapa, item, onStatusChange, onPrecoSalvo }: Orcamen
               .join(", ")
           : "—"}
       </p>
-      <div className="flex items-center justify-end">
-        <div className="relative">
-          <span className="absolute left-2 top-1/2 -translate-y-1/2 font-mono text-xs text-brand-muted">
-            R$
-          </span>
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={preco}
-            onChange={(e) => setPreco(e.target.value)}
-            onBlur={handleBlur}
-            placeholder="0,00"
-            className="w-24 rounded border border-brand-border bg-white pl-7 pr-2 py-1.5 font-mono text-xs text-brand-black text-right focus:border-teal focus:outline-none"
-          />
-        </div>
-      </div>
+      <p className="font-mono text-sm text-brand-black text-right">
+        {precoUnitario > 0 ? formatCurrency(valorTotal) : "—"}
+      </p>
     </div>
   );
 }
@@ -1713,26 +1695,34 @@ export function FichaClient({
                       <span className="text-right">Valor (R$)</span>
                     </div>
                     {/* Itens */}
-                    {etapas.map((etapa) => (
-                      <OrcamentoItemRow
-                        key={etapa.id}
-                        etapa={etapa}
-                        item={orcamentoItens.find((i) => i.etapa_id === etapa.id)}
-                        onStatusChange={handleSetStatus}
-                        onPrecoSalvo={handlePrecoSalvo}
-                      />
-                    ))}
-                    {/* Total */}
-                    <div className="flex items-center justify-between pt-3 border-t border-brand-border">
-                      <p className="font-mono text-xs text-brand-muted">
-                        {orcamentoItens.some((i) => i.preco_total == null)
-                          ? "Preencha os valores para calcular o total"
-                          : "Total calculado automaticamente"}
+                    {etapas.map((etapa) => {
+                      const item = orcamentoItens.find((i) => i.etapa_id === etapa.id);
+                      return (
+                        <OrcamentoItemRow
+                          key={etapa.id}
+                          etapa={etapa}
+                          item={item}
+                          onStatusChange={handleSetStatus}
+                        />
+                      );
+                    })}
+                    {/* Total do Tratamento */}
+                    <div className="flex items-center justify-between pt-4 mt-2 border-t border-brand-border">
+                      <p className="font-sans text-sm font-medium text-brand-black">
+                        Total do Tratamento
                       </p>
-                      <p className="font-mono text-sm font-semibold text-brand-black">
-                        {orcamento?.total != null
-                          ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(orcamento.total)
-                          : "—"}
+                      <p className="font-mono text-lg font-bold text-brand-black">
+                        {(() => {
+                          const total = etapas.reduce((acc, etapa) => {
+                            const item = orcamentoItens.find((i) => i.etapa_id === etapa.id);
+                            const precoUnitario = item?.preco_unitario ?? 0;
+                            const qtdDentes = (etapa.dentes ?? []).length || 1;
+                            return acc + (precoUnitario * qtdDentes);
+                          }, 0);
+                          return total > 0
+                            ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(total)
+                            : "—";
+                        })()}
                       </p>
                     </div>
                   </CardContent>
