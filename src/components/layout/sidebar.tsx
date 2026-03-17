@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard,
   Users,
+  FileText,
   Receipt,
   Settings,
   LogOut,
@@ -19,6 +20,7 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { href: "/dashboard",               label: "Início",        icon: LayoutDashboard },
   { href: "/dashboard/pacientes",     label: "Pacientes",     icon: Users           },
+  { href: "/dashboard/fichas",        label: "Fichas",        icon: FileText        },
   { href: "/dashboard/orcamentos",    label: "Orçamentos",    icon: Receipt         },
   { href: "/dashboard/configuracoes", label: "Configurações", icon: Settings        },
 ] as const;
