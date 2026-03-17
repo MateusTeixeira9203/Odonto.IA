@@ -4,22 +4,22 @@ import { cn } from "@/lib/utils"
 
 // ── BUTTON ────────────────────────────────────────
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap font-sans font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98]",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap font-sans font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal/50 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98]",
   {
     variants: {
       variant: {
-        primary:     "bg-teal text-white hover:bg-teal-dark shadow-sm",
-        secondary:   "bg-brand-black text-white hover:bg-zinc-800 shadow-sm",
+        primary:     "bg-teal text-white hover:bg-teal-dark shadow-md shadow-teal/20 hover:shadow-lg hover:shadow-teal/25",
+        secondary:   "bg-brand-black text-white hover:bg-zinc-800 shadow-md",
         outline:     "border-[1.5px] border-teal text-teal bg-transparent hover:bg-teal-pale",
-        ghost:       "border-[1.5px] border-brand-border text-brand-muted bg-transparent hover:border-brand-muted hover:text-brand-black",
-        destructive: "bg-red-600 text-white hover:bg-red-700 shadow-sm",
+        ghost:       "border-[1.5px] border-brand-border text-brand-muted bg-transparent hover:border-brand-muted hover:text-brand-black hover:bg-muted/50",
+        destructive: "bg-red-600 text-white hover:bg-red-700 shadow-md",
         link:        "text-teal underline-offset-4 hover:underline p-0 h-auto",
       },
       size: {
-        sm:   "text-xs px-3 py-1.5 rounded-[3px]",
-        md:   "text-sm px-5 py-2.5 rounded-[3px]",
-        lg:   "text-base px-7 py-3 rounded-[4px]",
-        icon: "h-9 w-9 rounded-[3px]",
+        sm:   "text-xs px-3.5 py-2 rounded-lg",
+        md:   "text-sm px-5 py-2.5 rounded-xl",
+        lg:   "text-base px-7 py-3.5 rounded-xl",
+        icon: "h-10 w-10 rounded-xl",
       },
     },
     defaultVariants: { variant: "primary", size: "md" },
@@ -77,33 +77,33 @@ export function Badge({ className, variant, ...props }: BadgeProps): React.JSX.E
 // ── CARD ──────────────────────────────────────────
 export const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn("bg-card rounded border border-border shadow-card dark:shadow-none", className)} {...props} />
+    <div ref={ref} className={cn("bg-card rounded-2xl border border-border shadow-sm", className)} {...props} />
   )
 )
 Card.displayName = "Card"
 
 export const CardHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn("px-5 pt-5 pb-3 border-b border-border", className)} {...props} />
+    <div ref={ref} className={cn("px-6 pt-6 pb-4 border-b border-border/50", className)} {...props} />
   )
 )
 CardHeader.displayName = "CardHeader"
 
 export const CardTitle = React.forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTMLHeadingElement>>(
   ({ className, ...props }, ref) => (
-    <h3 ref={ref} className={cn("font-sans font-semibold text-base text-foreground", className)} {...props} />
+    <h3 ref={ref} className={cn("font-serif font-semibold text-lg text-foreground", className)} {...props} />
   )
 )
 CardTitle.displayName = "CardTitle"
 
 export const CardContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => <div ref={ref} className={cn("px-5 py-4", className)} {...props} />
+  ({ className, ...props }, ref) => <div ref={ref} className={cn("px-6 py-5", className)} {...props} />
 )
 CardContent.displayName = "CardContent"
 
 export const CardFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn("px-5 pb-5 pt-3 border-t border-border flex items-center gap-2", className)} {...props} />
+    <div ref={ref} className={cn("px-6 pb-6 pt-4 border-t border-border/50 flex items-center gap-3", className)} {...props} />
   )
 )
 CardFooter.displayName = "CardFooter"
@@ -119,19 +119,19 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, label, hint, error, id, ...props }, ref) => {
     const inputId = id ?? label?.toLowerCase().replace(/\s+/g, "-")
     return (
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-2">
         {label && <label htmlFor={inputId} className="text-sm font-medium text-foreground">{label}</label>}
         <input
           id={inputId} ref={ref}
           className={cn(
-            "w-full font-sans text-sm px-3 py-2.5 rounded-[3px] border bg-brand-bg text-brand-black transition-colors duration-150 placeholder:text-brand-muted/60 focus:outline-none focus:ring-2 focus:ring-teal/30 focus:border-teal disabled:opacity-50",
-            error ? "border-red-400 focus:border-red-400" : "border-brand-border",
+            "w-full font-sans text-sm px-4 py-3 rounded-xl border bg-brand-bg text-brand-black transition-all duration-200 placeholder:text-brand-muted/50 focus:outline-none focus:ring-2 focus:ring-teal/20 focus:border-teal disabled:opacity-50",
+            error ? "border-red-400 focus:border-red-400 focus:ring-red-400/20" : "border-brand-border",
             className
           )}
           {...props}
         />
-        {error && <p className="text-xs text-red-600">{error}</p>}
-        {hint && !error && <p className="text-xs text-brand-muted">{hint}</p>}
+        {error && <p className="text-xs text-red-600 mt-0.5">{error}</p>}
+        {hint && !error && <p className="text-xs text-brand-muted mt-0.5">{hint}</p>}
       </div>
     )
   }

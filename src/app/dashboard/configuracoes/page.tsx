@@ -38,12 +38,12 @@ export default async function ConfiguracoesPage(): Promise<React.JSX.Element> {
   ]);
 
   return (
-    <div className="animate-fade-in">
-      <div className="mb-8">
-        <h1 className="font-sans text-[2rem] font-bold leading-tight text-foreground">
+    <div className="animate-fade-in space-y-6">
+      <div className="space-y-1">
+        <h1 className="font-serif text-3xl tracking-tight text-foreground">
           Configurações
         </h1>
-        <p className="font-mono text-sm text-muted-foreground mt-0.5">
+        <p className="font-mono text-sm text-muted-foreground">
           Gerencie as configurações da sua clínica
         </p>
       </div>

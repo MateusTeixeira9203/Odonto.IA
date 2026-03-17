@@ -29,11 +29,12 @@ export function DashboardShell({
         onExpandedChange={setIsExpanded}
       />
       <motion.div
-        animate={{ paddingLeft: isExpanded ? 240 : 64 }}
-        transition={{ duration: 0.2, ease: "easeInOut" }}
+        animate={{ paddingLeft: isExpanded ? 256 : 72 }}
+        transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+        className="min-h-screen"
       >
         <Header />
-        <main className="p-6">{children}</main>
+        <main className="px-8 py-6 max-w-7xl mx-auto">{children}</main>
       </motion.div>
     </div>
   );

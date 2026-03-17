@@ -65,7 +65,7 @@ type PacienteFormData = z.infer<typeof pacienteSchema>;
 
 // Classe base para inputs manuais com máscara
 const inputMascaraClass =
-  "w-full font-mono text-sm px-3 py-2.5 rounded-[3px] border border-brand-border bg-brand-bg text-brand-black focus:outline-none focus:ring-2 focus:ring-teal/30 focus:border-teal placeholder:text-brand-muted/60 transition-colors";
+  "w-full font-mono text-sm px-4 py-3 rounded-xl border border-brand-border bg-brand-bg text-brand-black focus:outline-none focus:ring-2 focus:ring-teal/20 focus:border-teal placeholder:text-brand-muted/50 transition-all duration-200";
 
 export default function NovoPacientePage(): React.JSX.Element {
   const router = useRouter();
@@ -157,18 +157,22 @@ export default function NovoPacientePage(): React.JSX.Element {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-5">
-      {/* Header: só o botão Voltar */}
-      <div>
+    <div className="mx-auto max-w-2xl space-y-6">
+      {/* Header */}
+      <div className="space-y-4">
         <Link href="/dashboard/pacientes">
-          <Button variant="ghost" size="sm">
-            <ArrowLeft size={15} />
+          <Button variant="ghost" size="sm" className="gap-2">
+            <ArrowLeft size={16} />
             Voltar
           </Button>
         </Link>
+        <div className="space-y-1">
+          <h1 className="font-serif text-2xl tracking-tight text-foreground">Novo Paciente</h1>
+          <p className="font-mono text-sm text-muted-foreground">Preencha os dados do paciente</p>
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         {/* ── Dados Pessoais ── */}
         <Card>
           <CardHeader>

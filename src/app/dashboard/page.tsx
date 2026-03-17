@@ -85,36 +85,36 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
   });
 
   return (
-    <div className="animate-fade-in">
+    <div className="animate-fade-in space-y-8">
       {/* Saudação */}
-      <div className="mb-10">
-        <h1 className="font-serif text-2xl tracking-tight text-foreground">
-          {saudacao}, Dr. {primeiroNome} 👋
+      <div className="space-y-1">
+        <h1 className="font-serif text-3xl tracking-tight text-foreground">
+          {saudacao}, Dr. {primeiroNome}
         </h1>
-        <p className="font-mono text-sm text-muted-foreground mt-1">
+        <p className="font-mono text-sm text-muted-foreground">
           {dataDisplay}
         </p>
       </div>
 
       {/* Cards de métricas — 3 colunas */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         <MetricCard
           label="Pacientes"
           value={totalPacientes ?? 0}
           subtitle="Total cadastrados"
-          icon={<Users className="w-4 h-4 text-muted-foreground" />}
+          icon={<Users className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />}
         />
         <MetricCard
           label="Fichas Abertas"
           value={fichasAbertas ?? 0}
           subtitle="Aguardando conclusão"
-          icon={<FileText className="w-4 h-4 text-muted-foreground" />}
+          icon={<FileText className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />}
         />
         <MetricCard
           label="Orçamentos Pendentes"
           value={orcamentosPendentes ?? 0}
           subtitle="Aguardando aprovação"
-          icon={<Receipt className="w-4 h-4 text-muted-foreground" />}
+          icon={<Receipt className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />}
         />
       </div>
 
@@ -122,12 +122,14 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
       {atividades.length > 0 ? (
         <ActivityList title="Atividade Recente" activities={atividades} />
       ) : (
-        <div>
-          <h3 className="font-sans font-medium text-base text-foreground mb-4">
+        <div className="bg-card border border-border rounded-2xl p-6">
+          <h3 className="font-sans font-semibold text-base text-foreground mb-5">
             Atividade Recente
           </h3>
-          <div className="flex flex-col items-center justify-center py-12 gap-3">
-            <FileText className="w-10 h-10 text-muted-foreground/30" />
+          <div className="flex flex-col items-center justify-center py-12 gap-4">
+            <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center">
+              <FileText className="w-7 h-7 text-muted-foreground/40" />
+            </div>
             <p className="font-sans text-sm text-muted-foreground">
               Nenhuma atividade ainda
             </p>

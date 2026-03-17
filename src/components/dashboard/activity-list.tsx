@@ -27,25 +27,25 @@ const itemVariant = {
 
 export function ActivityList({ title, activities }: { title: string; activities: Activity[] }): React.JSX.Element {
   return (
-    <div>
-      <h3 className="font-sans font-medium text-base mb-4 text-foreground">{title}</h3>
-      <motion.ul variants={stagger} initial="hidden" animate="show" className="space-y-1">
+    <div className="bg-card border border-border rounded-2xl p-6">
+      <h3 className="font-sans font-semibold text-base mb-5 text-foreground">{title}</h3>
+      <motion.ul variants={stagger} initial="hidden" animate="show" className="space-y-2">
         {activities.map((a) => (
           <motion.li
             key={a.id}
             variants={itemVariant}
-            className="group flex items-center gap-4 p-3 -mx-3 rounded-lg hover:bg-card transition-colors cursor-pointer"
+            className="group flex items-center gap-4 p-3.5 rounded-xl hover:bg-muted/50 transition-all duration-200 cursor-pointer"
           >
-            <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <span className="font-mono text-sm text-primary">{a.patientInitials}</span>
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0 ring-2 ring-primary/5">
+              <span className="font-mono text-sm font-semibold text-primary">{a.patientInitials}</span>
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2.5">
                 <span className="font-sans font-medium text-sm text-foreground truncate">
                   {a.patientName}
                 </span>
                 <span className={cn(
-                  "px-2 py-0.5 rounded text-xs font-sans",
+                  "px-2.5 py-1 rounded-lg text-xs font-medium",
                   a.status === "aberta"
                     ? "bg-amber-500/15 text-amber-700 dark:text-amber-400"
                     : "bg-primary/10 text-primary"
@@ -53,12 +53,12 @@ export function ActivityList({ title, activities }: { title: string; activities:
                   {a.status}
                 </span>
               </div>
-              <span className="font-mono text-xs text-muted-foreground">{a.date}</span>
+              <span className="font-mono text-xs text-muted-foreground mt-0.5 block">{a.date}</span>
             </div>
             {a.href && (
               <Link
                 href={a.href}
-                className="opacity-0 group-hover:opacity-100 flex items-center gap-1 text-primary font-sans text-sm transition-opacity"
+                className="opacity-0 group-hover:opacity-100 flex items-center gap-1.5 text-primary font-sans text-sm font-medium transition-all duration-200 hover:gap-2"
               >
                 Ver <ArrowRight className="w-4 h-4" />
               </Link>

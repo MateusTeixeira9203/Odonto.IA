@@ -53,12 +53,12 @@ export function Sidebar({ nome, isExpanded, onExpandedChange }: SidebarProps): R
   return (
     <motion.aside
       initial={false}
-      animate={{ width: isExpanded ? 240 : 64 }}
-      transition={{ duration: 0.2, ease: "easeInOut" }}
+      animate={{ width: isExpanded ? 256 : 72 }}
+      transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
       onClick={() => { if (!isExpanded) onExpandedChange(true); }}
       className={cn(
-        "fixed left-0 top-0 z-40 h-screen flex flex-col py-4 bg-sidebar border-r border-sidebar-border overflow-hidden",
-        !isExpanded && "cursor-pointer hover:bg-sidebar/80"
+        "fixed left-0 top-0 z-40 h-screen flex flex-col py-5 bg-sidebar border-r border-sidebar-border overflow-hidden shadow-sm",
+        !isExpanded && "cursor-pointer hover:bg-sidebar/90"
       )}
     >
       {/* Cabeçalho com logo e botão de recolher */}
@@ -107,7 +107,7 @@ export function Sidebar({ nome, isExpanded, onExpandedChange }: SidebarProps): R
       </div>
 
       {/* Navegação */}
-      <nav className="flex flex-col gap-1 flex-1 px-2">
+      <nav className="flex flex-col gap-1.5 flex-1 px-3">
         {navItems.map((item) => {
           const isActive =
             pathname === item.href ||
@@ -123,10 +123,10 @@ export function Sidebar({ nome, isExpanded, onExpandedChange }: SidebarProps): R
               aria-label={item.label}
               className={cn(
                 "relative flex items-center gap-3 rounded-xl transition-all duration-200",
-                isExpanded ? "px-3 py-2.5" : "w-12 h-12 justify-center mx-auto",
+                isExpanded ? "px-4 py-3" : "w-12 h-12 justify-center mx-auto",
                 isActive
-                  ? "bg-primary text-primary-foreground shadow-md shadow-primary/25"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
               )}
             >
               <Icon className="w-5 h-5 shrink-0" />
@@ -150,18 +150,18 @@ export function Sidebar({ nome, isExpanded, onExpandedChange }: SidebarProps): R
 
       {/* Rodapé — avatar + logout */}
       <div className={cn(
-        "mt-auto pt-4 border-t border-sidebar-border mx-2",
-        isExpanded ? "px-2" : "flex flex-col items-center gap-3"
+        "mt-auto pt-5 border-t border-sidebar-border mx-3",
+        isExpanded ? "px-1" : "flex flex-col items-center gap-3"
       )}>
         <div className={cn(
           "flex items-center gap-3",
           !isExpanded && "justify-center"
         )}>
           <div
-            className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0"
+            className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 ring-2 ring-primary/5"
             title={nome}
           >
-            <span className="font-mono text-xs text-primary font-medium">
+            <span className="font-mono text-xs text-primary font-semibold">
               {getIniciais(nome)}
             </span>
           </div>

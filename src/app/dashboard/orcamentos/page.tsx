@@ -61,13 +61,13 @@ export default async function OrcamentosPage(): Promise<React.JSX.Element> {
   };
 
   return (
-    <div className="animate-fade-in">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="font-sans text-[2rem] font-bold leading-tight text-foreground">
+    <div className="animate-fade-in space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
+          <h1 className="font-serif text-3xl tracking-tight text-foreground">
             Orçamentos
           </h1>
-          <p className="font-mono text-sm text-muted-foreground mt-0.5">
+          <p className="font-mono text-sm text-muted-foreground">
             Controle financeiro da clínica
           </p>
         </div>
