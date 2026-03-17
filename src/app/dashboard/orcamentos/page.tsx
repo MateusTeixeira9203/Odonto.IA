@@ -12,15 +12,11 @@ export default async function OrcamentosPage(): Promise<React.JSX.Element> {
   const clinicaId = dentista.clinica_id;
 
   // Busca orçamentos com joins de paciente e dentista
-  const { data: orcamentosRaw, error: orcamentosError } = await supabase
+  const { data: orcamentosRaw } = await supabase
     .from("orcamentos")
     .select("*, paciente:pacientes(id, nome), dentista:dentistas(id, nome)")
     .eq("clinica_id", clinicaId)
     .order("created_at", { ascending: false });
-  
-  console.log("[v0] Orçamentos query - clinicaId:", clinicaId);
-  console.log("[v0] Orçamentos encontrados:", orcamentosRaw?.length ?? 0);
-  if (orcamentosError) console.log("[v0] Erro na query:", orcamentosError);
 
   // Busca itens e pagamentos da clínica em paralelo
   const [{ data: itens }, { data: pagamentos }] = await Promise.all([
