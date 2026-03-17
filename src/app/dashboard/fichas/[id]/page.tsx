@@ -11,6 +11,7 @@ import type {
   PlanejamentoEtapa,
   Orcamento,
   OrcamentoItem,
+  ProcedimentoPadrao,
 } from "@/types/database";
 
 interface FichaPageProps {
@@ -42,6 +43,7 @@ export default async function FichaPage({ params }: FichaPageProps): Promise<Rea
     { data: arquivos },
     { data: planejamento },
     { data: orcamento },
+    { data: procedimentosPadrao },
   ] = await Promise.all([
     supabase
       .from("pacientes")
@@ -68,6 +70,10 @@ export default async function FichaPage({ params }: FichaPageProps): Promise<Rea
       .select("*")
       .eq("ficha_id", id)
       .maybeSingle(),
+    supabase
+      .from("procedimentos_padrao")
+      .select("id, nome, preco_sugerido")
+      .eq("ativo", true),
   ]);
 
   // Busca etapas e itens do orçamento em paralelo
@@ -108,6 +114,7 @@ export default async function FichaPage({ params }: FichaPageProps): Promise<Rea
       etapasIniciais={etapas}
       orcamentoInicial={(orcamento as Orcamento) ?? null}
       orcamentoItensIniciais={orcamentoItens}
+      procedimentosPadrao={(procedimentosPadrao as ProcedimentoPadrao[]) ?? []}
     />
   );
 }

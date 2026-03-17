@@ -41,6 +41,7 @@ import type {
   PlanejamentoEtapa,
   Orcamento,
   OrcamentoItem,
+  ProcedimentoPadrao,
 } from "@/types/database";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -122,13 +123,20 @@ function etapaStatusClassName(status: EtapaStatus): string {
 interface OrcamentoItemRowProps {
   etapa: PlanejamentoEtapa;
   item: OrcamentoItem | undefined;
+  procedimentosPadrao: ProcedimentoPadrao[];
   onStatusChange: (etapa: PlanejamentoEtapa, status: EtapaStatus) => void;
 }
 
-function OrcamentoItemRow({ etapa, item, onStatusChange }: OrcamentoItemRowProps): React.JSX.Element {
+function OrcamentoItemRow({ etapa, item, procedimentosPadrao, onStatusChange }: OrcamentoItemRowProps): React.JSX.Element {
   const s = (etapa.status as EtapaStatus) ?? "aberto";
   const qtdDentes = (etapa.dentes ?? []).length || 1;
-  const precoUnitario = item?.preco_unitario ?? 0;
+  
+  // Busca o preço do procedimento padrão pelo nome (case insensitive)
+  const procedimentoPadrao = procedimentosPadrao.find(
+    (p) => p.nome.toLowerCase() === etapa.titulo.toLowerCase()
+  );
+  // Prioriza o preço do item do orçamento, se existir, senão usa o preço sugerido do procedimento padrão
+  const precoUnitario = item?.preco_unitario ?? procedimentoPadrao?.preco_sugerido ?? 0;
   const valorTotal = precoUnitario * qtdDentes;
 
   const formatCurrency = (value: number): string => {
@@ -187,6 +195,7 @@ interface FichaClientProps {
   etapasIniciais: PlanejamentoEtapa[];
   orcamentoInicial: Orcamento | null;
   orcamentoItensIniciais: OrcamentoItem[];
+  procedimentosPadrao: ProcedimentoPadrao[];
 }
 
 // ── Componente principal ──────────────────────────────────────────────────────
@@ -201,6 +210,7 @@ export function FichaClient({
   etapasIniciais,
   orcamentoInicial,
   orcamentoItensIniciais,
+  procedimentosPadrao,
 }: FichaClientProps): React.JSX.Element {
   const supabase = createClient();
   const docInputId = useId();
@@ -1702,6 +1712,7 @@ export function FichaClient({
                           key={etapa.id}
                           etapa={etapa}
                           item={item}
+                          procedimentosPadrao={procedimentosPadrao}
                           onStatusChange={handleSetStatus}
                         />
                       );
@@ -1715,7 +1726,10 @@ export function FichaClient({
                         {(() => {
                           const total = etapas.reduce((acc, etapa) => {
                             const item = orcamentoItens.find((i) => i.etapa_id === etapa.id);
-                            const precoUnitario = item?.preco_unitario ?? 0;
+                            const procedimentoPadrao = procedimentosPadrao.find(
+                              (p) => p.nome.toLowerCase() === etapa.titulo.toLowerCase()
+                            );
+                            const precoUnitario = item?.preco_unitario ?? procedimentoPadrao?.preco_sugerido ?? 0;
                             const qtdDentes = (etapa.dentes ?? []).length || 1;
                             return acc + (precoUnitario * qtdDentes);
                           }, 0);
