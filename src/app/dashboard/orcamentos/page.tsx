@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
+import { Plus } from "lucide-react";
 import { getDentistaCached } from "@/lib/get-dentista";
 import { createClient } from "@/lib/supabase/server";
 import { OrcamentosClient } from "./_components/orcamentos-client";
@@ -11,20 +13,17 @@ export default async function OrcamentosPage(): Promise<React.JSX.Element> {
   const supabase = await createClient();
   const clinicaId = dentista.clinica_id;
 
-  // Busca orçamentos com joins de paciente e dentista
   const { data: orcamentosRaw } = await supabase
     .from("orcamentos")
     .select("*, paciente:pacientes(id, nome), dentista:dentistas(id, nome)")
     .eq("clinica_id", clinicaId)
     .order("created_at", { ascending: false });
 
-  // Busca itens e pagamentos da clínica em paralelo
   const [{ data: itens }, { data: pagamentos }] = await Promise.all([
     supabase.from("orcamento_itens").select("*").eq("clinica_id", clinicaId),
     supabase.from("pagamentos").select("*").eq("clinica_id", clinicaId),
   ]);
 
-  // Enriquece cada orçamento com seus itens e pagamentos
   const orcamentos: OrcamentoEnriquecido[] = (orcamentosRaw ?? []).map((o) => ({
     ...o,
     paciente: (o.paciente as { id: string; nome: string } | null) ?? { id: "", nome: "—" },
@@ -33,7 +32,6 @@ export default async function OrcamentosPage(): Promise<React.JSX.Element> {
     pagamentos: (pagamentos ?? []).filter((p) => p.orcamento_id === o.id),
   }));
 
-  // Métricas do mês atual
   const agora = new Date();
   const mesAtual = agora.getMonth();
   const anoAtual = agora.getFullYear();
@@ -43,37 +41,25 @@ export default async function OrcamentosPage(): Promise<React.JSX.Element> {
     return d.getMonth() === mesAtual && d.getFullYear() === anoAtual;
   });
 
+  const orcsMesAprovados = orcsMes.filter((o) => o.status === "aprovado");
+
   const metricas: MetricasMes = {
     totalMes: orcsMes.reduce((acc, o) => acc + (o.total ?? 0), 0),
+    aprovadosMes: orcsMesAprovados.reduce((acc, o) => acc + (o.total ?? 0), 0),
     recebido: (pagamentos ?? [])
       .filter((p) => {
         const d = new Date(p.created_at);
-        return (
-          p.status === "pago" &&
-          d.getMonth() === mesAtual &&
-          d.getFullYear() === anoAtual
-        );
+        return p.status === "pago" && d.getMonth() === mesAtual && d.getFullYear() === anoAtual;
       })
       .reduce((acc, p) => acc + Number(p.valor ?? 0), 0),
     pendente: (pagamentos ?? [])
       .filter((p) => p.status === "pendente")
       .reduce((acc, p) => acc + Number(p.valor ?? 0), 0),
+    taxaConversao:
+      orcsMes.length > 0
+        ? Math.round((orcsMesAprovados.length / orcsMes.length) * 100)
+        : 0,
   };
 
-  return (
-    <div className="animate-fade-in">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="font-sans text-[2rem] font-bold leading-tight text-foreground">
-            Orçamentos
-          </h1>
-          <p className="font-mono text-sm text-muted-foreground mt-0.5">
-            Controle financeiro da clínica
-          </p>
-        </div>
-      </div>
-
-      <OrcamentosClient orcamentos={orcamentos} metricas={metricas} />
-    </div>
-  );
+  return <OrcamentosClient orcamentos={orcamentos} metricas={metricas} />;
 }

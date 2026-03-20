@@ -64,6 +64,7 @@ export interface Procedimento {
   nome: string;
   descricao: string | null;
   codigo_tuss: string | null;
+  categoria: string;
   preco_padrao: number | null;
   duracao_minutos: number | null;
   ativo: boolean;
@@ -196,6 +197,7 @@ export interface PlanejamentoEtapa {
   descricao_simples: string | null;
   status: "aberto" | "pendente" | "concluido";
   imagem_arquivo_id: string | null;
+  procedimento_id: string | null;
   created_at: string;
   updated_at: string;
 }

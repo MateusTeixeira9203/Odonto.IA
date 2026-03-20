@@ -1,0 +1,6 @@
+# Conclusao Sprint 2
+
+- A refatoracao reduziu o acoplamento do modulo? Sim, no nivel de interface. Cabecalho, sidebar e abas agora tem responsabilidades visuais mais claras e o modulo deixou de depender de um unico arquivo monolitico para renderizar tudo. O acoplamento de dominio, porem, ainda existe fortemente no componente pai.
+- `ficha-client.tsx` ficou mais legivel? Sim. A leitura da tela melhorou porque a composicao principal ficou explicita e os blocos visuais foram removidos do arquivo. Ainda assim, a legibilidade funcional continua pressionada pela quantidade de estados e handlers centralizados.
+- Quais riscos ainda existem? O maior risco e concentracao excessiva de regras de negocio em `ficha-client.tsx`, especialmente nos fluxos de arquivos, audio, planejamento e orcamento. Mudancas futuras nesses fluxos ainda podem gerar regressao cruzada porque varios comportamentos compartilham o mesmo estado local e os mesmos pontos de persistencia.
+- Quais seriam os proximos candidatos a refatoracao futura? Os melhores candidatos sao os subdominios que ja aparecem bem delimitados: `anexos e uploads`, `audio e transcricao`, `planejamento`, `orcamento` e `sincronizacao entre etapas e itens`. O proximo passo natural seria extrair hooks ou servicos para reduzir o peso do componente orquestrador sem fragmentar a UI novamente.

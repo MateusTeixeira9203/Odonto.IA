@@ -1,6 +1,5 @@
 import type { Orcamento, OrcamentoItem, Pagamento } from "@/types/database";
 
-// Orçamento enriquecido com joins de paciente, dentista, itens e pagamentos
 export type OrcamentoEnriquecido = Orcamento & {
   paciente: { id: string; nome: string };
   dentista: { id: string; nome: string };
@@ -9,7 +8,9 @@ export type OrcamentoEnriquecido = Orcamento & {
 };
 
 export interface MetricasMes {
-  totalMes: number;
-  recebido: number;
-  pendente: number;
+  aprovadosMes: number;     // valor total dos aprovados no mês
+  pendente: number;          // valor total a receber
+  taxaConversao: number;     // 0-100 — aprovados / criados no mês
+  totalMes: number;          // valor total criado no mês (mantido para retrocompat)
+  recebido: number;          // valor confirmado recebido
 }

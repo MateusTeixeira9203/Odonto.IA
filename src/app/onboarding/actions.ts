@@ -43,7 +43,14 @@ export async function completeOnboarding(
   const clinicaId = randomUUID();
   const { error: clinicaError } = await supabase
     .from("clinicas")
-    .insert({ id: clinicaId, nome: data.nomeConsultorio });
+    .insert({
+      id: clinicaId,
+      nome: data.nomeConsultorio,
+      // Campos de localização coletados no onboarding
+      cidade: data.cidade || null,
+      estado: data.estado || null,
+      telefone: data.telefone || null,
+    });
 
   if (clinicaError) {
     console.error("Erro ao criar clínica:", clinicaError);
@@ -74,18 +81,19 @@ export async function completeOnboarding(
     };
   }
 
-  // 3. Buscar procedimentos_padrao ativos
+  // 3. Buscar procedimentos_padrao ativos para popular a tabela da clínica
   const { data: procedimentosPadrao, error: padraoError } = await supabase
     .from("procedimentos_padrao")
-    .select("nome, descricao, preco_sugerido, duracao_minutos")
+    .select("nome, descricao, categoria, preco_sugerido, duracao_minutos")
     .eq("ativo", true);
 
   if (!padraoError && procedimentosPadrao && procedimentosPadrao.length > 0) {
-    // 4. INSERT em procedimentos para cada um
+    // 4. Copia cada procedimento_padrao para a tabela procedimentos da clínica
     const procedimentosToInsert = procedimentosPadrao.map((p) => ({
       clinica_id: clinicaId,
       nome: p.nome,
       descricao: p.descricao,
+      categoria: p.categoria,
       preco_padrao: p.preco_sugerido,
       duracao_minutos: p.duracao_minutos,
       ativo: true,

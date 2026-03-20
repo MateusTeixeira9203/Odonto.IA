@@ -1,128 +1,119 @@
 # DentAI
 
-Micro-SaaS odontológico com inteligência artificial para gestão de clínicas dentárias.
+Aplicacao web para operacao basica de clinicas odontologicas, com foco atual em autenticacao, onboarding, pacientes, fichas clinicas, planejamento, orcamentos e configuracoes basicas.
 
-## Funcionalidades
+## Estado Atual do Projeto
 
-- **Gestão de pacientes** — cadastro, histórico e ficha clínica completa
-- **Fichas clínicas com IA** — transcrição de áudio via Whisper, extração de dados de documentos e radiografias via GPT-4o
-- **Orçamentos** — geração automática a partir das fichas, envio por WhatsApp
-- **Multi-tenant** — isolamento por clínica com Row Level Security no Supabase
-- **Onboarding** — fluxo de cadastro guiado para novas clínicas
-- **Autenticação** — login, cadastro, recuperação de senha via Supabase Auth
+### Funcionalidades implementadas
 
-## Stack
+- Autenticacao com Supabase Auth para login e cadastro, com protecao de rotas no middleware (`src/app/(auth)/*`, `src/proxy.ts`, `src/lib/supabase/*`).
+- Onboarding inicial que cria clinica, dentista e copia procedimentos padrao para a clinica (`src/app/onboarding/page.tsx`, `src/app/onboarding/actions.ts`, `supabase/migrations/20260311001528_003_procedimentos_padrao.sql`).
+- Dashboard autenticado com metricas de pacientes, fichas abertas, orcamentos pendentes e atividade recente (`src/app/dashboard/page.tsx`).
+- Gestao de pacientes com listagem, busca, cadastro, perfil individual e acesso para criar fichas (`src/app/dashboard/pacientes/*`, `src/components/pacientes/pacientes-table.tsx`).
+- Ficha clinica detalhada com anamnese, anotacoes, odontograma, status e navegacao de volta ao perfil do paciente (`src/app/dashboard/fichas/[id]/page.tsx`, `src/app/dashboard/fichas/[id]/ficha-client.tsx`).
+- Gravacao de audio com upload para o Supabase Storage e transcricao via OpenAI Whisper (`src/hooks/useAudioRecorder.ts`, `src/app/api/transcricao/route.ts`).
+- Upload de documentos com extracao de texto para DOC, DOCX, PDF e TXT (`src/app/dashboard/fichas/[id]/ficha-client.tsx`, `src/app/api/processar-documento/route.ts`).
+- Upload, visualizacao e remocao de fotos da ficha e radiografias (`src/app/dashboard/fichas/[id]/ficha-client.tsx`, `src/app/dashboard/fichas/[id]/_components/lightbox.tsx`).
+- Planejamento por etapas dentro da ficha, com criacao, edicao, remocao, status, vinculo de radiografia e modo apresentacao (`src/app/dashboard/fichas/[id]/ficha-client.tsx`, `src/app/dashboard/fichas/[id]/_components/modo-apresentacao.tsx`).
+- Orcamento vinculado ao planejamento, com geracao de itens por etapa, edicao de preco, recalculo de total e troca de status (`src/app/dashboard/fichas/[id]/ficha-client.tsx`, `src/app/dashboard/fichas/[id]/_components/tab-orcamento.tsx`).
+- Tela de orcamentos com filtros, resumo mensal, detalhe lateral e acao para marcar pagamentos existentes como pagos (`src/app/dashboard/orcamentos/page.tsx`, `src/app/dashboard/orcamentos/_components/orcamentos-client.tsx`, `src/app/dashboard/orcamentos/actions.ts`).
+- Configuracoes basicas da clinica, horarios e procedimentos padrao (`src/app/dashboard/configuracoes/*`).
+- Estrutura multi-tenant baseada em `clinica_id` com RLS nas tabelas principais (`supabase/migrations/001_core_tables.sql`, `supabase/migrations/002_modules_tables.sql`, `supabase/migrations/20260311020000_005_fix_dentistas_rls_recursion.sql`).
+
+### Funcionalidades parciais
+
+- Recuperacao de senha tem telas de solicitacao e redefinicao, mas o email de recovery aponta para `/nova-senha` enquanto a rota implementada e `/redefinir-senha` (`src/app/(auth)/esqueci-senha/page.tsx`, `src/app/(auth)/redefinir-senha/page.tsx`).
+- A area `/dashboard/fichas` ainda nao lista fichas reais; hoje mostra apenas estado vazio, enquanto a criacao e a tela detalhada funcionam por outros fluxos (`src/app/dashboard/fichas/page.tsx`, `src/app/dashboard/pacientes/[id]/_components/fichas-lista.tsx`).
+- A rota para extracao de imagem com GPT-4o existe, mas nao esta conectada a nenhum botao ou fluxo da interface (`src/app/api/extrair-imagem/route.ts`, ausencia de chamadas em `src/app/dashboard/fichas/[id]/ficha-client.tsx`).
+- O backend aceita `pptx` em `processar-documento`, mas a validacao do cliente bloqueia esse formato antes do envio (`src/app/api/processar-documento/route.ts`, `src/app/dashboard/fichas/[id]/ficha-client.tsx`).
+- O onboarding coleta cidade, estado e dados do consultorio, mas a action persiste apenas o nome da clinica e os dados do dentista; parte do formulario nao vai para o banco (`src/app/onboarding/page.tsx`, `src/app/onboarding/actions.ts`).
+- A tela de orcamentos consome e atualiza `pagamentos`, mas o app nao cria esses registros automaticamente a partir do fluxo de orcamento (`src/app/dashboard/orcamentos/page.tsx`, `src/app/dashboard/orcamentos/actions.ts`, `supabase/migrations/002_modules_tables.sql`).
+- A configuracao de procedimentos hoje altera `procedimentos_padrao` globais, enquanto o onboarding copia dados para `procedimentos` por clinica; esse fluxo ainda nao esta totalmente alinhado (`src/app/dashboard/configuracoes/actions.ts`, `src/app/onboarding/actions.ts`, `supabase/migrations/001_core_tables.sql`, `supabase/migrations/20260311001528_003_procedimentos_padrao.sql`).
+
+### Funcionalidades planejadas
+
+- Envio de orcamento por WhatsApp / Evolution API.
+- Geracao de PDF de orcamento.
+- Integracao com Stripe.
+- Agenda clinica e calendario operacional.
+- Integracao com Google Calendar.
+- Automacao de conversas via WhatsApp.
+
+## Stack Atual
 
 | Camada | Tecnologia |
-|---|---|
+| --- | --- |
 | Framework | Next.js 16 (App Router) |
-| Linguagem | TypeScript estrito |
-| Banco de dados | Supabase (PostgreSQL + RLS) |
-| Autenticação | Supabase Auth |
-| Estilização | Tailwind CSS v4 + shadcn/ui |
-| IA | OpenAI GPT-4o + Whisper |
-| WhatsApp | Evolution API |
-| Pagamentos | Stripe |
-| Deploy | Vercel |
+| Linguagem | TypeScript |
+| Banco de dados | Supabase Postgres + RLS |
+| Autenticacao | Supabase Auth |
+| Storage | Supabase Storage |
+| UI | Tailwind CSS v4 + componentes locais/shadcn |
+| IA em uso | OpenAI Whisper para audio; rota GPT-4o preparada para imagens |
 
-## Estrutura do projeto
+## Estrutura Relevante
 
-```
-/
-├── dentai/                  # Aplicação Next.js
-│   ├── src/
-│   │   ├── app/
-│   │   │   ├── (auth)/      # Login, cadastro, recuperação de senha
-│   │   │   ├── dashboard/   # Área autenticada
-│   │   │   │   ├── pacientes/
-│   │   │   │   ├── fichas/
-│   │   │   │   ├── orcamentos/
-│   │   │   │   └── configuracoes/
-│   │   │   ├── onboarding/  # Fluxo de setup inicial
-│   │   │   └── api/         # Route Handlers
-│   │   ├── components/      # Componentes reutilizáveis
-│   │   ├── lib/             # Supabase, auth, utils
-│   │   ├── hooks/           # Custom hooks
-│   │   └── types/           # Tipos TypeScript
-│   └── package.json
-├── supabase/
-│   ├── config.toml
-│   └── migrations/          # Migrations do banco
-├── lib/                     # Lógica compartilhada (IA, WhatsApp, Stripe)
-└── types/                   # Tipos globais
+```text
+src/
+  app/
+    (auth)/           telas publicas de autenticacao
+    onboarding/       criacao inicial da clinica e do dentista
+    dashboard/        area autenticada
+    api/              rotas de transcricao e processamento de arquivos
+  components/         UI reutilizavel e layout
+  hooks/              hooks client-side
+  lib/                auth, supabase e helpers
+  types/              tipos TypeScript
+supabase/
+  migrations/         schema e policies
+docs/
+  mvp-status.md
+  definition-of-done.md
+  manual-test-checklist.md
+  next-issues.md
 ```
 
-## Configuração local
+## Configuracao Local
 
-### Pré-requisitos
+### Pre-requisitos
 
 - Node.js 20+
-- Conta no [Supabase](https://supabase.com)
-- Chave de API da [OpenAI](https://platform.openai.com)
+- Projeto Supabase com Auth, banco e buckets de Storage configurados
+- Chave da OpenAI apenas se voce quiser validar a transcricao de audio ou a rota de extracao de imagem
 
-### 1. Clone o repositório
+### Variaveis de ambiente
 
-```bash
-git clone https://github.com/seu-usuario/dentai.git
-cd dentai
-```
-
-### 2. Instale as dependências
-
-```bash
-cd dentai
-npm install
-```
-
-### 3. Configure as variáveis de ambiente
-
-Crie o arquivo `dentai/.env.local`:
+Use `.env.local` com:
 
 ```env
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=https://SEU_PROJETO.supabase.co
+NEXT_PUBLIC_SUPABASE_URL=https://seu-projeto.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=sua_anon_key
-
-# OpenAI
 OPENAI_API_KEY=sk-...
-
-# Evolution API (WhatsApp) - opcional
-EVOLUTION_API_URL=https://sua-instancia.evolution.com
-EVOLUTION_API_KEY=sua_api_key
-
-# Stripe - opcional
-STRIPE_SECRET_KEY=sk_...
-STRIPE_WEBHOOK_SECRET=whsec_...
 ```
 
-### 4. Execute as migrations
+Observacao: os uploads atuais esperam buckets no Supabase Storage com os nomes `audios`, `documentos`, `fichas` e `radiografias`. A criacao desses buckets nao esta versionada nas migrations do repositorio.
 
-No painel do Supabase, execute os arquivos em `supabase/migrations/` na ordem numérica.
-
-### 5. Inicie o servidor de desenvolvimento
+### Setup
 
 ```bash
-cd dentai
+npm install
 npm run dev
 ```
 
-Acesse [http://localhost:3000](http://localhost:3000).
+As migrations SQL estao em `supabase/migrations/` e precisam ser aplicadas no projeto Supabase.
 
-## Banco de dados
+## Comandos Uteis
 
-O schema é multi-tenant, isolado por `clinica_id` com RLS em todas as tabelas:
+```bash
+npm run dev
+npm run build
+npm run lint
+npm run typecheck
+```
 
-- `clinicas` — tenant raiz
-- `dentistas` — usuários vinculados a uma clínica
-- `pacientes` — pacientes da clínica
-- `procedimentos` — tabela de procedimentos/preços
-- `fichas` — fichas clínicas (áudio, transcrição, radiografia)
-- `orcamentos` + `orcamento_itens` — orçamentos gerados
+## Documentacao Complementar
 
-## Convenções de código
-
-- TypeScript estrito, sem `any`
-- Componentes em `/components`, páginas em `/app`, lógica de negócio em `/lib`
-- Supabase apenas server-side (Server Components ou Route Handlers)
-- Código IA isolado em `/lib/ai`, WhatsApp em `/lib/whatsapp`
-- Erros sempre tratados explicitamente
+- `docs/mvp-status.md`: inventario do que esta implementado, parcial ou ausente.
+- `docs/definition-of-done.md`: criterio para considerar uma entrega pronta.
+- `docs/manual-test-checklist.md`: checklist manual dos fluxos principais.
+- `docs/next-issues.md`: backlog recomendado para os proximos ciclos.

@@ -1,24 +1,13 @@
-import { redirect } from "next/navigation";
-import { DashboardShell } from "@/components/layout/dashboard-shell";
-import { getDentistaCached } from "@/lib/get-dentista";
+import { redirect } from 'next/navigation';
+import { getDentistaCached } from '@/lib/get-dentista';
+import { DashboardShell } from '@/components/layout/dashboard-shell';
 
-export default async function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}): Promise<React.JSX.Element> {
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const dentista = await getDentistaCached();
-
-  // Redireciona se não há sessão ou dentista cadastrado
-  if (!dentista) {
-    redirect("/login");
-  }
+  if (!dentista) redirect('/login');
 
   return (
-    <DashboardShell
-      nome={dentista.nome}
-      clinicaNome={dentista.clinica}
-    >
+    <DashboardShell nome={dentista.nome} clinicaNome={dentista.clinica}>
       {children}
     </DashboardShell>
   );

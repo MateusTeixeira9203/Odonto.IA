@@ -1,44 +1,41 @@
-import type { Metadata } from "next";
-import { Outfit, DM_Mono, DM_Serif_Display } from "next/font/google";
-import { Toaster } from "@/components/ui/sonner";
-import { ThemeProvider } from "@/components/theme-provider";
-import "./globals.css";
+import type { Metadata } from 'next';
+import { DM_Serif_Display, Outfit, DM_Mono } from 'next/font/google';
+import './globals.css';
+import { cn } from '@/lib/utils';
+import { ThemeProvider } from '@/components/theme-provider';
+import { Toaster } from '@/components/ui/sonner';
+
+const dmSerif = DM_Serif_Display({
+  weight: ['400'],
+  subsets: ['latin'],
+  variable: '--font-dm-serif',
+});
 
 const outfit = Outfit({
-  variable: "--font-outfit",
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
+  subsets: ['latin'],
+  variable: '--font-outfit',
 });
 
 const dmMono = DM_Mono({
-  variable: "--font-dm-mono",
-  subsets: ["latin"],
-  weight: ["400", "500"],
-});
-
-const dmSerifDisplay = DM_Serif_Display({
-  variable: "--font-dm-serif-display",
-  subsets: ["latin"],
-  weight: ["400"],
-  style: ["normal", "italic"],
+  weight: ['400', '500'],
+  subsets: ['latin'],
+  variable: '--font-dm-mono',
 });
 
 export const metadata: Metadata = {
-  title: "Dent IA — Inteligência Odontológica",
-  description: "Micro-SaaS odontológico com inteligência artificial",
+  title: 'DentAI | Inteligência Odontológica',
+  description: 'Micro-SaaS odontológico para dentistas.',
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>): React.JSX.Element {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR" suppressHydrationWarning>
-      <body
-        className={`${outfit.variable} ${dmMono.variable} ${dmSerifDisplay.variable} antialiased`}
-      >
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+    <html
+      lang="pt-BR"
+      className={cn(dmSerif.variable, outfit.variable, dmMono.variable, 'font-sans')}
+      suppressHydrationWarning
+    >
+      <body className="bg-bg text-text-primary font-sans antialiased min-h-screen flex flex-col">
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           {children}
           <Toaster />
         </ThemeProvider>

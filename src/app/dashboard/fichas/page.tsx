@@ -1,45 +1,20 @@
-import Link from "next/link";
-import { Plus, FileText } from "lucide-react";
+import { redirect } from 'next/navigation';
+import { getDentistaCached } from '@/lib/get-dentista';
+import { createClient } from '@/lib/supabase/server';
+import { FichasClient } from './_components/fichas-client';
+import type { FichaComPaciente } from './_components/fichas-client';
 
-export default function FichasPage(): React.JSX.Element {
-  return (
-    <div className="animate-fade-in">
-      {/* Cabeçalho da página */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="font-sans text-[2rem] font-bold leading-tight text-foreground">
-            Fichas Clínicas
-          </h1>
-          <p className="font-mono text-sm text-muted-foreground mt-0.5">
-            Fichas clínicas dos pacientes
-          </p>
-        </div>
-        <Link
-          href="/dashboard/fichas/nova"
-          className="inline-flex items-center gap-2 h-10 px-4 bg-primary text-primary-foreground font-sans font-medium text-sm rounded-md hover:bg-[hsl(var(--primary-hover))] active:scale-[0.98] transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          Nova Ficha
-        </Link>
-      </div>
+export default async function FichasPage() {
+  const dentista = await getDentistaCached();
+  if (!dentista) redirect('/login');
 
-      {/* Estado vazio */}
-      <div className="flex flex-col items-center justify-center py-16">
-        <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-          <FileText className="w-8 h-8 text-muted-foreground/30" />
-        </div>
-        <h3 className="font-serif text-lg text-foreground mb-1">Nenhuma ficha ainda</h3>
-        <p className="font-sans text-sm text-muted-foreground mb-6 text-center max-w-sm">
-          Crie fichas clínicas para registrar o histórico dos seus pacientes
-        </p>
-        <Link
-          href="/dashboard/fichas/nova"
-          className="inline-flex items-center gap-2 h-10 px-4 bg-primary text-primary-foreground font-sans font-medium text-sm rounded-md hover:bg-[hsl(var(--primary-hover))] active:scale-[0.98] transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          Nova Ficha
-        </Link>
-      </div>
-    </div>
-  );
+  const supabase = await createClient();
+
+  const { data: fichas } = await supabase
+    .from('fichas')
+    .select('*, paciente:pacientes(id, nome)')
+    .eq('clinica_id', dentista.clinica_id)
+    .order('created_at', { ascending: false });
+
+  return <FichasClient fichas={(fichas as unknown as FichaComPaciente[]) ?? []} />;
 }

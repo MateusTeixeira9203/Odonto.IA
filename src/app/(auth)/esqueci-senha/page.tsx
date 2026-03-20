@@ -41,8 +41,8 @@ export default function EsqueciSenhaPage(): React.JSX.Element {
 
       const redirectTo =
         typeof window !== "undefined"
-          ? `${window.location.origin}/nova-senha`
-          : "/nova-senha";
+          ? `${window.location.origin}/redefinir-senha`
+          : "/redefinir-senha";
 
       const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
         redirectTo,

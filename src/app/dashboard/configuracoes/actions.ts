@@ -108,34 +108,34 @@ export async function salvarHorarios(
   return {};
 }
 
-// --- Procedimentos padrão ---
+// --- Procedimentos da clínica ---
 
 export interface ProcedimentoUpdateData {
-  preco_sugerido: number;
+  preco_padrao: number;
   duracao_minutos: number;
 }
 
 /**
- * Atualiza preço e duração de um procedimento padrão.
+ * Atualiza preço e duração de um procedimento da clínica.
+ * Filtra por clinica_id obtido do servidor — nunca do cliente.
  */
 export async function atualizarProcedimento(
   id: string,
   data: ProcedimentoUpdateData
 ): Promise<{ error?: string }> {
+  const dentista = await getDentistaCached();
+  if (!dentista) redirect("/login");
+
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
   const { error } = await supabase
-    .from("procedimentos_padrao")
+    .from("procedimentos")
     .update({
-      preco_sugerido: data.preco_sugerido,
+      preco_padrao: data.preco_padrao,
       duracao_minutos: data.duracao_minutos,
     })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("clinica_id", dentista.clinica_id);
 
   if (error) {
     console.error("Erro ao atualizar procedimento:", error);
@@ -146,23 +146,23 @@ export async function atualizarProcedimento(
 }
 
 /**
- * Ativa ou desativa um procedimento padrão.
+ * Ativa ou desativa um procedimento da clínica.
+ * Filtra por clinica_id obtido do servidor — nunca do cliente.
  */
 export async function toggleProcedimento(
   id: string,
   ativo: boolean
 ): Promise<{ error?: string }> {
+  const dentista = await getDentistaCached();
+  if (!dentista) redirect("/login");
+
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
   const { error } = await supabase
-    .from("procedimentos_padrao")
+    .from("procedimentos")
     .update({ ativo })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("clinica_id", dentista.clinica_id);
 
   if (error) {
     console.error("Erro ao togglear procedimento:", error);
@@ -176,26 +176,25 @@ export interface NovoProcedimentoData {
   nome: string;
   descricao: string;
   categoria: string;
-  preco_sugerido: number;
+  preco_padrao: number;
   duracao_minutos: number;
 }
 
 /**
- * Cria um novo procedimento padrão.
+ * Cria um novo procedimento na tabela da clínica.
+ * clinica_id sempre vem do servidor via getDentistaCached().
  */
 export async function criarProcedimento(
   data: NovoProcedimentoData
 ): Promise<{ error?: string }> {
+  const dentista = await getDentistaCached();
+  if (!dentista) redirect("/login");
+
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
   const { error } = await supabase
-    .from("procedimentos_padrao")
-    .insert({ ...data, ativo: true });
+    .from("procedimentos")
+    .insert({ ...data, clinica_id: dentista.clinica_id, ativo: true });
 
   if (error) {
     console.error("Erro ao criar procedimento:", error);

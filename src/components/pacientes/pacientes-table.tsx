@@ -1,9 +1,11 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { Users, Search, UserPlus } from "lucide-react";
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { Users, Search, UserPlus, ChevronRight } from 'lucide-react';
+import { format } from 'date-fns';
+import { motion } from 'motion/react';
 import {
   Dialog,
   DialogContent,
@@ -11,33 +13,59 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/dentai";
-import type { Paciente } from "@/types/database";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/dentai';
+import type { Paciente } from '@/types/database';
+
+// ── Avatar ────────────────────────────────────────────────────────────────────
+const AVATAR_COLORS = [
+  'bg-teal text-white',
+  'bg-teal-lt text-white',
+  'bg-teal-dark text-white',
+  'bg-teal/70 text-white',
+];
+
+function getAvatarColor(nome: string): string {
+  let hash = 0;
+  for (let i = 0; i < nome.length; i++) {
+    hash = (hash * 31 + nome.charCodeAt(i)) >>> 0;
+  }
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
+}
 
 function getIniciais(nome: string): string {
   const partes = nome.trim().split(/\s+/).filter(Boolean);
-  if (partes.length === 0) return "?";
+  if (partes.length === 0) return '?';
   if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
   return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase();
 }
 
+// ── Status derivado ───────────────────────────────────────────────────────────
+function derivarStatus(paciente: Paciente): { label: string; className: string } {
+  const diasDesdeCreation = (Date.now() - new Date(paciente.created_at).getTime()) / (1000 * 60 * 60 * 24);
+  if (diasDesdeCreation < 7) {
+    return { label: 'Novo', className: 'bg-teal/10 text-teal' };
+  }
+  return { label: 'Ativo', className: 'bg-teal-pale text-teal-dark' };
+}
+
+// ── Props ─────────────────────────────────────────────────────────────────────
 interface PacientesTableProps {
   pacientes: Paciente[];
 }
 
 export function PacientesTable({ pacientes }: PacientesTableProps): React.JSX.Element {
   const router = useRouter();
-  const [busca, setBusca] = useState("");
+  const [busca, setBusca] = useState('');
   const [pacienteSelecionado, setPacienteSelecionado] = useState<Paciente | null>(null);
   const [dialogAberto, setDialogAberto] = useState(false);
 
-  // Filtro por nome ou CPF em tempo real
   const pacientesFiltrados = pacientes.filter((p) => {
     const termo = busca.toLowerCase();
     return (
       p.nome.toLowerCase().includes(termo) ||
-      (p.cpf ?? "").toLowerCase().includes(termo)
+      (p.cpf ?? '').toLowerCase().includes(termo) ||
+      (p.telefone ?? '').toLowerCase().includes(termo)
     );
   });
 
@@ -53,61 +81,60 @@ export function PacientesTable({ pacientes }: PacientesTableProps): React.JSX.El
   }
 
   return (
-    <div>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+    >
       {/* Busca */}
       <div className="relative mb-6">
         <Search
           size={16}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 pointer-events-none"
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none"
         />
         <input
           type="search"
-          placeholder="Buscar paciente..."
+          placeholder="Buscar por nome, CPF ou telefone..."
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
-          className="w-full max-w-sm h-10 pl-9 pr-3 bg-card border border-border rounded-md font-sans text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+          className="w-full max-w-sm h-10 pl-9 pr-3 bg-surface-alt rounded-xl font-sans text-sm text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-teal/40 transition-all border border-border"
         />
       </div>
 
       {/* Tabela */}
-      <div className="bg-card border border-border rounded-lg overflow-hidden">
+      <div className="bg-surface rounded-2xl border border-border shadow-sm overflow-hidden">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-border">
-              <th className="text-left px-4 py-3 font-mono text-[0.65rem] uppercase tracking-widest text-muted-foreground">
-                Nome
+            <tr className="border-b border-border bg-surface-alt/50">
+              <th className="text-left px-5 py-3.5 font-mono text-[0.6rem] uppercase tracking-widest text-text-secondary">
+                Paciente
               </th>
-              <th className="text-left px-4 py-3 font-mono text-[0.65rem] uppercase tracking-widest text-muted-foreground">
-                CPF
+              <th className="text-left px-5 py-3.5 font-mono text-[0.6rem] uppercase tracking-widest text-text-secondary hidden sm:table-cell">
+                Status
               </th>
-              <th className="text-left px-4 py-3 font-mono text-[0.65rem] uppercase tracking-widest text-muted-foreground hidden md:table-cell">
+              <th className="text-left px-5 py-3.5 font-mono text-[0.6rem] uppercase tracking-widest text-text-secondary hidden md:table-cell">
                 Telefone
               </th>
-              <th className="text-left px-4 py-3 font-mono text-[0.65rem] uppercase tracking-widest text-muted-foreground hidden lg:table-cell">
-                WhatsApp
+              <th className="text-left px-5 py-3.5 font-mono text-[0.6rem] uppercase tracking-widest text-text-secondary hidden lg:table-cell">
+                Último atendimento
               </th>
-              <th className="text-left px-4 py-3 font-mono text-[0.65rem] uppercase tracking-widest text-muted-foreground hidden lg:table-cell">
-                Cidade
-              </th>
-              <th className="text-right px-4 py-3 font-mono text-[0.65rem] uppercase tracking-widest text-muted-foreground">
-                Ações
-              </th>
+              <th className="w-10 px-5 py-3.5" />
             </tr>
           </thead>
           <tbody>
             {pacientesFiltrados.length === 0 ? (
               <tr>
-                <td colSpan={6} className="h-52 text-center">
+                <td colSpan={5} className="h-56 text-center">
                   <div className="flex flex-col items-center gap-3">
-                    <Users size={40} className="text-muted-foreground/30" />
+                    <Users size={40} className="text-text-muted" />
                     <div className="space-y-1">
-                      <p className="font-serif text-base text-foreground">
-                        {busca ? "Nenhum paciente encontrado" : "Nenhum paciente ainda"}
+                      <p className="font-serif text-base text-text-primary">
+                        {busca ? 'Nenhum paciente encontrado' : 'Nenhum paciente ainda'}
                       </p>
-                      <p className="font-sans text-sm text-muted-foreground">
+                      <p className="font-sans text-sm text-text-secondary">
                         {busca
-                          ? "Tente buscar por outro nome ou CPF"
-                          : "Cadastre seu primeiro paciente para começar"}
+                          ? 'Tente buscar por outro nome, CPF ou telefone'
+                          : 'Cadastre seu primeiro paciente para começar'}
                       </p>
                     </div>
                     {!busca && (
@@ -122,68 +149,84 @@ export function PacientesTable({ pacientes }: PacientesTableProps): React.JSX.El
                 </td>
               </tr>
             ) : (
-              pacientesFiltrados.map((paciente) => (
-                <tr
-                  key={paciente.id}
-                  className="border-b border-border last:border-b-0 hover:bg-background/50 transition-colors cursor-pointer group"
-                >
-                  {/* Nome com avatar */}
-                  <td className="px-4 py-3 font-sans text-sm font-medium text-foreground">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                        <span className="font-mono text-xs text-primary">
+              pacientesFiltrados.map((paciente) => {
+                const status = derivarStatus(paciente);
+                return (
+                  <tr
+                    key={paciente.id}
+                    onClick={() => router.push(`/dashboard/pacientes/${paciente.id}`)}
+                    className="border-b border-border last:border-b-0 hover:bg-surface-alt/60 transition-colors cursor-pointer group"
+                  >
+                    {/* Paciente — avatar + nome */}
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 font-mono text-xs font-bold ${getAvatarColor(paciente.nome)}`}>
                           {getIniciais(paciente.nome)}
-                        </span>
+                        </div>
+                        <div>
+                          <p className="font-sans text-sm font-semibold text-text-primary leading-tight">
+                            {paciente.nome}
+                          </p>
+                          {paciente.cpf && (
+                            <p className="font-mono text-xs text-text-secondary mt-0.5">
+                              {paciente.cpf}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      {paciente.nome}
-                    </div>
-                  </td>
+                    </td>
 
-                  {/* CPF */}
-                  <td className="px-4 py-3 font-mono text-sm text-muted-foreground">
-                    {paciente.cpf ?? "—"}
-                  </td>
+                    {/* Status badge */}
+                    <td className="px-5 py-3.5 hidden sm:table-cell">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${status.className}`}>
+                        {status.label}
+                      </span>
+                    </td>
 
-                  {/* Telefone */}
-                  <td className="px-4 py-3 font-mono text-sm text-muted-foreground hidden md:table-cell">
-                    {paciente.telefone ?? "—"}
-                  </td>
+                    {/* Telefone */}
+                    <td className="px-5 py-3.5 hidden md:table-cell">
+                      {paciente.telefone ? (
+                        <span className="font-mono text-sm text-text-secondary">{paciente.telefone}</span>
+                      ) : (
+                        <span className="text-text-muted text-sm">—</span>
+                      )}
+                    </td>
 
-                  {/* WhatsApp */}
-                  <td className="px-4 py-3 font-mono text-sm text-muted-foreground hidden lg:table-cell">
-                    {paciente.whatsapp ?? "—"}
-                  </td>
+                    {/* Último atendimento */}
+                    <td className="px-5 py-3.5 hidden lg:table-cell">
+                      <span className="font-mono text-sm text-text-secondary">
+                        {format(new Date(paciente.updated_at), 'dd/MM/yyyy')}
+                      </span>
+                    </td>
 
-                  {/* Cidade */}
-                  <td className="px-4 py-3 font-sans text-sm text-muted-foreground hidden lg:table-cell">
-                    {paciente.cidade && paciente.estado
-                      ? `${paciente.cidade} / ${paciente.estado}`
-                      : (paciente.cidade ?? "—")}
-                  </td>
-
-                  {/* Ações — aparecem no hover */}
-                  <td className="px-4 py-3">
-                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
-                      <button
-                        type="button"
-                        onClick={() => abrirDialogNovaFicha(paciente)}
-                        className="font-sans text-xs font-medium text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded hover:bg-background"
-                      >
-                        Nova Ficha
-                      </button>
-                      <Link
-                        href={`/dashboard/pacientes/${paciente.id}`}
-                        className="font-sans text-xs font-medium text-primary transition-colors px-2 py-1 rounded hover:bg-primary/10"
-                      >
-                        Ver →
-                      </Link>
-                    </div>
-                  </td>
-                </tr>
-              ))
+                    {/* Seta */}
+                    <td className="px-5 py-3.5">
+                      <ChevronRight className="w-4 h-4 text-text-muted group-hover:text-teal transition-colors" />
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
+
+        {/* Rodapé com contagem */}
+        {pacientesFiltrados.length > 0 && (
+          <div className="px-5 py-3 border-t border-border bg-surface-alt/30 flex items-center justify-between">
+            <p className="font-mono text-xs text-text-secondary">
+              {pacientesFiltrados.length} de {pacientes.length} paciente{pacientes.length !== 1 ? 's' : ''}
+            </p>
+            {busca && (
+              <button
+                type="button"
+                onClick={() => setBusca('')}
+                className="font-mono text-xs text-teal hover:text-teal-dark transition-colors"
+              >
+                Limpar busca
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Dialog de confirmação Nova Ficha */}
@@ -192,7 +235,7 @@ export function PacientesTable({ pacientes }: PacientesTableProps): React.JSX.El
           <DialogHeader>
             <DialogTitle className="font-serif">Nova Ficha</DialogTitle>
             <DialogDescription>
-              Criar uma nova ficha para{" "}
+              Criar uma nova ficha para{' '}
               <strong>{pacienteSelecionado?.nome}</strong>?
             </DialogDescription>
           </DialogHeader>
@@ -206,6 +249,6 @@ export function PacientesTable({ pacientes }: PacientesTableProps): React.JSX.El
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </motion.div>
   );
 }

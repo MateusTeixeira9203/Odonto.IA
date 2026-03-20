@@ -179,7 +179,7 @@ export function Waveform({ className }: { className?: string }): React.JSX.Eleme
   return (
     <div className={cn("flex items-center justify-center gap-[3px] h-10", className)} role="img" aria-label="Gravando…">
       {WAVE_HEIGHTS.map((h, i) => (
-        <div key={i} className="w-[3px] bg-teal-light rounded-full animate-wave" style={{ height: h, animationDelay: `${WAVE_DELAYS[i]}s` }} />
+        <div key={i} className="w-[3px] bg-teal-lt rounded-full animate-wave" style={{ height: h, animationDelay: `${WAVE_DELAYS[i]}s` }} />
       ))}
     </div>
   )
