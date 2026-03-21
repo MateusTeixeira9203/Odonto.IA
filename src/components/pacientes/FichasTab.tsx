@@ -44,7 +44,8 @@ type FichaDB = {
   created_at: string;
   queixa_principal: string | null;
   anotacoes: string | null;
-  dentes_afetados: string[] | null;
+  dentes_afetados: number[];
+  dentes_observacoes: Record<string, string>;
   status: string;
   dentista?: { nome: string } | null;
 };
@@ -75,7 +76,7 @@ const mapFichaToEvolution = (f: FichaDB): Evolution => ({
     .replace(",", " às"),
   type: f.queixa_principal ?? "Evolução",
   observation: f.anotacoes ?? "",
-  teethNotes: (f.dentes_afetados ?? []).map((t) => ({ tooth: parseInt(t, 10), note: "" })),
+  teethNotes: (f.dentes_afetados ?? []).map((t) => ({ tooth: t, note: f.dentes_observacoes?.[String(t)] ?? "" })),
   professional: f.dentista?.nome ?? "Profissional",
   files: [],
 });
@@ -117,7 +118,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId }: FichasTabProps) 
       const supabase = createClient();
       const { data, error } = await supabase
         .from("fichas")
-        .select("id, created_at, queixa_principal, anotacoes, dentes_afetados, status, dentista:dentistas(nome)")
+        .select("id, created_at, queixa_principal, anotacoes, dentes_afetados, dentes_observacoes, status, dentista:dentistas(nome)")
         .eq("paciente_id", patientId)
         .eq("clinica_id", clinicaId)
         .order("created_at", { ascending: false });
@@ -220,7 +221,10 @@ export function FichasTab({ patientId, clinicaId, dentistaId }: FichasTabProps) 
     setIsSaving(true);
     try {
       const supabase = createClient();
-      const dentesAfetados = selectedTeeth.length > 0 ? selectedTeeth.map(String) : null;
+      const dentesAfetados = selectedTeeth;
+      const dentesObservacoes = Object.fromEntries(
+        formData.teethNotes.filter(tn => tn.note).map(tn => [String(tn.tooth), tn.note])
+      );
 
       if (editingId) {
         const { error } = await supabase
@@ -229,6 +233,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId }: FichasTabProps) 
             queixa_principal: formData.type,
             anotacoes: formData.observation || null,
             dentes_afetados: dentesAfetados,
+            dentes_observacoes: dentesObservacoes,
             updated_at: new Date().toISOString(),
           })
           .eq("id", editingId)
@@ -243,6 +248,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId }: FichasTabProps) 
           queixa_principal: formData.type,
           anotacoes: formData.observation || null,
           dentes_afetados: dentesAfetados,
+          dentes_observacoes: dentesObservacoes,
           status: "aberta",
         });
 
