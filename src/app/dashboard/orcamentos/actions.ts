@@ -122,7 +122,7 @@ export async function criarOrcamento(dados: {
     procedimento_id: item.procedimentoId ?? null,
     quantidade: item.quantidade,
     preco_unitario: item.precoUnitario,
-    total: item.quantidade * item.precoUnitario,
+    preco_total: item.quantidade * item.precoUnitario,
   }));
 
   const { error: itensError } = await supabase

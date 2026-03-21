@@ -109,7 +109,7 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
           (budgetResult.data.orcamento_itens as Array<Record<string, unknown>> ?? []).map(p => ({
             id: p.id as string,
             name: p.descricao as string,
-            value: p.total as number,
+            value: p.preco_total as number,
           }))
         );
       } else {
