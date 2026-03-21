@@ -1,370 +1,602 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { format } from 'date-fns';
-import { motion, AnimatePresence } from 'motion/react';
+import * as React from "react";
 import {
   Plus,
-  FileText,
-  MoreHorizontal,
-  Trash2,
-  ExternalLink,
-  X,
-  AlertTriangle,
-  ChevronRight,
   Mic,
-  Square,
+  MicOff,
+  Trash2,
+  MoreVertical,
+  Edit2,
+  FileText,
+  Upload,
+  Check,
+  User,
   Loader2,
-  Pencil,
-} from 'lucide-react';
-import { toast } from 'sonner';
+} from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
+import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import { ARCADA_SUPERIOR, ARCADA_INFERIOR } from '@/app/dashboard/fichas/[id]/_components/ficha-helpers';
-import { deletarFicha, criarFichaInline, atualizarFicha } from '@/app/dashboard/pacientes/[id]/actions';
-import { Badge } from '@/components/dentai';
-import { useAudioRecorder } from '@/hooks/useAudioRecorder';
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
+import { createClient } from "@/lib/supabase/client";
 
-// ── Tipo exportado ──────────────────────────────────────────────────────────
-export type FichaResumida = {
+interface ToothNote {
+  tooth: number;
+  note: string;
+}
+
+interface Evolution {
   id: string;
-  status: 'aberta' | 'concluida';
+  date: string;
+  type: string;
+  observation: string;
+  teethNotes: ToothNote[];
+  professional: string;
+  files: string[];
+}
+
+type FichaDB = {
+  id: string;
   created_at: string;
   queixa_principal: string | null;
   anotacoes: string | null;
   dentes_afetados: string[] | null;
+  status: string;
+  dentista?: { nome: string } | null;
 };
 
-const TIPOS_CONSULTA = [
-  'Consulta de rotina',
-  'Urgência / dor',
-  'Retorno',
-  'Procedimento',
-  'Avaliação inicial',
-  'Outro',
-];
+const TEETH_UPPER = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
+const TEETH_LOWER = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
 
-interface Props {
+const ALLOWED_MIME: Record<string, boolean> = {
+  'image/jpeg': true,
+  'image/png': true,
+  'image/webp': true,
+  'application/pdf': true,
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': true,
+};
+const MAX_UPLOAD_SIZE = 10 * 1024 * 1024; // 10 MB
+const getCategoria = (mime: string) => (mime.startsWith('image/') ? 'Fotografias' : 'Documentos');
+
+const mapFichaToEvolution = (f: FichaDB): Evolution => ({
+  id: f.id,
+  date: new Date(f.created_at)
+    .toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+    .replace(",", " às"),
+  type: f.queixa_principal ?? "Evolução",
+  observation: f.anotacoes ?? "",
+  teethNotes: (f.dentes_afetados ?? []).map((t) => ({ tooth: parseInt(t, 10), note: "" })),
+  professional: f.dentista?.nome ?? "Profissional",
+  files: [],
+});
+
+interface FichasTabProps {
   patientId: string;
-  fichas: FichaResumida[];
-  dentistaId: string;
   clinicaId: string;
+  dentistaId: string;
 }
 
-// Formata timer de gravação em mm:ss
-function formatTimer(seconds: number): string {
-  const m = Math.floor(seconds / 60).toString().padStart(2, '0');
-  const s = (seconds % 60).toString().padStart(2, '0');
-  return `${m}:${s}`;
-}
+export function FichasTab({ patientId, clinicaId, dentistaId }: FichasTabProps) {
+  const [evolutions, setEvolutions] = React.useState<Evolution[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [isSaving, setIsSaving] = React.useState(false);
+  const [isPanelOpen, setIsPanelOpen] = React.useState(false);
+  const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [isRecording, setIsRecording] = React.useState(false);
+  const [isTranscribing, setIsTranscribing] = React.useState(false);
+  const [selectedTeeth, setSelectedTeeth] = React.useState<number[]>([]);
+  const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
+  const audioChunksRef = React.useRef<Blob[]>([]);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = React.useState<string | null>(null);
+  const [uploadedFiles, setUploadedFiles] = React.useState<
+    Array<{ name: string; url: string; docId: string; storagePath: string }>
+  >([]);
+  const [isUploading, setIsUploading] = React.useState(false);
 
-export function FichasTab({ fichas, patientId }: Props): React.JSX.Element {
-  const router = useRouter();
+  const [formData, setFormData] = React.useState({
+    type: "Evolução",
+    observation: "",
+    teethNotes: [] as ToothNote[],
+  });
 
-  // ── Estado: lista ──────────────────────────────────────────────────────────
-  const [menuAbertoId, setMenuAbertoId] = useState<string | null>(null);
-  const [confirmandoId, setConfirmandoId] = useState<string | null>(null);
-  const [deletando, setDeletando] = useState(false);
+  // Busca fichas do Supabase
+  const fetchFichas = React.useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("fichas")
+        .select("id, created_at, queixa_principal, anotacoes, dentes_afetados, status, dentista:dentistas(nome)")
+        .eq("paciente_id", patientId)
+        .eq("clinica_id", clinicaId)
+        .order("created_at", { ascending: false });
 
-  // ── Estado: nova evolução ──────────────────────────────────────────────────
-  const [novaEvolucaoAberta, setNovaEvolucaoAberta] = useState(false);
-  const [tipo, setTipo] = useState(TIPOS_CONSULTA[0]);
-  const [observacoes, setObservacoes] = useState('');
-  const [dentesSelecionados, setDentesSelecionados] = useState<string[]>([]);
-  const [salvando, setSalvando] = useState(false);
-  const [transcrevendo, setTranscrevendo] = useState(false);
-
-  // ── Estado: edição ─────────────────────────────────────────────────────────
-  const [fichaEditando, setFichaEditando] = useState<FichaResumida | null>(null);
-  const [editTipo, setEditTipo] = useState('');
-  const [editObs, setEditObs] = useState('');
-  const [editStatus, setEditStatus] = useState<'aberta' | 'concluida'>('aberta');
-  const [salvandoEdit, setSalvandoEdit] = useState(false);
-
-  // ── Gravação de voz ────────────────────────────────────────────────────────
-  const { status: recStatus, timer, startRecording, stopRecording } = useAudioRecorder();
-  const isGravando = recStatus === 'recording';
-  const isProcessandoAudio = recStatus === 'processing' || transcrevendo;
-
-  async function handleToggleGravacao(): Promise<void> {
-    if (isGravando) {
-      const blob = await stopRecording();
-      if (!blob) {
-        toast.error('Erro ao capturar o áudio');
-        return;
-      }
-      setTranscrevendo(true);
-      try {
-        const fd = new FormData();
-        fd.append('audio', new File([blob], 'audio.webm', { type: blob.type }));
-        const res = await fetch('/api/transcrever', { method: 'POST', body: fd });
-        const data = await res.json() as { transcricao?: string; error?: string };
-        if (data.error) {
-          toast.error(data.error);
-        } else if (data.transcricao) {
-          // Adiciona ao campo de observações já existente
-          setObservacoes((prev) => (prev ? `${prev}\n${data.transcricao}` : (data.transcricao ?? '')));
-          toast.success('Transcrição concluída');
-        }
-      } catch {
-        toast.error('Erro ao transcrever o áudio');
-      } finally {
-        setTranscrevendo(false);
-      }
-    } else {
-      await startRecording();
+      if (error) throw error;
+      setEvolutions((data as unknown as FichaDB[]).map(mapFichaToEvolution));
+    } catch (err) {
+      console.error("Erro ao buscar fichas:", err);
+    } finally {
+      setIsLoading(false);
     }
-  }
+  }, [patientId, clinicaId]);
 
-  // ── Handlers: nova evolução ────────────────────────────────────────────────
-  function toggleDente(dente: string): void {
-    setDentesSelecionados((prev) =>
-      prev.includes(dente) ? prev.filter((d) => d !== dente) : [...prev, dente]
-    );
-  }
+  React.useEffect(() => {
+    if (patientId && clinicaId) {
+      void fetchFichas();
+    }
+  }, [patientId, clinicaId, fetchFichas]);
 
-  async function handleSalvar(): Promise<void> {
-    if (!observacoes.trim() && dentesSelecionados.length === 0) {
-      toast.error('Preencha ao menos o tipo ou observações');
+  const startRecording = async (): Promise<void> => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        await transcribeAudio(audioBlob);
+        stream.getTracks().forEach((track) => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (err) {
+      console.error("Erro ao acessar microfone:", err);
+      alert("Não foi possível acessar o microfone.");
+    }
+  };
+
+  const stopRecording = (): void => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const transcribeAudio = async (blob: Blob): Promise<void> => {
+    setIsTranscribing(true);
+    try {
+      const fd = new FormData();
+      fd.append("audio", blob, "gravacao.webm");
+      const response = await fetch("/api/transcrever", { method: "POST", body: fd });
+      if (!response.ok) throw new Error("Falha na transcrição");
+      const data = await response.json() as { texto?: string };
+      if (data.texto) {
+        setFormData((f) => ({
+          ...f,
+          observation: f.observation ? `${f.observation}\n${data.texto}` : (data.texto ?? ""),
+        }));
+      }
+    } catch (error) {
+      console.error("Erro na transcrição:", error);
+    } finally {
+      setIsTranscribing(false);
+    }
+  };
+
+  const toggleTooth = (tooth: number) => {
+    setSelectedTeeth((prev) => {
+      const isSelected = prev.includes(tooth);
+      if (isSelected) {
+        setFormData((f) => ({
+          ...f,
+          teethNotes: f.teethNotes.filter((tn) => tn.tooth !== tooth),
+        }));
+        return prev.filter((t) => t !== tooth);
+      } else {
+        setFormData((f) => ({
+          ...f,
+          teethNotes: [...f.teethNotes, { tooth, note: "" }],
+        }));
+        return [...prev, tooth];
+      }
+    });
+  };
+
+  const handleToothNoteChange = (tooth: number, note: string) => {
+    setFormData((f) => ({
+      ...f,
+      teethNotes: f.teethNotes.map((tn) => (tn.tooth === tooth ? { ...tn, note } : tn)),
+    }));
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const supabase = createClient();
+      const dentesAfetados = selectedTeeth.length > 0 ? selectedTeeth.map(String) : null;
+
+      if (editingId) {
+        const { error } = await supabase
+          .from("fichas")
+          .update({
+            queixa_principal: formData.type,
+            anotacoes: formData.observation || null,
+            dentes_afetados: dentesAfetados,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", editingId)
+          .eq("clinica_id", clinicaId);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("fichas").insert({
+          paciente_id: patientId,
+          dentista_id: dentistaId,
+          clinica_id: clinicaId,
+          queixa_principal: formData.type,
+          anotacoes: formData.observation || null,
+          dentes_afetados: dentesAfetados,
+          status: "aberta",
+        });
+
+        if (error) throw error;
+      }
+
+      await fetchFichas();
+      closePanel();
+    } catch (err) {
+      console.error("Erro ao salvar ficha:", err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const closePanel = () => {
+    setIsPanelOpen(false);
+    setEditingId(null);
+    setSelectedTeeth([]);
+    setFormData({ type: "Evolução", observation: "", teethNotes: [] });
+    setUploadedFiles([]);
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    if (!ALLOWED_MIME[file.type]) {
+      alert('Tipo não permitido. Use JPG, PNG, WEBP, PDF ou DOCX.');
       return;
     }
-    setSalvando(true);
-    const result = await criarFichaInline({
-      pacienteId: patientId,
-      queixaPrincipal: tipo,
-      anotacoes: observacoes,
-      dentesAfetados: dentesSelecionados,
-    });
-    setSalvando(false);
-    if (result.error) {
-      toast.error('Erro ao criar ficha');
-    } else {
-      toast.success('Ficha criada com sucesso');
-      setNovaEvolucaoAberta(false);
-      setTipo(TIPOS_CONSULTA[0]);
-      setObservacoes('');
-      setDentesSelecionados([]);
-      router.refresh();
+    if (file.size > MAX_UPLOAD_SIZE) {
+      alert('Arquivo muito grande. Máximo 10 MB.');
+      return;
     }
-  }
 
-  // ── Handlers: edição ──────────────────────────────────────────────────────
-  function abrirEdicao(ficha: FichaResumida): void {
-    setFichaEditando(ficha);
-    setEditTipo(ficha.queixa_principal ?? TIPOS_CONSULTA[0]);
-    setEditObs(ficha.anotacoes ?? '');
-    setEditStatus(ficha.status);
-    setMenuAbertoId(null);
-  }
-
-  async function handleSalvarEdicao(): Promise<void> {
-    if (!fichaEditando) return;
-    setSalvandoEdit(true);
-    const result = await atualizarFicha(fichaEditando.id, patientId, {
-      queixa_principal: editTipo || null,
-      anotacoes: editObs || null,
-      status: editStatus,
-    });
-    setSalvandoEdit(false);
-    if (result.error) {
-      toast.error('Erro ao atualizar ficha');
-    } else {
-      toast.success('Ficha atualizada');
-      setFichaEditando(null);
-      router.refresh();
-    }
-  }
-
-  // ── Handlers: delete ──────────────────────────────────────────────────────
-  async function handleDeletar(fichaId: string): Promise<void> {
-    setDeletando(true);
+    setIsUploading(true);
     try {
-      await deletarFicha(fichaId);
-      setConfirmandoId(null);
-      toast.success('Ficha excluída');
-      router.refresh();
-    } catch {
-      toast.error('Erro ao excluir ficha');
+      const supabase = createClient();
+      const storagePath = `${clinicaId}/${patientId}/${Date.now()}_${file.name}`;
+
+      const { error: storageErr } = await supabase.storage
+        .from('fichas')
+        .upload(storagePath, file, { upsert: false });
+      if (storageErr) throw storageErr;
+
+      const { data: urlData } = supabase.storage.from('fichas').getPublicUrl(storagePath);
+
+      const { data: doc, error: dbErr } = await supabase
+        .from('paciente_documentos')
+        .insert({
+          paciente_id: patientId,
+          clinica_id: clinicaId,
+          nome: file.name,
+          url: urlData.publicUrl,
+          categoria: getCategoria(file.type),
+        })
+        .select('id')
+        .single();
+      if (dbErr) throw dbErr;
+
+      setUploadedFiles((prev) => [
+        ...prev,
+        { name: file.name, url: urlData.publicUrl, docId: doc.id as string, storagePath },
+      ]);
+    } catch (err) {
+      console.error('Erro no upload:', err);
+      alert('Erro ao fazer upload. Tente novamente.');
     } finally {
-      setDeletando(false);
+      setIsUploading(false);
     }
-  }
+  };
 
-  // ── CSS helpers ────────────────────────────────────────────────────────────
-  const inputClass =
-    'w-full font-sans text-sm px-3 py-2 rounded-xl border border-border bg-surface-alt text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-teal/40 transition-colors';
+  const handleRemoveFile = async (docId: string, storagePath: string) => {
+    try {
+      const supabase = createClient();
+      await Promise.all([
+        supabase.from('paciente_documentos').delete().eq('id', docId),
+        supabase.storage.from('fichas').remove([storagePath]),
+      ]);
+      setUploadedFiles((prev) => prev.filter((f) => f.docId !== docId));
+    } catch (err) {
+      console.error('Erro ao remover arquivo:', err);
+    }
+  };
 
-  function renderArcada(dentes: readonly string[]): React.JSX.Element {
+  const handleEdit = (evolution: Evolution) => {
+    setEditingId(evolution.id);
+    setFormData({
+      type: evolution.type,
+      observation: evolution.observation,
+      teethNotes: [...evolution.teethNotes],
+    });
+    setSelectedTeeth(evolution.teethNotes.map((tn) => tn.tooth));
+    setIsPanelOpen(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from("fichas")
+        .delete()
+        .eq("id", id)
+        .eq("clinica_id", clinicaId);
+
+      if (error) throw error;
+      setEvolutions((prev) => prev.filter((e) => e.id !== id));
+    } catch (err) {
+      console.error("Erro ao excluir ficha:", err);
+    } finally {
+      setShowDeleteConfirm(null);
+    }
+  };
+
+  if (isLoading) {
     return (
-      <div className="flex flex-wrap justify-center gap-1">
-        {dentes.map((dente) => (
-          <button
-            key={dente}
-            type="button"
-            onClick={() => toggleDente(dente)}
-            className={`w-8 h-8 flex items-center justify-center rounded border text-xs font-mono font-medium transition-colors ${
-              dentesSelecionados.includes(dente)
-                ? 'border-teal bg-teal text-white'
-                : 'border-border bg-surface-alt text-text-secondary hover:border-teal/50 hover:text-text-primary'
-            }`}
-          >
-            {dente}
-          </button>
-        ))}
+      <div className="flex items-center justify-center p-20">
+        <Loader2 className="w-8 h-8 animate-spin text-teal" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      {/* ── Toolbar ─────────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between">
-        <p className="font-sans text-sm text-text-secondary">
-          {fichas.length} ficha{fichas.length !== 1 ? 's' : ''}
-        </p>
-        <button
-          type="button"
-          onClick={() => setNovaEvolucaoAberta((v) => !v)}
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold bg-teal text-white hover:bg-teal-dark transition-colors"
-        >
-          {novaEvolucaoAberta ? (
-            <><X className="w-3.5 h-3.5" />Cancelar</>
-          ) : (
-            <><Plus className="w-3.5 h-3.5" />Nova Evolução</>
-          )}
-        </button>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="font-heading text-2xl text-foreground">Histórico Clínico</h2>
+        {!isPanelOpen && (
+          <Button
+            onClick={() => setIsPanelOpen(true)}
+            className="bg-teal hover:bg-teal-lt text-white rounded-xl px-6 py-5 font-bold text-sm flex items-center gap-2 shadow-[0_0_15px_rgba(47,156,133,0.3)] transition-all active:scale-95"
+          >
+            <Plus className="w-4 h-4" />
+            Nova Evolução
+          </Button>
+        )}
       </div>
 
-      {/* ── Painel de nova evolução ──────────────────────────────────────────── */}
       <AnimatePresence>
-        {novaEvolucaoAberta && (
+        {isPanelOpen && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.25 }}
+            initial={{ opacity: 0, height: 0, marginTop: 0 }}
+            animate={{ opacity: 1, height: "auto", marginTop: 24 }}
+            exit={{ opacity: 0, height: 0, marginTop: 0 }}
             className="overflow-hidden"
           >
-            <div className="bg-surface rounded-2xl border border-border overflow-hidden">
-              <div className="px-4 py-3 border-b border-border bg-surface-alt/50 flex items-center justify-between">
-                <div>
-                  <p className="font-sans text-sm font-semibold text-text-primary">Nova Evolução</p>
-                  <p className="font-sans text-xs text-text-secondary mt-0.5">Salva como nova ficha clínica</p>
+            <div className="bg-muted/30 border border-border/60 rounded-2xl p-6 flex flex-col lg:flex-row gap-8">
+              {/* Coluna Esquerda */}
+              <div className="flex-[3] flex flex-col gap-6">
+                <div className="flex-1">
+                  <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-[0.15em] mb-2">
+                    Tipo de Registro
+                  </label>
+                  <select
+                    value={formData.type}
+                    onChange={(e) => setFormData((f) => ({ ...f, type: e.target.value }))}
+                    className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-sm font-medium text-foreground outline-none focus:border-teal transition-colors"
+                  >
+                    <option value="Avaliação">Avaliação</option>
+                    <option value="Evolução">Evolução</option>
+                    <option value="Retorno">Retorno</option>
+                    <option value="Urgência">Urgência</option>
+                    <option value="Procedimento">Procedimento</option>
+                  </select>
                 </div>
-                {/* Botão de gravação de voz */}
-                <button
-                  type="button"
-                  onClick={handleToggleGravacao}
-                  disabled={isProcessandoAudio && !isGravando}
-                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
-                    isGravando
-                      ? 'bg-red-500 text-white hover:bg-red-600 animate-pulse'
-                      : isProcessandoAudio
-                      ? 'bg-surface-alt text-text-secondary cursor-not-allowed'
-                      : 'bg-teal/10 text-teal hover:bg-teal/20'
-                  }`}
-                >
-                  {isProcessandoAudio && !isGravando ? (
-                    <><Loader2 className="w-3.5 h-3.5 animate-spin" />Transcrevendo…</>
-                  ) : isGravando ? (
-                    <><Square className="w-3.5 h-3.5 fill-current" />{formatTimer(timer)}</>
-                  ) : (
-                    <><Mic className="w-3.5 h-3.5" />Gravar voz</>
-                  )}
-                </button>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-0 divide-y md:divide-y-0 md:divide-x divide-border">
-                {/* Coluna esquerda — campos */}
-                <div className="p-4 space-y-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-text-secondary">Tipo de consulta</label>
-                    <select value={tipo} onChange={(e) => setTipo(e.target.value)} className={inputClass}>
-                      {TIPOS_CONSULTA.map((t) => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-text-secondary">
-                      Observações / Evolução
-                      {isGravando && (
-                        <span className="ml-2 text-red-500 animate-pulse">● Gravando…</span>
-                      )}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-[0.15em]">
+                      Observações Gerais
                     </label>
-                    <textarea
-                      value={observacoes}
-                      onChange={(e) => setObservacoes(e.target.value)}
-                      placeholder={isProcessandoAudio ? 'Transcrevendo áudio…' : 'Descreva a evolução clínica, procedimentos realizados…'}
-                      rows={5}
-                      disabled={isProcessandoAudio}
-                      className={inputClass + ' resize-none disabled:opacity-60'}
-                    />
+                    <button
+                      onClick={() => {
+                        void (isRecording ? stopRecording() : startRecording());
+                      }}
+                      disabled={isTranscribing}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                        isRecording
+                          ? "bg-red-100 text-red-600 hover:bg-red-200 animate-pulse"
+                          : "bg-teal/10 text-teal hover:bg-teal/20"
+                      }`}
+                    >
+                      {isTranscribing ? (
+                        <>
+                          <span className="w-3.5 h-3.5 inline-block border-2 border-teal border-t-transparent rounded-full animate-spin" />{" "}
+                          Transcrevendo...
+                        </>
+                      ) : isRecording ? (
+                        <>
+                          <MicOff className="w-3.5 h-3.5" /> Parar Gravação
+                        </>
+                      ) : (
+                        <>
+                          <Mic className="w-3.5 h-3.5" /> Gravar Voz (IA)
+                        </>
+                      )}
+                    </button>
                   </div>
+                  <textarea
+                    value={formData.observation}
+                    onChange={(e) => setFormData((f) => ({ ...f, observation: e.target.value }))}
+                    placeholder="Descreva os procedimentos realizados, queixas do paciente, etc..."
+                    className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm font-medium text-foreground outline-none focus:border-teal transition-colors min-h-[120px] resize-y"
+                  />
+                </div>
 
-                  {dentesSelecionados.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {[...dentesSelecionados].sort((a, b) => Number(a) - Number(b)).map((d) => (
-                        <span key={d} className="inline-flex items-center gap-1 rounded-full bg-teal/10 px-2.5 py-0.5 font-mono text-xs text-teal">
-                          {d}
-                          <button type="button" onClick={() => toggleDente(d)}><X className="w-2.5 h-2.5" /></button>
-                        </span>
+                <AnimatePresence>
+                  {selectedTeeth.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="space-y-4"
+                    >
+                      <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-[0.15em]">
+                        Observações por Dente
+                      </label>
+                      <div className="space-y-3">
+                        {selectedTeeth.map((tooth) => (
+                          <motion.div
+                            key={tooth}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -10 }}
+                            className="flex items-start gap-3"
+                          >
+                            <div className="w-10 h-10 shrink-0 rounded-lg bg-teal text-white flex items-center justify-center font-mono text-sm font-bold shadow-sm">
+                              {tooth}
+                            </div>
+                            <input
+                              type="text"
+                              value={
+                                formData.teethNotes.find((tn) => tn.tooth === tooth)?.note ?? ""
+                              }
+                              onChange={(e) => handleToothNoteChange(tooth, e.target.value)}
+                              placeholder={`Procedimento no dente ${tooth}...`}
+                              className="flex-1 bg-background border border-border rounded-xl px-4 py-2.5 text-sm font-medium text-foreground outline-none focus:border-teal transition-colors"
+                            />
+                          </motion.div>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-[0.15em] mb-2">
+                    Anexos
+                  </label>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.webp,.pdf,.docx"
+                    className="hidden"
+                    onChange={(e) => void handleFileSelect(e)}
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="w-full border-2 border-dashed border-border hover:border-teal bg-background rounded-xl py-6 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-teal transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isUploading ? (
+                      <Loader2 className="w-6 h-6 animate-spin" />
+                    ) : (
+                      <Upload className="w-6 h-6" />
+                    )}
+                    <span className="text-sm font-medium">
+                      {isUploading ? 'Enviando...' : 'Clique para fazer upload de imagens ou raio-x'}
+                    </span>
+                  </button>
+                  {uploadedFiles.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {uploadedFiles.map((f) => (
+                        <div
+                          key={f.docId}
+                          className="flex items-center justify-between px-3 py-2 bg-muted rounded-xl border border-border/40"
+                        >
+                          <div className="flex items-center gap-2 text-xs font-medium text-foreground min-w-0">
+                            <FileText className="w-3.5 h-3.5 text-teal shrink-0" />
+                            <span className="truncate">{f.name}</span>
+                          </div>
+                          <button
+                            onClick={() => void handleRemoveFile(f.docId, f.storagePath)}
+                            className="p-1 text-muted-foreground hover:text-red-500 transition-colors shrink-0 ml-2"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       ))}
                     </div>
                   )}
+                </div>
 
-                  <p className="font-sans text-xs text-text-muted">
-                    Para gravar voz, clique no botão "Gravar voz" no cabeçalho. Para anexos, abra a ficha completa após salvar.
-                  </p>
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-border/60">
+                  <button
+                    onClick={closePanel}
+                    className="px-5 py-2.5 rounded-xl font-semibold text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={() => void handleSave()}
+                    disabled={isSaving}
+                    className="bg-teal hover:bg-teal-lt text-white px-5 py-2.5 rounded-xl font-semibold text-sm flex items-center gap-2 transition-all shadow-[0_0_15px_rgba(47,156,133,0.3)] disabled:opacity-50"
+                  >
+                    {isSaving ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Check className="w-4 h-4" />
+                    )}
+                    {isSaving ? "Salvando..." : "Salvar Evolução"}
+                  </button>
+                </div>
+              </div>
 
-                  <div className="flex gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => { setNovaEvolucaoAberta(false); setObservacoes(''); setDentesSelecionados([]); }}
-                      className="flex-1 py-2 rounded-xl text-sm font-medium border border-border text-text-secondary hover:text-text-primary hover:bg-surface-alt transition-colors"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSalvar}
-                      disabled={salvando}
-                      className="flex-1 py-2 rounded-xl text-sm font-bold bg-teal text-white hover:bg-teal-dark disabled:opacity-50 transition-colors"
-                    >
-                      {salvando ? 'Salvando…' : 'Salvar Ficha'}
-                    </button>
+              {/* Odontograma */}
+              <div className="flex-[2] bg-background rounded-xl border border-border/60 p-6 flex flex-col">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="font-heading text-lg text-foreground">Odontograma</h3>
+                  <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2.5 h-2.5 rounded-sm bg-teal" /> Selecionado
+                    </div>
                   </div>
                 </div>
 
-                {/* Coluna direita — odontograma */}
-                <div className="p-4 space-y-4">
-                  <p className="font-mono text-[0.65rem] uppercase tracking-widest text-text-secondary text-center">
-                    Odontograma ISO
-                  </p>
-                  <div className="space-y-2">
-                    <p className="text-center font-mono text-[0.6rem] text-text-muted">Arcada Superior</p>
-                    {renderArcada(ARCADA_SUPERIOR)}
+                <div className="flex-1 flex flex-col justify-center gap-8">
+                  <div className="flex justify-center gap-1 flex-wrap">
+                    {TEETH_UPPER.map((tooth) => (
+                      <ToothButton
+                        key={tooth}
+                        num={tooth}
+                        isSelected={selectedTeeth.includes(tooth)}
+                        isUpper={true}
+                        onClick={() => toggleTooth(tooth)}
+                      />
+                    ))}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-px flex-1 bg-border" />
-                    <span className="font-mono text-[0.6rem] text-text-secondary">↑ sup · inf ↓</span>
-                    <div className="h-px flex-1 bg-border" />
+                  <div className="flex justify-center gap-1 flex-wrap">
+                    {TEETH_LOWER.map((tooth) => (
+                      <ToothButton
+                        key={tooth}
+                        num={tooth}
+                        isSelected={selectedTeeth.includes(tooth)}
+                        isUpper={false}
+                        onClick={() => toggleTooth(tooth)}
+                      />
+                    ))}
                   </div>
-                  <div className="space-y-2">
-                    {renderArcada(ARCADA_INFERIOR)}
-                    <p className="text-center font-mono text-[0.6rem] text-text-muted">Arcada Inferior</p>
-                  </div>
-                  {dentesSelecionados.length === 0 && (
-                    <p className="text-center font-sans text-xs text-text-muted py-2">
-                      Clique nos dentes para marcar
-                    </p>
-                  )}
+                </div>
+
+                <div className="mt-8 text-center text-xs text-muted-foreground font-medium">
+                  Clique nos dentes para adicionar observações específicas.
                 </div>
               </div>
             </div>
@@ -372,148 +604,174 @@ export function FichasTab({ fichas, patientId }: Props): React.JSX.Element {
         )}
       </AnimatePresence>
 
-      {/* ── Lista de fichas ──────────────────────────────────────────────────── */}
-      {fichas.length === 0 ? (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-surface rounded-2xl border border-border flex flex-col items-center gap-3 py-12"
-        >
-          <FileText className="w-8 h-8 text-text-muted" />
-          <p className="font-sans text-sm text-text-secondary">Nenhuma ficha ainda</p>
-          <Link href={`/dashboard/fichas/nova?paciente_id=${patientId}`} className="text-xs font-medium text-teal hover:text-teal-dark transition-colors">
-            Criar primeira ficha →
-          </Link>
-        </motion.div>
-      ) : (
-        <div className="bg-surface rounded-2xl border border-border divide-y divide-border overflow-hidden">
-          {fichas.map((ficha) =>
-            confirmandoId === ficha.id ? (
-              <div key={ficha.id} className="flex items-center justify-between px-4 py-3 bg-red-50 dark:bg-red-950/20">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
-                  <p className="font-sans text-sm text-red-700 dark:text-red-400">
-                    Apagar ficha de {format(new Date(ficha.created_at), 'dd/MM/yyyy')}?
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button className="font-mono text-xs text-text-secondary hover:text-text-primary" onClick={() => setConfirmandoId(null)}>cancelar</button>
-                  <button disabled={deletando} onClick={() => handleDeletar(ficha.id)} className="px-3 py-1 rounded-lg bg-red-600 text-white text-xs font-medium disabled:opacity-50">
-                    {deletando ? 'Apagando…' : 'Apagar'}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div key={ficha.id} className="group flex items-center gap-3 px-4 py-3 hover:bg-surface-alt/60 transition-colors">
-                <div className="w-9 h-9 rounded-xl bg-teal/10 flex items-center justify-center shrink-0">
-                  <FileText className="w-4 h-4 text-teal" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-sans text-sm font-medium text-text-primary">
-                    {ficha.queixa_principal ?? 'Ficha clínica'}
-                  </p>
-                  <p className="font-mono text-xs text-text-secondary">
-                    {format(new Date(ficha.created_at), "dd/MM/yyyy 'às' HH:mm")}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Badge variant={ficha.status === 'aberta' ? 'warning' : 'success'}>
-                    {ficha.status === 'aberta' ? 'Aberta' : 'Concluída'}
-                  </Badge>
-                  {/* Menu contextual */}
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setMenuAbertoId(menuAbertoId === ficha.id ? null : ficha.id)}
-                      className="flex w-7 h-7 items-center justify-center rounded-lg text-text-secondary opacity-0 group-hover:opacity-100 hover:bg-surface-alt hover:text-text-primary transition-all"
-                    >
-                      <MoreHorizontal className="w-4 h-4" />
-                    </button>
-                    <AnimatePresence>
-                      {menuAbertoId === ficha.id && (
-                        <motion.div
-                          initial={{ opacity: 0, scale: 0.95, y: -4 }}
-                          animate={{ opacity: 1, scale: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.95, y: -4 }}
-                          transition={{ duration: 0.12 }}
-                          className="absolute right-0 top-8 z-20 w-44 bg-surface rounded-xl border border-border shadow-lg overflow-hidden"
-                        >
-                          <Link
-                            href={`/dashboard/fichas/${ficha.id}`}
-                            className="flex items-center gap-2 px-3 py-2.5 text-sm text-text-primary hover:bg-surface-alt transition-colors"
-                            onClick={() => setMenuAbertoId(null)}
-                          >
-                            <ExternalLink className="w-3.5 h-3.5 text-text-secondary" />
-                            Ver ficha completa
-                            <ChevronRight className="w-3.5 h-3.5 ml-auto text-text-secondary" />
-                          </Link>
-                          <button
-                            type="button"
-                            onClick={() => abrirEdicao(ficha)}
-                            className="flex w-full items-center gap-2 px-3 py-2.5 text-sm text-text-primary hover:bg-surface-alt transition-colors"
-                          >
-                            <Pencil className="w-3.5 h-3.5 text-text-secondary" />
-                            Editar ficha
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => { setConfirmandoId(ficha.id); setMenuAbertoId(null); }}
-                            className="flex w-full items-center gap-2 px-3 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            Excluir ficha
-                          </button>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                </div>
-              </div>
-            )
-          )}
+      {/* Timeline */}
+      {evolutions.length === 0 && !isPanelOpen && (
+        <div className="bg-card rounded-2xl border border-border p-12 text-center">
+          <FileText className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+          <p className="text-muted-foreground text-sm">
+            Nenhuma evolução registrada. Clique em &ldquo;Nova Evolução&rdquo; para começar.
+          </p>
         </div>
       )}
 
-      {/* ── Dialog: Editar Ficha ─────────────────────────────────────────────── */}
-      <Dialog open={!!fichaEditando} onOpenChange={(open) => { if (!open) setFichaEditando(null); }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="font-serif text-xl">Editar Ficha</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-text-secondary">Tipo de consulta</label>
-              <select value={editTipo} onChange={(e) => setEditTipo(e.target.value)} className={inputClass}>
-                {TIPOS_CONSULTA.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
+      <div className="relative space-y-8 before:absolute before:left-[19px] before:top-4 before:bottom-4 before:w-px before:bg-border/40">
+        {evolutions.map((evo, idx) => (
+          <motion.div
+            key={evo.id}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: idx * 0.05 }}
+            className="relative pl-12 group"
+          >
+            <div className="absolute left-0 top-1 w-10 h-10 rounded-full bg-card border-2 border-teal flex items-center justify-center z-10 shadow-sm group-hover:scale-110 transition-transform">
+              <div className="w-2 h-2 rounded-full bg-teal" />
             </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-text-secondary">Observações</label>
-              <textarea
-                value={editObs}
-                onChange={(e) => setEditObs(e.target.value)}
-                rows={5}
-                className={inputClass + ' resize-none'}
-              />
+
+            <div className="bg-card rounded-2xl border border-border/60 shadow-sm p-6 hover:shadow-md transition-all">
+              <div className="flex justify-between items-start mb-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-3">
+                    <span className="bg-teal/10 text-teal px-2.5 py-1 rounded-md text-[9px] font-bold uppercase tracking-widest">
+                      {evo.type}
+                    </span>
+                    <h4 className="text-sm font-bold text-foreground">{evo.date}</h4>
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-medium">
+                    <User className="w-3 h-3" /> {evo.professional}
+                  </div>
+                </div>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground">
+                      <MoreVertical className="w-4 h-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleEdit(evo)}>
+                      <Edit2 className="w-3 h-3" /> Editar
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setShowDeleteConfirm(evo.id)}
+                      className="text-red-500 focus:text-red-500"
+                    >
+                      <Trash2 className="w-3 h-3" /> Excluir
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+              {evo.observation && (
+                <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+                  {evo.observation}
+                </p>
+              )}
+
+              {evo.teethNotes.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {evo.teethNotes.map((tn) => (
+                    <div
+                      key={tn.tooth}
+                      className="bg-muted px-3 py-1.5 rounded-lg border border-border/40 flex items-center gap-2"
+                    >
+                      <span className="font-mono text-[10px] font-bold text-teal">
+                        Dente {tn.tooth}
+                      </span>
+                      {tn.note && (
+                        <span className="text-[10px] text-foreground font-medium">{tn.note}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {evo.files.length > 0 && (
+                <div className="flex gap-2">
+                  {evo.files.map((f, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center gap-2 px-3 py-2 bg-muted rounded-xl border border-border/40 text-[10px] font-bold text-foreground"
+                    >
+                      <FileText className="w-3 h-3 text-teal" /> {f}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-text-secondary">Status</label>
-              <select value={editStatus} onChange={(e) => setEditStatus(e.target.value as 'aberta' | 'concluida')} className={inputClass}>
-                <option value="aberta">Aberta</option>
-                <option value="concluida">Concluída</option>
-              </select>
-            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Modal Excluir */}
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowDeleteConfirm(null)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative bg-card rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center border border-border/40"
+            >
+              <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Trash2 className="w-8 h-8 text-red-500" />
+              </div>
+              <h3 className="font-heading text-2xl text-foreground mb-2">Excluir Evolução?</h3>
+              <p className="text-muted-foreground text-sm mb-8">
+                Esta ação não pode ser desfeita. O registro será removido permanentemente.
+              </p>
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowDeleteConfirm(null)}
+                  className="flex-1 rounded-xl"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={() => void handleDelete(showDeleteConfirm)}
+                  className="flex-1 bg-red-500 text-white hover:bg-red-600 rounded-xl"
+                >
+                  Excluir
+                </Button>
+              </div>
+            </motion.div>
           </div>
-          <DialogFooter>
-            <button type="button" onClick={() => setFichaEditando(null)} className="px-4 py-2 rounded-xl text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-alt transition-colors">
-              Cancelar
-            </button>
-            <button type="button" onClick={handleSalvarEdicao} disabled={salvandoEdit} className="px-6 py-2 rounded-xl text-sm font-bold bg-teal text-white hover:bg-teal-dark disabled:opacity-50 transition-colors">
-              {salvandoEdit ? 'Salvando…' : 'Salvar'}
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        )}
+      </AnimatePresence>
     </div>
+  );
+}
+
+function ToothButton({
+  num,
+  isSelected,
+  isUpper,
+  onClick,
+}: {
+  num: number;
+  isSelected: boolean;
+  isUpper: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`relative w-8 h-10 border-2 flex items-center justify-center font-mono text-xs font-bold transition-all ${
+        isUpper ? "rounded-t-md rounded-b-sm" : "rounded-b-md rounded-t-sm"
+      } ${
+        isSelected
+          ? "bg-teal border-teal text-white shadow-md scale-110 z-10"
+          : "bg-muted border-border text-muted-foreground hover:border-teal hover:text-teal"
+      }`}
+    >
+      {num}
+    </button>
   );
 }

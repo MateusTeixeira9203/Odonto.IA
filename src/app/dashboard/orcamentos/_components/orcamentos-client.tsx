@@ -1,564 +1,932 @@
-"use client";
+'use client';
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
-  CheckCircle,
-  Clock,
-  TrendingUp,
-  AlertCircle,
-  ChevronRight,
+  CircleDollarSign,
   Search,
+  Filter,
+  ChevronRight,
+  CheckCircle2,
+  Clock,
+  XCircle,
+  X,
+  FileText,
+  Calendar,
+  CreditCard,
   Plus,
-} from "lucide-react";
-import { motion } from "motion/react";
-import { toast } from "sonner";
+  Trash2,
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { format, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { useRouter } from 'next/navigation';
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { createClient } from '@/lib/supabase/client';
+import type { OrcamentoRow, OrcamentoItemRow, PagamentoRow } from '../page';
 import {
-  marcarPagamentoPago,
   atualizarStatusOrcamento,
+  registrarPagamento,
+  criarOrcamento,
   type FormaPagamento,
   type StatusOrcamento,
-} from "../actions";
-import type { OrcamentoEnriquecido, MetricasMes } from "./types";
+} from '../actions';
 
-// ── Status configs ────────────────────────────────────────────────────────────
-const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  rascunho: {
-    label: "Rascunho",
-    className: "bg-muted text-muted-foreground border border-border",
-  },
-  enviado: {
-    label: "Enviado",
-    className: "bg-teal-lt/20 text-teal-dark border border-teal/20",
-  },
-  aprovado: {
-    label: "Aprovado",
-    className: "bg-teal/10 text-teal border border-teal/20",
-  },
-  recusado: {
-    label: "Recusado",
-    className: "bg-red-500/10 text-red-500 border border-red-500/20",
-  },
+// Mapeamento de status para exibição
+const STATUS_MAP: Record<
+  string,
+  { label: string; icon: React.ElementType; color: string; bg: string }
+> = {
+  aprovado: { label: 'Aprovado', icon: CheckCircle2, color: 'text-teal', bg: 'bg-teal/10' },
+  enviado: { label: 'Enviado', icon: Clock, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+  rascunho: { label: 'Rascunho', icon: FileText, color: 'text-muted-foreground', bg: 'bg-muted' },
+  recusado: { label: 'Recusado', icon: XCircle, color: 'text-red-500', bg: 'bg-red-500/10' },
 };
 
-const PAGAMENTO_STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  pendente: {
-    label: "Pendente",
-    className:
-      "bg-amber-500/10 text-amber-600 border border-amber-500/20 dark:text-amber-400",
-  },
-  pago: {
-    label: "Pago",
-    className:
-      "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 dark:text-emerald-400",
-  },
-  cancelado: {
-    label: "Cancelado",
-    className: "bg-destructive/10 text-destructive border border-destructive/20",
-  },
-};
+const formatCurrency = (value: number | null) =>
+  (value ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-const FORMA_LABELS: Record<string, string> = {
-  dinheiro: "Dinheiro",
-  pix: "Pix",
-  cartao_credito: "Cartão de Crédito",
-  cartao_debito: "Cartão de Débito",
-  boleto: "Boleto",
-  outro: "Outro",
-};
-
-function formatBRL(valor: number): string {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valor);
+interface ProcedimentoClinica {
+  id: string;
+  nome: string;
+  preco_padrao: number | null;
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
-interface Props {
-  orcamentos: OrcamentoEnriquecido[];
-  metricas: MetricasMes;
+interface NovoOrcItem {
+  procedimentoId: string;
+  descricao: string;
+  quantidade: number;
+  preco: number;
 }
 
-export function OrcamentosClient({ orcamentos, metricas }: Props): React.JSX.Element {
+export function OrcamentosClient({
+  orcamentos: inicial,
+  clinicaId,
+}: {
+  orcamentos: OrcamentoRow[];
+  clinicaId: string;
+}) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const [orcamentos, setOrcamentos] = useState(inicial);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState<string>('todos');
+  const [selected, setSelected] = useState<OrcamentoRow | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const [busca, setBusca] = useState("");
-  const [filtroStatus, setFiltroStatus] = useState<string>("todos");
-  const [filtroMes, setFiltroMes] = useState<string>("todos");
-  const [orcamentoId, setOrcamentoId] = useState<string | null>(null);
-  const [formas, setFormas] = useState<Record<string, FormaPagamento>>({});
+  // Novo orçamento
+  const [isNovoOrcOpen, setIsNovoOrcOpen] = useState(false);
+  const [procedimentosClinica, setProcedimentosClinica] = useState<ProcedimentoClinica[]>([]);
+  const [novoOrcItens, setNovoOrcItens] = useState<NovoOrcItem[]>([
+    { procedimentoId: '', descricao: '', quantidade: 1, preco: 0 },
+  ]);
+  const [novoOrcPacienteSearch, setNovoOrcPacienteSearch] = useState('');
+  const [novoOrcPacienteId, setNovoOrcPacienteId] = useState('');
+  const [novoOrcPacienteNome, setNovoOrcPacienteNome] = useState('');
+  const [pacienteSugestoes, setPacienteSugestoes] = useState<{ id: string; nome: string }[]>([]);
+  const [showSugestoes, setShowSugestoes] = useState(false);
+  const [orcSaving, setOrcSaving] = useState(false);
+  const [orcError, setOrcError] = useState<string | null>(null);
 
-  const selectedOrcamento = orcamentos.find((o) => o.id === orcamentoId) ?? null;
-
-  const mesesDisponiveis = Array.from(
-    new Set(orcamentos.map((o) => o.created_at.slice(0, 7)))
-  ).sort((a, b) => b.localeCompare(a));
-
-  const filtrados = orcamentos.filter((o) => {
-    if (busca && !o.paciente.nome.toLowerCase().includes(busca.toLowerCase())) return false;
-    if (filtroStatus !== "todos" && o.status !== filtroStatus) return false;
-    if (filtroMes !== "todos" && !o.created_at.startsWith(filtroMes)) return false;
-    return true;
+  // Registrar pagamento (painel lateral)
+  const [pagForm, setPagForm] = useState({
+    valor: '',
+    formaPagamento: 'pix' as FormaPagamento,
+    data: new Date().toISOString().split('T')[0],
   });
+  const [pagSaving, setPagSaving] = useState(false);
+  const [pagError, setPagError] = useState<string | null>(null);
 
-  async function handleAtualizarStatus(id: string, status: StatusOrcamento): Promise<void> {
+  // Busca procedimentos da clínica ao montar
+  useEffect(() => {
+    const supabase = createClient();
+    supabase
+      .from('procedimentos')
+      .select('id, nome, preco_padrao')
+      .eq('clinica_id', clinicaId)
+      .eq('ativo', true)
+      .order('nome')
+      .then(({ data }) => {
+        setProcedimentosClinica(data ?? []);
+      });
+  }, [clinicaId]);
+
+  // Autocomplete de pacientes para o modal de novo orçamento
+  const buscarPacientes = useCallback(async (nome: string) => {
+    if (nome.length < 2) {
+      setPacienteSugestoes([]);
+      return;
+    }
+    const supabase = createClient();
+    const { data } = await supabase
+      .from('pacientes')
+      .select('id, nome')
+      .ilike('nome', `%${nome}%`)
+      .limit(6);
+    setPacienteSugestoes(data ?? []);
+  }, []);
+
+  const novoOrcTotal = novoOrcItens.reduce((s, i) => s + i.quantidade * i.preco, 0);
+
+  // Filtra por busca e status
+  const filtered = useMemo(
+    () =>
+      orcamentos.filter((o) => {
+        const nome = o.paciente?.nome ?? '';
+        const matchesSearch =
+          nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          o.id.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesStatus = filterStatus === 'todos' || o.status === filterStatus;
+        return matchesSearch && matchesStatus;
+      }),
+    [orcamentos, searchTerm, filterStatus]
+  );
+
+  // Métricas do mês atual
+  const agora = new Date();
+  const inicioMes = new Date(agora.getFullYear(), agora.getMonth(), 1);
+
+  const totalAprovados = orcamentos
+    .filter((o) => o.status === 'aprovado' && new Date(o.created_at) >= inicioMes)
+    .reduce((sum, o) => sum + (o.total ?? 0), 0);
+
+  const totalAguardando = orcamentos
+    .filter((o) => o.status === 'enviado')
+    .reduce((sum, o) => sum + (o.total ?? 0), 0);
+
+  const totalValidos = orcamentos.filter((o) => o.status !== 'rascunho').length;
+  const totalAprovadosCount = orcamentos.filter((o) => o.status === 'aprovado').length;
+  const taxaConversao = totalValidos > 0 ? Math.round((totalAprovadosCount / totalValidos) * 100) : 0;
+
+  // Atualiza status via server action
+  const handleStatusChange = async (id: string, status: StatusOrcamento) => {
+    setIsSaving(true);
     const result = await atualizarStatusOrcamento(id, status);
-    if (result.error) toast.error(`Erro: ${result.error}`);
-    else router.refresh();
-  }
+    if (!result.error) {
+      setOrcamentos((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
+      setSelected((prev) => (prev?.id === id ? { ...prev, status } : prev));
+    }
+    setIsSaving(false);
+  };
 
-  async function handleMarcarPago(pagamentoId: string): Promise<void> {
-    const forma = formas[pagamentoId];
-    if (!forma) { toast.error("Selecione a forma de pagamento"); return; }
-    startTransition(async () => {
-      const result = await marcarPagamentoPago(pagamentoId, forma);
-      if (result.error) toast.error(`Erro: ${result.error}`);
-      else { toast.success("Pagamento marcado como pago"); router.refresh(); }
+  // Registra pagamento no orçamento selecionado
+  const handleRegistrarPagamento = async () => {
+    if (!selected) return;
+    const valor = parseFloat(pagForm.valor.replace(',', '.'));
+    if (!valor || valor <= 0) {
+      setPagError('Informe um valor válido.');
+      return;
+    }
+    setPagError(null);
+    setPagSaving(true);
+
+    const result = await registrarPagamento({
+      orcamentoId: selected.id,
+      valor,
+      formaPagamento: pagForm.formaPagamento,
+      data: pagForm.data,
     });
-  }
 
-  const sheetPendente = selectedOrcamento
-    ? selectedOrcamento.pagamentos.filter((p) => p.status === "pendente").reduce((a, p) => a + Number(p.valor), 0)
-    : 0;
-  const sheetPago = selectedOrcamento
-    ? selectedOrcamento.pagamentos.filter((p) => p.status === "pago").reduce((a, p) => a + Number(p.valor), 0)
-    : 0;
+    if (result.error) {
+      setPagError(result.error);
+    } else {
+      const novoPag: PagamentoRow = {
+        id: result.id ?? crypto.randomUUID(),
+        orcamento_id: selected.id,
+        valor,
+        status: 'pago',
+        forma_pagamento: pagForm.formaPagamento,
+        data_pagamento: pagForm.data,
+      };
+      setOrcamentos((prev) =>
+        prev.map((o) =>
+          o.id === selected.id ? { ...o, pagamentos: [...o.pagamentos, novoPag] } : o
+        )
+      );
+      setSelected((prev) =>
+        prev ? { ...prev, pagamentos: [...prev.pagamentos, novoPag] } : prev
+      );
+      setPagForm({
+        valor: '',
+        formaPagamento: 'pix',
+        data: new Date().toISOString().split('T')[0],
+      });
+      router.refresh();
+    }
+    setPagSaving(false);
+  };
+
+  // Cria novo orçamento
+  const handleCriarOrcamento = async () => {
+    if (!novoOrcPacienteId) {
+      setOrcError('Selecione um paciente.');
+      return;
+    }
+    const itensValidos = novoOrcItens.filter((i) => i.descricao.trim() && i.preco > 0);
+    if (itensValidos.length === 0) {
+      setOrcError('Adicione ao menos um procedimento com descrição e valor.');
+      return;
+    }
+    setOrcError(null);
+    setOrcSaving(true);
+
+    const result = await criarOrcamento({
+      pacienteId: novoOrcPacienteId,
+      itens: itensValidos.map((i) => ({
+        procedimentoId: i.procedimentoId || null,
+        descricao: i.descricao,
+        quantidade: i.quantidade,
+        precoUnitario: i.preco,
+      })),
+    });
+
+    if (result.error) {
+      setOrcError(result.error);
+    } else {
+      // Atualização otimista — adiciona o novo orçamento ao topo da lista
+      const novoOrc: OrcamentoRow = {
+        id: result.id ?? crypto.randomUUID(),
+        created_at: new Date().toISOString(),
+        status: 'rascunho',
+        total: novoOrcTotal,
+        validade_dias: 30,
+        condicoes_pagamento: null,
+        paciente: { id: novoOrcPacienteId, nome: novoOrcPacienteNome },
+        dentista: null,
+        itens: itensValidos.map(
+          (i): OrcamentoItemRow => ({
+            id: crypto.randomUUID(),
+            orcamento_id: result.id ?? '',
+            descricao: i.descricao,
+            quantidade: i.quantidade,
+            preco_unitario: i.preco,
+            preco_total: i.quantidade * i.preco,
+          })
+        ),
+        pagamentos: [],
+      };
+      setOrcamentos((prev) => [novoOrc, ...prev]);
+      setIsNovoOrcOpen(false);
+      setNovoOrcItens([{ procedimentoId: '', descricao: '', quantidade: 1, preco: 0 }]);
+      setNovoOrcPacienteSearch('');
+      setNovoOrcPacienteId('');
+      setNovoOrcPacienteNome('');
+      router.refresh();
+    }
+    setOrcSaving(false);
+  };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-      className="p-8 max-w-7xl mx-auto w-full"
-    >
-      {/* Header */}
-      <header className="flex items-center justify-between mb-10">
-        <h1 className="font-serif text-4xl text-text-primary">Orçamentos</h1>
-        <Link
-          href="/dashboard/fichas/nova"
-          className="bg-teal text-white px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-teal-dark transition-all"
+    <div className="p-8 max-w-6xl mx-auto w-full">
+      {/* Cabeçalho */}
+      <motion.header
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8"
+      >
+        <div>
+          <h1 className="font-heading text-4xl text-foreground mb-2">Orçamentos</h1>
+          <p className="text-muted-foreground text-sm font-medium">Acompanhe propostas e conversões.</p>
+        </div>
+        <button
+          onClick={() => {
+            setOrcError(null);
+            setNovoOrcItens([{ procedimentoId: '', descricao: '', quantidade: 1, preco: 0 }]);
+            setNovoOrcPacienteSearch('');
+            setNovoOrcPacienteId('');
+            setNovoOrcPacienteNome('');
+            setIsNovoOrcOpen(true);
+          }}
+          className="bg-teal hover:bg-teal-lt text-white px-5 py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-colors shadow-[0_0_15px_rgba(47,156,133,0.3)] w-full sm:w-auto"
         >
           <Plus className="w-4 h-4" />
           Novo Orçamento
-        </Link>
-      </header>
+        </button>
+      </motion.header>
 
-      {/* ── Métricas ──────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        {/* Aprovados do mês */}
-        <div className="rounded-2xl border border-teal/20 bg-teal/5 p-5">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 rounded-lg bg-teal/10 flex items-center justify-center">
-              <CheckCircle className="w-3.5 h-3.5 text-teal" />
-            </div>
-            <span className="font-mono text-[11px] uppercase tracking-widest text-teal">
-              Aprovados
-            </span>
+      {/* Cards de métricas */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8"
+      >
+        <div className="bg-card p-5 rounded-2xl border border-border shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-teal/10 text-teal flex items-center justify-center">
+            <CheckCircle2 className="w-6 h-6" />
           </div>
-          <p className="font-mono text-2xl font-bold text-teal leading-none">
-            {formatBRL(metricas.aprovadosMes)}
-          </p>
-          <p className="font-mono text-[10px] text-teal/60 mt-1.5 uppercase tracking-wider">
-            do mês
-          </p>
-        </div>
-
-        {/* Pendentes */}
-        <div className="rounded-2xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-5">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-800/40 flex items-center justify-center">
-              <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+          <div>
+            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.15em] mb-1">
+              Aprovados (Mês)
             </div>
-            <span className="font-mono text-[11px] uppercase tracking-widest text-amber-700 dark:text-amber-400">
-              Pendentes
-            </span>
-          </div>
-          <p className="font-mono text-2xl font-bold text-amber-700 dark:text-amber-300 leading-none">
-            {formatBRL(metricas.pendente)}
-          </p>
-          <p className="font-mono text-[10px] text-amber-600/60 dark:text-amber-400/60 mt-1.5 uppercase tracking-wider">
-            a receber
-          </p>
-        </div>
-
-        {/* Taxa de conversão */}
-        <div className="rounded-2xl border border-border bg-card p-5">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 rounded-lg bg-primary/15 flex items-center justify-center">
-              <TrendingUp className="w-3.5 h-3.5 text-primary" />
+            <div className="font-mono text-2xl font-semibold text-foreground">
+              {formatCurrency(totalAprovados)}
             </div>
-            <span className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-              Conversão
-            </span>
           </div>
-          <p className="font-mono text-2xl font-bold text-foreground leading-none">
-            {metricas.taxaConversao}%
-          </p>
-          <p className="font-mono text-[10px] text-muted-foreground mt-1.5 uppercase tracking-wider">
-            aprovados / criados
-          </p>
-        </div>
-      </div>
-
-      {/* ── Filtros ───────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 mb-4 flex-wrap">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50 pointer-events-none" />
-          <input
-            type="search"
-            placeholder="Buscar paciente…"
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            className="w-full h-10 pl-9 pr-3 bg-surface-alt border border-border rounded-xl font-sans text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-teal/40 transition-colors"
-          />
         </div>
 
-        <Select value={filtroStatus} onValueChange={(v) => { if (v) setFiltroStatus(v); }}>
-          <SelectTrigger className="w-36 h-10 rounded-xl bg-muted border-0">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos</SelectItem>
-            <SelectItem value="rascunho">Rascunho</SelectItem>
-            <SelectItem value="enviado">Enviado</SelectItem>
-            <SelectItem value="aprovado">Aprovado</SelectItem>
-            <SelectItem value="recusado">Recusado</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select value={filtroMes} onValueChange={(v) => { if (v) setFiltroMes(v); }}>
-          <SelectTrigger className="w-44 h-10 rounded-xl bg-muted border-0">
-            <SelectValue placeholder="Mês" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos os meses</SelectItem>
-            {mesesDisponiveis.map((m) => (
-              <SelectItem key={m} value={m}>
-                {format(new Date(`${m}-01`), "MMMM yyyy", { locale: ptBR })}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* ── Tabela ────────────────────────────────────────────────────────── */}
-      {filtrados.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 bg-card rounded-2xl border border-border">
-          <AlertCircle className="w-10 h-10 text-muted-foreground/30 mb-4" />
-          <p className="font-serif text-base text-foreground mb-1">Nenhum orçamento encontrado</p>
-          <p className="font-sans text-sm text-muted-foreground">
-            {busca || filtroStatus !== "todos" ? "Tente outros filtros" : "Crie o primeiro orçamento"}
-          </p>
+        <div className="bg-card p-5 rounded-2xl border border-border shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center">
+            <Clock className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.15em] mb-1">
+              Aguardando
+            </div>
+            <div className="font-mono text-2xl font-semibold text-foreground">
+              {formatCurrency(totalAguardando)}
+            </div>
+          </div>
         </div>
-      ) : (
-        <div className="rounded-2xl border border-border overflow-hidden bg-card">
-          <table className="w-full text-sm">
+
+        <div className="bg-zinc-950 dark:bg-zinc-900 p-5 rounded-2xl border border-zinc-950 dark:border-white/10 shadow-lg flex items-center gap-4 text-white">
+          <div className="w-12 h-12 rounded-full bg-white/10 text-teal-lt flex items-center justify-center">
+            <CircleDollarSign className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] mb-1">
+              Taxa de Conversão
+            </div>
+            <div className="font-mono text-2xl font-semibold text-white">{taxaConversao}%</div>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Tabela */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden"
+      >
+        {/* Barra de busca e filtro */}
+        <div className="p-4 border-b border-border flex flex-col sm:flex-row gap-4 items-center justify-between bg-muted/30">
+          <div className="relative w-full sm:max-w-md">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Buscar por paciente ou ID..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-4 py-2.5 bg-card border border-border rounded-xl text-sm outline-none focus:border-teal transition-colors font-sans text-foreground"
+            />
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Filter className="w-4 h-4 text-muted-foreground shrink-0" />
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="border border-border bg-card rounded-xl px-3 py-2 text-sm font-semibold text-foreground outline-none focus:border-teal transition-colors w-full sm:w-auto"
+            >
+              <option value="todos">Todos</option>
+              <option value="aprovado">Aprovados</option>
+              <option value="enviado">Enviados</option>
+              <option value="rascunho">Rascunhos</option>
+              <option value="recusado">Recusados</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-border bg-muted/30">
-                <th className="text-left px-4 py-3.5 font-mono text-[11px] text-muted-foreground uppercase tracking-widest">
+              <tr className="border-b border-border bg-muted/50">
+                <th className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-[0.15em]">
                   ID / Data
                 </th>
-                <th className="text-left px-4 py-3.5 font-mono text-[11px] text-muted-foreground uppercase tracking-widest">
+                <th className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-[0.15em]">
                   Paciente
                 </th>
-                <th className="text-right px-4 py-3.5 font-mono text-[11px] text-muted-foreground uppercase tracking-widest">
+                <th className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-[0.15em]">
                   Valor Total
                 </th>
-                <th className="text-left px-4 py-3.5 font-mono text-[11px] text-muted-foreground uppercase tracking-widest">
+                <th className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-[0.15em]">
                   Status
                 </th>
-                <th className="w-8 px-4 py-3.5" />
+                <th className="px-6 py-4 text-right" />
               </tr>
             </thead>
-            <tbody>
-              {filtrados.map((orc, i) => {
-                const statusCfg = STATUS_CONFIG[orc.status] ?? {
-                  label: orc.status,
-                  className: "bg-muted text-muted-foreground border border-border",
-                };
+            <tbody className="divide-y divide-border">
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center text-sm text-muted-foreground">
+                    Nenhum orçamento encontrado.
+                  </td>
+                </tr>
+              )}
+              {filtered.map((o, i) => {
+                const s = STATUS_MAP[o.status] ?? STATUS_MAP.rascunho;
+                const Icon = s.icon;
                 return (
-                  <tr
-                    key={orc.id}
-                    onClick={() => setOrcamentoId(orc.id)}
-                    className={`border-b border-border/50 hover:bg-muted/20 cursor-pointer transition-colors ${
-                      i === filtrados.length - 1 ? "border-b-0" : ""
-                    }`}
+                  <motion.tr
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.3 + i * 0.05 }}
+                    key={o.id}
+                    onClick={() => {
+                      setSelected(o);
+                      setPagError(null);
+                      setPagForm({
+                        valor: '',
+                        formaPagamento: 'pix',
+                        data: new Date().toISOString().split('T')[0],
+                      });
+                    }}
+                    className="hover:bg-muted/50 transition-colors group cursor-pointer"
                   >
-                    <td className="px-4 py-3.5">
-                      <p className="font-mono text-[0.6rem] text-muted-foreground/60 border border-border rounded px-1.5 py-0.5 inline-block">
-                        #{orc.id.split("-")[0].toUpperCase()}
-                      </p>
-                      <p className="font-mono text-xs text-muted-foreground mt-1">
-                        {format(new Date(orc.created_at), "dd/MM/yyyy")}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <p className="font-sans text-sm font-medium text-foreground">{orc.paciente.nome}</p>
-                      <p className="font-mono text-xs text-muted-foreground">{orc.dentista.nome}</p>
-                    </td>
-                    <td className="px-4 py-3.5 font-mono text-sm font-semibold text-foreground text-right">
-                      {orc.total != null ? formatBRL(orc.total) : "—"}
-                    </td>
-                    <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
-                      <div
-                        className={`relative inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusCfg.className}`}
-                      >
-                        {statusCfg.label}
-                        <select
-                          value={orc.status}
-                          onChange={(e) => void handleAtualizarStatus(orc.id, e.target.value as StatusOrcamento)}
-                          className="absolute inset-0 w-full opacity-0 cursor-pointer"
-                        >
-                          <option value="rascunho">Rascunho</option>
-                          <option value="enviado">Enviado</option>
-                          <option value="aprovado">Aprovado</option>
-                          <option value="recusado">Recusado</option>
-                        </select>
+                    <td className="px-6 py-4">
+                      <div className="font-mono text-xs font-semibold text-foreground">
+                        {o.id.slice(0, 8).toUpperCase()}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground mt-1">
+                        {format(parseISO(o.created_at), "dd 'de' MMM 'de' yyyy", { locale: ptBR })}
                       </div>
                     </td>
-                    <td className="px-4 py-3.5">
-                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                    <td className="px-6 py-4">
+                      <div className="font-semibold text-sm text-foreground group-hover:text-teal transition-colors">
+                        {o.paciente?.nome ?? '—'}
+                      </div>
                     </td>
-                  </tr>
+                    <td className="px-6 py-4">
+                      <div className="font-mono text-sm font-semibold text-foreground">
+                        {formatCurrency(o.total)}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${s.bg} ${s.color}`}
+                      >
+                        <Icon className="w-3 h-3" />
+                        {s.label}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <button className="p-2 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted transition-colors">
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </motion.tr>
                 );
               })}
             </tbody>
           </table>
         </div>
-      )}
 
-      {/* ── Sheet de detalhe ──────────────────────────────────────────────── */}
-      <Sheet open={orcamentoId !== null} onOpenChange={(open) => { if (!open) setOrcamentoId(null); }}>
-        <SheetContent side="right" className="w-[560px] sm:max-w-[560px] overflow-y-auto p-0">
-          {selectedOrcamento && (
-            <>
-              <SheetHeader className="p-6 pb-5 border-b border-border">
-                <div className="flex items-start justify-between pr-8">
-                  <div>
-                    <p className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground mb-1">
-                      Orçamento #{selectedOrcamento.id.split("-")[0].toUpperCase()}
-                    </p>
-                    <SheetTitle className="font-serif text-xl text-foreground">
-                      {selectedOrcamento.paciente.nome}
-                    </SheetTitle>
-                    <SheetDescription className="mt-1">
-                      Criado em{" "}
-                      {format(new Date(selectedOrcamento.created_at), "dd 'de' MMMM 'de' yyyy", {
-                        locale: ptBR,
-                      })}
-                    </SheetDescription>
+        <div className="px-6 py-3 border-t border-border bg-muted/20 text-xs text-muted-foreground font-medium">
+          Exibindo {filtered.length} de {orcamentos.length} orçamento{orcamentos.length !== 1 ? 's' : ''}
+        </div>
+      </motion.div>
+
+      {/* Painel lateral de detalhe */}
+      <AnimatePresence>
+        {selected && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelected(null)}
+              className="fixed inset-0 bg-black/40 z-40"
+            />
+            <motion.aside
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              className="fixed right-0 top-0 h-full w-full sm:w-[480px] bg-card border-l border-border shadow-2xl z-50 flex flex-col"
+            >
+              {/* Cabeçalho do painel */}
+              <div className="p-6 border-b border-border flex items-center justify-between bg-muted/30">
+                <div>
+                  <div className="font-mono text-xs text-muted-foreground mb-1">
+                    {selected.id.slice(0, 8).toUpperCase()}
                   </div>
-                  <div
-                    className={`relative inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium mt-1 ${
-                      STATUS_CONFIG[selectedOrcamento.status]?.className ??
-                      "bg-muted text-muted-foreground border border-border"
-                    }`}
-                  >
-                    {STATUS_CONFIG[selectedOrcamento.status]?.label ?? selectedOrcamento.status}
-                    <select
-                      value={selectedOrcamento.status}
-                      onChange={(e) =>
-                        void handleAtualizarStatus(
-                          selectedOrcamento.id,
-                          e.target.value as StatusOrcamento
-                        )
-                      }
-                      className="absolute inset-0 w-full opacity-0 cursor-pointer"
-                    >
-                      <option value="rascunho">Rascunho</option>
-                      <option value="enviado">Enviado</option>
-                      <option value="aprovado">Aprovado</option>
-                      <option value="recusado">Recusado</option>
-                    </select>
+                  <h2 className="font-heading text-2xl text-foreground">
+                    {selected.paciente?.nome ?? '—'}
+                  </h2>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Calendar className="w-3 h-3 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">
+                      {format(parseISO(selected.created_at), "dd 'de' MMM 'de' yyyy", { locale: ptBR })}
+                    </span>
                   </div>
                 </div>
-              </SheetHeader>
+                <button
+                  onClick={() => setSelected(null)}
+                  className="p-2 rounded-xl hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
 
-              <div className="p-6 space-y-6">
-                {/* Mini métricas */}
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="rounded-2xl border border-border bg-muted/20 p-3.5 text-center">
-                    <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Total</p>
-                    <p className="font-mono text-base font-bold text-foreground">
-                      {selectedOrcamento.total != null ? formatBRL(selectedOrcamento.total) : "—"}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-3.5 text-center">
-                    <p className="font-mono text-[10px] uppercase tracking-widest text-amber-600 dark:text-amber-400 mb-1">
-                      Pendente
-                    </p>
-                    <p className="font-mono text-base font-bold text-amber-600 dark:text-amber-400">
-                      {formatBRL(sheetPendente)}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 p-3.5 text-center">
-                    <p className="font-mono text-[10px] uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-1">
-                      Recebido
-                    </p>
-                    <p className="font-mono text-base font-bold text-emerald-600 dark:text-emerald-400">
-                      {formatBRL(sheetPago)}
-                    </p>
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                {/* Alterar status */}
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2 block">
+                    Status do Orçamento
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {(['rascunho', 'enviado', 'aprovado', 'recusado'] as StatusOrcamento[]).map((s) => (
+                      <button
+                        key={s}
+                        disabled={isSaving}
+                        onClick={() => void handleStatusChange(selected.id, s)}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all disabled:opacity-50 ${
+                          selected.status === s
+                            ? `${STATUS_MAP[s].bg} ${STATUS_MAP[s].color} ring-2 ring-current ring-offset-1`
+                            : 'bg-muted text-muted-foreground hover:bg-accent'
+                        }`}
+                      >
+                        {STATUS_MAP[s].label}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                {/* Procedimentos */}
-                {selectedOrcamento.itens.length > 0 && (
+                {/* Valor total */}
+                <div className="bg-muted rounded-2xl p-5">
+                  <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">
+                    Valor Total
+                  </div>
+                  <div className="font-mono text-3xl font-bold text-foreground">
+                    {formatCurrency(selected.total)}
+                  </div>
+                  {selected.condicoes_pagamento && (
+                    <div className="text-xs text-muted-foreground mt-2">{selected.condicoes_pagamento}</div>
+                  )}
+                </div>
+
+                {/* Itens do orçamento */}
+                {selected.itens.length > 0 && (
                   <div>
-                    <p className="font-mono text-[11px] text-muted-foreground uppercase tracking-widest mb-3">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3 block">
                       Procedimentos
-                    </p>
-                    <div className="rounded-2xl border border-border overflow-hidden">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-border bg-muted/30">
-                            <th className="text-left px-4 py-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                              Dente
-                            </th>
-                            <th className="text-left px-4 py-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                              Procedimento
-                            </th>
-                            <th className="text-right px-4 py-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                              Valor
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {selectedOrcamento.itens.map((item, i) => (
-                            <tr
-                              key={item.id}
-                              className={`border-b border-border/50 ${
-                                i === selectedOrcamento.itens.length - 1 ? "border-b-0" : ""
-                              }`}
-                            >
-                              <td className="px-4 py-3 font-mono text-sm text-muted-foreground">
-                                {item.dente ?? "—"}
-                              </td>
-                              <td className="px-4 py-3 font-sans text-foreground">
-                                {item.descricao ?? "—"}
-                                {item.quantidade > 1 && (
-                                  <span className="ml-1.5 font-mono text-xs text-muted-foreground">
-                                    ×{item.quantidade}
-                                  </span>
-                                )}
-                              </td>
-                              <td className="px-4 py-3 font-mono text-sm text-foreground text-right font-semibold">
-                                {item.preco_total != null ? formatBRL(item.preco_total) : "—"}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                        <tfoot>
-                          <tr className="border-t border-border bg-muted/20">
-                            <td
-                              colSpan={2}
-                              className="px-4 py-3 font-mono text-xs text-muted-foreground uppercase tracking-wider text-right"
-                            >
-                              Total Geral
-                            </td>
-                            <td className="px-4 py-3 font-mono text-base font-bold text-foreground text-right">
-                              {selectedOrcamento.total != null ? formatBRL(selectedOrcamento.total) : "—"}
-                            </td>
-                          </tr>
-                        </tfoot>
-                      </table>
+                    </label>
+                    <div className="space-y-2">
+                      {selected.itens.map((item) => (
+                        <div
+                          key={item.id}
+                          className="flex items-center justify-between p-3 bg-muted/50 rounded-xl"
+                        >
+                          <div className="text-sm font-medium text-foreground">{item.descricao ?? '—'}</div>
+                          <div className="font-mono text-sm font-semibold text-foreground">
+                            {formatCurrency(item.preco_total)}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
 
-                {/* Pagamentos */}
-                {selectedOrcamento.pagamentos.length > 0 && (
+                {/* Pagamentos registrados */}
+                {selected.pagamentos.length > 0 && (
                   <div>
-                    <p className="font-mono text-[11px] text-muted-foreground uppercase tracking-widest mb-3">
-                      Pagamentos
-                    </p>
-                    <div className="space-y-3">
-                      {selectedOrcamento.pagamentos.map((pg) => {
-                        const pgCfg = PAGAMENTO_STATUS_CONFIG[pg.status] ?? {
-                          label: pg.status,
-                          className: "bg-muted text-muted-foreground border border-border",
-                        };
-                        return (
-                          <div key={pg.id} className="rounded-2xl border border-border bg-muted/10 p-4">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="font-mono text-sm font-bold text-foreground">
-                                {formatBRL(Number(pg.valor))}
-                              </span>
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${pgCfg.className}`}>
-                                {pgCfg.label}
-                              </span>
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3 flex items-center gap-2">
+                      <CreditCard className="w-3 h-3" /> Pagamentos
+                    </label>
+                    <div className="space-y-2">
+                      {selected.pagamentos.map((pag) => (
+                        <div
+                          key={pag.id}
+                          className="flex items-center justify-between p-3 bg-muted/50 rounded-xl"
+                        >
+                          <div>
+                            <div className="font-mono text-sm font-semibold text-foreground">
+                              {formatCurrency(pag.valor)}
                             </div>
-                            {pg.forma_pagamento && (
-                              <p className="font-mono text-xs text-muted-foreground">
-                                {FORMA_LABELS[pg.forma_pagamento] ?? pg.forma_pagamento}
-                              </p>
-                            )}
-                            {pg.data_pagamento && (
-                              <p className="font-mono text-xs text-muted-foreground mt-0.5">
-                                Pago em {format(new Date(pg.data_pagamento), "dd/MM/yyyy")}
-                              </p>
-                            )}
-                            {pg.data_vencimento && pg.status === "pendente" && (
-                              <p className="font-mono text-xs text-muted-foreground mt-0.5">
-                                Vencimento: {format(new Date(pg.data_vencimento), "dd/MM/yyyy")}
-                              </p>
-                            )}
-                            {pg.status === "pendente" && (
-                              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border">
-                                <Select
-                                  value={formas[pg.id] ?? ""}
-                                  onValueChange={(v) =>
-                                    setFormas((prev) => ({ ...prev, [pg.id]: v as FormaPagamento }))
-                                  }
-                                >
-                                  <SelectTrigger className="h-8 flex-1 text-xs">
-                                    <SelectValue placeholder="Forma de pagamento" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                                    <SelectItem value="pix">Pix</SelectItem>
-                                    <SelectItem value="cartao_credito">Cartão de Crédito</SelectItem>
-                                    <SelectItem value="cartao_debito">Cartão de Débito</SelectItem>
-                                    <SelectItem value="boleto">Boleto</SelectItem>
-                                    <SelectItem value="outro">Outro</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <button
-                                  type="button"
-                                  disabled={isPending || !formas[pg.id]}
-                                  onClick={() => void handleMarcarPago(pg.id)}
-                                  className="h-8 px-3 rounded-xl bg-teal text-white text-xs font-medium hover:bg-teal-dark disabled:opacity-50 transition-colors shrink-0"
-                                >
-                                  {isPending ? "Salvando…" : "Marcar como Pago"}
-                                </button>
+                            {pag.forma_pagamento && (
+                              <div className="text-[10px] text-muted-foreground uppercase mt-0.5">
+                                {pag.forma_pagamento.replace(/_/g, ' ')}
                               </div>
                             )}
                           </div>
-                        );
-                      })}
+                          <span
+                            className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md ${
+                              pag.status === 'pago'
+                                ? 'bg-teal/10 text-teal'
+                                : 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'
+                            }`}
+                          >
+                            {pag.status}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
+
+                {/* Registrar pagamento */}
+                <div className="border border-border rounded-2xl p-5 space-y-4">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                    <CreditCard className="w-3 h-3" /> Registrar Pagamento
+                  </label>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-foreground text-xs">Valor (R$)</Label>
+                      <Input
+                        type="number"
+                        placeholder="0,00"
+                        min="0"
+                        step="0.01"
+                        value={pagForm.valor}
+                        onChange={(e) =>
+                          setPagForm((f) => ({ ...f, valor: e.target.value }))
+                        }
+                        className="rounded-xl bg-muted border-border text-foreground"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-foreground text-xs">Data</Label>
+                      <Input
+                        type="date"
+                        value={pagForm.data}
+                        onChange={(e) =>
+                          setPagForm((f) => ({ ...f, data: e.target.value }))
+                        }
+                        className="rounded-xl bg-muted border-border text-foreground"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-foreground text-xs">Forma de Pagamento</Label>
+                    <Select
+                      value={pagForm.formaPagamento}
+                      onValueChange={(v) =>
+                        v && setPagForm((f) => ({ ...f, formaPagamento: v as FormaPagamento }))
+                      }
+                    >
+                      <SelectTrigger className="rounded-xl bg-muted border-border text-foreground">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-card border-border">
+                        <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                        <SelectItem value="pix">PIX</SelectItem>
+                        <SelectItem value="cartao_credito">Cartão de Crédito</SelectItem>
+                        <SelectItem value="cartao_debito">Cartão de Débito</SelectItem>
+                        <SelectItem value="boleto">Boleto</SelectItem>
+                        <SelectItem value="outro">Outro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {pagError && (
+                    <p className="text-xs text-red-500 bg-red-500/10 rounded-lg px-3 py-2">
+                      {pagError}
+                    </p>
+                  )}
+
+                  <Button
+                    onClick={() => void handleRegistrarPagamento()}
+                    disabled={pagSaving || !pagForm.valor}
+                    className="w-full bg-teal text-white hover:bg-teal-lt rounded-xl disabled:opacity-50"
+                  >
+                    {pagSaving ? 'Salvando...' : 'Confirmar Pagamento'}
+                  </Button>
+                </div>
+
+                {/* Link para o paciente */}
+                {selected.paciente?.id && (
+                  <button
+                    onClick={() => router.push(`/dashboard/pacientes/${selected.paciente!.id}`)}
+                    className="w-full py-3 border border-border rounded-xl text-sm font-semibold text-foreground hover:bg-muted transition-colors"
+                  >
+                    Ver Perfil do Paciente →
+                  </button>
+                )}
               </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
-    </motion.div>
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Dialog: Novo Orçamento */}
+      <Dialog open={isNovoOrcOpen} onOpenChange={setIsNovoOrcOpen}>
+        <DialogContent className="max-w-lg rounded-2xl bg-card border-border max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-2xl text-foreground">
+              Novo Orçamento
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Selecione o paciente e os procedimentos.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5 py-4">
+            {/* Busca de paciente */}
+            <div className="space-y-2 relative">
+              <Label className="text-foreground text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                Paciente <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                placeholder="Digite o nome do paciente..."
+                value={novoOrcPacienteSearch}
+                autoComplete="off"
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setNovoOrcPacienteSearch(v);
+                  setNovoOrcPacienteId('');
+                  setNovoOrcPacienteNome('');
+                  setShowSugestoes(true);
+                  void buscarPacientes(v);
+                }}
+                className="rounded-xl bg-muted border-border text-foreground"
+              />
+              {showSugestoes && pacienteSugestoes.length > 0 && (
+                <div className="absolute z-50 w-full bg-card border border-border rounded-xl shadow-lg mt-1 overflow-hidden">
+                  {pacienteSugestoes.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        setNovoOrcPacienteSearch(p.nome);
+                        setNovoOrcPacienteId(p.id);
+                        setNovoOrcPacienteNome(p.nome);
+                        setShowSugestoes(false);
+                        setPacienteSugestoes([]);
+                      }}
+                      className="w-full px-4 py-2.5 text-sm text-left hover:bg-muted transition-colors text-foreground"
+                    >
+                      {p.nome}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Itens / Procedimentos */}
+            <div className="space-y-3">
+              <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
+                Procedimentos
+              </Label>
+
+              {novoOrcItens.map((item, idx) => (
+                <div key={idx} className="bg-muted rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-muted-foreground">
+                      Item {idx + 1}
+                    </span>
+                    {novoOrcItens.length > 1 && (
+                      <button
+                        onClick={() =>
+                          setNovoOrcItens((prev) => prev.filter((_, i) => i !== idx))
+                        }
+                        className="p-1 text-muted-foreground hover:text-red-500 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  <Select
+                    value={item.procedimentoId}
+                    onValueChange={(v) => {
+                      if (!v) return;
+                      const proc = procedimentosClinica.find((p) => p.id === v);
+                      setNovoOrcItens((prev) =>
+                        prev.map((it, i) =>
+                          i === idx
+                            ? {
+                                ...it,
+                                procedimentoId: v,
+                                descricao: proc?.nome ?? it.descricao,
+                                preco: proc?.preco_padrao ?? it.preco,
+                              }
+                            : it
+                        )
+                      );
+                    }}
+                  >
+                    <SelectTrigger className="rounded-xl bg-card border-border text-foreground">
+                      <SelectValue placeholder="Selecionar da clínica (opcional)..." />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-border">
+                      {procedimentosClinica.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Input
+                    placeholder="Descrição do procedimento *"
+                    value={item.descricao}
+                    onChange={(e) =>
+                      setNovoOrcItens((prev) =>
+                        prev.map((it, i) =>
+                          i === idx ? { ...it, descricao: e.target.value } : it
+                        )
+                      )
+                    }
+                    className="rounded-xl bg-card border-border text-foreground"
+                  />
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-foreground">Qtd</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={item.quantidade}
+                        onChange={(e) =>
+                          setNovoOrcItens((prev) =>
+                            prev.map((it, i) =>
+                              i === idx
+                                ? { ...it, quantidade: parseInt(e.target.value) || 1 }
+                                : it
+                            )
+                          )
+                        }
+                        className="rounded-xl bg-card border-border text-foreground"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-foreground">Valor unitário (R$)</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={item.preco}
+                        onChange={(e) =>
+                          setNovoOrcItens((prev) =>
+                            prev.map((it, i) =>
+                              i === idx
+                                ? { ...it, preco: parseFloat(e.target.value) || 0 }
+                                : it
+                            )
+                          )
+                        }
+                        className="rounded-xl bg-card border-border text-foreground"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              <button
+                onClick={() =>
+                  setNovoOrcItens((prev) => [
+                    ...prev,
+                    { procedimentoId: '', descricao: '', quantidade: 1, preco: 0 },
+                  ])
+                }
+                className="w-full py-3 border-2 border-dashed border-border rounded-xl text-xs font-bold text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-all flex items-center justify-center gap-2"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Adicionar Procedimento
+              </button>
+            </div>
+
+            {/* Total */}
+            {novoOrcTotal > 0 && (
+              <div className="bg-teal/10 rounded-xl p-4 flex items-center justify-between border border-teal/20">
+                <span className="text-sm font-bold text-foreground">Total</span>
+                <span className="font-mono text-xl font-bold text-teal">
+                  {formatCurrency(novoOrcTotal)}
+                </span>
+              </div>
+            )}
+
+            {orcError && (
+              <p className="text-xs text-red-500 bg-red-500/10 rounded-lg px-3 py-2">{orcError}</p>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsNovoOrcOpen(false)}
+              className="rounded-xl border-border text-foreground hover:bg-muted"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => void handleCriarOrcamento()}
+              disabled={orcSaving}
+              className="bg-teal text-white hover:bg-teal-lt rounded-xl disabled:opacity-50"
+            >
+              {orcSaving ? 'Salvando...' : 'Criar Orçamento'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

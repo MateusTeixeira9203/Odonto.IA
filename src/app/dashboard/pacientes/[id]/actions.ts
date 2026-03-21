@@ -100,8 +100,8 @@ export async function gerarPlanejamentoIA(
   const dentista = await getDentistaCached();
   if (!dentista) redirect("/login");
 
-  const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-  if (!apiKey) return { error: "Gemini não configurado. Adicione NEXT_PUBLIC_GEMINI_API_KEY." };
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return { error: "Gemini não configurado. Adicione GEMINI_API_KEY." };
 
   const supabase = await createClient();
 

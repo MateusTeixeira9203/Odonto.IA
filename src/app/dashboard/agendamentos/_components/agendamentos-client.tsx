@@ -1,586 +1,689 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  Calendar as CalendarIcon,
+  User,
+  ExternalLink,
+} from 'lucide-react';
+import { useState, useMemo, useCallback } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   format,
+  addMonths,
+  subMonths,
   startOfMonth,
   endOfMonth,
   startOfWeek,
   endOfWeek,
   eachDayOfInterval,
-  isSameDay,
   isSameMonth,
-  addMonths,
-  subMonths,
-  isToday,
-  endOfDay,
-  startOfDay,
-  addDays,
+  isSameDay,
+  isToday as isDateToday,
+  parseISO,
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import {
-  ChevronLeft,
-  ChevronRight,
-  Plus,
-  Clock,
-  Calendar,
-  User,
-  X,
-  ExternalLink,
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
-import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
-  criarAgendamento,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import type { AgendamentoRow } from '../page';
+import {
   atualizarStatusAgendamento,
-  atualizarAgendamento,
+  criarAgendamento,
   type StatusAgendamento,
 } from '../actions';
+import { createClient } from '@/lib/supabase/client';
 
-// ── Tipos ─────────────────────────────────────────────────────────────────────
-export type Agendamento = {
-  id: string;
-  clinica_id: string;
-  paciente_id: string;
-  dentista_id: string;
-  data_hora: string;
-  duracao_minutos: number;
-  tipo: string | null;
-  status: StatusAgendamento;
-  observacoes: string | null;
-  created_at: string;
-  paciente: { id: string; nome: string } | null;
-  dentista: { id: string; nome: string } | null;
+// Mapeamento de status do banco (lowercase) para exibição
+const STATUS_DISPLAY: Record<string, string> = {
+  agendado: 'Agendado',
+  confirmado: 'Confirmado',
+  cancelado: 'Cancelado',
+  realizado: 'Realizado',
+  faltou: 'Faltou',
 };
 
-// ── Status config ─────────────────────────────────────────────────────────────
-const STATUS_CONFIG: Record<StatusAgendamento, { label: string; className: string }> = {
-  agendado:   { label: 'Agendado',   className: 'bg-teal/10 text-teal border border-teal/20' },
-  confirmado: { label: 'Confirmado', className: 'bg-teal-pale text-teal-dark border border-teal/20' },
-  aguardando: { label: 'Aguardando', className: 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-400' },
-  cancelado:  { label: 'Cancelado',  className: 'bg-red-50 text-red-600 border border-red-200 dark:bg-red-900/20 dark:text-red-400' },
-  realizado:  { label: 'Realizado',  className: 'bg-teal-pale text-teal-dark border border-teal/20' },
-  faltou:     { label: 'Faltou',     className: 'bg-surface-alt text-text-secondary border border-border' },
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case 'confirmado': return 'bg-teal/10 text-teal';
+    case 'agendado': return 'bg-blue-500/10 text-blue-600 dark:text-blue-400';
+    case 'cancelado': return 'bg-red-500/10 text-red-600 dark:text-red-400';
+    case 'realizado': return 'bg-green-500/10 text-green-600 dark:text-green-400';
+    case 'faltou': return 'bg-orange-500/10 text-orange-600 dark:text-orange-400';
+    default: return 'bg-muted text-muted-foreground';
+  }
 };
 
-const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-const DURACOES = [15, 30, 45, 60, 90, 120];
+const getTimelineDotColor = (status: string) => {
+  switch (status) {
+    case 'confirmado': return 'bg-teal';
+    case 'agendado': return 'bg-blue-500';
+    case 'cancelado': return 'bg-red-500';
+    case 'realizado': return 'bg-green-500';
+    case 'faltou': return 'bg-orange-500';
+    default: return 'bg-muted';
+  }
+};
 
-const inputClass =
-  'w-full font-sans text-sm px-3 py-2 rounded-xl border border-border bg-surface-alt text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-teal/40 transition-all';
-
-// ── Props ─────────────────────────────────────────────────────────────────────
 interface Props {
-  agendamentos: Agendamento[];
-  pacientes: { id: string; nome: string }[];
+  agendamentos: AgendamentoRow[];
   clinicaId: string;
 }
 
-export function AgendamentosClient({ agendamentos, pacientes }: Props): React.JSX.Element {
+export function AgendamentosClient({ agendamentos: inicial, clinicaId: _clinicaId }: Props) {
   const router = useRouter();
-  const hoje = new Date();
+  const [agendamentos, setAgendamentos] = useState(inicial);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [isNewModalOpen, setIsNewModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [selectedApt, setSelectedApt] = useState<AgendamentoRow | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  const [mesVisualizacao, setMesVisualizacao] = useState(hoje);
-  const [diaSelecionado, setDiaSelecionado] = useState(hoje);
-  const [dialogNovoAberto, setDialogNovoAberto] = useState(false);
-  const [agendamentoEdicao, setAgendamentoEdicao] = useState<Agendamento | null>(null);
-  const [salvando, setSalvando] = useState(false);
-
-  const [formNovo, setFormNovo] = useState({
+  // Estado do formulário de novo agendamento
+  const [novoForm, setNovoForm] = useState({
+    pacienteSearch: '',
     pacienteId: '',
-    data: format(hoje, 'yyyy-MM-dd'),
-    hora: '08:00',
-    duracao: 30,
+    pacienteNome: '',
+    data: format(new Date(), 'yyyy-MM-dd'),
+    hora: '09:00',
+    duracao: '30',
     tipo: '',
     observacoes: '',
   });
+  const [pacienteSugestoes, setPacienteSugestoes] = useState<{ id: string; nome: string }[]>([]);
+  const [showSugestoes, setShowSugestoes] = useState(false);
 
-  const [formEdicao, setFormEdicao] = useState({
-    data: '',
-    hora: '',
-    duracao: 30,
-    tipo: '',
-    observacoes: '',
-    status: 'agendado' as StatusAgendamento,
-  });
+  const daysOfWeek = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
-  // ── Calendário ──────────────────────────────────────────────────────────────
-  const diasDoCalendario = eachDayOfInterval({
-    start: startOfWeek(startOfMonth(mesVisualizacao), { locale: ptBR }),
-    end: endOfWeek(endOfMonth(mesVisualizacao), { locale: ptBR }),
-  });
+  // Dias do calendário para o mês atual
+  const calendarDays = useMemo(() => {
+    const start = startOfWeek(startOfMonth(currentMonth));
+    const end = endOfWeek(endOfMonth(currentMonth));
+    return eachDayOfInterval({ start, end }).map((date) => ({
+      date,
+      isCurrentMonth: isSameMonth(date, currentMonth),
+      isToday: isDateToday(date),
+      isSelected: isSameDay(date, selectedDate),
+      hasAppointments: agendamentos.some((apt) => isSameDay(parseISO(apt.data_hora), date)),
+    }));
+  }, [currentMonth, selectedDate, agendamentos]);
 
-  function temAgendamento(dia: Date): boolean {
-    return agendamentos.some((a) => isSameDay(new Date(a.data_hora), dia));
-  }
-
-  // ── Agendamentos do dia selecionado ─────────────────────────────────────────
-  const agendamentosDia = agendamentos.filter((a) =>
-    isSameDay(new Date(a.data_hora), diaSelecionado)
+  // Agendamentos do dia selecionado
+  const filteredAppointments = useMemo(
+    () =>
+      agendamentos
+        .filter((apt) => isSameDay(parseISO(apt.data_hora), selectedDate))
+        .sort((a, b) => a.data_hora.localeCompare(b.data_hora)),
+    [agendamentos, selectedDate]
   );
 
-  // Stats
-  const agendamentosHoje = agendamentos.filter((a) => isToday(new Date(a.data_hora)));
-  const agendamentosSemana = agendamentos.filter((a) => {
-    const d = new Date(a.data_hora);
-    const inicioSemana = startOfDay(hoje);
-    const fimSemana = endOfDay(addDays(hoje, 6));
-    return d >= inicioSemana && d <= fimSemana;
-  });
+  // Busca pacientes por nome (autocomplete)
+  const buscarPacientes = useCallback(async (nome: string) => {
+    if (nome.length < 2) {
+      setPacienteSugestoes([]);
+      return;
+    }
+    const supabase = createClient();
+    const { data } = await supabase
+      .from('pacientes')
+      .select('id, nome')
+      .ilike('nome', `%${nome}%`)
+      .limit(6);
+    setPacienteSugestoes(data ?? []);
+  }, []);
 
-  // ── Handlers ────────────────────────────────────────────────────────────────
-  async function handleCriarAgendamento() {
-    if (!formNovo.pacienteId) { toast.error('Selecione um paciente'); return; }
-    setSalvando(true);
-    const dataHora = `${formNovo.data}T${formNovo.hora}:00`;
+  // Atualiza status do agendamento via server action
+  const handleStatusChange = async (id: string, status: string) => {
+    const dbStatus = status as StatusAgendamento;
+    const result = await atualizarStatusAgendamento(id, dbStatus);
+    if (!result.error) {
+      setAgendamentos((prev) =>
+        prev.map((apt) => (apt.id === id ? { ...apt, status } : apt))
+      );
+      setSelectedApt((prev) => (prev?.id === id ? { ...prev, status } : prev));
+    }
+  };
+
+  // Cria novo agendamento via server action
+  const handleCriarAgendamento = async () => {
+    if (!novoForm.pacienteId) {
+      setSaveError('Selecione um paciente.');
+      return;
+    }
+    setSaveError(null);
+    setIsSaving(true);
+
+    const dataHora = `${novoForm.data}T${novoForm.hora}:00`;
+    const observacoesCombinadas =
+      [novoForm.tipo, novoForm.observacoes].filter(Boolean).join(' — ') || null;
     const result = await criarAgendamento({
-      pacienteId: formNovo.pacienteId,
+      pacienteId: novoForm.pacienteId,
       dataHora,
-      duracaoMinutos: formNovo.duracao,
-      tipo: formNovo.tipo || null,
-      observacoes: formNovo.observacoes || null,
+      duracaoMinutos: parseInt(novoForm.duracao, 10) || 30,
+      observacoes: observacoesCombinadas,
     });
-    setSalvando(false);
+
     if (result.error) {
-      toast.error('Erro ao criar agendamento');
+      setSaveError(result.error);
     } else {
-      toast.success('Agendamento criado');
-      setDialogNovoAberto(false);
-      setFormNovo({ pacienteId: '', data: format(hoje, 'yyyy-MM-dd'), hora: '08:00', duracao: 30, tipo: '', observacoes: '' });
-      router.refresh();
+      // Adiciona otimisticamente ao estado local
+      const novoAgt: AgendamentoRow = {
+        id: result.id ?? crypto.randomUUID(),
+        clinica_id: _clinicaId,
+        paciente_id: novoForm.pacienteId,
+        dentista_id: '',
+        data_hora: dataHora,
+        duracao_minutos: parseInt(novoForm.duracao, 10) || 30,
+        status: 'agendado',
+        observacoes: observacoesCombinadas,
+        created_at: new Date().toISOString(),
+        paciente: { id: novoForm.pacienteId, nome: novoForm.pacienteNome },
+        dentista: null,
+      };
+      setAgendamentos((prev) => [...prev, novoAgt]);
+      setIsNewModalOpen(false);
+      setNovoForm({
+        pacienteSearch: '',
+        pacienteId: '',
+        pacienteNome: '',
+        data: format(new Date(), 'yyyy-MM-dd'),
+        hora: '09:00',
+        duracao: '30',
+        tipo: '',
+        observacoes: '',
+      });
     }
-  }
+    setIsSaving(false);
+  };
 
-  function abrirEdicao(ag: Agendamento) {
-    const d = new Date(ag.data_hora);
-    setFormEdicao({
-      data: format(d, 'yyyy-MM-dd'),
-      hora: format(d, 'HH:mm'),
-      duracao: ag.duracao_minutos,
-      tipo: ag.tipo ?? '',
-      observacoes: ag.observacoes ?? '',
-      status: ag.status,
-    });
-    setAgendamentoEdicao(ag);
-  }
-
-  async function handleSalvarEdicao() {
-    if (!agendamentoEdicao) return;
-    setSalvando(true);
-    const dataHora = `${formEdicao.data}T${formEdicao.hora}:00`;
-    const result = await atualizarAgendamento(agendamentoEdicao.id, {
-      dataHora,
-      duracaoMinutos: formEdicao.duracao,
-      tipo: formEdicao.tipo || null,
-      observacoes: formEdicao.observacoes || null,
-      status: formEdicao.status,
-    });
-    setSalvando(false);
-    if (result.error) {
-      toast.error('Erro ao salvar');
-    } else {
-      toast.success('Agendamento atualizado');
-      setAgendamentoEdicao(null);
-      router.refresh();
-    }
-  }
-
-  async function handleAtualizarStatus(id: string, status: StatusAgendamento) {
-    const result = await atualizarStatusAgendamento(id, status);
-    if (result.error) toast.error('Erro ao atualizar status');
-    else router.refresh();
-  }
+  const handleOpenDetail = (apt: AgendamentoRow) => {
+    setSelectedApt(apt);
+    setIsDetailModalOpen(true);
+  };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-      className="p-8 max-w-7xl mx-auto w-full"
-    >
-      {/* Header */}
-      <header className="flex items-center justify-between mb-8">
+    <div className="p-8 max-w-7xl mx-auto w-full">
+      {/* Cabeçalho */}
+      <motion.header
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8"
+      >
         <div>
-          <h1 className="font-serif text-4xl text-text-primary mb-1">Agendamentos</h1>
-          <p className="text-text-secondary text-sm font-medium">Agenda da clínica</p>
+          <h1 className="font-heading text-4xl text-foreground mb-2">Agendamentos</h1>
+          <p className="text-muted-foreground text-sm font-medium">
+            Gerencie sua agenda e compromissos.
+          </p>
         </div>
         <button
-          type="button"
-          onClick={() => setDialogNovoAberto(true)}
-          className="bg-teal text-white px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-teal-dark transition-all shadow-lg premium-shadow"
+          onClick={() => { setSaveError(null); setIsNewModalOpen(true); }}
+          className="bg-teal text-white hover:bg-teal-lt px-5 py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(47,156,133,0.3)] w-full sm:w-auto"
         >
           <Plus className="w-4 h-4" />
           Novo Agendamento
         </button>
-      </header>
+      </motion.header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* Coluna esquerda — calendário */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* Cards stats */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-surface rounded-2xl border border-border p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-7 h-7 rounded-lg bg-teal/10 flex items-center justify-center">
-                  <Calendar className="w-3.5 h-3.5 text-teal" />
-                </div>
-                <p className="font-mono text-[10px] uppercase tracking-widest text-text-secondary">Hoje</p>
-              </div>
-              <p className="font-mono text-2xl font-bold text-text-primary">{agendamentosHoje.length}</p>
-            </div>
-            <div className="bg-surface rounded-2xl border border-border p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-7 h-7 rounded-lg bg-teal/10 flex items-center justify-center">
-                  <Clock className="w-3.5 h-3.5 text-teal" />
-                </div>
-                <p className="font-mono text-[10px] uppercase tracking-widest text-text-secondary">Semana</p>
-              </div>
-              <p className="font-mono text-2xl font-bold text-text-primary">{agendamentosSemana.length}</p>
-            </div>
-          </div>
-
-          {/* Calendário */}
-          <div className="bg-surface rounded-2xl border border-border p-5">
-            {/* Navegação do mês */}
-            <div className="flex items-center justify-between mb-4">
-              <button
-                type="button"
-                onClick={() => setMesVisualizacao(subMonths(mesVisualizacao, 1))}
-                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-alt transition-colors text-text-secondary hover:text-text-primary"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <h2 className="font-sans font-semibold text-sm text-text-primary capitalize">
-                {format(mesVisualizacao, 'MMMM yyyy', { locale: ptBR })}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Calendário */}
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.1 }}
+          className="lg:col-span-1"
+        >
+          <div className="bg-card rounded-2xl border border-border shadow-sm p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="font-heading text-xl text-foreground capitalize">
+                {format(currentMonth, 'MMMM yyyy', { locale: ptBR })}
               </h2>
-              <button
-                type="button"
-                onClick={() => setMesVisualizacao(addMonths(mesVisualizacao, 1))}
-                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-alt transition-colors text-text-secondary hover:text-text-primary"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+                  className="p-2 hover:bg-accent rounded-lg transition-colors border border-border"
+                >
+                  <ChevronLeft className="w-4 h-4 text-foreground" />
+                </button>
+                <button
+                  onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+                  className="p-2 hover:bg-accent rounded-lg transition-colors border border-border"
+                >
+                  <ChevronRight className="w-4 h-4 text-foreground" />
+                </button>
+              </div>
             </div>
 
-            {/* Dias da semana */}
-            <div className="grid grid-cols-7 mb-2">
-              {DIAS_SEMANA.map((d) => (
-                <div key={d} className="text-center font-mono text-[10px] text-text-secondary py-1">{d}</div>
+            <div className="grid grid-cols-7 gap-1 mb-2">
+              {daysOfWeek.map((day) => (
+                <div
+                  key={day}
+                  className="text-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider py-2"
+                >
+                  {day}
+                </div>
               ))}
             </div>
 
-            {/* Dias */}
-            <div className="grid grid-cols-7 gap-0.5">
-              {diasDoCalendario.map((dia) => {
-                const ativo = isSameDay(dia, diaSelecionado);
-                const ehHoje = isToday(dia);
-                const mesAtual = isSameMonth(dia, mesVisualizacao);
-                const temAg = temAgendamento(dia);
-
-                return (
-                  <button
-                    key={dia.toISOString()}
-                    type="button"
-                    onClick={() => setDiaSelecionado(dia)}
-                    className={`relative h-9 w-full flex items-center justify-center rounded-lg text-xs font-medium transition-all ${
-                      ativo
-                        ? 'bg-teal text-white font-bold shadow-sm'
-                        : ehHoje
-                        ? 'bg-teal/10 text-teal font-semibold'
-                        : mesAtual
-                        ? 'text-text-primary hover:bg-surface-alt'
-                        : 'text-text-muted hover:bg-surface-alt/50'
-                    }`}
-                  >
-                    {format(dia, 'd')}
-                    {temAg && !ativo && (
-                      <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-teal" />
-                    )}
-                  </button>
-                );
-              })}
+            <div className="grid grid-cols-7 gap-1">
+              {calendarDays.map((day, i) => (
+                <div
+                  key={i}
+                  onClick={() => setSelectedDate(day.date)}
+                  className={`aspect-square flex flex-col items-center justify-center rounded-xl text-sm relative cursor-pointer transition-all
+                    ${!day.isCurrentMonth ? 'text-muted-foreground/50' : 'text-foreground hover:bg-accent'}
+                    ${day.isToday ? 'border-2 border-teal' : ''}
+                    ${day.isSelected ? 'bg-teal text-white hover:bg-teal-lt font-bold shadow-md' : ''}
+                  `}
+                >
+                  <span>{format(day.date, 'd')}</span>
+                  {day.hasAppointments && day.isCurrentMonth && !day.isSelected && (
+                    <span className="absolute bottom-1.5 w-1 h-1 rounded-full bg-teal" />
+                  )}
+                  {day.hasAppointments && day.isSelected && (
+                    <span className="absolute bottom-1.5 w-1 h-1 rounded-full bg-white" />
+                  )}
+                </div>
+              ))}
             </div>
           </div>
-        </div>
 
-        {/* Coluna direita — lista do dia */}
-        <div className="lg:col-span-3 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="font-sans font-semibold text-text-primary">
-              {isToday(diaSelecionado) ? 'Hoje' : format(diaSelecionado, "EEEE, dd 'de' MMMM", { locale: ptBR })}
-            </h3>
-            <span className="font-mono text-xs text-text-secondary">
-              {agendamentosDia.length} agendamento{agendamentosDia.length !== 1 ? 's' : ''}
-            </span>
+          {/* Mini-resumo do dia */}
+          <div className="mt-6 grid grid-cols-2 gap-4">
+            <div className="bg-teal/10 rounded-2xl p-4 border border-teal/20">
+              <div className="text-[10px] font-bold text-teal uppercase tracking-wider mb-1">Hoje</div>
+              <div className="font-mono text-2xl font-medium text-teal">
+                {agendamentos.filter((a) => isDateToday(parseISO(a.data_hora))).length}
+              </div>
+              <div className="text-xs text-teal mt-1">Consultas</div>
+            </div>
+            <div className="bg-muted rounded-2xl p-4 border border-border">
+              <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
+                Selecionado
+              </div>
+              <div className="font-mono text-2xl font-medium text-foreground">
+                {filteredAppointments.length}
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">Agendadas</div>
+            </div>
           </div>
+        </motion.div>
 
-          {agendamentosDia.length === 0 ? (
-            <div className="bg-surface rounded-2xl border border-border flex flex-col items-center gap-3 py-14">
-              <Calendar className="w-10 h-10 text-text-muted" />
-              <div className="text-center">
-                <p className="font-serif text-base text-text-primary">Sem agendamentos</p>
-                <p className="font-sans text-sm text-text-secondary mt-1">
-                  Nenhum agendamento para este dia
+        {/* Lista do dia selecionado */}
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.2 }}
+          className="lg:col-span-2"
+        >
+          <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden flex flex-col h-full min-h-[500px]">
+            <div className="p-6 border-b border-border bg-muted/30 flex items-center justify-between">
+              <div>
+                <h2 className="font-heading text-2xl text-foreground capitalize">
+                  {format(selectedDate, "EEEE, d 'de' MMMM", { locale: ptBR })}
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
+                  <CalendarIcon className="w-4 h-4" />
+                  {filteredAppointments.length} agendamento
+                  {filteredAppointments.length !== 1 ? 's' : ''}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setFormNovo((f) => ({ ...f, data: format(diaSelecionado, 'yyyy-MM-dd') }));
-                  setDialogNovoAberto(true);
-                }}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-teal text-white hover:bg-teal-dark transition-colors"
-              >
-                <Plus className="w-4 h-4" /> Agendar para este dia
-              </button>
             </div>
-          ) : (
-            <AnimatePresence mode="popLayout">
-              {agendamentosDia.map((ag) => {
-                const statusCfg = STATUS_CONFIG[ag.status];
-                const hora = format(new Date(ag.data_hora), 'HH:mm');
 
-                return (
+            <div className="flex-1 p-6">
+              <AnimatePresence mode="wait">
+                {filteredAppointments.length > 0 ? (
                   <motion.div
-                    key={ag.id}
-                    initial={{ opacity: 0, x: 10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -10 }}
-                    transition={{ duration: 0.2 }}
-                    className="bg-surface rounded-2xl border border-border p-4 hover:border-teal/30 transition-all group"
+                    key="list"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="relative border-l-2 border-border ml-4 space-y-8 pb-4"
                   >
-                    <div className="flex items-start gap-3">
-                      {/* Hora */}
-                      <div className="w-14 shrink-0">
-                        <p className="font-mono text-sm font-bold text-teal">{hora}</p>
-                        <p className="font-mono text-[10px] text-text-secondary">{ag.duracao_minutos}min</p>
-                      </div>
+                    {filteredAppointments.map((apt, i) => (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.1 + i * 0.1 }}
+                        key={apt.id}
+                        className="relative pl-8 group"
+                      >
+                        {/* Ponto da timeline */}
+                        <div
+                          className={`absolute -left-[9px] top-1 w-4 h-4 rounded-full border-4 border-background shadow-sm ${getTimelineDotColor(apt.status)}`}
+                        />
 
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <p className="font-sans text-sm font-semibold text-text-primary">
-                              {ag.paciente?.nome ?? '—'}
-                            </p>
-                            {ag.tipo && (
-                              <p className="font-sans text-xs text-text-secondary mt-0.5">{ag.tipo}</p>
-                            )}
-                            {ag.dentista && (
-                              <p className="font-mono text-xs text-text-muted mt-0.5">
-                                <User className="w-3 h-3 inline mr-1" />
-                                {ag.dentista.nome}
-                              </p>
-                            )}
-                          </div>
+                        <div
+                          onClick={() => handleOpenDetail(apt)}
+                          className="bg-card border border-border rounded-2xl p-5 shadow-sm hover:shadow-md transition-all group-hover:border-teal/30 cursor-pointer"
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                            <div>
+                              <div className="flex items-center gap-3 mb-2">
+                                <span className="font-mono text-lg font-medium text-foreground">
+                                  {format(parseISO(apt.data_hora), 'HH:mm')}
+                                </span>
+                                <div
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Select
+                                    value={apt.status}
+                                    onValueChange={(val) => val && void handleStatusChange(apt.id, val)}
+                                  >
+                                    <SelectTrigger
+                                      className={`h-7 px-2.5 text-[10px] font-bold uppercase tracking-wider border-none shadow-none ${getStatusColor(apt.status)}`}
+                                    >
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-card border-border">
+                                      <SelectItem value="agendado">Agendado</SelectItem>
+                                      <SelectItem value="confirmado">Confirmado</SelectItem>
+                                      <SelectItem value="cancelado">Cancelado</SelectItem>
+                                      <SelectItem value="realizado">Realizado</SelectItem>
+                                      <SelectItem value="faltou">Faltou</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </div>
+                              <h3 className="font-semibold text-lg text-foreground flex items-center gap-2">
+                                <User className="w-4 h-4 text-muted-foreground" />
+                                {apt.paciente?.nome ?? '—'}
+                              </h3>
+                              {apt.observacoes && (
+                                <p className="text-sm text-muted-foreground mt-1">{apt.observacoes}</p>
+                              )}
+                            </div>
 
-                          {/* Status inline select */}
-                          <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusCfg.className}`}>
-                              {statusCfg.label}
-                            </span>
-                            <select
-                              value={ag.status}
-                              onChange={(e) => void handleAtualizarStatus(ag.id, e.target.value as StatusAgendamento)}
-                              className="absolute inset-0 w-full opacity-0 cursor-pointer"
-                            >
-                              <option value="agendado">Agendado</option>
-                              <option value="confirmado">Confirmado</option>
-                              <option value="aguardando">Aguardando</option>
-                              <option value="cancelado">Cancelado</option>
-                              <option value="realizado">Realizado</option>
-                              <option value="faltou">Faltou</option>
-                            </select>
+                            <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                onClick={() => router.push(`/dashboard/pacientes/${apt.paciente?.id}`)}
+                                className="px-4 py-2 text-sm font-semibold text-foreground border border-border rounded-lg hover:bg-accent transition-colors"
+                              >
+                                Ver Ficha
+                              </button>
+                            </div>
                           </div>
                         </div>
-
-                        {ag.observacoes && (
-                          <p className="font-sans text-xs text-text-secondary mt-2 line-clamp-2">{ag.observacoes}</p>
-                        )}
-
-                        {/* Ações */}
-                        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border">
-                          <button
-                            type="button"
-                            onClick={() => router.push(`/dashboard/pacientes/${ag.paciente?.id ?? ag.paciente_id}`)}
-                            className="inline-flex items-center gap-1.5 text-xs font-medium text-text-secondary hover:text-teal transition-colors"
-                          >
-                            <ExternalLink className="w-3 h-3" />
-                            Ver Ficha
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => abrirEdicao(ag)}
-                            className="ml-auto inline-flex items-center gap-1.5 text-xs font-medium text-text-secondary hover:text-text-primary transition-colors px-2 py-1 rounded-lg hover:bg-surface-alt"
-                          >
-                            Editar
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                      </motion.div>
+                    ))}
                   </motion.div>
-                );
-              })}
-            </AnimatePresence>
-          )}
-        </div>
+                ) : (
+                  <motion.div
+                    key="empty"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex flex-col items-center justify-center h-full py-20 text-center"
+                  >
+                    <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
+                      <CalendarIcon className="w-8 h-8 text-muted-foreground/50" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-foreground">Nenhum agendamento</h3>
+                    <p className="text-sm text-muted-foreground max-w-xs mx-auto mt-1">
+                      Não há compromissos marcados para este dia.
+                    </p>
+                    <Button
+                      variant="outline"
+                      className="mt-6 rounded-xl border-border text-foreground hover:bg-muted"
+                      onClick={() => setIsNewModalOpen(true)}
+                    >
+                      Agendar agora
+                    </Button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+        </motion.div>
       </div>
 
-      {/* Dialog — Novo Agendamento */}
-      <Dialog open={dialogNovoAberto} onOpenChange={setDialogNovoAberto}>
-        <DialogContent className="sm:max-w-md">
+      {/* Modal: Novo Agendamento */}
+      <Dialog open={isNewModalOpen} onOpenChange={setIsNewModalOpen}>
+        <DialogContent className="max-w-md rounded-2xl bg-card border-border">
           <DialogHeader>
-            <DialogTitle className="font-serif text-xl">Novo Agendamento</DialogTitle>
+            <DialogTitle className="font-heading text-2xl text-foreground">
+              Novo Agendamento
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Preencha os dados para marcar uma nova consulta.
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3 py-2">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-text-secondary">Paciente</label>
-              <select
-                value={formNovo.pacienteId}
-                onChange={(e) => setFormNovo((f) => ({ ...f, pacienteId: e.target.value }))}
-                className={inputClass}
-              >
-                <option value="">Selecionar paciente…</option>
-                {pacientes.map((p) => (
-                  <option key={p.id} value={p.id}>{p.nome}</option>
-                ))}
-              </select>
+
+          <div className="space-y-4 py-4">
+            {/* Busca de paciente com autocomplete */}
+            <div className="space-y-2 relative">
+              <Label htmlFor="patient" className="text-foreground">
+                Paciente <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="patient"
+                placeholder="Digite o nome do paciente..."
+                value={novoForm.pacienteSearch}
+                autoComplete="off"
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setNovoForm((f) => ({ ...f, pacienteSearch: v, pacienteId: '', pacienteNome: '' }));
+                  setShowSugestoes(true);
+                  void buscarPacientes(v);
+                }}
+                className="rounded-xl bg-muted border-border text-foreground"
+              />
+              {showSugestoes && pacienteSugestoes.length > 0 && (
+                <div className="absolute z-50 w-full bg-card border border-border rounded-xl shadow-lg mt-1 overflow-hidden">
+                  {pacienteSugestoes.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        setNovoForm((f) => ({
+                          ...f,
+                          pacienteSearch: p.nome,
+                          pacienteId: p.id,
+                          pacienteNome: p.nome,
+                        }));
+                        setShowSugestoes(false);
+                        setPacienteSugestoes([]);
+                      }}
+                      className="w-full px-4 py-2.5 text-sm text-left hover:bg-muted transition-colors text-foreground"
+                    >
+                      {p.nome}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-text-secondary">Data</label>
-                <input
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="apt-date" className="text-foreground">
+                  Data
+                </Label>
+                <Input
+                  id="apt-date"
                   type="date"
-                  value={formNovo.data}
-                  onChange={(e) => setFormNovo((f) => ({ ...f, data: e.target.value }))}
-                  className={inputClass}
+                  value={novoForm.data}
+                  onChange={(e) => setNovoForm((f) => ({ ...f, data: e.target.value }))}
+                  className="rounded-xl bg-muted border-border text-foreground"
                 />
               </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-text-secondary">Hora</label>
-                <input
+              <div className="space-y-2">
+                <Label htmlFor="apt-time" className="text-foreground">
+                  Hora
+                </Label>
+                <Input
+                  id="apt-time"
                   type="time"
-                  value={formNovo.hora}
-                  onChange={(e) => setFormNovo((f) => ({ ...f, hora: e.target.value }))}
-                  className={inputClass}
+                  value={novoForm.hora}
+                  onChange={(e) => setNovoForm((f) => ({ ...f, hora: e.target.value }))}
+                  className="rounded-xl bg-muted border-border text-foreground"
                 />
               </div>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-text-secondary">Duração</label>
-              <select
-                value={formNovo.duracao}
-                onChange={(e) => setFormNovo((f) => ({ ...f, duracao: Number(e.target.value) }))}
-                className={inputClass}
-              >
-                {DURACOES.map((d) => (
-                  <option key={d} value={d}>{d} min</option>
-                ))}
-              </select>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-foreground">Duração (min)</Label>
+                <Select
+                  value={novoForm.duracao}
+                  onValueChange={(v) => v && setNovoForm((f) => ({ ...f, duracao: v }))}
+                >
+                  <SelectTrigger className="rounded-xl bg-muted border-border text-foreground">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border-border">
+                    <SelectItem value="15">15 min</SelectItem>
+                    <SelectItem value="30">30 min</SelectItem>
+                    <SelectItem value="45">45 min</SelectItem>
+                    <SelectItem value="60">60 min</SelectItem>
+                    <SelectItem value="90">90 min</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-foreground">Procedimento</Label>
+                <Input
+                  placeholder="Ex: Limpeza, Avaliação..."
+                  value={novoForm.tipo}
+                  onChange={(e) => setNovoForm((f) => ({ ...f, tipo: e.target.value }))}
+                  className="rounded-xl bg-muted border-border text-foreground"
+                />
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-text-secondary">Tipo / Procedimento</label>
-              <input
-                type="text"
-                value={formNovo.tipo}
-                onChange={(e) => setFormNovo((f) => ({ ...f, tipo: e.target.value }))}
-                placeholder="Ex: Consulta, Limpeza…"
-                className={inputClass}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-text-secondary">Observações</label>
+
+            <div className="space-y-2">
+              <Label htmlFor="apt-notes" className="text-foreground">
+                Observações
+              </Label>
               <textarea
-                value={formNovo.observacoes}
-                onChange={(e) => setFormNovo((f) => ({ ...f, observacoes: e.target.value }))}
-                rows={3}
-                className={inputClass + ' resize-none'}
+                id="apt-notes"
+                value={novoForm.observacoes}
+                onChange={(e) => setNovoForm((f) => ({ ...f, observacoes: e.target.value }))}
+                className="w-full bg-muted border border-border rounded-xl p-3 text-sm min-h-[80px] focus:ring-2 focus:ring-teal/20 transition-all resize-none text-foreground placeholder:text-muted-foreground/50"
+                placeholder="Notas adicionais..."
               />
             </div>
+
+            {saveError && (
+              <p className="text-sm text-red-500 bg-red-500/10 rounded-lg p-3">{saveError}</p>
+            )}
           </div>
+
           <DialogFooter>
-            <button
-              type="button"
-              onClick={() => setDialogNovoAberto(false)}
-              className="px-4 py-2 rounded-xl text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-alt transition-colors"
+            <Button
+              variant="outline"
+              onClick={() => setIsNewModalOpen(false)}
+              className="rounded-xl border-border text-foreground hover:bg-muted"
             >
               Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={handleCriarAgendamento}
-              disabled={salvando || !formNovo.pacienteId}
-              className="px-6 py-2 rounded-xl text-sm font-bold bg-teal text-white hover:bg-teal-dark disabled:opacity-50 transition-colors"
+            </Button>
+            <Button
+              onClick={() => void handleCriarAgendamento()}
+              disabled={isSaving}
+              className="bg-teal text-white hover:bg-teal-lt rounded-xl disabled:opacity-50"
             >
-              {salvando ? 'Salvando…' : 'Agendar'}
-            </button>
+              {isSaving ? 'Salvando...' : 'Salvar Agendamento'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Dialog — Editar Agendamento */}
-      <Dialog open={!!agendamentoEdicao} onOpenChange={(open) => { if (!open) setAgendamentoEdicao(null); }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="font-serif text-xl">
-              Editar — {agendamentoEdicao?.paciente?.nome ?? ''}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-text-secondary">Data</label>
-                <input type="date" value={formEdicao.data} onChange={(e) => setFormEdicao((f) => ({ ...f, data: e.target.value }))} className={inputClass} />
+      {/* Modal: Detalhe do agendamento */}
+      <Dialog open={isDetailModalOpen} onOpenChange={setIsDetailModalOpen}>
+        <DialogContent className="max-w-md rounded-2xl bg-card border-border">
+          {selectedApt && (
+            <>
+              <DialogHeader>
+                <div className="flex items-center justify-between mb-2">
+                  <div
+                    className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${getStatusColor(selectedApt.status)}`}
+                  >
+                    {STATUS_DISPLAY[selectedApt.status] ?? selectedApt.status}
+                  </div>
+                  <button
+                    onClick={() => router.push(`/dashboard/pacientes/${selectedApt.paciente?.id}`)}
+                    className="text-teal text-xs font-bold flex items-center gap-1 hover:underline"
+                  >
+                    Ver Ficha <ExternalLink className="w-3 h-3" />
+                  </button>
+                </div>
+                <DialogTitle className="font-heading text-3xl text-foreground">
+                  {selectedApt.paciente?.nome ?? '—'}
+                </DialogTitle>
+                <DialogDescription className="text-muted-foreground">
+                  Detalhes do agendamento clínico.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-6 py-6">
+                <div className="space-y-1">
+                  <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                    Data e Hora
+                  </div>
+                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <CalendarIcon className="w-4 h-4 text-teal" />
+                    {format(parseISO(selectedApt.data_hora), "dd/MM/yyyy 'às' HH:mm")}
+                  </div>
+                </div>
+
+                {selectedApt.observacoes && (
+                  <div className="space-y-1">
+                    <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                      Observações
+                    </div>
+                    <div className="text-sm font-medium text-foreground">{selectedApt.observacoes}</div>
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  <Label className="text-foreground">Alterar Status</Label>
+                  <Select
+                    value={selectedApt.status}
+                    onValueChange={(val) => val && void handleStatusChange(selectedApt.id, val)}
+                  >
+                    <SelectTrigger className="rounded-xl bg-muted border-border text-foreground">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-border">
+                      <SelectItem value="agendado">Agendado</SelectItem>
+                      <SelectItem value="confirmado">Confirmado</SelectItem>
+                      <SelectItem value="cancelado">Cancelado</SelectItem>
+                      <SelectItem value="realizado">Realizado</SelectItem>
+                      <SelectItem value="faltou">Faltou</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-text-secondary">Hora</label>
-                <input type="time" value={formEdicao.hora} onChange={(e) => setFormEdicao((f) => ({ ...f, hora: e.target.value }))} className={inputClass} />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-text-secondary">Duração</label>
-                <select value={formEdicao.duracao} onChange={(e) => setFormEdicao((f) => ({ ...f, duracao: Number(e.target.value) }))} className={inputClass}>
-                  {DURACOES.map((d) => <option key={d} value={d}>{d} min</option>)}
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-text-secondary">Status</label>
-                <select value={formEdicao.status} onChange={(e) => setFormEdicao((f) => ({ ...f, status: e.target.value as StatusAgendamento }))} className={inputClass}>
-                  <option value="agendado">Agendado</option>
-                  <option value="confirmado">Confirmado</option>
-                  <option value="aguardando">Aguardando</option>
-                  <option value="cancelado">Cancelado</option>
-                  <option value="realizado">Realizado</option>
-                  <option value="faltou">Faltou</option>
-                </select>
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-text-secondary">Tipo / Procedimento</label>
-              <input type="text" value={formEdicao.tipo} onChange={(e) => setFormEdicao((f) => ({ ...f, tipo: e.target.value }))} placeholder="Ex: Consulta, Limpeza…" className={inputClass} />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-text-secondary">Observações</label>
-              <textarea value={formEdicao.observacoes} onChange={(e) => setFormEdicao((f) => ({ ...f, observacoes: e.target.value }))} rows={3} className={inputClass + ' resize-none'} />
-            </div>
-          </div>
-          <DialogFooter>
-            <button type="button" onClick={() => setAgendamentoEdicao(null)} className="px-4 py-2 rounded-xl text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-alt transition-colors">Cancelar</button>
-            <button type="button" onClick={handleSalvarEdicao} disabled={salvando} className="px-6 py-2 rounded-xl text-sm font-bold bg-teal text-white hover:bg-teal-dark disabled:opacity-50 transition-colors">
-              {salvando ? 'Salvando…' : 'Salvar'}
-            </button>
-          </DialogFooter>
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsDetailModalOpen(false)}
+                  className="rounded-xl border-border text-foreground hover:bg-muted"
+                >
+                  Fechar
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
-    </motion.div>
+    </div>
   );
 }

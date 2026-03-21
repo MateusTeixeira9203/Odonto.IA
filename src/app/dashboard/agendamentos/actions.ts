@@ -8,7 +8,6 @@ import { revalidatePath } from "next/cache";
 export type StatusAgendamento =
   | "agendado"
   | "confirmado"
-  | "aguardando"
   | "cancelado"
   | "realizado"
   | "faltou";
@@ -17,7 +16,6 @@ export async function criarAgendamento(dados: {
   pacienteId: string;
   dataHora: string;
   duracaoMinutos: number;
-  tipo: string | null;
   observacoes: string | null;
 }): Promise<{ error?: string; id?: string }> {
   const dentista = await getDentistaCached();
@@ -32,7 +30,6 @@ export async function criarAgendamento(dados: {
       paciente_id: dados.pacienteId,
       data_hora: dados.dataHora,
       duracao_minutos: dados.duracaoMinutos,
-      tipo: dados.tipo || null,
       observacoes: dados.observacoes || null,
       status: "agendado",
     })
@@ -69,7 +66,6 @@ export async function atualizarAgendamento(
     pacienteId?: string;
     dataHora?: string;
     duracaoMinutos?: number;
-    tipo?: string | null;
     observacoes?: string | null;
     status?: StatusAgendamento;
   }
@@ -84,7 +80,6 @@ export async function atualizarAgendamento(
       ...(dados.pacienteId && { paciente_id: dados.pacienteId }),
       ...(dados.dataHora && { data_hora: dados.dataHora }),
       ...(dados.duracaoMinutos && { duracao_minutos: dados.duracaoMinutos }),
-      tipo: dados.tipo ?? null,
       observacoes: dados.observacoes ?? null,
       ...(dados.status && { status: dados.status }),
       updated_at: new Date().toISOString(),

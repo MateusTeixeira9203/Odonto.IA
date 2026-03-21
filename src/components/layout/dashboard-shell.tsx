@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Sidebar } from './sidebar';
+import { useState } from "react";
+import { Sidebar } from "@/components/layout/sidebar";
 
 interface DashboardShellProps {
   children: React.ReactNode;
@@ -10,13 +10,13 @@ interface DashboardShellProps {
 }
 
 export function DashboardShell({ children, nome, clinicaNome }: DashboardShellProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
 
   return (
     <div className="flex min-h-screen bg-bg overflow-hidden">
       <Sidebar
-        isExpanded={isExpanded}
-        onToggle={() => setIsExpanded(!isExpanded)}
+        isExpanded={isSidebarExpanded}
+        onToggle={() => setIsSidebarExpanded(!isSidebarExpanded)}
         nome={nome}
         clinicaNome={clinicaNome}
       />

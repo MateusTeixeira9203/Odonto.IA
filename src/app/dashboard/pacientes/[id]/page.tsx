@@ -1,89 +1,88 @@
-import { notFound, redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { getDentistaCached } from "@/lib/get-dentista";
-import type { FichaArquivo, Orcamento, Planejamento } from "@/types/database";
-import { PacienteDetailClient } from "./_components/paciente-detail-client";
-import type { FichaResumida, PagamentoResumido, ProximaConsulta } from "./_components/paciente-detail-client";
+import { notFound, redirect } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
+import { getDentistaCached } from '@/lib/get-dentista';
+import { PacienteDetailClient } from './_components/paciente-detail-client';
+import type { Paciente } from '@/types/database';
 
-interface Props {
+type AgendamentoProximo = {
+  id: string;
+  data_hora: string;
+  duracao_minutos: number;
+  status: string;
+  observacoes: string | null;
+  dentista: { nome: string } | null;
+};
+
+type OrcamentoComItens = {
+  id: string;
+  status: 'rascunho' | 'enviado' | 'aprovado' | 'recusado';
+  total: number | null;
+  created_at: string;
+  validade_dias: number;
+  condicoes_pagamento: string | null;
+  itens: Array<{
+    id: string;
+    descricao: string | null;
+    preco_total: number | null;
+    quantidade: number;
+  }>;
+  pagamentos: Array<{
+    id: string;
+    valor: number;
+    status: string;
+    forma_pagamento: string | null;
+  }>;
+};
+
+export default async function PacienteDetalhePage({
+  params,
+}: {
   params: Promise<{ id: string }>;
-}
-
-export default async function PacienteDetalhePage({ params }: Props) {
+}) {
   const { id } = await params;
+
   const dentista = await getDentistaCached();
-  if (!dentista) redirect("/login");
+  if (!dentista) redirect('/login');
 
   const supabase = await createClient();
 
   const [
-    { data: paciente },
-    { data: fichasRaw },
-    { data: orcamentos },
-    { data: planejamentos },
-    { data: agendamentoData },
+    { data: pacienteRaw },
+    { data: agendamentoRaw },
+    { data: orcamentosRaw },
   ] = await Promise.all([
     supabase
-      .from("pacientes")
-      .select("*")
-      .eq("id", id)
-      .eq("clinica_id", dentista.clinica_id)
+      .from('pacientes')
+      .select('*')
+      .eq('id', id)
+      .eq('clinica_id', dentista.clinica_id)
       .maybeSingle(),
     supabase
-      .from("fichas")
-      .select("id, status, created_at, queixa_principal, anotacoes, dentes_afetados")
-      .eq("paciente_id", id)
-      .eq("clinica_id", dentista.clinica_id)
-      .order("created_at", { ascending: false }),
+      .from('agendamentos')
+      .select('id, data_hora, duracao_minutos, status, observacoes, dentista:dentistas(nome)')
+      .eq('paciente_id', id)
+      .eq('clinica_id', dentista.clinica_id)
+      .gte('data_hora', new Date().toISOString())
+      .order('data_hora', { ascending: true })
+      .limit(1)
+      .maybeSingle(),
     supabase
-      .from("orcamentos")
-      .select("id, status, total, created_at, condicoes_pagamento, validade_dias, ficha_id")
-      .eq("paciente_id", id)
-      .eq("clinica_id", dentista.clinica_id)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("planejamentos")
-      .select("id, titulo, status, created_at")
-      .eq("paciente_id", id)
-      .eq("clinica_id", dentista.clinica_id)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("agendamentos")
-      .select("id, data_hora, status")
-      .eq("paciente_id", id)
-      .gt("data_hora", new Date().toISOString())
-      .order("data_hora", { ascending: true })
-      .limit(1),
+      .from('orcamentos')
+      .select('id, status, total, created_at, validade_dias, condicoes_pagamento, itens:orcamento_itens(id, descricao, preco_total, quantidade), pagamentos(id, valor, status, forma_pagamento)')
+      .eq('paciente_id', id)
+      .eq('clinica_id', dentista.clinica_id)
+      .order('created_at', { ascending: false }),
   ]);
 
-  if (!paciente) notFound();
-
-  const fichas = (fichasRaw ?? []) as FichaResumida[];
-  const fichaIds = fichas.map((f) => f.id);
-
-  const [{ data: arquivos }, { data: pagamentos }] = await Promise.all([
-    supabase
-      .from("fichas_arquivos")
-      .select("id, tipo, nome_original, storage_url, created_at, ficha_id")
-      .in("ficha_id", fichaIds.length > 0 ? fichaIds : [""]),
-    supabase
-      .from("pagamentos")
-      .select("valor, status, data_pagamento")
-      .eq("paciente_id", id)
-      .eq("clinica_id", dentista.clinica_id),
-  ]);
+  if (!pacienteRaw) notFound();
 
   return (
     <PacienteDetailClient
-      paciente={paciente}
-      fichas={fichas}
-      orcamentos={(orcamentos as Orcamento[]) ?? []}
-      planejamentos={(planejamentos as Planejamento[]) ?? []}
-      arquivos={(arquivos as FichaArquivo[]) ?? []}
-      pagamentos={(pagamentos as PagamentoResumido[]) ?? []}
-      proximaConsulta={(agendamentoData?.[0] as ProximaConsulta) ?? null}
-      dentistaId={dentista.id}
+      paciente={pacienteRaw as Paciente}
+      agendamentoProximo={(agendamentoRaw as AgendamentoProximo | null) ?? null}
+      orcamentos={(orcamentosRaw as unknown as OrcamentoComItens[]) ?? []}
       clinicaId={dentista.clinica_id}
+      dentistaId={dentista.id}
     />
   );
 }

@@ -10,6 +10,7 @@
   --color-teal-sym: #3a9e90;
   --color-teal-pale: #e4f4f1;
   --color-teal-dark: #1e7060;
+
   --color-bg: #f5f3ef;
   --color-surface: #ffffff;
   --color-surface-alt: #eceae4;
@@ -17,12 +18,7 @@
   --color-text-primary: #0d0d0d;
   --color-text-secondary: #8a8a8a;
   --color-text-muted: #d9d9d9;
-  /* Aliases brand-* → novo design system */
-  --color-brand-black: #0d0d0d;
-  --color-brand-muted: #8a8a8a;
-  --color-brand-bg: #f5f3ef;
-  --color-brand-surface: #eceae4;
-  --color-brand-border: #d4d1ca;
+
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -41,6 +37,11 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.809 0.105 251.813);
+  --chart-2: oklch(0.623 0.214 259.815);
+  --chart-3: oklch(0.546 0.245 262.881);
+  --chart-4: oklch(0.488 0.243 264.376);
+  --chart-5: oklch(0.424 0.199 265.638);
   --radius: 0.625rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
@@ -61,12 +62,7 @@
   --color-text-secondary: #a0a0a0;
   --color-text-muted: #404040;
   --color-teal-pale: #1e3a35;
-  /* Aliases brand-* dark mode */
-  --color-brand-black: #ffffff;
-  --color-brand-muted: #a0a0a0;
-  --color-brand-bg: #0d0d0d;
-  --color-brand-surface: #1a1a1a;
-  --color-brand-border: #2a2a2a;
+
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
@@ -85,8 +81,17 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.809 0.105 251.813);
+  --chart-2: oklch(0.623 0.214 259.815);
+  --chart-3: oklch(0.546 0.245 262.881);
+  --chart-4: oklch(0.488 0.243 264.376);
+  --chart-5: oklch(0.424 0.199 265.638);
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
 }
@@ -94,8 +99,10 @@
 @theme {
   --color-teal: var(--color-teal);
   --color-teal-lt: var(--color-teal-lt);
+  --color-teal-sym: var(--color-teal-sym);
   --color-teal-pale: var(--color-teal-pale);
   --color-teal-dark: var(--color-teal-dark);
+
   --color-bg: var(--color-bg);
   --color-surface: var(--color-surface);
   --color-surface-alt: var(--color-surface-alt);
@@ -103,24 +110,30 @@
   --color-text-primary: var(--color-text-primary);
   --color-text-secondary: var(--color-text-secondary);
   --color-text-muted: var(--color-text-muted);
+
   --font-heading: var(--font-dm-serif);
   --font-sans: var(--font-outfit);
   --font-mono: var(--font-dm-mono);
-  --radius-sm: calc(var(--radius) * 0.6);
-  /* brand-* aliases para Tailwind utilities */
-  --color-brand-black: var(--color-brand-black);
-  --color-brand-muted: var(--color-brand-muted);
-  --color-brand-bg: var(--color-brand-bg);
-  --color-brand-surface: var(--color-brand-surface);
-  --color-brand-border: var(--color-brand-border);
-  /* Animações customizadas */
-  --animate-fade-in: fade-in 0.3s ease forwards;
-  --animate-wave: wave 1s ease-in-out infinite;
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
+}
+
+@layer base {
+  body {
+    @apply font-sans antialiased bg-bg text-text-primary transition-colors duration-300;
+  }
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+.glass-card {
+  @apply bg-white/80 dark:bg-black/80 backdrop-blur-md border border-white/20 dark:border-white/10 shadow-sm;
+}
+
+.premium-shadow {
+  box-shadow: 0 10px 30px -10px rgba(47, 156, 133, 0.1);
 }
 
 @theme inline {
@@ -133,6 +146,11 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -151,31 +169,11 @@
   --color-card: var(--card);
   --color-foreground: var(--foreground);
   --color-background: var(--background);
-}
-
-@layer base {
-  body {
-    @apply font-sans antialiased bg-bg text-text-primary transition-colors duration-300;
-  }
-  * {
-    @apply border-border outline-ring/50;
-  }
-}
-
-@keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes wave {
-  0%, 100% { transform: scaleY(0.4); }
-  50% { transform: scaleY(1); }
-}
-
-.glass-card {
-  @apply bg-white/80 dark:bg-black/80 backdrop-blur-md border border-white/20 dark:border-white/10 shadow-sm;
-}
-
-.premium-shadow {
-  box-shadow: 0 10px 30px -10px rgba(47, 156, 133, 0.1);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }

@@ -5,9 +5,6 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -113,28 +110,28 @@ export default function OnboardingPage(): React.JSX.Element {
     }
   }
 
+  const inputClass =
+    "w-full font-sans text-sm px-3 py-2.5 rounded-xl border border-border bg-surface-alt text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-teal/20 focus:border-teal transition-all";
+
   return (
     <div className="w-full max-w-lg">
-      {/* Cabeçalho da página */}
+      {/* Cabeçalho */}
       <div className="text-center mb-8">
-        <h1 className="font-serif text-[2rem] leading-tight text-foreground mb-2">
-          Olá! Vamos configurar seu consultório 🦷
+        <h1 className="font-heading text-4xl text-text-primary mb-2">
+          Configure seu consultório
         </h1>
-        <p className="font-sans text-sm" style={{ color: "var(--gray-mid)" }}>
-          Isso leva menos de 2 minutos
+        <p className="text-text-secondary text-sm font-medium">
+          Isso leva menos de 2 minutos.
         </p>
       </div>
 
-      {/* Card do formulário */}
-      <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
+      {/* Card */}
+      <div className="bg-surface rounded-3xl border border-border shadow-sm overflow-hidden">
         {/* Barra de progresso */}
-        <div className="h-1 w-full bg-muted">
+        <div className="h-1 w-full bg-surface-alt">
           <div
-            className="h-full transition-all duration-500 ease-out"
-            style={{
-              width: `${progress}%`,
-              backgroundColor: "var(--teal)",
-            }}
+            className="h-full bg-teal transition-all duration-500 ease-out"
+            style={{ width: `${progress}%` }}
           />
         </div>
 
@@ -142,45 +139,42 @@ export default function OnboardingPage(): React.JSX.Element {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             {/* Nome completo */}
             <div className="space-y-1.5">
-              <Label htmlFor="nome" className="font-sans font-medium text-sm">
+              <label className="block text-[11px] font-bold text-text-secondary uppercase tracking-widest">
                 Nome completo
-              </Label>
-              <Input
+              </label>
+              <input
                 id="nome"
                 placeholder="Ex: Dr. João Silva"
                 disabled={isLoading}
-                className="h-10"
+                className={inputClass}
                 {...register("nome")}
               />
               {errors.nome && (
-                <p className="text-xs text-destructive">{errors.nome.message}</p>
+                <p className="text-xs text-red-500">{errors.nome.message}</p>
               )}
             </div>
 
             {/* CRO + Especialidade */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label htmlFor="cro" className="font-sans font-medium text-sm">
+                <label className="block text-[11px] font-bold text-text-secondary uppercase tracking-widest">
                   CRO
-                </Label>
-                <Input
+                </label>
+                <input
                   id="cro"
                   placeholder="Ex: CRO-SP 12345"
                   disabled={isLoading}
-                  className="h-10"
+                  className={inputClass}
                   {...register("cro")}
                 />
                 {errors.cro && (
-                  <p className="text-xs text-destructive">{errors.cro.message}</p>
+                  <p className="text-xs text-red-500">{errors.cro.message}</p>
                 )}
               </div>
               <div className="space-y-1.5">
-                <Label
-                  htmlFor="especialidade"
-                  className="font-sans font-medium text-sm"
-                >
+                <label className="block text-[11px] font-bold text-text-secondary uppercase tracking-widest">
                   Especialidade
-                </Label>
+                </label>
                 <Select
                   value={especialidadeValue ?? ""}
                   onValueChange={(v) =>
@@ -192,7 +186,7 @@ export default function OnboardingPage(): React.JSX.Element {
                   }
                   disabled={isLoading}
                 >
-                  <SelectTrigger id="especialidade" className="w-full h-10">
+                  <SelectTrigger className="w-full h-10 rounded-xl border border-border bg-surface-alt text-text-primary text-sm">
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
@@ -204,7 +198,7 @@ export default function OnboardingPage(): React.JSX.Element {
                   </SelectContent>
                 </Select>
                 {errors.especialidade && (
-                  <p className="text-xs text-destructive">
+                  <p className="text-xs text-red-500">
                     {errors.especialidade.message}
                   </p>
                 )}
@@ -213,21 +207,18 @@ export default function OnboardingPage(): React.JSX.Element {
 
             {/* Nome do consultório */}
             <div className="space-y-1.5">
-              <Label
-                htmlFor="nomeConsultorio"
-                className="font-sans font-medium text-sm"
-              >
+              <label className="block text-[11px] font-bold text-text-secondary uppercase tracking-widest">
                 Nome do consultório
-              </Label>
-              <Input
+              </label>
+              <input
                 id="nomeConsultorio"
                 placeholder="Ex: Consultório Dr. João"
                 disabled={isLoading}
-                className="h-10"
+                className={inputClass}
                 {...register("nomeConsultorio")}
               />
               {errors.nomeConsultorio && (
-                <p className="text-xs text-destructive">
+                <p className="text-xs text-red-500">
                   {errors.nomeConsultorio.message}
                 </p>
               )}
@@ -235,18 +226,15 @@ export default function OnboardingPage(): React.JSX.Element {
 
             {/* Telefone */}
             <div className="space-y-1.5">
-              <Label
-                htmlFor="telefone"
-                className="font-sans font-medium text-sm"
-              >
+              <label className="block text-[11px] font-bold text-text-secondary uppercase tracking-widest">
                 Telefone{" "}
-                <span style={{ color: "var(--gray-mid)" }}>(opcional)</span>
-              </Label>
-              <Input
+                <span className="normal-case font-normal">(opcional)</span>
+              </label>
+              <input
                 id="telefone"
                 placeholder="(00) 00000-0000"
                 disabled={isLoading}
-                className="h-10"
+                className={inputClass}
                 {...register("telefone")}
               />
             </div>
@@ -254,56 +242,49 @@ export default function OnboardingPage(): React.JSX.Element {
             {/* Cidade + Estado */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label
-                  htmlFor="cidade"
-                  className="font-sans font-medium text-sm"
-                >
+                <label className="block text-[11px] font-bold text-text-secondary uppercase tracking-widest">
                   Cidade
-                </Label>
-                <Input
+                </label>
+                <input
                   id="cidade"
                   placeholder="Cidade"
                   disabled={isLoading}
-                  className="h-10"
+                  className={inputClass}
                   {...register("cidade")}
                 />
                 {errors.cidade && (
-                  <p className="text-xs text-destructive">
+                  <p className="text-xs text-red-500">
                     {errors.cidade.message}
                   </p>
                 )}
               </div>
               <div className="space-y-1.5">
-                <Label
-                  htmlFor="estado"
-                  className="font-sans font-medium text-sm"
-                >
+                <label className="block text-[11px] font-bold text-text-secondary uppercase tracking-widest">
                   Estado
-                </Label>
-                <Input
+                </label>
+                <input
                   id="estado"
                   placeholder="UF"
                   maxLength={2}
                   disabled={isLoading}
-                  className="h-10 uppercase"
+                  className={inputClass + " uppercase"}
                   {...register("estado")}
                 />
                 {errors.estado && (
-                  <p className="text-xs text-destructive">
+                  <p className="text-xs text-red-500">
                     {errors.estado.message}
                   </p>
                 )}
               </div>
             </div>
 
-            <Button
+            <button
               type="submit"
-              className="w-full h-11 font-sans font-semibold text-sm mt-2"
               disabled={isLoading}
-              style={{ backgroundColor: "var(--teal)", color: "white" }}
+              className="w-full bg-black hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-black py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors shadow-md mt-2 disabled:opacity-60"
             >
               {isLoading ? "Salvando..." : "Concluir configuração →"}
-            </Button>
+            </button>
           </form>
         </div>
       </div>
