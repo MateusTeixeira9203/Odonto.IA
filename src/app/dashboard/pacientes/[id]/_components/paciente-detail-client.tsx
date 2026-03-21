@@ -168,6 +168,7 @@ export function PacienteDetailClient({
   const [pagSaving, setPagSaving] = useState(false);
   const [orcError, setOrcError] = useState<string | null>(null);
   const [pagError, setPagError] = useState<string | null>(null);
+  const [isLoadingFichaParaOrc, setIsLoadingFichaParaOrc] = useState(false);
 
   // Nova Consulta
   const [isNovaConsultaOpen, setIsNovaConsultaOpen] = useState(false);
@@ -319,6 +320,52 @@ export function PacienteDetailClient({
       router.refresh();
     }
     setPagSaving(false);
+  };
+
+  const abrirNovoOrcamento = async () => {
+    setOrcError(null);
+    setIsLoadingFichaParaOrc(true);
+    try {
+      const supabase = createClient();
+      const { data: ficha } = await supabase
+        .from('fichas')
+        .select('dentes_afetados, dentes_observacoes')
+        .eq('paciente_id', paciente.id)
+        .eq('clinica_id', clinicaId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const dentes = (ficha?.dentes_afetados as number[] | null) ?? [];
+      const obs = (ficha?.dentes_observacoes as Record<string, string> | null) ?? {};
+
+      if (dentes.length > 0) {
+        const itens: NovoOrcItem[] = dentes.map((tooth) => {
+          const toothObs = obs[String(tooth)] ?? '';
+          const match = toothObs
+            ? procedimentosClinica.find(
+                (p) =>
+                  p.nome.toLowerCase().includes(toothObs.toLowerCase()) ||
+                  toothObs.toLowerCase().includes(p.nome.toLowerCase())
+              )
+            : undefined;
+          return {
+            procedimentoId: match?.id ?? '',
+            descricao: `Dente ${tooth}${toothObs ? ` — ${match?.nome ?? toothObs}` : ''}`,
+            quantidade: 1,
+            preco: match?.preco_padrao ?? 0,
+          };
+        });
+        setNovoOrcItens(itens);
+      } else {
+        setNovoOrcItens([{ procedimentoId: '', descricao: '', quantidade: 1, preco: 0 }]);
+      }
+    } catch {
+      setNovoOrcItens([{ procedimentoId: '', descricao: '', quantidade: 1, preco: 0 }]);
+    } finally {
+      setIsLoadingFichaParaOrc(false);
+    }
+    setIsNovoOrcOpen(true);
   };
 
   const handleCriarOrcamento = async () => {
@@ -647,14 +694,15 @@ export function PacienteDetailClient({
                       {orcamentosState.length} orçamento{orcamentosState.length !== 1 ? 's' : ''}
                     </span>
                     <button
-                      onClick={() => {
-                        setOrcError(null);
-                        setNovoOrcItens([{ procedimentoId: '', descricao: '', quantidade: 1, preco: 0 }]);
-                        setIsNovoOrcOpen(true);
-                      }}
-                      className="bg-teal text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 hover:bg-teal-lt transition-all shadow-md"
+                      onClick={() => void abrirNovoOrcamento()}
+                      disabled={isLoadingFichaParaOrc}
+                      className="bg-teal text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 hover:bg-teal-lt transition-all shadow-md disabled:opacity-60"
                     >
-                      <Plus className="w-3.5 h-3.5" />
+                      {isLoadingFichaParaOrc ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Plus className="w-3.5 h-3.5" />
+                      )}
                       Novo Orçamento
                     </button>
                   </div>
@@ -665,16 +713,9 @@ export function PacienteDetailClient({
                       <h3 className="font-heading text-2xl text-foreground mb-2">
                         Nenhum orçamento
                       </h3>
-                      <p className="text-muted-foreground text-sm max-w-md mx-auto mb-6">
-                        Crie um planejamento de tratamento para gerar o orçamento automaticamente.
+                      <p className="text-muted-foreground text-sm max-w-md mx-auto">
+                        Nenhum orçamento ainda. Clique em + Novo Orçamento para criar.
                       </p>
-                      <button
-                        onClick={() => setActiveTab('planejamento')}
-                        className="bg-teal text-white px-6 py-3 rounded-xl font-bold text-sm inline-flex items-center gap-2 hover:bg-teal-lt transition-all shadow-md"
-                      >
-                        <Plus className="w-4 h-4" />
-                        Ir para Planejamento
-                      </button>
                     </div>
                   ) : (
                     orcamentosState.map((orc) => {
