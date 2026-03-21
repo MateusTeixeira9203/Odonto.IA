@@ -175,3 +175,94 @@ export async function registrarPagamento(dados: {
   revalidatePath("/dashboard/orcamentos");
   return { id: data.id };
 }
+
+/**
+ * Edita os itens de um orçamento (delete + reinsert) e atualiza o total.
+ */
+export async function editarOrcamento(
+  orcamentoId: string,
+  itens: Array<{
+    descricao: string;
+    quantidade: number;
+    preco_unitario: number;
+    procedimento_id?: string | null;
+  }>
+): Promise<{ error?: string }> {
+  const dentista = await getDentistaCached();
+  if (!dentista) redirect("/login");
+  const clinicaId = dentista.clinica_id;
+
+  const supabase = await createClient();
+
+  const { error: delError } = await supabase
+    .from("orcamento_itens")
+    .delete()
+    .eq("orcamento_id", orcamentoId)
+    .eq("clinica_id", clinicaId);
+
+  if (delError) return { error: delError.message };
+
+  const itensInsert = itens.map((item) => ({
+    orcamento_id: orcamentoId,
+    clinica_id: clinicaId,
+    descricao: item.descricao,
+    procedimento_id: item.procedimento_id ?? null,
+    quantidade: item.quantidade,
+    preco_unitario: item.preco_unitario,
+    preco_total: item.quantidade * item.preco_unitario,
+  }));
+
+  const { error: insError } = await supabase.from("orcamento_itens").insert(itensInsert);
+  if (insError) return { error: insError.message };
+
+  const total = itens.reduce((sum, i) => sum + i.quantidade * i.preco_unitario, 0);
+
+  const { error: updError } = await supabase
+    .from("orcamentos")
+    .update({ total })
+    .eq("id", orcamentoId)
+    .eq("clinica_id", clinicaId);
+
+  if (updError) return { error: updError.message };
+
+  revalidatePath("/dashboard/orcamentos");
+  return {};
+}
+
+/**
+ * Exclui um orçamento junto com seus itens e pagamentos.
+ */
+export async function excluirOrcamento(
+  orcamentoId: string,
+  pacienteId?: string
+): Promise<{ error?: string }> {
+  const dentista = await getDentistaCached();
+  if (!dentista) redirect("/login");
+  const clinicaId = dentista.clinica_id;
+
+  const supabase = await createClient();
+
+  await supabase
+    .from("pagamentos")
+    .delete()
+    .eq("orcamento_id", orcamentoId)
+    .eq("clinica_id", clinicaId);
+
+  await supabase
+    .from("orcamento_itens")
+    .delete()
+    .eq("orcamento_id", orcamentoId)
+    .eq("clinica_id", clinicaId);
+
+  const { error } = await supabase
+    .from("orcamentos")
+    .delete()
+    .eq("id", orcamentoId)
+    .eq("clinica_id", clinicaId);
+
+  if (error) return { error: error.message };
+
+  if (pacienteId) revalidatePath(`/dashboard/pacientes/${pacienteId}`);
+  revalidatePath("/dashboard/orcamentos");
+  return {};
+}

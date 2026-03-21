@@ -51,6 +51,8 @@ import {
   atualizarStatusOrcamento,
   registrarPagamento,
   criarOrcamento,
+  editarOrcamento,
+  excluirOrcamento,
   type FormaPagamento,
   type StatusOrcamento,
 } from '@/app/dashboard/orcamentos/actions';
@@ -169,6 +171,18 @@ export function PacienteDetailClient({
   const [orcError, setOrcError] = useState<string | null>(null);
   const [pagError, setPagError] = useState<string | null>(null);
   const [isLoadingFichaParaOrc, setIsLoadingFichaParaOrc] = useState(false);
+
+  // Edição de orçamento
+  const [orcEditMode, setOrcEditMode] = useState(false);
+  const [orcEditItens, setOrcEditItens] = useState<
+    Array<{ id?: string; descricao: string; quantidade: number; preco_unitario: number }>
+  >([]);
+  const [orcEditSaving, setOrcEditSaving] = useState(false);
+  const [orcEditError, setOrcEditError] = useState<string | null>(null);
+
+  // Exclusão de orçamento
+  const [confirmDeleteOrcId, setConfirmDeleteOrcId] = useState<string | null>(null);
+  const [orcDeleteSaving, setOrcDeleteSaving] = useState(false);
 
   // Nova Consulta
   const [isNovaConsultaOpen, setIsNovaConsultaOpen] = useState(false);
@@ -396,6 +410,64 @@ export function PacienteDetailClient({
       router.refresh();
     }
     setOrcSaving(false);
+  };
+
+  const handleOpenEditOrc = () => {
+    if (!detalheOrc) return;
+    setOrcEditItens(
+      detalheOrc.itens.map((item) => ({
+        id: item.id,
+        descricao: item.descricao ?? '',
+        quantidade: item.quantidade,
+        preco_unitario:
+          item.quantidade > 0 ? (item.preco_total ?? 0) / item.quantidade : (item.preco_total ?? 0),
+      }))
+    );
+    setOrcEditError(null);
+    setOrcEditMode(true);
+  };
+
+  const handleSalvarEdicaoOrc = async () => {
+    if (!detalheOrc) return;
+    const itensValidos = orcEditItens.filter((i) => i.descricao.trim() && i.preco_unitario > 0);
+    if (itensValidos.length === 0) {
+      setOrcEditError('Adicione ao menos um procedimento com descrição e valor.');
+      return;
+    }
+    setOrcEditSaving(true);
+    const result = await editarOrcamento(detalheOrc.id, itensValidos);
+    if (result.error) {
+      setOrcEditError(result.error);
+    } else {
+      const novoTotal = itensValidos.reduce((sum, i) => sum + i.quantidade * i.preco_unitario, 0);
+      const novosItens: OrcamentoItem[] = itensValidos.map((i) => ({
+        id: i.id ?? crypto.randomUUID(),
+        descricao: i.descricao,
+        quantidade: i.quantidade,
+        preco_total: i.quantidade * i.preco_unitario,
+      }));
+      setOrcamentosState((prev) =>
+        prev.map((o) =>
+          o.id === detalheOrc.id ? { ...o, total: novoTotal, itens: novosItens } : o
+        )
+      );
+      setOrcEditMode(false);
+      router.refresh();
+    }
+    setOrcEditSaving(false);
+  };
+
+  const handleExcluirOrc = async () => {
+    if (!confirmDeleteOrcId) return;
+    setOrcDeleteSaving(true);
+    const result = await excluirOrcamento(confirmDeleteOrcId, paciente.id);
+    if (!result.error) {
+      setOrcamentosState((prev) => prev.filter((o) => o.id !== confirmDeleteOrcId));
+      setDetalheOrcId(null);
+      setConfirmDeleteOrcId(null);
+      router.refresh();
+    }
+    setOrcDeleteSaving(false);
   };
 
   const handleNovaConsulta = async () => {
@@ -974,6 +1046,8 @@ export function PacienteDetailClient({
           if (!open) {
             setDetalheOrcId(null);
             setPagError(null);
+            setOrcEditMode(false);
+            setOrcEditError(null);
           }
         }}
       >
@@ -981,22 +1055,37 @@ export function PacienteDetailClient({
           {detalheOrc && (
             <>
               <DialogHeader>
-                <div className="mb-1">
-                  <span
-                    className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md ${STATUS_ORCAMENTO[detalheOrc.status]?.cls ?? ''}`}
-                  >
-                    {STATUS_ORCAMENTO[detalheOrc.status]?.label}
-                  </span>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1">
+                    <div className="mb-1">
+                      <span
+                        className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md ${STATUS_ORCAMENTO[detalheOrc.status]?.cls ?? ''}`}
+                      >
+                        {STATUS_ORCAMENTO[detalheOrc.status]?.label}
+                      </span>
+                    </div>
+                    <DialogTitle className="font-heading text-2xl text-foreground">
+                      Orçamento de{' '}
+                      {format(parseISO(detalheOrc.created_at), "dd 'de' MMMM 'de' yyyy", {
+                        locale: ptBR,
+                      })}
+                    </DialogTitle>
+                    <DialogDescription className="text-muted-foreground">
+                      Validade: {detalheOrc.validade_dias} dias
+                    </DialogDescription>
+                  </div>
+                  {!orcEditMode && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleOpenEditOrc}
+                      className="rounded-xl border-border text-foreground hover:bg-muted mt-1"
+                    >
+                      <Edit2 className="w-4 h-4 mr-1" />
+                      Editar
+                    </Button>
+                  )}
                 </div>
-                <DialogTitle className="font-heading text-2xl text-foreground">
-                  Orçamento de{' '}
-                  {format(parseISO(detalheOrc.created_at), "dd 'de' MMMM 'de' yyyy", {
-                    locale: ptBR,
-                  })}
-                </DialogTitle>
-                <DialogDescription className="text-muted-foreground">
-                  Validade: {detalheOrc.validade_dias} dias
-                </DialogDescription>
               </DialogHeader>
 
               <div className="space-y-6 py-4">
@@ -1024,12 +1113,105 @@ export function PacienteDetailClient({
                 </div>
 
                 {/* Procedimentos */}
-                {detalheOrc.itens.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                      Procedimentos
+                <div className="space-y-2">
+                  <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                    Procedimentos
+                  </div>
+                  {orcEditMode ? (
+                    <div className="space-y-3">
+                      {orcEditItens.map((item, idx) => (
+                        <div key={idx} className="bg-muted rounded-xl p-3 space-y-2">
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="Descrição"
+                              value={item.descricao}
+                              onChange={(e) =>
+                                setOrcEditItens((prev) =>
+                                  prev.map((it, i) =>
+                                    i === idx ? { ...it, descricao: e.target.value } : it
+                                  )
+                                )
+                              }
+                              className="rounded-xl bg-background border-border text-foreground text-sm flex-1"
+                            />
+                            <button
+                              onClick={() =>
+                                setOrcEditItens((prev) => prev.filter((_, i) => i !== idx))
+                              }
+                              className="p-2 rounded-xl hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                          <div className="flex gap-2">
+                            <div className="space-y-1 w-20">
+                              <label className="text-[10px] text-muted-foreground">Qtd</label>
+                              <Input
+                                type="number"
+                                min="1"
+                                value={item.quantidade}
+                                onChange={(e) =>
+                                  setOrcEditItens((prev) =>
+                                    prev.map((it, i) =>
+                                      i === idx
+                                        ? { ...it, quantidade: parseInt(e.target.value) || 1 }
+                                        : it
+                                    )
+                                  )
+                                }
+                                className="rounded-xl bg-background border-border text-foreground text-sm"
+                              />
+                            </div>
+                            <div className="space-y-1 flex-1">
+                              <label className="text-[10px] text-muted-foreground">
+                                Preço unit. (R$)
+                              </label>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={item.preco_unitario}
+                                onChange={(e) =>
+                                  setOrcEditItens((prev) =>
+                                    prev.map((it, i) =>
+                                      i === idx
+                                        ? { ...it, preco_unitario: parseFloat(e.target.value) || 0 }
+                                        : it
+                                    )
+                                  )
+                                }
+                                className="rounded-xl bg-background border-border text-foreground text-sm"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      <button
+                        onClick={() =>
+                          setOrcEditItens((prev) => [
+                            ...prev,
+                            { descricao: '', quantidade: 1, preco_unitario: 0 },
+                          ])
+                        }
+                        className="w-full py-2 border border-dashed border-border rounded-xl text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Plus className="w-4 h-4" /> Adicionar item
+                      </button>
+                      <div className="flex items-center justify-between font-bold px-1">
+                        <span className="text-sm text-foreground">Total</span>
+                        <span className="font-mono text-lg text-foreground">
+                          R${' '}
+                          {orcEditItens
+                            .reduce((sum, i) => sum + i.quantidade * i.preco_unitario, 0)
+                            .toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
                     </div>
+                  ) : (
                     <div className="bg-muted rounded-xl p-4 space-y-2">
+                      {detalheOrc.itens.length === 0 && (
+                        <p className="text-sm text-muted-foreground">Nenhum procedimento.</p>
+                      )}
                       {detalheOrc.itens.map((item) => (
                         <div
                           key={item.id}
@@ -1061,8 +1243,8 @@ export function PacienteDetailClient({
                         </span>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
 
                 {/* Histórico de pagamentos */}
                 {detalheOrc.pagamentos.length > 0 && (
@@ -1168,20 +1350,94 @@ export function PacienteDetailClient({
                 </div>
               </div>
 
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setDetalheOrcId(null);
-                    setPagError(null);
-                  }}
-                  className="rounded-xl border-border text-foreground hover:bg-muted"
-                >
-                  Fechar
-                </Button>
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                {orcEditMode ? (
+                  <>
+                    {orcEditError && (
+                      <p className="text-xs text-red-500 bg-red-500/10 rounded-lg px-3 py-2 w-full sm:w-auto">
+                        {orcEditError}
+                      </p>
+                    )}
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setOrcEditMode(false);
+                        setOrcEditError(null);
+                      }}
+                      disabled={orcEditSaving}
+                      className="rounded-xl border-border text-foreground hover:bg-muted"
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      onClick={() => void handleSalvarEdicaoOrc()}
+                      disabled={orcEditSaving}
+                      className="bg-teal text-white hover:bg-teal-lt rounded-xl"
+                    >
+                      {orcEditSaving ? 'Salvando...' : 'Salvar Alterações'}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      variant="outline"
+                      onClick={() => setConfirmDeleteOrcId(detalheOrcId)}
+                      className="rounded-xl border-red-500/30 text-red-500 hover:bg-red-500/10 mr-auto"
+                    >
+                      <Trash2 className="w-4 h-4 mr-1.5" />
+                      Excluir
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setDetalheOrcId(null);
+                        setPagError(null);
+                      }}
+                      className="rounded-xl border-border text-foreground hover:bg-muted"
+                    >
+                      Fechar
+                    </Button>
+                  </>
+                )}
               </DialogFooter>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Confirmar exclusão de orçamento */}
+      <Dialog
+        open={!!confirmDeleteOrcId}
+        onOpenChange={(open) => {
+          if (!open) setConfirmDeleteOrcId(null);
+        }}
+      >
+        <DialogContent className="max-w-sm rounded-2xl bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-xl text-foreground">
+              Excluir orçamento?
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Esta ação é irreversível. Todos os pagamentos vinculados também serão removidos.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setConfirmDeleteOrcId(null)}
+              disabled={orcDeleteSaving}
+              className="rounded-xl border-border text-foreground hover:bg-muted"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => void handleExcluirOrc()}
+              disabled={orcDeleteSaving}
+              className="bg-red-500 text-white hover:bg-red-600 rounded-xl"
+            >
+              {orcDeleteSaving ? 'Excluindo...' : 'Excluir'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

@@ -15,6 +15,7 @@ import {
   CreditCard,
   Plus,
   Trash2,
+  Edit2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, parseISO } from 'date-fns';
@@ -44,6 +45,8 @@ import {
   atualizarStatusOrcamento,
   registrarPagamento,
   criarOrcamento,
+  editarOrcamento,
+  excluirOrcamento,
   type FormaPagamento,
   type StatusOrcamento,
 } from '../actions';
@@ -111,6 +114,18 @@ export function OrcamentosClient({
   });
   const [pagSaving, setPagSaving] = useState(false);
   const [pagError, setPagError] = useState<string | null>(null);
+
+  // Edição de orçamento
+  const [editMode, setEditMode] = useState(false);
+  const [editItens, setEditItens] = useState<
+    Array<{ id?: string; descricao: string; quantidade: number; preco_unitario: number }>
+  >([]);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  // Exclusão de orçamento
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleteSaving, setDeleteSaving] = useState(false);
 
   // Busca procedimentos da clínica ao montar
   useEffect(() => {
@@ -290,6 +305,71 @@ export function OrcamentosClient({
       router.refresh();
     }
     setOrcSaving(false);
+  };
+
+  const handleOpenEdit = () => {
+    if (!selected) return;
+    setEditItens(
+      selected.itens.map((item) => ({
+        id: item.id,
+        descricao: item.descricao ?? '',
+        quantidade: item.quantidade,
+        preco_unitario:
+          item.quantidade > 0
+            ? (item.preco_total ?? 0) / item.quantidade
+            : (item.preco_total ?? 0),
+      }))
+    );
+    setEditError(null);
+    setEditMode(true);
+  };
+
+  const handleSalvarEdicao = async () => {
+    if (!selected) return;
+    const itensValidos = editItens.filter((i) => i.descricao.trim() && i.preco_unitario > 0);
+    if (itensValidos.length === 0) {
+      setEditError('Adicione ao menos um procedimento com descrição e valor.');
+      return;
+    }
+    setEditSaving(true);
+    const result = await editarOrcamento(selected.id, itensValidos);
+    if (result.error) {
+      setEditError(result.error);
+    } else {
+      const novoTotal = itensValidos.reduce((sum, i) => sum + i.quantidade * i.preco_unitario, 0);
+      const novosItens: OrcamentoItemRow[] = itensValidos.map((i) => ({
+        id: i.id ?? crypto.randomUUID(),
+        orcamento_id: selected.id,
+        descricao: i.descricao,
+        quantidade: i.quantidade,
+        preco_unitario: i.preco_unitario,
+        preco_total: i.quantidade * i.preco_unitario,
+      }));
+      setOrcamentos((prev) =>
+        prev.map((o) =>
+          o.id === selected.id ? { ...o, total: novoTotal, itens: novosItens } : o
+        )
+      );
+      setSelected((prev) =>
+        prev ? { ...prev, total: novoTotal, itens: novosItens } : prev
+      );
+      setEditMode(false);
+      router.refresh();
+    }
+    setEditSaving(false);
+  };
+
+  const handleExcluir = async () => {
+    if (!confirmDeleteId) return;
+    setDeleteSaving(true);
+    const result = await excluirOrcamento(confirmDeleteId);
+    if (!result.error) {
+      setOrcamentos((prev) => prev.filter((o) => o.id !== confirmDeleteId));
+      if (selected?.id === confirmDeleteId) setSelected(null);
+      setConfirmDeleteId(null);
+      router.refresh();
+    }
+    setDeleteSaving(false);
   };
 
   return (
@@ -501,7 +581,7 @@ export function OrcamentosClient({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setSelected(null)}
+              onClick={() => { setSelected(null); setEditMode(false); setEditError(null); }}
               className="fixed inset-0 bg-black/40 z-40"
             />
             <motion.aside
@@ -527,12 +607,32 @@ export function OrcamentosClient({
                     </span>
                   </div>
                 </div>
-                <button
-                  onClick={() => setSelected(null)}
-                  className="p-2 rounded-xl hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-1">
+                  {!editMode && (
+                    <>
+                      <button
+                        onClick={handleOpenEdit}
+                        className="p-2 rounded-xl hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                        title="Editar orçamento"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteId(selected.id)}
+                        className="p-2 rounded-xl hover:bg-red-500/10 transition-colors text-muted-foreground hover:text-red-500"
+                        title="Excluir orçamento"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
+                  <button
+                    onClick={() => { setSelected(null); setEditMode(false); setEditError(null); }}
+                    className="p-2 rounded-xl hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
 
               <div className="flex-1 overflow-y-auto p-6 space-y-6">
@@ -573,12 +673,121 @@ export function OrcamentosClient({
                 </div>
 
                 {/* Itens do orçamento */}
-                {selected.itens.length > 0 && (
-                  <div>
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3 block">
-                      Procedimentos
-                    </label>
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3 block">
+                    Procedimentos
+                  </label>
+                  {editMode ? (
+                    <div className="space-y-3">
+                      {editItens.map((item, idx) => (
+                        <div key={idx} className="bg-muted rounded-xl p-3 space-y-2">
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="Descrição"
+                              value={item.descricao}
+                              onChange={(e) =>
+                                setEditItens((prev) =>
+                                  prev.map((it, i) =>
+                                    i === idx ? { ...it, descricao: e.target.value } : it
+                                  )
+                                )
+                              }
+                              className="rounded-xl bg-background border-border text-foreground text-sm flex-1"
+                            />
+                            <button
+                              onClick={() =>
+                                setEditItens((prev) => prev.filter((_, i) => i !== idx))
+                              }
+                              className="p-2 rounded-xl hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                          <div className="flex gap-2">
+                            <div className="space-y-1 w-20">
+                              <label className="text-[10px] text-muted-foreground">Qtd</label>
+                              <Input
+                                type="number"
+                                min="1"
+                                value={item.quantidade}
+                                onChange={(e) =>
+                                  setEditItens((prev) =>
+                                    prev.map((it, i) =>
+                                      i === idx
+                                        ? { ...it, quantidade: parseInt(e.target.value) || 1 }
+                                        : it
+                                    )
+                                  )
+                                }
+                                className="rounded-xl bg-background border-border text-foreground text-sm"
+                              />
+                            </div>
+                            <div className="space-y-1 flex-1">
+                              <label className="text-[10px] text-muted-foreground">
+                                Preço unit. (R$)
+                              </label>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={item.preco_unitario}
+                                onChange={(e) =>
+                                  setEditItens((prev) =>
+                                    prev.map((it, i) =>
+                                      i === idx
+                                        ? {
+                                            ...it,
+                                            preco_unitario: parseFloat(e.target.value) || 0,
+                                          }
+                                        : it
+                                    )
+                                  )
+                                }
+                                className="rounded-xl bg-background border-border text-foreground text-sm"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      <button
+                        onClick={() =>
+                          setEditItens((prev) => [
+                            ...prev,
+                            { descricao: '', quantidade: 1, preco_unitario: 0 },
+                          ])
+                        }
+                        className="w-full py-2 border border-dashed border-border rounded-xl text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Plus className="w-4 h-4" /> Adicionar item
+                      </button>
+                      {editError && (
+                        <p className="text-xs text-red-500 bg-red-500/10 rounded-lg px-3 py-2">
+                          {editError}
+                        </p>
+                      )}
+                      <div className="flex gap-2 pt-1">
+                        <Button
+                          variant="outline"
+                          onClick={() => { setEditMode(false); setEditError(null); }}
+                          disabled={editSaving}
+                          className="flex-1 rounded-xl border-border text-foreground hover:bg-muted"
+                        >
+                          Cancelar
+                        </Button>
+                        <Button
+                          onClick={() => void handleSalvarEdicao()}
+                          disabled={editSaving}
+                          className="flex-1 bg-teal text-white hover:bg-teal-lt rounded-xl"
+                        >
+                          {editSaving ? 'Salvando...' : 'Salvar'}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
                     <div className="space-y-2">
+                      {selected.itens.length === 0 && (
+                        <p className="text-sm text-muted-foreground">Nenhum procedimento.</p>
+                      )}
                       {selected.itens.map((item) => (
                         <div
                           key={item.id}
@@ -591,8 +800,8 @@ export function OrcamentosClient({
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
 
                 {/* Pagamentos registrados */}
                 {selected.pagamentos.length > 0 && (
@@ -716,6 +925,40 @@ export function OrcamentosClient({
           </>
         )}
       </AnimatePresence>
+
+      {/* Dialog: Confirmar exclusão de orçamento */}
+      <Dialog
+        open={!!confirmDeleteId}
+        onOpenChange={(open) => { if (!open) setConfirmDeleteId(null); }}
+      >
+        <DialogContent className="max-w-sm rounded-2xl bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-xl text-foreground">
+              Excluir orçamento?
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Esta ação é irreversível. Todos os pagamentos vinculados também serão removidos.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setConfirmDeleteId(null)}
+              disabled={deleteSaving}
+              className="rounded-xl border-border text-foreground hover:bg-muted"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => void handleExcluir()}
+              disabled={deleteSaving}
+              className="bg-red-500 text-white hover:bg-red-600 rounded-xl"
+            >
+              {deleteSaving ? 'Excluindo...' : 'Excluir'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog: Novo Orçamento */}
       <Dialog open={isNovoOrcOpen} onOpenChange={setIsNovoOrcOpen}>
