@@ -13,6 +13,9 @@ import {
   Sparkles,
   Loader2,
   Save,
+  Presentation,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
@@ -55,9 +58,13 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
   const [isGeneratingAI, setIsGeneratingAI] = useState<string | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [budgetProcedures, setBudgetProcedures] = useState<BudgetProcedure[]>([]);
+  const [budgetExists, setBudgetExists] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
+  const [isPresentationOpen, setIsPresentationOpen] = useState(false);
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [slideDirection, setSlideDirection] = useState(1);
 
   // Ref para acesso sempre atualizado nas funções de debounce
   const sectionsRef = useRef<Section[]>([]);
@@ -96,14 +103,18 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
       setDocuments(docsResult.data ?? []);
 
       if (budgetResult.error) throw budgetResult.error;
-      if (budgetResult.data?.orcamento_itens) {
+      if (budgetResult.data) {
+        setBudgetExists(true);
         setBudgetProcedures(
-          (budgetResult.data.orcamento_itens as Array<Record<string, unknown>>).map(p => ({
+          (budgetResult.data.orcamento_itens as Array<Record<string, unknown>> ?? []).map(p => ({
             id: p.id as string,
             name: p.descricao as string,
             value: p.total as number,
           }))
         );
+      } else {
+        setBudgetExists(false);
+        setBudgetProcedures([]);
       }
 
       if (secoesResult.error) throw secoesResult.error;
@@ -205,36 +216,6 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
       }
     } catch (error) {
       console.error('Erro ao gerar com IA:', error);
-    } finally {
-      setIsGeneratingAI(null);
-    }
-  };
-
-  const generateFullPlanWithAI = async (): Promise<void> => {
-    setIsGeneratingAI('all');
-    try {
-      const response = await fetch('/api/gerar-planejamento', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          completo: true,
-          procedimentos: budgetProcedures.map(p => p.name),
-        }),
-      });
-
-      if (!response.ok) throw new Error('Falha ao gerar');
-      const data = await response.json() as { secoes?: Array<{ title: string; content: string }> };
-      if (data.secoes) {
-        const newSections = data.secoes.map(gs => ({
-          id: Math.random().toString(36).substr(2, 9),
-          title: gs.title,
-          content: gs.content,
-          imageIds: [],
-        }));
-        setSections(newSections);
-      }
-    } catch (error) {
-      console.error('Erro ao gerar plano completo:', error);
     } finally {
       setIsGeneratingAI(null);
     }
@@ -353,10 +334,31 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
   };
 
   const totalBudget = budgetProcedures.reduce((acc, curr) => acc + curr.value, 0);
+  const totalSlides = sections.length + 1; // +1 para o slide de orçamento
 
-  const addSection = () => {
+  const addSection = async (): Promise<void> => {
+    const supabase = createClient();
+    const newOrder = sectionsRef.current.length;
+    const { data, error } = await supabase
+      .from('planejamento_secoes')
+      .insert({
+        clinica_id: clinicaId,
+        paciente_id: patientId,
+        titulo: '',
+        conteudo: '',
+        imagem_ids: [],
+        ordem: newOrder,
+      })
+      .select('id')
+      .single();
+
+    if (error ?? !data) {
+      console.error('Erro ao criar seção:', error);
+      return;
+    }
+
     const newSection: Section = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: (data as Record<string, unknown>).id as string,
       title: '',
       content: '',
       imageIds: [],
@@ -365,6 +367,8 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
   };
 
   const removeSection = async (id: string): Promise<void> => {
+    if (!window.confirm('Remover esta seção do planejamento?')) return;
+
     setSections(prev => prev.filter(s => s.id !== id));
     clearTimeout(debounceTimers.current[id]);
     delete debounceTimers.current[id];
@@ -425,16 +429,12 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => void generateFullPlanWithAI()}
-              disabled={isGeneratingAI === 'all'}
+              onClick={() => { setCurrentSlide(0); setIsPresentationOpen(true); }}
+              disabled={sections.length === 0}
               className="bg-teal/10 text-teal px-6 py-3 rounded-2xl font-bold text-sm flex items-center gap-2 hover:bg-teal/20 transition-all border border-teal/20 disabled:opacity-50"
             >
-              {isGeneratingAI === 'all' ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Sparkles className="w-4 h-4" />
-              )}
-              Gerar com a IA
+              <Presentation className="w-4 h-4" />
+              Apresentar
             </button>
             <button
               onClick={handleGerarPDF}
@@ -569,7 +569,7 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
         </AnimatePresence>
 
         <button
-          onClick={addSection}
+          onClick={() => void addSection()}
           className="w-full py-6 border-2 border-dashed border-border rounded-3xl flex items-center justify-center gap-2 text-gray-md hover:text-black hover:border-black transition-all group"
         >
           <Plus className="w-5 h-5 group-hover:scale-110 transition-transform" />
@@ -590,14 +590,20 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
           </div>
 
           <div className="space-y-4 mb-10">
-            {budgetProcedures.map(proc => (
-              <div key={proc.id} className="flex items-center justify-between py-3 border-b border-white/10">
-                <span className="text-sm font-medium text-white/70">{proc.name}</span>
-                <span className="font-mono text-sm font-semibold text-white">
-                  R$ {proc.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-            ))}
+            {!budgetExists ? (
+              <p className="text-sm text-white/50 italic">
+                Nenhum orçamento gerado ainda. Crie uma ficha clínica para gerar automaticamente.
+              </p>
+            ) : (
+              budgetProcedures.map(proc => (
+                <div key={proc.id} className="flex items-center justify-between py-3 border-b border-white/10">
+                  <span className="text-sm font-medium text-white/70">{proc.name}</span>
+                  <span className="font-mono text-sm font-semibold text-white">
+                    R$ {proc.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              ))
+            )}
           </div>
 
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -625,6 +631,116 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
           </div>
         </div>
       </div>
+
+      {/* Modal de Apresentação em Slides */}
+      <AnimatePresence>
+        {isPresentationOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] bg-zinc-950 flex flex-col"
+          >
+            {/* Barra superior */}
+            <div className="flex items-center justify-between px-8 py-5 border-b border-white/10">
+              <span className="font-mono text-xs text-zinc-500">
+                Slide {currentSlide + 1} de {totalSlides}
+              </span>
+              <button
+                onClick={() => setIsPresentationOpen(false)}
+                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Conteúdo do slide */}
+            <div className="flex-1 relative overflow-hidden">
+              <AnimatePresence mode="wait" custom={slideDirection}>
+                <motion.div
+                  key={currentSlide}
+                  custom={slideDirection}
+                  initial={{ x: slideDirection * 80, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  exit={{ x: slideDirection * -80, opacity: 0 }}
+                  transition={{ duration: 0.3, ease: 'easeInOut' }}
+                  className="absolute inset-0 flex flex-col items-center justify-center px-16 py-12 max-w-5xl mx-auto w-full"
+                >
+                  {currentSlide < sections.length ? (
+                    <>
+                      <div className="text-[10px] font-bold text-teal uppercase tracking-[0.2em] mb-4">
+                        {String(currentSlide + 1).padStart(2, '0')} / {String(sections.length).padStart(2, '0')}
+                      </div>
+                      <h2 className="font-serif text-4xl text-white mb-6 text-center">
+                        {sections[currentSlide].title || 'Sem título'}
+                      </h2>
+                      <p className="text-lg text-zinc-300 text-center leading-relaxed max-w-3xl">
+                        {sections[currentSlide].content || 'Sem conteúdo.'}
+                      </p>
+                      {sections[currentSlide].imageIds.length > 0 && (
+                        <div className="mt-10 grid grid-cols-3 gap-4 max-w-3xl w-full">
+                          {sections[currentSlide].imageIds.map(imgId => {
+                            const doc = documents.find(d => d.id === imgId);
+                            if (!doc) return null;
+                            return (
+                              <div key={imgId} className="aspect-square relative rounded-2xl overflow-hidden border border-white/10">
+                                <Image src={doc.thumbnail} alt={doc.name} fill className="object-cover" referrerPolicy="no-referrer" />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-[10px] font-bold text-teal uppercase tracking-[0.2em] mb-4">Resumo do Investimento</div>
+                      <h2 className="font-serif text-4xl text-white mb-10 text-center">Seu Investimento em Saúde</h2>
+                      {!budgetExists ? (
+                        <p className="text-zinc-400 italic text-center">Nenhum orçamento gerado ainda.</p>
+                      ) : (
+                        <div className="w-full max-w-lg space-y-3">
+                          {budgetProcedures.map(proc => (
+                            <div key={proc.id} className="flex items-center justify-between py-3 border-b border-white/10">
+                              <span className="text-sm font-medium text-zinc-300">{proc.name}</span>
+                              <span className="font-mono text-sm font-semibold text-white">
+                                R$ {proc.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                          ))}
+                          <div className="flex items-center justify-between pt-4">
+                            <span className="text-sm font-bold text-white">Total</span>
+                            <span className="font-mono text-3xl font-bold text-white">
+                              R$ {totalBudget.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+
+            {/* Navegação */}
+            <div className="flex items-center justify-between px-8 py-5 border-t border-white/10">
+              <button
+                onClick={() => { setSlideDirection(-1); setCurrentSlide(prev => prev - 1); }}
+                disabled={currentSlide === 0}
+                className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-white/10 hover:bg-white/20 transition-colors text-white font-bold text-sm disabled:opacity-30"
+              >
+                <ChevronLeft className="w-4 h-4" /> Anterior
+              </button>
+              <button
+                onClick={() => { setSlideDirection(1); setCurrentSlide(prev => prev + 1); }}
+                disabled={currentSlide === totalSlides - 1}
+                className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-white/10 hover:bg-white/20 transition-colors text-white font-bold text-sm disabled:opacity-30"
+              >
+                Próximo <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Modal de Seleção de Imagens */}
       <AnimatePresence>
