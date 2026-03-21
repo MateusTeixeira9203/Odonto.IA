@@ -1070,16 +1070,16 @@ export function PacienteDetailClient({
                         locale: ptBR,
                       })}
                     </DialogTitle>
-                    <DialogDescription className="text-muted-foreground">
-                      Validade: {detalheOrc.validade_dias} dias
-                    </DialogDescription>
+                    <p className="font-mono text-xs text-muted-foreground mt-0.5">
+                      {format(parseISO(detalheOrc.created_at), 'dd/MM/yyyy', { locale: ptBR })}
+                    </p>
                   </div>
                   {!orcEditMode && (
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={handleOpenEditOrc}
-                      className="rounded-xl border-border text-foreground hover:bg-muted mt-1"
+                      className="rounded-xl bg-muted border-border text-foreground hover:bg-muted/80 mt-1"
                     >
                       <Edit2 className="w-4 h-4 mr-1" />
                       Editar
@@ -1091,7 +1091,7 @@ export function PacienteDetailClient({
               <div className="space-y-6 py-4">
                 {/* Alterar status */}
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                  <Label className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
                     Status
                   </Label>
                   <Select
@@ -1114,13 +1114,13 @@ export function PacienteDetailClient({
 
                 {/* Procedimentos */}
                 <div className="space-y-2">
-                  <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                  <div className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
                     Procedimentos
                   </div>
                   {orcEditMode ? (
                     <div className="space-y-3">
                       {orcEditItens.map((item, idx) => (
-                        <div key={idx} className="bg-muted rounded-xl p-3 space-y-2">
+                        <div key={idx} className="bg-muted rounded-2xl border border-border p-4 space-y-2">
                           <div className="flex gap-2">
                             <Input
                               placeholder="Descrição"
@@ -1132,13 +1132,13 @@ export function PacienteDetailClient({
                                   )
                                 )
                               }
-                              className="rounded-xl bg-background border-border text-foreground text-sm flex-1"
+                              className="rounded-xl bg-card border-border text-foreground text-sm flex-1"
                             />
                             <button
                               onClick={() =>
                                 setOrcEditItens((prev) => prev.filter((_, i) => i !== idx))
                               }
-                              className="p-2 rounded-xl hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-colors"
+                              className="p-2 rounded-xl hover:bg-red-500/10 text-red-400 hover:text-red-500 transition-colors"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -1159,7 +1159,7 @@ export function PacienteDetailClient({
                                     )
                                   )
                                 }
-                                className="rounded-xl bg-background border-border text-foreground text-sm"
+                                className="rounded-xl bg-card border-border text-foreground text-sm font-mono"
                               />
                             </div>
                             <div className="space-y-1 flex-1">
@@ -1180,7 +1180,7 @@ export function PacienteDetailClient({
                                     )
                                   )
                                 }
-                                className="rounded-xl bg-background border-border text-foreground text-sm"
+                                className="rounded-xl bg-card border-border text-foreground text-sm font-mono"
                               />
                             </div>
                           </div>
@@ -1193,13 +1193,13 @@ export function PacienteDetailClient({
                             { descricao: '', quantidade: 1, preco_unitario: 0 },
                           ])
                         }
-                        className="w-full py-2 border border-dashed border-border rounded-xl text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors flex items-center justify-center gap-2"
+                        className="w-full py-3 border border-dashed border-border rounded-xl text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors flex items-center justify-center gap-2"
                       >
                         <Plus className="w-4 h-4" /> Adicionar item
                       </button>
-                      <div className="flex items-center justify-between font-bold px-1">
-                        <span className="text-sm text-foreground">Total</span>
-                        <span className="font-mono text-lg text-foreground">
+                      <div className="bg-teal/10 rounded-xl p-3 border border-teal/20 flex items-center justify-between">
+                        <span className="text-sm font-bold text-foreground">Total</span>
+                        <span className="font-mono text-lg font-bold text-teal">
                           R${' '}
                           {orcEditItens
                             .reduce((sum, i) => sum + i.quantidade * i.preco_unitario, 0)
@@ -1208,7 +1208,7 @@ export function PacienteDetailClient({
                       </div>
                     </div>
                   ) : (
-                    <div className="bg-muted rounded-xl p-4 space-y-2">
+                    <div className="bg-muted rounded-2xl p-4 space-y-2">
                       {detalheOrc.itens.length === 0 && (
                         <p className="text-sm text-muted-foreground">Nenhum procedimento.</p>
                       )}
@@ -1235,7 +1235,7 @@ export function PacienteDetailClient({
                       ))}
                       <div className="pt-2 border-t border-border/40 flex items-center justify-between font-bold">
                         <span className="text-sm text-foreground">Total</span>
-                        <span className="font-mono text-lg text-foreground">
+                        <span className="font-mono text-lg text-teal">
                           R${' '}
                           {(detalheOrc.total ?? 0).toLocaleString('pt-BR', {
                             minimumFractionDigits: 2,
@@ -1249,14 +1249,14 @@ export function PacienteDetailClient({
                 {/* Histórico de pagamentos */}
                 {detalheOrc.pagamentos.length > 0 && (
                   <div className="space-y-2">
-                    <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                    <div className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
                       Histórico de Pagamentos
                     </div>
-                    <div className="bg-muted rounded-xl p-4 space-y-2">
+                    <div className="space-y-2">
                       {detalheOrc.pagamentos.map((pg) => (
                         <div
                           key={pg.id}
-                          className="flex items-center justify-between text-sm"
+                          className="bg-card rounded-xl border border-border p-3 flex items-center justify-between text-sm"
                         >
                           <div className="flex items-center gap-2">
                             <span className="text-foreground capitalize">
@@ -1284,7 +1284,7 @@ export function PacienteDetailClient({
 
                 {/* Registrar pagamento */}
                 <div className="space-y-3 border-t border-border/40 pt-4">
-                  <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                  <div className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
                     Registrar Pagamento
                   </div>
                   <div className="grid grid-cols-2 gap-3">
@@ -1540,9 +1540,9 @@ export function PacienteDetailClient({
 
           <div className="space-y-4 py-4">
             {novoOrcItens.map((item, idx) => (
-              <div key={idx} className="bg-muted rounded-xl p-4 space-y-3">
+              <div key={idx} className="bg-muted rounded-2xl border border-border p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                  <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
                     Procedimento {idx + 1}
                   </span>
                   {novoOrcItens.length > 1 && (
@@ -1550,7 +1550,7 @@ export function PacienteDetailClient({
                       onClick={() =>
                         setNovoOrcItens((prev) => prev.filter((_, i) => i !== idx))
                       }
-                      className="p-1 text-muted-foreground hover:text-red-500 transition-colors"
+                      className="p-1 text-red-400 hover:text-red-500 transition-colors"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -1623,7 +1623,7 @@ export function PacienteDetailClient({
                           )
                         )
                       }
-                      className="rounded-xl bg-card border-border text-foreground"
+                      className="rounded-xl bg-card border-border text-foreground font-mono"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -1642,7 +1642,7 @@ export function PacienteDetailClient({
                           )
                         )
                       }
-                      className="rounded-xl bg-card border-border text-foreground"
+                      className="rounded-xl bg-card border-border text-foreground font-mono"
                     />
                   </div>
                 </div>
@@ -1656,20 +1656,18 @@ export function PacienteDetailClient({
                   { procedimentoId: '', descricao: '', quantidade: 1, preco: 0 },
                 ])
               }
-              className="w-full py-3 border-2 border-dashed border-border rounded-xl text-xs font-bold text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-all flex items-center justify-center gap-2"
+              className="w-full py-3 border border-dashed border-border rounded-xl text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors flex items-center justify-center gap-2"
             >
               <Plus className="w-3.5 h-3.5" />
               Adicionar Procedimento
             </button>
 
-            {novoOrcTotal > 0 && (
-              <div className="bg-teal/10 rounded-xl p-4 flex items-center justify-between border border-teal/20">
-                <span className="text-sm font-bold text-foreground">Total</span>
-                <span className="font-mono text-xl font-bold text-teal">
-                  R$ {novoOrcTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-            )}
+            <div className="bg-teal/10 rounded-xl p-3 flex items-center justify-between border border-teal/20">
+              <span className="text-sm font-bold text-foreground">Total</span>
+              <span className="font-mono text-xl font-bold text-teal">
+                R$ {novoOrcTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
 
             {orcError && (
               <p className="text-xs text-red-500 bg-red-500/10 rounded-lg px-3 py-2">
@@ -1689,7 +1687,7 @@ export function PacienteDetailClient({
             <Button
               onClick={() => void handleCriarOrcamento()}
               disabled={orcSaving}
-              className="bg-teal text-white hover:bg-teal-lt rounded-xl disabled:opacity-50"
+              className="bg-teal text-white hover:bg-teal-lt rounded-xl disabled:opacity-50 font-bold"
             >
               {orcSaving ? 'Salvando...' : 'Criar Orçamento'}
             </Button>
