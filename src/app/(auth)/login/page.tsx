@@ -77,7 +77,7 @@ function LoginForm(): React.JSX.Element {
 
   return (
     <div className="min-h-screen flex">
-      <div className="hidden md:flex md:w-1/2 bg-teal flex-col items-center justify-center p-12">
+      <div className="hidden md:flex md:w-1/2 bg-zinc-950 flex-col items-center justify-center p-12">
         <div className="text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/20 mb-6">
             <Sparkles className="w-8 h-8 text-white" />
@@ -88,7 +88,7 @@ function LoginForm(): React.JSX.Element {
           </p>
         </div>
       </div>
-      <div className="w-full md:w-1/2 bg-bg flex flex-col items-center justify-center p-4">
+      <div className="flex-1 bg-bg flex flex-col items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
