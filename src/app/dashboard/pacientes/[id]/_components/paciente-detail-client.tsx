@@ -976,7 +976,7 @@ export function PacienteDetailClient({
           }
         }}
       >
-        <DialogContent className="max-w-lg rounded-2xl bg-card border-border max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg rounded-2xl bg-card border-border max-h-[90vh] overflow-y-auto scrollbar-hide">
           {detalheOrc && (
             <>
               <DialogHeader>
@@ -1271,7 +1271,7 @@ export function PacienteDetailClient({
 
       {/* Dialog: Novo Orçamento */}
       <Dialog open={isNovoOrcOpen} onOpenChange={setIsNovoOrcOpen}>
-        <DialogContent className="max-w-lg rounded-2xl bg-card border-border max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg rounded-2xl bg-card border-border max-h-[90vh] overflow-y-auto scrollbar-hide">
           <DialogHeader>
             <DialogTitle className="font-heading text-2xl text-foreground">
               Novo Orçamento
