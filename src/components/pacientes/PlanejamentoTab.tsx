@@ -52,7 +52,7 @@ interface PlanejamentoTabProps {
 }
 
 export function PlanejamentoTab({ patientId, clinicaId, patientName }: PlanejamentoTabProps) {
-  const [planningTitle, setPlanningTitle] = useState('Plano de Reabilitação Estética e Funcional');
+  const [planningTitle, setPlanningTitle] = useState(patientName);
   const [sections, setSections] = useState<Section[]>([]);
   const [isImagePickerOpen, setIsImagePickerOpen] = useState<string | null>(null);
   const [isGeneratingAI, setIsGeneratingAI] = useState<string | null>(null);
@@ -60,7 +60,6 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
   const [budgetProcedures, setBudgetProcedures] = useState<BudgetProcedure[]>([]);
   const [budgetExists, setBudgetExists] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const [isPresentationOpen, setIsPresentationOpen] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -218,55 +217,6 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
       console.error('Erro ao gerar com IA:', error);
     } finally {
       setIsGeneratingAI(null);
-    }
-  };
-
-  // Faz upsert de todas as seções — usado pelo botão "Aprovar Plano e Iniciar"
-  const handleAprovar = async (): Promise<void> => {
-    setIsSaving(true);
-    try {
-      const supabase = createClient();
-      const current = sectionsRef.current;
-      const updatedSections = [...current];
-
-      for (let i = 0; i < current.length; i++) {
-        const s = current[i];
-        if (isUUID(s.id)) {
-          await supabase.from('planejamento_secoes').upsert({
-            id: s.id,
-            clinica_id: clinicaId,
-            paciente_id: patientId,
-            titulo: s.title,
-            conteudo: s.content,
-            imagem_ids: s.imageIds,
-            ordem: i,
-            updated_at: new Date().toISOString(),
-          });
-        } else {
-          const { data } = await supabase
-            .from('planejamento_secoes')
-            .insert({
-              clinica_id: clinicaId,
-              paciente_id: patientId,
-              titulo: s.title,
-              conteudo: s.content,
-              imagem_ids: s.imageIds,
-              ordem: i,
-            })
-            .select('id')
-            .single();
-
-          if (data) {
-            updatedSections[i] = { ...s, id: (data as Record<string, unknown>).id as string };
-          }
-        }
-      }
-
-      setSections(updatedSections);
-    } catch (error) {
-      console.error('Erro ao aprovar planejamento:', error);
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -575,61 +525,6 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
           <Plus className="w-5 h-5 group-hover:scale-110 transition-transform" />
           <span className="font-bold text-sm">Adicionar Nova Seção ao Plano</span>
         </button>
-      </div>
-
-      {/* Resumo do Orçamento */}
-      <div className="bg-black rounded-3xl p-10 text-white shadow-2xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-teal/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
-
-        <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
-              <CheckCircle2 className="w-6 h-6 text-teal-lt" />
-            </div>
-            <h2 className="font-heading text-2xl">Resumo do Investimento</h2>
-          </div>
-
-          <div className="space-y-4 mb-10">
-            {!budgetExists ? (
-              <p className="text-sm text-white/50 italic">
-                Nenhum orçamento gerado ainda. Crie uma ficha clínica para gerar automaticamente.
-              </p>
-            ) : (
-              budgetProcedures.map(proc => (
-                <div key={proc.id} className="flex items-center justify-between py-3 border-b border-white/10">
-                  <span className="text-sm font-medium text-white/70">{proc.name}</span>
-                  <span className="font-mono text-sm font-semibold text-white">
-                    R$ {proc.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div>
-              <div className="text-[10px] font-bold text-white/50 uppercase tracking-[0.2em] mb-1">
-                Valor Total do Planejamento
-              </div>
-              <div className="font-mono text-4xl font-bold text-white">
-                R$ {totalBudget.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => void handleAprovar()}
-                disabled={isSaving}
-                className="bg-white text-black px-8 py-4 rounded-2xl font-bold text-sm hover:bg-zinc-100 transition-all shadow-lg disabled:opacity-70 flex items-center gap-2"
-              >
-                {isSaving ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Salvando...</>
-                ) : (
-                  'Aprovar Plano e Iniciar'
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Modal de Apresentação em Slides */}
