@@ -99,7 +99,15 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
       ]);
 
       if (docsResult.error) throw docsResult.error;
-      setDocuments(docsResult.data ?? []);
+      setDocuments(
+        (docsResult.data ?? []).map((doc: Record<string, unknown>) => ({
+          id: doc.id as string,
+          name: doc.nome as string,
+          category: doc.categoria as string,
+          url: doc.url as string,
+          thumbnail: (doc.thumbnail as string | undefined) ?? (doc.url as string),
+        }))
+      );
 
       if (budgetResult.error) throw budgetResult.error;
       if (budgetResult.data) {
@@ -128,7 +136,7 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
         );
       }
     } catch (error) {
-      console.error('Erro ao buscar dados de planejamento:', error);
+      console.error('Erro ao buscar dados de planejamento:', JSON.stringify(error), error);
     } finally {
       setLoadingData(false);
     }
