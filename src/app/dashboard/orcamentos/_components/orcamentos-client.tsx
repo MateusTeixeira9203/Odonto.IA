@@ -197,6 +197,7 @@ export function OrcamentosClient({
 
     const result = await registrarPagamento({
       orcamentoId: selected.id,
+      pacienteId: selected.paciente?.id ?? '',
       valor,
       formaPagamento: pagForm.formaPagamento,
       data: pagForm.data,

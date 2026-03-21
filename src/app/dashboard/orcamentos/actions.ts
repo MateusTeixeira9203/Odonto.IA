@@ -143,6 +143,7 @@ export async function criarOrcamento(dados: {
  */
 export async function registrarPagamento(dados: {
   orcamentoId: string;
+  pacienteId: string;
   valor: number;
   formaPagamento: FormaPagamento;
   data: string;
@@ -156,6 +157,7 @@ export async function registrarPagamento(dados: {
     .from("pagamentos")
     .insert({
       orcamento_id: dados.orcamentoId,
+      paciente_id: dados.pacienteId,
       clinica_id: dentista.clinica_id,
       valor: dados.valor,
       status: "pago",

@@ -291,6 +291,7 @@ export function PacienteDetailClient({
 
     const result = await registrarPagamento({
       orcamentoId: detalheOrcId,
+      pacienteId: paciente.id,
       valor,
       formaPagamento: pagForm.formaPagamento,
       data: pagForm.data,
