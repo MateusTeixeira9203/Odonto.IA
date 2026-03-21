@@ -158,6 +158,7 @@ export async function registrarPagamento(dados: {
     .insert({
       orcamento_id: dados.orcamentoId,
       paciente_id: dados.pacienteId,
+      dentista_id: dentista.id,
       clinica_id: dentista.clinica_id,
       valor: dados.valor,
       status: "pago",
