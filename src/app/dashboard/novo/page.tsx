@@ -44,7 +44,7 @@ export default function NovoOrcamento() {
         </div>
         <div className="hidden sm:flex items-center gap-2 bg-black text-white px-3 py-1.5 rounded-full">
           <Sparkles className="w-3.5 h-3.5 text-teal-lt" />
-          <span className="font-mono text-[10px] uppercase tracking-widest font-bold">Dent IA Ativa</span>
+          <span className="font-mono text-[10px] uppercase tracking-widest font-bold">Dent <em className="italic font-serif">IA</em> Ativa</span>
         </div>
       </header>
 
