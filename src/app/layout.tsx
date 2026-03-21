@@ -9,6 +9,7 @@ const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
 
 const dmSerif = DM_Serif_Display({
   weight: ['400'],
+  style: ['normal', 'italic'],
   subsets: ['latin'],
   variable: '--font-dm-serif',
 });
