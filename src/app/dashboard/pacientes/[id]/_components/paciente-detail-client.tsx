@@ -154,7 +154,11 @@ export function PacienteDetailClient({
   const [editError, setEditError] = useState<string | null>(null);
 
   // Orçamentos — cópia local para atualizações otimistas
+  // Sincroniza com o prop sempre que o servidor retornar dados atualizados (ex: após router.refresh())
   const [orcamentosState, setOrcamentosState] = useState<OrcamentoComItens[]>(orcamentos);
+  useEffect(() => {
+    setOrcamentosState(orcamentos);
+  }, [orcamentos]);
   const [detalheOrcId, setDetalheOrcId] = useState<string | null>(null);
   const [isNovoOrcOpen, setIsNovoOrcOpen] = useState(false);
   const [procedimentosClinica, setProcedimentosClinica] = useState<ProcedimentoClinica[]>([]);
