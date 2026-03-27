@@ -6,9 +6,10 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion } from "motion/react";
-import { ArrowLeft, Mail, Sparkles, CheckCircle2, Loader2 } from "lucide-react";
+import { ArrowLeft, Mail, CheckCircle2, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
+import { DentIALogo } from "@/components/ui/dent-ia-logo";
 
 const esqueciSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -34,10 +35,7 @@ export default function EsqueciSenhaPage(): React.JSX.Element {
     setIsLoading(true);
     try {
       const supabase = createClient();
-      const redirectTo =
-        typeof window !== "undefined"
-          ? `${window.location.origin}/redefinir-senha`
-          : "/redefinir-senha";
+      const redirectTo = `${window.location.origin}/auth/callback?next=/redefinir-senha`;
 
       const { error } = await supabase.auth.resetPasswordForEmail(data.email, { redirectTo });
 
@@ -64,7 +62,7 @@ export default function EsqueciSenhaPage(): React.JSX.Element {
       >
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-teal text-white mb-4 shadow-lg">
-            <Sparkles className="w-6 h-6" />
+            <DentAILogo className="w-7 h-7" />
           </div>
           <h1 className="font-heading text-4xl text-text-primary mb-2">Recuperar Senha</h1>
           <p className="text-text-secondary text-sm font-medium">

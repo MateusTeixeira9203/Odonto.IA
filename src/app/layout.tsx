@@ -26,7 +26,7 @@ const dmMono = DM_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'DentAI | Inteligência Odontológica',
+  title: 'Dent IA | Inteligência Odontológica',
   description: 'Micro-SaaS odontológico para dentistas.',
 };
 
