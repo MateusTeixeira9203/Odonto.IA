@@ -109,7 +109,7 @@ export default function RedefinirSenhaPage(): React.JSX.Element {
       >
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-teal text-white mb-4 shadow-lg">
-            <DentAILogo className="w-7 h-7" />
+            <DentIALogo className="w-7 h-7" />
           </div>
           <h1 className="font-serif text-4xl text-text-primary dark:text-white mb-2">Nova senha</h1>
           <p className="text-text-secondary dark:text-zinc-400 text-sm font-medium">

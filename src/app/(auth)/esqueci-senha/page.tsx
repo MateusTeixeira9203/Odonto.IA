@@ -62,7 +62,7 @@ export default function EsqueciSenhaPage(): React.JSX.Element {
       >
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-teal text-white mb-4 shadow-lg">
-            <DentAILogo className="w-7 h-7" />
+            <DentIALogo className="w-7 h-7" />
           </div>
           <h1 className="font-heading text-4xl text-text-primary mb-2">Recuperar Senha</h1>
           <p className="text-text-secondary text-sm font-medium">
