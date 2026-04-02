@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
+import { HelpTooltip } from '@/components/ui/help-tooltip';
 
 // Verifica se a string é um UUID válido (indica que a seção está persistida no banco)
 const isUUID = (str: string): boolean =>
@@ -377,10 +378,10 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
               type="text"
               value={planningTitle}
               onChange={(e) => setPlanningTitle(e.target.value)}
-              className="font-heading text-3xl text-black bg-transparent border-none outline-none w-full focus:ring-0 p-0"
+              className="font-heading text-3xl text-text-primary bg-transparent border-none outline-none w-full focus:ring-0 p-0"
               placeholder="Título do Planejamento"
             />
-            <div className="flex items-center gap-2 mt-2 text-gray-md text-sm font-medium">
+            <div className="flex items-center gap-2 mt-2 text-text-secondary text-sm font-medium">
               <Calendar className="w-4 h-4" />
               Criado em 19 de Março, 2026
             </div>
@@ -396,7 +397,7 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
             </button>
             <button
               onClick={handleGerarPDF}
-              className="bg-black text-white px-6 py-3 rounded-2xl font-bold text-sm flex items-center gap-2 hover:bg-zinc-800 transition-all shadow-md"
+              className="bg-text-primary text-bg px-6 py-3 rounded-2xl font-bold text-sm flex items-center gap-2 hover:opacity-80 transition-all shadow-md"
             >
               <Download className="w-4 h-4" /> Gerar PDF da Apresentação
             </button>
@@ -417,7 +418,7 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
             >
               <div className="p-6 border-b border-border/40 flex items-center justify-between bg-surface-alt/30">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center font-mono text-xs font-bold">
+                  <div className="w-8 h-8 rounded-full bg-text-primary text-bg flex items-center justify-center font-mono text-xs font-bold">
                     {String(index + 1).padStart(2, '0')}
                   </div>
                   <input
@@ -425,18 +426,18 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
                     value={section.title}
                     onChange={(e) => updateSection(section.id, 'title', e.target.value)}
                     placeholder="Título da Seção (ex: Situação Atual)"
-                    className="font-heading text-xl text-black bg-transparent border-none outline-none focus:ring-0 p-0 min-w-[300px]"
+                    className="font-heading text-xl text-text-primary bg-transparent border-none outline-none focus:ring-0 p-0 min-w-[300px]"
                   />
                 </div>
                 <div className="flex items-center gap-1">
                   {savingIds.has(section.id) ? (
-                    <div className="p-2 text-gray-md">
+                    <div className="p-2 text-text-secondary">
                       <Loader2 className="w-4 h-4 animate-spin" />
                     </div>
                   ) : (
                     <button
                       onClick={() => void saveSectionToDb(section.id)}
-                      className="p-2 text-gray-md hover:text-teal transition-colors opacity-0 group-hover:opacity-100"
+                      className="p-2 text-text-secondary hover:text-teal transition-colors opacity-0 group-hover:opacity-100"
                       title="Salvar seção"
                     >
                       <Save className="w-4 h-4" />
@@ -444,7 +445,7 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
                   )}
                   <button
                     onClick={() => void removeSection(section.id)}
-                    className="p-2 text-gray-md hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                    className="p-2 text-text-secondary hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -454,7 +455,7 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
               <div className="p-8 grid grid-cols-1 lg:grid-cols-2 gap-10">
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-bold text-gray-md uppercase tracking-widest">Explicação para o Paciente</label>
+                    <label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">Explicação para o Paciente</label>
                     <button
                       onClick={() => void generateSectionWithAI(section.id)}
                       disabled={isGeneratingAI === section.id || !section.title}
@@ -466,19 +467,20 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
                         <Sparkles className="w-3 h-3" />
                       )}
                       Gerar com a IA
+                      <HelpTooltip content="Descreva os procedimentos e a IA gera um orçamento profissional." className="ml-0.5" />
                     </button>
                   </div>
                   <textarea
                     value={section.content}
                     onChange={(e) => updateSection(section.id, 'content', e.target.value)}
                     placeholder="Descreva aqui o que o paciente precisa entender de forma simples..."
-                    className="w-full h-40 bg-surface-alt/50 border border-border/60 rounded-2xl p-4 text-sm text-black leading-relaxed outline-none focus:border-teal transition-colors resize-none"
+                    className="w-full h-40 bg-surface-alt/50 border border-border/60 rounded-2xl p-4 text-sm text-text-primary leading-relaxed outline-none focus:border-teal transition-colors resize-none"
                   />
                 </div>
 
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-bold text-gray-md uppercase tracking-widest">Imagens Ilustrativas</label>
+                    <label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">Imagens Ilustrativas</label>
                     <button
                       onClick={() => setIsImagePickerOpen(section.id)}
                       className="text-teal text-xs font-bold flex items-center gap-1 hover:text-teal-dark transition-colors"
@@ -515,8 +517,8 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
                         onClick={() => setIsImagePickerOpen(section.id)}
                         className="col-span-3 h-32 border-2 border-dashed border-border rounded-2xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-surface-alt/50 transition-colors"
                       >
-                        <ImageIcon className="w-6 h-6 text-gray-md" />
-                        <span className="text-xs font-medium text-gray-md">Nenhuma imagem selecionada</span>
+                        <ImageIcon className="w-6 h-6 text-text-secondary" />
+                        <span className="text-xs font-medium text-text-secondary">Nenhuma imagem selecionada</span>
                       </div>
                     )}
                   </div>
@@ -528,7 +530,7 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
 
         <button
           onClick={() => void addSection()}
-          className="w-full py-6 border-2 border-dashed border-border rounded-3xl flex items-center justify-center gap-2 text-gray-md hover:text-black hover:border-black transition-all group"
+          className="w-full py-6 border-2 border-dashed border-border rounded-3xl flex items-center justify-center gap-2 text-text-secondary hover:text-text-primary hover:border-text-primary transition-all group"
         >
           <Plus className="w-5 h-5 group-hover:scale-110 transition-transform" />
           <span className="font-bold text-sm">Adicionar Nova Seção ao Plano</span>
@@ -664,10 +666,10 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
               className="relative w-full max-w-2xl bg-surface rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[80vh] border border-border/40"
             >
               <div className="p-6 border-b border-border/60 flex items-center justify-between">
-                <h3 className="font-heading text-xl text-black">Selecionar Imagens do Histórico</h3>
+                <h3 className="font-heading text-xl text-text-primary">Selecionar Imagens do Histórico</h3>
                 <button
                   onClick={() => setIsImagePickerOpen(null)}
-                  className="p-2 rounded-xl hover:bg-surface-alt/50 transition-colors text-gray-md hover:text-black"
+                  className="p-2 rounded-xl hover:bg-surface-alt/50 transition-colors text-text-secondary hover:text-text-primary"
                 >
                   <X className="w-5 h-5" />
                 </button>

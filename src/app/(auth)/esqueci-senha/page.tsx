@@ -66,7 +66,7 @@ export default function EsqueciSenhaPage(): React.JSX.Element {
           </div>
           <h1 className="font-heading text-4xl text-text-primary mb-2">Recuperar Senha</h1>
           <p className="text-text-secondary text-sm font-medium">
-            Enviaremos um link para você criar uma nova senha.
+            Enviaremos um link para você criar uma nova senha. Verifique também a pasta de spam.
           </p>
         </div>
 
@@ -81,12 +81,15 @@ export default function EsqueciSenhaPage(): React.JSX.Element {
                 <CheckCircle2 className="w-8 h-8" />
               </div>
               <h3 className="font-heading text-2xl text-text-primary mb-2">E-mail Enviado!</h3>
-              <p className="text-sm text-text-secondary mb-6">
+              <p className="text-sm text-text-secondary mb-2">
                 Enviamos as instruções para <strong>{emailEnviado}</strong>.
+              </p>
+              <p className="text-xs text-text-secondary mb-6">
+                Não encontrou? Verifique a pasta de spam ou lixo eletrônico.
               </p>
               <Link
                 href="/login"
-                className="w-full bg-black dark:bg-white text-white dark:text-black py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors hover:bg-zinc-800 dark:hover:bg-zinc-200"
+                className="w-full bg-teal text-white py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors hover:bg-teal-dark"
               >
                 Voltar para o Login
               </Link>
@@ -117,7 +120,7 @@ export default function EsqueciSenhaPage(): React.JSX.Element {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full bg-black hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-black py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors shadow-md disabled:opacity-60"
+                className="w-full bg-teal hover:bg-teal-dark text-white py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors shadow-md disabled:opacity-60"
               >
                 {isLoading ? (
                   <>

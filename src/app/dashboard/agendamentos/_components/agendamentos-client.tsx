@@ -7,8 +7,12 @@ import {
   Calendar as CalendarIcon,
   User,
   ExternalLink,
+  UserCog,
+  Pencil,
+  Trash2,
+  ArrowLeft,
 } from 'lucide-react';
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useTransition } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   format,
@@ -47,10 +51,15 @@ import {
 import type { AgendamentoRow } from '../page';
 import {
   atualizarStatusAgendamento,
+  atualizarAgendamento,
+  deletarAgendamento,
   criarAgendamento,
   type StatusAgendamento,
 } from '../actions';
 import { createClient } from '@/lib/supabase/client';
+import { HelpTooltip } from '@/components/ui/help-tooltip';
+import { GoogleCalendarSyncButton } from '@/components/calendar/sync-button';
+import type { DentistaRole } from '@/types/database';
 
 // Mapeamento de status do banco (lowercase) para exibição
 const STATUS_DISPLAY: Record<string, string> = {
@@ -86,18 +95,57 @@ const getTimelineDotColor = (status: string) => {
 interface Props {
   agendamentos: AgendamentoRow[];
   clinicaId: string;
+  role: DentistaRole;
+  dentistaAtualId: string;
+  /** Lista de dentistas para filtro/form (apenas preenchida para secretária) */
+  dentistas: { id: string; nome: string }[];
+  calendarConnected: boolean;
+  /** Mês atual no formato 'YYYY-MM' — controlado via URL search param */
+  mesAtual: string;
 }
 
-export function AgendamentosClient({ agendamentos: inicial, clinicaId: _clinicaId }: Props) {
+export function AgendamentosClient({
+  agendamentos: inicial,
+  clinicaId: _clinicaId,
+  role,
+  dentistaAtualId: _dentistaAtualId,
+  dentistas,
+  calendarConnected,
+  mesAtual,
+}: Props) {
   const router = useRouter();
+  const isSecretaria = role === 'secretaria';
+
+  // currentMonth é derivado do prop (controlado pelo servidor via URL)
+  const currentMonth = parseISO(`${mesAtual}-01`);
+
+  // Navegação de mês via URL para que o servidor re-faça a query filtrada
+  const [isPending, startTransition] = useTransition();
+  const goToMonth = (date: Date) => {
+    const mes = format(date, 'yyyy-MM');
+    startTransition(() => {
+      router.push(`/dashboard/agendamentos?mes=${mes}`);
+    });
+  };
+
   const [agendamentos, setAgendamentos] = useState(inicial);
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  // selectedDate: hoje se estiver no mês atual, senão o 1º dia do mês
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const today = new Date();
+    return isSameMonth(today, currentMonth) ? today : currentMonth;
+  });
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedApt, setSelectedApt] = useState<AgendamentoRow | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Modo do modal de detalhe: visualização / edição / confirmação de exclusão
+  const [detailMode, setDetailMode] = useState<'view' | 'edit' | 'confirm-delete'>('view');
+  const [editForm, setEditForm] = useState({ data: '', hora: '', duracao: '30', observacoes: '' });
+
+  // Filtro por dentista (somente secretária)
+  const [filtroDentistaId, setFiltroDentistaId] = useState<string>('todos');
 
   // Estado do formulário de novo agendamento
   const [novoForm, setNovoForm] = useState({
@@ -109,11 +157,18 @@ export function AgendamentosClient({ agendamentos: inicial, clinicaId: _clinicaI
     duracao: '30',
     tipo: '',
     observacoes: '',
+    dentistaId: dentistas[0]?.id ?? '',
   });
   const [pacienteSugestoes, setPacienteSugestoes] = useState<{ id: string; nome: string }[]>([]);
   const [showSugestoes, setShowSugestoes] = useState(false);
 
   const daysOfWeek = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+  // Agendamentos filtrados pelo dentista selecionado (somente secretária)
+  const agendamentosFiltrados = useMemo(() => {
+    if (!isSecretaria || filtroDentistaId === 'todos') return agendamentos;
+    return agendamentos.filter((a) => a.dentista_id === filtroDentistaId);
+  }, [agendamentos, isSecretaria, filtroDentistaId]);
 
   // Dias do calendário para o mês atual
   const calendarDays = useMemo(() => {
@@ -124,17 +179,19 @@ export function AgendamentosClient({ agendamentos: inicial, clinicaId: _clinicaI
       isCurrentMonth: isSameMonth(date, currentMonth),
       isToday: isDateToday(date),
       isSelected: isSameDay(date, selectedDate),
-      hasAppointments: agendamentos.some((apt) => isSameDay(parseISO(apt.data_hora), date)),
+      hasAppointments: agendamentosFiltrados.some((apt) =>
+        isSameDay(parseISO(apt.data_hora), date)
+      ),
     }));
-  }, [currentMonth, selectedDate, agendamentos]);
+  }, [currentMonth, selectedDate, agendamentosFiltrados]);
 
-  // Agendamentos do dia selecionado
+  // Agendamentos do dia selecionado (com filtro de dentista aplicado)
   const filteredAppointments = useMemo(
     () =>
-      agendamentos
+      agendamentosFiltrados
         .filter((apt) => isSameDay(parseISO(apt.data_hora), selectedDate))
         .sort((a, b) => a.data_hora.localeCompare(b.data_hora)),
-    [agendamentos, selectedDate]
+    [agendamentosFiltrados, selectedDate]
   );
 
   // Busca pacientes por nome (autocomplete)
@@ -164,10 +221,30 @@ export function AgendamentosClient({ agendamentos: inicial, clinicaId: _clinicaI
     }
   };
 
+  const resetForm = () => {
+    setNovoForm({
+      pacienteSearch: '',
+      pacienteId: '',
+      pacienteNome: '',
+      data: format(new Date(), 'yyyy-MM-dd'),
+      hora: '09:00',
+      duracao: '30',
+      tipo: '',
+      observacoes: '',
+      dentistaId: dentistas[0]?.id ?? '',
+    });
+    setPacienteSugestoes([]);
+    setShowSugestoes(false);
+  };
+
   // Cria novo agendamento via server action
   const handleCriarAgendamento = async () => {
     if (!novoForm.pacienteId) {
       setSaveError('Selecione um paciente.');
+      return;
+    }
+    if (isSecretaria && !novoForm.dentistaId) {
+      setSaveError('Selecione um dentista.');
       return;
     }
     setSaveError(null);
@@ -176,49 +253,105 @@ export function AgendamentosClient({ agendamentos: inicial, clinicaId: _clinicaI
     const dataHora = `${novoForm.data}T${novoForm.hora}:00`;
     const observacoesCombinadas =
       [novoForm.tipo, novoForm.observacoes].filter(Boolean).join(' — ') || null;
+
     const result = await criarAgendamento({
       pacienteId: novoForm.pacienteId,
       dataHora,
       duracaoMinutos: parseInt(novoForm.duracao, 10) || 30,
       observacoes: observacoesCombinadas,
+      ...(isSecretaria && novoForm.dentistaId ? { dentistaId: novoForm.dentistaId } : {}),
     });
 
     if (result.error) {
       setSaveError(result.error);
     } else {
-      // Adiciona otimisticamente ao estado local
+      const dentistaDoAgt = isSecretaria
+        ? dentistas.find((d) => d.id === novoForm.dentistaId) ?? null
+        : null;
+
       const novoAgt: AgendamentoRow = {
         id: result.id ?? crypto.randomUUID(),
         clinica_id: _clinicaId,
         paciente_id: novoForm.pacienteId,
-        dentista_id: '',
+        dentista_id: novoForm.dentistaId,
         data_hora: dataHora,
         duracao_minutos: parseInt(novoForm.duracao, 10) || 30,
         status: 'agendado',
         observacoes: observacoesCombinadas,
         created_at: new Date().toISOString(),
         paciente: { id: novoForm.pacienteId, nome: novoForm.pacienteNome },
-        dentista: null,
+        dentista: dentistaDoAgt ? { id: dentistaDoAgt.id, nome: dentistaDoAgt.nome } : null,
       };
       setAgendamentos((prev) => [...prev, novoAgt]);
       setIsNewModalOpen(false);
-      setNovoForm({
-        pacienteSearch: '',
-        pacienteId: '',
-        pacienteNome: '',
-        data: format(new Date(), 'yyyy-MM-dd'),
-        hora: '09:00',
-        duracao: '30',
-        tipo: '',
-        observacoes: '',
-      });
+      resetForm();
     }
     setIsSaving(false);
   };
 
   const handleOpenDetail = (apt: AgendamentoRow) => {
     setSelectedApt(apt);
+    setDetailMode('view');
+    setSaveError(null);
     setIsDetailModalOpen(true);
+  };
+
+  const enterEditMode = () => {
+    if (!selectedApt) return;
+    const dt = parseISO(selectedApt.data_hora);
+    setEditForm({
+      data: format(dt, 'yyyy-MM-dd'),
+      hora: format(dt, 'HH:mm'),
+      duracao: String(selectedApt.duracao_minutos),
+      observacoes: selectedApt.observacoes ?? '',
+    });
+    setSaveError(null);
+    setDetailMode('edit');
+  };
+
+  const handleSalvarEdicao = async () => {
+    if (!selectedApt) return;
+    setSaveError(null);
+    setIsSaving(true);
+
+    const dataHora = `${editForm.data}T${editForm.hora}:00`;
+    const result = await atualizarAgendamento(selectedApt.id, {
+      dataHora,
+      duracaoMinutos: parseInt(editForm.duracao, 10) || 30,
+      observacoes: editForm.observacoes.trim() || null,
+    });
+
+    if (result.error) {
+      setSaveError(result.error);
+    } else {
+      const updated: AgendamentoRow = {
+        ...selectedApt,
+        data_hora: dataHora,
+        duracao_minutos: parseInt(editForm.duracao, 10) || 30,
+        observacoes: editForm.observacoes.trim() || null,
+      };
+      setAgendamentos((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+      setSelectedApt(updated);
+      setDetailMode('view');
+    }
+    setIsSaving(false);
+  };
+
+  const handleDeletar = async () => {
+    if (!selectedApt) return;
+    setIsSaving(true);
+
+    const result = await deletarAgendamento(selectedApt.id);
+
+    if (result.error) {
+      setSaveError(result.error);
+      setDetailMode('view');
+    } else {
+      setAgendamentos((prev) => prev.filter((a) => a.id !== selectedApt.id));
+      setIsDetailModalOpen(false);
+      setDetailMode('view');
+    }
+    setIsSaving(false);
   };
 
   return (
@@ -230,18 +363,53 @@ export function AgendamentosClient({ agendamentos: inicial, clinicaId: _clinicaI
         className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8"
       >
         <div>
-          <h1 className="font-heading text-4xl text-foreground mb-2">Agendamentos</h1>
+          <h1 className="font-heading text-4xl text-foreground mb-2 flex items-center">
+            Agendamentos
+            <HelpTooltip content="Gerencie sua agenda com visualização mensal/semanal." />
+          </h1>
           <p className="text-muted-foreground text-sm font-medium">
-            Gerencie sua agenda e compromissos.
+            {isSecretaria
+              ? 'Gerencie a agenda de todos os dentistas da clínica.'
+              : 'Gerencie sua agenda e compromissos.'}
           </p>
         </div>
-        <button
-          onClick={() => { setSaveError(null); setIsNewModalOpen(true); }}
-          className="bg-teal text-white hover:bg-teal-lt px-5 py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(47,156,133,0.3)] w-full sm:w-auto"
-        >
-          <Plus className="w-4 h-4" />
-          Novo Agendamento
-        </button>
+
+        <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
+          {/* Filtro por dentista — apenas secretária */}
+          {isSecretaria && dentistas.length > 0 && (
+            <div className="flex items-center gap-2">
+              <UserCog className="w-4 h-4 text-muted-foreground shrink-0" />
+              <Select
+                value={filtroDentistaId}
+                onValueChange={(v) => v && setFiltroDentistaId(v)}
+              >
+                <SelectTrigger className="h-10 w-48 rounded-xl bg-card border-border text-foreground text-sm">
+                  <SelectValue placeholder="Todos os dentistas" />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-border">
+                  <SelectItem value="todos">Todos os dentistas</SelectItem>
+                  {dentistas.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {!isSecretaria && (
+            <GoogleCalendarSyncButton connected={calendarConnected} />
+          )}
+
+          <button
+            onClick={() => { setSaveError(null); setIsNewModalOpen(true); }}
+            className="bg-teal text-white hover:bg-teal-lt px-5 py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(47,156,133,0.3)] w-full sm:w-auto"
+          >
+            <Plus className="w-4 h-4" />
+            Novo Agendamento
+          </button>
+        </div>
       </motion.header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -259,16 +427,18 @@ export function AgendamentosClient({ agendamentos: inicial, clinicaId: _clinicaI
               </h2>
               <div className="flex gap-2">
                 <button
-                  onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-                  className="p-2 hover:bg-accent rounded-lg transition-colors border border-border"
+                  onClick={() => goToMonth(subMonths(currentMonth, 1))}
+                  disabled={isPending}
+                  className="p-2 hover:bg-accent rounded-lg transition-colors border border-border disabled:opacity-40"
                 >
-                  <ChevronLeft className="w-4 h-4 text-foreground" />
+                  <ChevronLeft className={`w-4 h-4 text-foreground ${isPending ? 'animate-pulse' : ''}`} />
                 </button>
                 <button
-                  onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-                  className="p-2 hover:bg-accent rounded-lg transition-colors border border-border"
+                  onClick={() => goToMonth(addMonths(currentMonth, 1))}
+                  disabled={isPending}
+                  className="p-2 hover:bg-accent rounded-lg transition-colors border border-border disabled:opacity-40"
                 >
-                  <ChevronRight className="w-4 h-4 text-foreground" />
+                  <ChevronRight className={`w-4 h-4 text-foreground ${isPending ? 'animate-pulse' : ''}`} />
                 </button>
               </div>
             </div>
@@ -312,7 +482,7 @@ export function AgendamentosClient({ agendamentos: inicial, clinicaId: _clinicaI
             <div className="bg-teal/10 rounded-2xl p-4 border border-teal/20">
               <div className="text-[10px] font-bold text-teal uppercase tracking-wider mb-1">Hoje</div>
               <div className="font-mono text-2xl font-medium text-teal">
-                {agendamentos.filter((a) => isDateToday(parseISO(a.data_hora))).length}
+                {agendamentosFiltrados.filter((a) => isDateToday(parseISO(a.data_hora))).length}
               </div>
               <div className="text-xs text-teal mt-1">Consultas</div>
             </div>
@@ -345,6 +515,11 @@ export function AgendamentosClient({ agendamentos: inicial, clinicaId: _clinicaI
                   <CalendarIcon className="w-4 h-4" />
                   {filteredAppointments.length} agendamento
                   {filteredAppointments.length !== 1 ? 's' : ''}
+                  {isSecretaria && filtroDentistaId !== 'todos' && (
+                    <span className="text-teal font-semibold">
+                      · Dr(a). {dentistas.find((d) => d.id === filtroDentistaId)?.nome}
+                    </span>
+                  )}
                 </p>
               </div>
             </div>
@@ -381,9 +556,7 @@ export function AgendamentosClient({ agendamentos: inicial, clinicaId: _clinicaI
                                 <span className="font-mono text-lg font-medium text-foreground">
                                   {format(parseISO(apt.data_hora), 'HH:mm')}
                                 </span>
-                                <div
-                                  onClick={(e) => e.stopPropagation()}
-                                >
+                                <div onClick={(e) => e.stopPropagation()}>
                                   <Select
                                     value={apt.status}
                                     onValueChange={(val) => val && void handleStatusChange(apt.id, val)}
@@ -403,10 +576,20 @@ export function AgendamentosClient({ agendamentos: inicial, clinicaId: _clinicaI
                                   </Select>
                                 </div>
                               </div>
+
                               <h3 className="font-semibold text-lg text-foreground flex items-center gap-2">
                                 <User className="w-4 h-4 text-muted-foreground" />
                                 {apt.paciente?.nome ?? '—'}
                               </h3>
+
+                              {/* Nome do dentista — visível para secretária */}
+                              {isSecretaria && apt.dentista && (
+                                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                                  <UserCog className="w-3 h-3" />
+                                  Dr(a). {apt.dentista.nome}
+                                </p>
+                              )}
+
                               {apt.observacoes && (
                                 <p className="text-sm text-muted-foreground mt-1">{apt.observacoes}</p>
                               )}
@@ -455,7 +638,7 @@ export function AgendamentosClient({ agendamentos: inicial, clinicaId: _clinicaI
       </div>
 
       {/* Modal: Novo Agendamento */}
-      <Dialog open={isNewModalOpen} onOpenChange={setIsNewModalOpen}>
+      <Dialog open={isNewModalOpen} onOpenChange={(open) => { if (!open) resetForm(); setIsNewModalOpen(open); }}>
         <DialogContent className="max-w-md rounded-2xl bg-card border-border">
           <DialogHeader>
             <DialogTitle className="font-heading text-2xl text-foreground">
@@ -467,6 +650,30 @@ export function AgendamentosClient({ agendamentos: inicial, clinicaId: _clinicaI
           </DialogHeader>
 
           <div className="space-y-4 py-4">
+            {/* Dentista — apenas secretária */}
+            {isSecretaria && dentistas.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-foreground">
+                  Dentista <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={novoForm.dentistaId}
+                  onValueChange={(v) => v && setNovoForm((f) => ({ ...f, dentistaId: v }))}
+                >
+                  <SelectTrigger className="rounded-xl bg-muted border-border text-foreground">
+                    <SelectValue placeholder="Selecione o dentista..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border-border">
+                    {dentistas.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>
+                        {d.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             {/* Busca de paciente com autocomplete */}
             <div className="space-y-2 relative">
               <Label htmlFor="patient" className="text-foreground">
@@ -588,7 +795,7 @@ export function AgendamentosClient({ agendamentos: inicial, clinicaId: _clinicaI
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setIsNewModalOpen(false)}
+              onClick={() => { setIsNewModalOpen(false); resetForm(); }}
               className="rounded-xl border-border text-foreground hover:bg-muted"
             >
               Cancelar
@@ -605,81 +812,259 @@ export function AgendamentosClient({ agendamentos: inicial, clinicaId: _clinicaI
       </Dialog>
 
       {/* Modal: Detalhe do agendamento */}
-      <Dialog open={isDetailModalOpen} onOpenChange={setIsDetailModalOpen}>
+      <Dialog
+        open={isDetailModalOpen}
+        onOpenChange={(open) => {
+          if (!open) setDetailMode('view');
+          setIsDetailModalOpen(open);
+        }}
+      >
         <DialogContent className="max-w-md rounded-2xl bg-card border-border">
           {selectedApt && (
             <>
-              <DialogHeader>
-                <div className="flex items-center justify-between mb-2">
-                  <div
-                    className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${getStatusColor(selectedApt.status)}`}
-                  >
-                    {STATUS_DISPLAY[selectedApt.status] ?? selectedApt.status}
-                  </div>
-                  <button
-                    onClick={() => router.push(`/dashboard/pacientes/${selectedApt.paciente?.id}`)}
-                    className="text-teal text-xs font-bold flex items-center gap-1 hover:underline"
-                  >
-                    Ver Ficha <ExternalLink className="w-3 h-3" />
-                  </button>
-                </div>
-                <DialogTitle className="font-heading text-3xl text-foreground">
-                  {selectedApt.paciente?.nome ?? '—'}
-                </DialogTitle>
-                <DialogDescription className="text-muted-foreground">
-                  Detalhes do agendamento clínico.
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="space-y-6 py-6">
-                <div className="space-y-1">
-                  <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
-                    Data e Hora
-                  </div>
-                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                    <CalendarIcon className="w-4 h-4 text-teal" />
-                    {format(parseISO(selectedApt.data_hora), "dd/MM/yyyy 'às' HH:mm")}
-                  </div>
-                </div>
-
-                {selectedApt.observacoes && (
-                  <div className="space-y-1">
-                    <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
-                      Observações
+              {/* ── MODO: VISUALIZAÇÃO ─────────────────────────────── */}
+              {detailMode === 'view' && (
+                <>
+                  <DialogHeader>
+                    <div className="flex items-center justify-between mb-2">
+                      <div
+                        className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${getStatusColor(selectedApt.status)}`}
+                      >
+                        {STATUS_DISPLAY[selectedApt.status] ?? selectedApt.status}
+                      </div>
+                      <button
+                        onClick={() => router.push(`/dashboard/pacientes/${selectedApt.paciente?.id}`)}
+                        className="text-teal text-xs font-bold flex items-center gap-1 hover:underline"
+                      >
+                        Ver Ficha <ExternalLink className="w-3 h-3" />
+                      </button>
                     </div>
-                    <div className="text-sm font-medium text-foreground">{selectedApt.observacoes}</div>
+                    <DialogTitle className="font-heading text-3xl text-foreground">
+                      {selectedApt.paciente?.nome ?? '—'}
+                    </DialogTitle>
+                    <DialogDescription className="text-muted-foreground">
+                      Detalhes do agendamento clínico.
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <div className="space-y-6 py-6">
+                    <div className="space-y-1">
+                      <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                        Data e Hora
+                      </div>
+                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                        <CalendarIcon className="w-4 h-4 text-teal" />
+                        {format(parseISO(selectedApt.data_hora), "dd/MM/yyyy 'às' HH:mm")}
+                        <span className="text-muted-foreground font-normal">
+                          · {selectedApt.duracao_minutos} min
+                        </span>
+                      </div>
+                    </div>
+
+                    {isSecretaria && selectedApt.dentista && (
+                      <div className="space-y-1">
+                        <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                          Dentista Responsável
+                        </div>
+                        <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                          <UserCog className="w-4 h-4 text-teal" />
+                          {selectedApt.dentista.nome}
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedApt.observacoes && (
+                      <div className="space-y-1">
+                        <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                          Observações
+                        </div>
+                        <div className="text-sm font-medium text-foreground">{selectedApt.observacoes}</div>
+                      </div>
+                    )}
+
+                    <div className="space-y-3">
+                      <Label className="text-foreground">Alterar Status</Label>
+                      <Select
+                        value={selectedApt.status}
+                        onValueChange={(val) => val && void handleStatusChange(selectedApt.id, val)}
+                      >
+                        <SelectTrigger className="rounded-xl bg-muted border-border text-foreground">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-card border-border">
+                          <SelectItem value="agendado">Agendado</SelectItem>
+                          <SelectItem value="confirmado">Confirmado</SelectItem>
+                          <SelectItem value="cancelado">Cancelado</SelectItem>
+                          <SelectItem value="realizado">Realizado</SelectItem>
+                          <SelectItem value="faltou">Faltou</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                )}
 
-                <div className="space-y-3">
-                  <Label className="text-foreground">Alterar Status</Label>
-                  <Select
-                    value={selectedApt.status}
-                    onValueChange={(val) => val && void handleStatusChange(selectedApt.id, val)}
-                  >
-                    <SelectTrigger className="rounded-xl bg-muted border-border text-foreground">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border-border">
-                      <SelectItem value="agendado">Agendado</SelectItem>
-                      <SelectItem value="confirmado">Confirmado</SelectItem>
-                      <SelectItem value="cancelado">Cancelado</SelectItem>
-                      <SelectItem value="realizado">Realizado</SelectItem>
-                      <SelectItem value="faltou">Faltou</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+                  <DialogFooter className="flex-col sm:flex-row gap-2">
+                    <button
+                      onClick={() => setDetailMode('confirm-delete')}
+                      className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-red-500 hover:bg-red-500/10 rounded-xl transition-colors mr-auto"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Excluir
+                    </button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsDetailModalOpen(false)}
+                      className="rounded-xl border-border text-foreground hover:bg-muted"
+                    >
+                      Fechar
+                    </Button>
+                    <Button
+                      onClick={enterEditMode}
+                      className="bg-teal text-white hover:bg-teal-lt rounded-xl flex items-center gap-1.5"
+                    >
+                      <Pencil className="w-4 h-4" />
+                      Editar
+                    </Button>
+                  </DialogFooter>
+                </>
+              )}
 
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setIsDetailModalOpen(false)}
-                  className="rounded-xl border-border text-foreground hover:bg-muted"
-                >
-                  Fechar
-                </Button>
-              </DialogFooter>
+              {/* ── MODO: EDIÇÃO ────────────────────────────────────── */}
+              {detailMode === 'edit' && (
+                <>
+                  <DialogHeader>
+                    <button
+                      onClick={() => setDetailMode('view')}
+                      className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-2 w-fit"
+                    >
+                      <ArrowLeft className="w-4 h-4" /> Voltar
+                    </button>
+                    <DialogTitle className="font-heading text-2xl text-foreground">
+                      Editar Agendamento
+                    </DialogTitle>
+                    <DialogDescription className="text-muted-foreground">
+                      {selectedApt.paciente?.nome ?? '—'}
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <div className="space-y-4 py-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-foreground">Data</Label>
+                        <Input
+                          type="date"
+                          value={editForm.data}
+                          onChange={(e) => setEditForm((f) => ({ ...f, data: e.target.value }))}
+                          className="rounded-xl bg-muted border-border text-foreground"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-foreground">Hora</Label>
+                        <Input
+                          type="time"
+                          value={editForm.hora}
+                          onChange={(e) => setEditForm((f) => ({ ...f, hora: e.target.value }))}
+                          className="rounded-xl bg-muted border-border text-foreground"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-foreground">Duração</Label>
+                      <Select
+                        value={editForm.duracao}
+                        onValueChange={(v) => v && setEditForm((f) => ({ ...f, duracao: v }))}
+                      >
+                        <SelectTrigger className="rounded-xl bg-muted border-border text-foreground">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-card border-border">
+                          <SelectItem value="15">15 min</SelectItem>
+                          <SelectItem value="30">30 min</SelectItem>
+                          <SelectItem value="45">45 min</SelectItem>
+                          <SelectItem value="60">60 min</SelectItem>
+                          <SelectItem value="90">90 min</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-foreground">Observações</Label>
+                      <textarea
+                        value={editForm.observacoes}
+                        onChange={(e) => setEditForm((f) => ({ ...f, observacoes: e.target.value }))}
+                        className="w-full bg-muted border border-border rounded-xl p-3 text-sm min-h-[80px] focus:ring-2 focus:ring-teal/20 transition-all resize-none text-foreground placeholder:text-muted-foreground/50"
+                        placeholder="Notas adicionais..."
+                      />
+                    </div>
+
+                    {saveError && (
+                      <p className="text-sm text-red-500 bg-red-500/10 rounded-lg p-3">{saveError}</p>
+                    )}
+                  </div>
+
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => setDetailMode('view')}
+                      className="rounded-xl border-border text-foreground hover:bg-muted"
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      onClick={() => void handleSalvarEdicao()}
+                      disabled={isSaving}
+                      className="bg-teal text-white hover:bg-teal-lt rounded-xl disabled:opacity-50"
+                    >
+                      {isSaving ? 'Salvando...' : 'Salvar Alterações'}
+                    </Button>
+                  </DialogFooter>
+                </>
+              )}
+
+              {/* ── MODO: CONFIRMAR EXCLUSÃO ─────────────────────────── */}
+              {detailMode === 'confirm-delete' && (
+                <>
+                  <DialogHeader>
+                    <DialogTitle className="font-heading text-2xl text-foreground">
+                      Excluir Agendamento
+                    </DialogTitle>
+                    <DialogDescription className="text-muted-foreground">
+                      Esta ação não pode ser desfeita.
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <div className="py-6">
+                    <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 text-sm text-foreground">
+                      Deseja excluir o agendamento de{' '}
+                      <strong>{selectedApt.paciente?.nome ?? 'este paciente'}</strong> em{' '}
+                      <strong>
+                        {format(parseISO(selectedApt.data_hora), "dd/MM/yyyy 'às' HH:mm")}
+                      </strong>
+                      ?
+                    </div>
+                    {saveError && (
+                      <p className="text-sm text-red-500 bg-red-500/10 rounded-lg p-3 mt-3">{saveError}</p>
+                    )}
+                  </div>
+
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => setDetailMode('view')}
+                      className="rounded-xl border-border text-foreground hover:bg-muted"
+                    >
+                      Não, manter
+                    </Button>
+                    <Button
+                      onClick={() => void handleDeletar()}
+                      disabled={isSaving}
+                      className="bg-red-500 text-white hover:bg-red-600 rounded-xl disabled:opacity-50"
+                    >
+                      {isSaving ? 'Excluindo...' : 'Sim, excluir'}
+                    </Button>
+                  </DialogFooter>
+                </>
+              )}
             </>
           )}
         </DialogContent>

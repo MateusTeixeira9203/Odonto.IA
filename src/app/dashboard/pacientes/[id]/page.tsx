@@ -83,6 +83,7 @@ export default async function PacienteDetalhePage({
       orcamentos={(orcamentosRaw as unknown as OrcamentoComItens[]) ?? []}
       clinicaId={dentista.clinica_id}
       dentistaId={dentista.id}
+      role={dentista.role}
     />
   );
 }

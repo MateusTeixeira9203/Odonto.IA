@@ -90,9 +90,10 @@ export default function RedefinirSenhaPage(): React.JSX.Element {
 
       setPageState("success");
       setTimeout(() => {
-        router.push("/dashboard");
+        toast.success("Senha redefinida com sucesso! Faça login para continuar.");
+        router.push("/login");
         router.refresh();
-      }, 2500);
+      }, 2000);
     } catch {
       toast.error("Erro ao redefinir senha. Tente novamente.");
     } finally {
@@ -101,7 +102,7 @@ export default function RedefinirSenhaPage(): React.JSX.Element {
   }
 
   return (
-    <div className="min-h-screen bg-bg dark:bg-zinc-950 flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-bg flex flex-col items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -111,13 +112,13 @@ export default function RedefinirSenhaPage(): React.JSX.Element {
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-teal text-white mb-4 shadow-lg">
             <DentIALogo className="w-7 h-7" />
           </div>
-          <h1 className="font-serif text-4xl text-text-primary dark:text-white mb-2">Nova senha</h1>
-          <p className="text-text-secondary dark:text-zinc-400 text-sm font-medium">
+          <h1 className="font-serif text-4xl text-text-primary mb-2">Nova senha</h1>
+          <p className="text-text-secondary text-sm font-medium">
             Escolha uma senha segura com pelo menos 8 caracteres.
           </p>
         </div>
 
-        <div className="bg-surface dark:bg-zinc-900 p-8 rounded-3xl border border-border dark:border-zinc-800 shadow-sm">
+        <div className="bg-surface p-8 rounded-3xl border border-border shadow-sm">
           <AnimatePresence mode="wait">
             {pageState === "loading" && (
               <motion.div
@@ -127,9 +128,9 @@ export default function RedefinirSenhaPage(): React.JSX.Element {
                 exit={{ opacity: 0 }}
                 className="space-y-4 py-2"
               >
-                <div className="h-11 rounded-xl bg-surface-alt dark:bg-zinc-800 animate-pulse" />
-                <div className="h-11 rounded-xl bg-surface-alt dark:bg-zinc-800 animate-pulse" />
-                <div className="h-12 rounded-xl bg-surface-alt dark:bg-zinc-800 animate-pulse" />
+                <div className="h-11 rounded-xl bg-surface-alt animate-pulse" />
+                <div className="h-11 rounded-xl bg-surface-alt animate-pulse" />
+                <div className="h-12 rounded-xl bg-surface-alt animate-pulse" />
               </motion.div>
             )}
 
@@ -140,11 +141,11 @@ export default function RedefinirSenhaPage(): React.JSX.Element {
                 animate={{ opacity: 1, scale: 1 }}
                 className="text-center py-4"
               >
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-50 dark:bg-red-900/20 text-red-500 mb-4">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-50 text-red-500 mb-4">
                   <AlertTriangle className="w-8 h-8" />
                 </div>
-                <h3 className="font-serif text-2xl text-text-primary dark:text-white mb-2">Link Expirado</h3>
-                <p className="text-sm text-text-secondary dark:text-zinc-400 mb-6">
+                <h3 className="font-serif text-2xl text-text-primary mb-2">Link Expirado</h3>
+                <p className="text-sm text-text-secondary mb-6">
                   Este link expirou ou já foi utilizado. Solicite um novo para continuar.
                 </p>
                 <Link
@@ -157,7 +158,7 @@ export default function RedefinirSenhaPage(): React.JSX.Element {
                 <div className="mt-4">
                   <Link
                     href="/login"
-                    className="text-sm text-text-secondary dark:text-zinc-400 font-semibold hover:text-text-primary dark:hover:text-white transition-colors"
+                    className="text-sm text-text-secondary font-semibold hover:text-text-primary transition-colors"
                   >
                     Voltar para o Login
                   </Link>
@@ -176,13 +177,13 @@ export default function RedefinirSenhaPage(): React.JSX.Element {
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.1 }}
-                  className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-teal-pale dark:bg-teal/20 text-teal mb-4"
+                  className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-teal-pale text-teal mb-4"
                 >
                   <CheckCircle2 className="w-8 h-8" />
                 </motion.div>
-                <h3 className="font-serif text-2xl text-text-primary dark:text-white mb-2">Senha atualizada!</h3>
-                <p className="text-sm text-text-secondary dark:text-zinc-400">
-                  Redirecionando para o dashboard...
+                <h3 className="font-serif text-2xl text-text-primary mb-2">Senha atualizada!</h3>
+                <p className="text-sm text-text-secondary">
+                  Redirecionando para o login...
                 </p>
               </motion.div>
             )}
@@ -196,7 +197,7 @@ export default function RedefinirSenhaPage(): React.JSX.Element {
                 className="space-y-5"
               >
                 <div>
-                  <label className="block font-mono text-xs text-text-secondary dark:text-zinc-400 uppercase tracking-widest mb-1.5">
+                  <label className="block font-mono text-xs text-text-secondary uppercase tracking-widest mb-1.5">
                     Nova Senha
                   </label>
                   <div className="relative">
@@ -204,13 +205,13 @@ export default function RedefinirSenhaPage(): React.JSX.Element {
                       type={showPassword ? "text" : "password"}
                       disabled={isLoading}
                       placeholder="Mínimo 8 caracteres"
-                      className="bg-surface-alt dark:bg-zinc-800 border border-border dark:border-zinc-700 rounded-xl px-4 py-3 pr-11 text-sm text-text-primary dark:text-white w-full focus:ring-2 focus:ring-teal/20 outline-none transition-all placeholder:text-text-secondary"
+                      className="bg-surface-alt border border-border rounded-xl px-4 py-3 pr-11 text-sm text-text-primary w-full focus:ring-2 focus:ring-teal/20 outline-none transition-all placeholder:text-text-secondary"
                       {...register("password")}
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 pr-4 flex items-center text-text-secondary dark:text-zinc-400 hover:text-text-primary dark:hover:text-white transition-colors"
+                      className="absolute inset-y-0 right-0 pr-4 flex items-center text-text-secondary hover:text-text-primary transition-colors"
                     >
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -221,7 +222,7 @@ export default function RedefinirSenhaPage(): React.JSX.Element {
                 </div>
 
                 <div>
-                  <label className="block font-mono text-xs text-text-secondary dark:text-zinc-400 uppercase tracking-widest mb-1.5">
+                  <label className="block font-mono text-xs text-text-secondary uppercase tracking-widest mb-1.5">
                     Confirmar Senha
                   </label>
                   <div className="relative">
@@ -229,13 +230,13 @@ export default function RedefinirSenhaPage(): React.JSX.Element {
                       type={showConfirmPassword ? "text" : "password"}
                       disabled={isLoading}
                       placeholder="Repita a nova senha"
-                      className="bg-surface-alt dark:bg-zinc-800 border border-border dark:border-zinc-700 rounded-xl px-4 py-3 pr-11 text-sm text-text-primary dark:text-white w-full focus:ring-2 focus:ring-teal/20 outline-none transition-all"
+                      className="bg-surface-alt border border-border rounded-xl px-4 py-3 pr-11 text-sm text-text-primary w-full focus:ring-2 focus:ring-teal/20 outline-none transition-all"
                       {...register("confirmPassword")}
                     />
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute inset-y-0 right-0 pr-4 flex items-center text-text-secondary dark:text-zinc-400 hover:text-text-primary dark:hover:text-white transition-colors"
+                      className="absolute inset-y-0 right-0 pr-4 flex items-center text-text-secondary hover:text-text-primary transition-colors"
                     >
                       {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>

@@ -1,31 +1,26 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
 import {
   FileText,
-  Eye,
   Filter,
-  X,
   Calendar,
   Search,
   Loader2,
-  Download,
   Upload,
   Plus,
-  Trash2,
 } from 'lucide-react';
-import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
+import { GaleriaImagens } from '@/components/fichas/galeria-imagens';
 
 interface Document {
   id: string;
   name: string;
+  tipo: string;
   category: 'Radiografias' | 'Fotografias' | 'Documentos' | 'Outros';
   date: string;
   source: string;
   url: string;
-  thumbnail: string;
 }
 
 const CATEGORIES = ['Radiografias', 'Fotografias', 'Documentos', 'Outros'] as const;
@@ -34,16 +29,43 @@ const ALLOWED_MIME: Record<string, boolean> = {
   'image/jpeg': true,
   'image/png': true,
   'image/webp': true,
+  'image/gif': true,
+  'image/bmp': true,
   'application/pdf': true,
+  'application/msword': true,
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': true,
+  'application/vnd.ms-excel': true,
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': true,
+  'application/vnd.ms-powerpoint': true,
   'application/vnd.openxmlformats-officedocument.presentationml.presentation': true,
 };
+
 const MAX_UPLOAD_SIZE = 20 * 1024 * 1024; // 20 MB
+
+function inferMimeFromName(name: string): string {
+  const ext = name.split('.').pop()?.toLowerCase() ?? '';
+  const map: Record<string, string> = {
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    png: 'image/png',
+    webp: 'image/webp',
+    gif: 'image/gif',
+    bmp: 'image/bmp',
+    pdf: 'application/pdf',
+    doc: 'application/msword',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xls: 'application/vnd.ms-excel',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ppt: 'application/vnd.ms-powerpoint',
+    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  };
+  return map[ext] ?? 'application/octet-stream';
+}
 
 const getCategoryFromFile = (file: File): Document['category'] => {
   const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
-  if (['jpg', 'jpeg', 'png', 'webp'].includes(ext)) return 'Fotografias';
-  if (['pdf', 'docx', 'pptx'].includes(ext)) return 'Documentos';
+  if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'].includes(ext)) return 'Fotografias';
+  if (['pdf', 'docx', 'doc', 'pptx', 'ppt', 'xls', 'xlsx'].includes(ext)) return 'Documentos';
   return 'Outros';
 };
 
@@ -55,23 +77,24 @@ interface DocumentosTabProps {
 export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
   const [filterMonth, setFilterMonth] = useState('');
   const [filterYear, setFilterYear] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [selecionados, setSelecionados] = useState<string[]>([]);
+  const [modoSelecao, setModoSelecao] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleSearchChange = (value: string) => {
+  const handleSearchChange = (value: string): void => {
     setSearchTerm(value);
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     searchTimerRef.current = setTimeout(() => setDebouncedSearch(value), 300);
   };
 
-  const fetchDocuments = useCallback(async () => {
+  const fetchDocuments = useCallback(async (): Promise<void> => {
     setLoading(true);
     try {
       const supabase = createClient();
@@ -83,19 +106,22 @@ export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
 
       if (error) throw error;
 
-      const formattedDocs = (data ?? []).map((doc: Record<string, unknown>) => ({
-        id: doc.id as string,
-        name: doc.nome as string,
-        category: doc.categoria as Document['category'],
-        date: new Date(doc.created_at as string).toLocaleDateString('pt-BR', {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-        }),
-        source: (doc.origem as string | undefined) ?? 'Upload Direto',
-        url: doc.url as string,
-        thumbnail: (doc.thumbnail as string | undefined) ?? (doc.url as string),
-      }));
+      const formattedDocs = (data ?? []).map((doc: Record<string, unknown>) => {
+        const nome = doc.nome as string;
+        return {
+          id: doc.id as string,
+          name: nome,
+          tipo: inferMimeFromName(nome),
+          category: doc.categoria as Document['category'],
+          date: new Date(doc.created_at as string).toLocaleDateString('pt-BR', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+          }),
+          source: (doc.origem as string | undefined) ?? 'Upload Direto',
+          url: doc.url as string,
+        };
+      });
 
       setDocuments(formattedDocs);
     } catch (error) {
@@ -117,7 +143,7 @@ export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
     e.target.value = '';
 
     if (!ALLOWED_MIME[file.type]) {
-      alert('Tipo não permitido. Use JPG, PNG, WEBP, PDF, DOCX ou PPTX.');
+      alert('Tipo não permitido. Use imagens, PDF, DOC, DOCX, XLS, XLSX, PPT ou PPTX.');
       return;
     }
     if (file.size > MAX_UPLOAD_SIZE) {
@@ -154,6 +180,7 @@ export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
       const newDoc: Document = {
         id: row.id as string,
         name: file.name,
+        tipo: file.type || inferMimeFromName(file.name),
         category: getCategoryFromFile(file),
         date: new Date(row.created_at as string).toLocaleDateString('pt-BR', {
           day: '2-digit',
@@ -162,7 +189,6 @@ export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
         }),
         source: 'Upload Direto',
         url: urlData.publicUrl,
-        thumbnail: urlData.publicUrl,
       };
 
       setDocuments(prev => [newDoc, ...prev]);
@@ -174,24 +200,24 @@ export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
     }
   };
 
-  const handleDeleteDoc = async (doc: Document, e: React.MouseEvent): Promise<void> => {
+  const handleDeleteDoc = async (docId: string, e: React.MouseEvent): Promise<void> => {
     e.stopPropagation();
-    if (!window.confirm(`Excluir "${doc.name}"?`)) return;
+    const doc = documents.find(d => d.id === docId);
+    if (!doc || !window.confirm(`Excluir "${doc.name}"?`)) return;
 
     try {
       const supabase = createClient();
-      // Extrai o caminho no bucket a partir da URL pública
       const storagePath = doc.url.split('/storage/v1/object/public/fichas/')[1];
 
       await Promise.all([
-        supabase.from('paciente_documentos').delete().eq('id', doc.id),
+        supabase.from('paciente_documentos').delete().eq('id', docId),
         storagePath
           ? supabase.storage.from('fichas').remove([storagePath])
           : Promise.resolve(),
       ]);
 
-      setDocuments(prev => prev.filter(d => d.id !== doc.id));
-      if (selectedDoc?.id === doc.id) setSelectedDoc(null);
+      setDocuments(prev => prev.filter(d => d.id !== docId));
+      setSelecionados(prev => prev.filter(id => id !== docId));
     } catch (error) {
       console.error('Erro ao excluir documento:', error);
       alert('Erro ao excluir documento. Tente novamente.');
@@ -214,23 +240,23 @@ export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".jpg,.jpeg,.png,.webp,.pdf,.docx,.pptx"
+        accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
         className="hidden"
         onChange={handleFileSelect}
       />
 
-      {/* Filtros */}
+      {/* Filtros e ações */}
       <div className="flex flex-wrap items-center justify-between gap-4 bg-surface p-4 rounded-2xl border border-border shadow-sm">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-gray-md" />
-            <span className="text-sm font-semibold text-black">Filtrar por:</span>
+            <Filter className="w-4 h-4 text-text-secondary" />
+            <span className="text-sm font-semibold text-text-primary">Filtrar por:</span>
           </div>
 
           <select
             value={filterMonth}
             onChange={(e) => setFilterMonth(e.target.value)}
-            className="bg-surface-alt border border-border rounded-lg px-3 py-1.5 text-xs font-bold text-black outline-none focus:border-teal transition-colors"
+            className="bg-surface-alt border border-border rounded-lg px-3 py-1.5 text-xs font-bold text-text-primary outline-none focus:border-teal transition-colors"
           >
             <option value="">Todos os Meses</option>
             {months.map(m => <option key={m} value={m}>{m}</option>)}
@@ -239,7 +265,7 @@ export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
           <select
             value={filterYear}
             onChange={(e) => setFilterYear(e.target.value)}
-            className="bg-surface-alt border border-border rounded-lg px-3 py-1.5 text-xs font-bold text-black outline-none focus:border-teal transition-colors"
+            className="bg-surface-alt border border-border rounded-lg px-3 py-1.5 text-xs font-bold text-text-primary outline-none focus:border-teal transition-colors"
           >
             <option value="">Todos os Anos</option>
             {years.map(y => <option key={y} value={y}>{y}</option>)}
@@ -256,16 +282,29 @@ export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Botão de modo seleção */}
+          <button
+            onClick={() => { setModoSelecao(!modoSelecao); if (modoSelecao) setSelecionados([]); }}
+            className={`text-xs px-3 py-1.5 rounded-lg font-bold transition-colors ${
+              modoSelecao
+                ? 'bg-teal text-white'
+                : 'bg-surface-alt text-text-secondary hover:bg-border'
+            }`}
+          >
+            {modoSelecao ? `${selecionados.length} selecionado(s)` : 'Selecionar'}
+          </button>
+
           <div className="relative">
-            <Search className="w-4 h-4 text-gray-md absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-text-secondary absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="Buscar arquivo..."
-              className="bg-surface-alt border border-border rounded-lg pl-9 pr-4 py-1.5 text-xs font-medium text-black outline-none focus:border-teal transition-colors w-64"
+              className="bg-surface-alt border border-border rounded-lg pl-9 pr-4 py-1.5 text-xs font-medium text-text-primary outline-none focus:border-teal transition-colors w-64"
             />
           </div>
+
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
@@ -280,7 +319,7 @@ export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
         </div>
       </div>
 
-      {/* Categorias */}
+      {/* Categorias com galeria */}
       {loading ? (
         <div className="flex items-center justify-center p-20">
           <Loader2 className="w-8 h-8 animate-spin text-teal" />
@@ -294,54 +333,23 @@ export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
             <div key={category} className="space-y-4">
               <div className="flex items-center gap-3">
                 <div className="h-px flex-1 bg-border" />
-                <h3 className="font-heading text-lg text-black px-2">{category}</h3>
+                <h3 className="font-heading text-lg text-text-primary px-2">{category}</h3>
                 <div className="h-px flex-1 bg-border" />
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {docsInCategory.map(doc => (
-                  <motion.div
-                    key={doc.id}
-                    whileHover={{ y: -4 }}
-                    className="group bg-surface rounded-xl border border-border overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer"
-                    onClick={() => setSelectedDoc(doc)}
-                  >
-                    <div className="aspect-square relative bg-surface-alt overflow-hidden">
-                      <Image
-                        src={doc.thumbnail}
-                        alt={doc.name}
-                        fill
-                        className="object-cover group-hover:scale-110 transition-transform duration-500"
-                        referrerPolicy="no-referrer"
-                      />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white">
-                          <Eye className="w-4 h-4" />
-                        </div>
-                        <button
-                          onClick={(e) => void handleDeleteDoc(doc, e)}
-                          className="w-8 h-8 rounded-full bg-red-500/80 backdrop-blur-md flex items-center justify-center text-white hover:bg-red-600 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="p-3">
-                      <div className="text-[10px] font-bold text-teal uppercase tracking-wider mb-1 truncate">
-                        {doc.name}
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div className="text-[9px] font-medium text-gray-md flex items-center gap-1">
-                          <Calendar className="w-3 h-3" /> {doc.date}
-                        </div>
-                      </div>
-                      <div className="mt-2 pt-2 border-t border-border text-[8px] font-bold text-gray-md uppercase truncate">
-                        {doc.source}
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
+              <GaleriaImagens
+                documentos={docsInCategory.map(d => ({
+                  id: d.id,
+                  nome: d.name,
+                  url: d.url,
+                  tipo: d.tipo,
+                  date: d.date,
+                }))}
+                selecionados={selecionados}
+                onSelecionar={setSelecionados}
+                modoSelecao={modoSelecao}
+                onDelete={handleDeleteDoc}
+              />
             </div>
           );
         })
@@ -350,10 +358,10 @@ export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
       {!loading && filteredDocs.length === 0 && (
         <div className="bg-surface rounded-2xl border border-border p-12 flex flex-col items-center justify-center text-center">
           <div className="w-16 h-16 rounded-full bg-surface-alt flex items-center justify-center mb-4">
-            <FileText className="w-8 h-8 text-gray-md" />
+            <FileText className="w-8 h-8 text-text-secondary" />
           </div>
-          <h3 className="font-heading text-xl text-black mb-2">Nenhum documento encontrado</h3>
-          <p className="text-gray-md text-sm max-w-xs">
+          <h3 className="font-heading text-xl text-text-primary mb-2">Nenhum documento encontrado</h3>
+          <p className="text-text-secondary text-sm max-w-xs">
             Não existem arquivos nesta categoria ou para o período selecionado.
           </p>
           <button
@@ -365,74 +373,6 @@ export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
           </button>
         </div>
       )}
-
-      {/* Modal Visualizador */}
-      <AnimatePresence>
-        {selectedDoc && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-8">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSelectedDoc(null)}
-              className="absolute inset-0 bg-black/90 backdrop-blur-sm"
-            />
-
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-5xl bg-surface rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-full"
-            >
-              {/* Cabeçalho do Modal */}
-              <div className="p-4 sm:p-6 border-b border-border flex items-center justify-between bg-surface">
-                <div>
-                  <h3 className="font-heading text-xl text-black">{selectedDoc.name}</h3>
-                  <div className="flex items-center gap-3 mt-1">
-                    <span className="text-xs font-bold text-teal uppercase tracking-wider">{selectedDoc.category}</span>
-                    <span className="text-xs font-medium text-gray-md">• {selectedDoc.date}</span>
-                    <span className="text-xs font-medium text-gray-md">• {selectedDoc.source}</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button className="p-2 rounded-xl bg-surface-alt hover:bg-border transition-colors text-black">
-                    <Download className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={() => setSelectedDoc(null)}
-                    className="p-2 rounded-xl bg-black text-white hover:bg-zinc-800 transition-colors"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Conteúdo do Modal */}
-              <div className="flex-1 overflow-auto p-4 sm:p-8 bg-surface-alt/30 flex items-center justify-center min-h-[300px]">
-                <div className="relative w-full h-full min-h-[400px]">
-                  <Image
-                    src={selectedDoc.url}
-                    alt={selectedDoc.name}
-                    fill
-                    className="object-contain"
-                    referrerPolicy="no-referrer"
-                  />
-                </div>
-              </div>
-
-              {/* Rodapé do Modal */}
-              <div className="p-4 border-t border-border bg-surface flex justify-end">
-                <button
-                  onClick={() => setSelectedDoc(null)}
-                  className="px-6 py-2.5 rounded-xl bg-black text-white font-bold text-sm hover:bg-zinc-800 transition-colors"
-                >
-                  Fechar Visualização
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

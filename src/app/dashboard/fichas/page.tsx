@@ -17,6 +17,7 @@ export type FichaRow = {
 export default async function FichasPage() {
   const dentista = await getDentistaCached();
   if (!dentista) redirect('/login');
+  if (dentista.role === 'secretaria') redirect('/dashboard');
 
   const supabase = await createClient();
   const { data: fichasRaw } = await supabase

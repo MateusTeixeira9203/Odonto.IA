@@ -5,11 +5,14 @@ export interface Clinica {
   updated_at: string;
 }
 
+export type DentistaRole = 'admin' | 'dentista' | 'secretaria';
+
 export interface Dentista {
   id: string;
   clinica_id: string;
   user_id: string;
   nome: string;
+  role: DentistaRole;
   cro: string | null;
   especialidade: string | null;
   telefone: string | null;
@@ -146,6 +149,24 @@ export interface ConfiguracaoClinica {
   updated_at: string;
 }
 
+export interface Agendamento {
+  id: string;
+  clinica_id: string;
+  paciente_id: string;
+  dentista_id: string;
+  data_hora: string;
+  duracao_minutos: number;
+  status: 'agendado' | 'confirmado' | 'cancelado' | 'realizado' | 'faltou';
+  origem: 'manual' | 'bot' | 'app';
+  observacoes: string | null;
+  confirmado_em: string | null;
+  google_event_id: string | null;
+  whatsapp_reminder_sent: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface HorarioDisponivel {
   id: string;
   clinica_id: string;
@@ -198,6 +219,56 @@ export interface PlanejamentoEtapa {
   status: "aberto" | "pendente" | "concluido";
   imagem_arquivo_id: string | null;
   procedimento_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BotConfig {
+  clinica_id: string;
+  whatsapp_number: string;
+  welcome_message: string;
+  working_hours_start: string;
+  working_hours_end: string;
+  transfer_to_human_enabled: boolean;
+  reminder_enabled: boolean;
+  reminder_hours: number;
+  reminder_message: string;
+  updated_at: string;
+}
+
+export interface InstanciaWhatsapp {
+  id: string;
+  clinica_id: string;
+  instance_name: string;
+  status: 'inactive' | 'connecting' | 'connected' | 'error';
+  qrcode: string | null;
+  last_qrcode_at: string | null;
+  updated_at: string;
+}
+
+/** Linha real da tabela conversas_bot (schema da migration 002) */
+export interface ConversaBot {
+  id: string;
+  clinica_id: string;
+  telefone: string;
+  etapa: string;
+  contexto: Record<string, unknown>;
+  paciente_id: string | null;
+  ativo: boolean;         // false = transferido para humano
+  ultimo_contato: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Schema real da tabela mensagens_bot (migration 002) */
+export interface MensagemBot {
+  id: string;
+  clinica_id: string;
+  conversa_id: string;
+  direcao: 'entrada' | 'saida';
+  conteudo: string;
+  tipo: 'texto' | 'imagem' | 'audio' | 'documento';
+  metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }

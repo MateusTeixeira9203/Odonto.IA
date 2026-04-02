@@ -42,10 +42,16 @@ export async function updateSession(
     },
   });
 
-  // Refresh da sessão - importante chamar antes de qualquer resposta
+  // Valida a sessão contra o servidor (getUser faz chamada real ao Supabase,
+  // ao contrário de getSession que apenas lê o cookie local).
+  // Isso garante que sessões de usuários deletados sejam tratadas como inválidas.
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const session = user
+    ? ({ user: { id: user.id }, access_token: "" } as const)
+    : null;
 
   return { response, session, supabase };
 }

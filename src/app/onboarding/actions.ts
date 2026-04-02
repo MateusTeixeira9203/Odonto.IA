@@ -60,7 +60,7 @@ export async function completeOnboarding(
     };
   }
 
-  // 2. INSERT em dentistas
+  // 2. INSERT em dentistas — quem cria a clínica é sempre admin
   const { error: dentistaError } = await supabase.from("dentistas").insert({
     clinica_id: clinicaId,
     user_id: session.user.id,
@@ -69,6 +69,7 @@ export async function completeOnboarding(
     especialidade: data.especialidade,
     telefone: data.telefone || null,
     email: session.user.email ?? null,
+    role: "admin",
     ativo: true,
   });
 

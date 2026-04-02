@@ -7,11 +7,26 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion } from "motion/react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, AlertCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { hasDentistaRegistro } from "@/lib/auth";
 import { toast } from "sonner";
 import { DentIALogo } from "@/components/ui/dent-ia-logo";
+
+const AUTH_ERRORS: Record<string, string> = {
+  "Invalid login credentials": "Email ou senha incorretos.",
+  "Email not confirmed": "Seu email ainda não foi confirmado.",
+  "User not found": "Email não cadastrado. Que tal criar uma conta?",
+  "Invalid email or password": "Email ou senha incorretos.",
+  "Too many requests": "Muitas tentativas. Aguarde alguns minutos e tente novamente.",
+};
+
+function getAuthError(message: string): string {
+  for (const [key, value] of Object.entries(AUTH_ERRORS)) {
+    if (message.includes(key)) return value;
+  }
+  return "Ocorreu um erro. Tente novamente.";
+}
 
 const loginSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -25,6 +40,8 @@ function LoginFormContent(): React.JSX.Element {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirectTo") ?? "/dashboard";
   const [isLoading, setIsLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [emailNaoConfirmado, setEmailNaoConfirmado] = useState(false);
 
   const {
     register,
@@ -47,6 +64,8 @@ function LoginFormContent(): React.JSX.Element {
 
   async function onSubmit(data: LoginFormData): Promise<void> {
     setIsLoading(true);
+    setAuthError(null);
+    setEmailNaoConfirmado(false);
     try {
       const supabase = createClient();
       const { data: authData, error } = await supabase.auth.signInWithPassword({
@@ -55,11 +74,9 @@ function LoginFormContent(): React.JSX.Element {
       });
 
       if (error) {
-        toast.error(
-          error.message.includes("Invalid login credentials")
-            ? "Email ou senha incorretos. Verifique e tente novamente."
-            : error.message
-        );
+        const isNotConfirmed = error.message.includes("Email not confirmed");
+        setEmailNaoConfirmado(isNotConfirmed);
+        setAuthError(getAuthError(error.message));
         return;
       }
 
@@ -70,7 +87,7 @@ function LoginFormContent(): React.JSX.Element {
         router.refresh();
       }
     } catch {
-      toast.error("Erro ao fazer login");
+      setAuthError("Erro ao fazer login. Tente novamente.");
     } finally {
       setIsLoading(false);
     }
@@ -78,7 +95,7 @@ function LoginFormContent(): React.JSX.Element {
 
   return (
     <div className="min-h-screen flex">
-      <div className="hidden md:flex flex-col items-center justify-center w-1/2 min-h-screen bg-teal dark:bg-zinc-950">
+      <div className="hidden md:flex flex-col items-center justify-center w-1/2 min-h-screen bg-teal">
         <div className="flex flex-col items-center gap-6">
           <div className="flex items-center gap-3">
             <DentIALogo className="w-12 h-12 text-white" />
@@ -89,26 +106,26 @@ function LoginFormContent(): React.JSX.Element {
           </p>
         </div>
       </div>
-      <div className="flex-1 bg-bg dark:bg-zinc-950 flex flex-col items-center justify-center min-h-screen px-12">
+      <div className="flex-1 bg-bg flex flex-col items-center justify-center min-h-screen px-12">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-md"
         >
-          <h1 className="font-serif text-4xl text-text-primary dark:text-white mb-2">Bem-vindo de volta</h1>
-          <p className="text-text-secondary dark:text-zinc-400 text-sm font-medium mb-8">Acesse sua conta para gerenciar sua clínica.</p>
+          <h1 className="font-serif text-4xl text-text-primary mb-2">Bem-vindo de volta</h1>
+          <p className="text-text-secondary text-sm font-medium mb-8">Acesse sua conta para gerenciar sua clínica.</p>
 
-          <div className="bg-surface dark:bg-zinc-900 rounded-3xl border border-border dark:border-zinc-800 shadow-sm p-8 w-full max-w-md">
+          <div className="bg-surface rounded-3xl border border-border shadow-sm p-8 w-full max-w-md">
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
               <div>
-                <label className="block font-mono text-xs text-text-secondary dark:text-zinc-400 uppercase tracking-widest mb-1.5">
+                <label className="block font-mono text-xs text-text-secondary uppercase tracking-widest mb-1.5">
                   E-mail
                 </label>
                 <input
                   type="email"
                   disabled={isLoading}
                   placeholder="seu@email.com"
-                  className="bg-surface-alt dark:bg-zinc-800 border border-border dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-text-primary dark:text-white w-full focus:ring-2 focus:ring-teal/20 outline-none transition-all placeholder:text-text-secondary"
+                  className="bg-surface-alt border border-border rounded-xl px-4 py-3 text-sm text-text-primary w-full focus:ring-2 focus:ring-teal/20 outline-none transition-all placeholder:text-text-secondary"
                   {...register("email")}
                 />
                 {errors.email && (
@@ -118,7 +135,7 @@ function LoginFormContent(): React.JSX.Element {
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block font-mono text-xs text-text-secondary dark:text-zinc-400 uppercase tracking-widest">
+                  <label className="block font-mono text-xs text-text-secondary uppercase tracking-widest">
                     Senha
                   </label>
                   <Link
@@ -132,7 +149,7 @@ function LoginFormContent(): React.JSX.Element {
                   type="password"
                   disabled={isLoading}
                   placeholder="••••••••"
-                  className="bg-surface-alt dark:bg-zinc-800 border border-border dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-text-primary dark:text-white w-full focus:ring-2 focus:ring-teal/20 outline-none transition-all"
+                  className="bg-surface-alt border border-border rounded-xl px-4 py-3 text-sm text-text-primary w-full focus:ring-2 focus:ring-teal/20 outline-none transition-all"
                   {...register("password")}
                 />
                 {errors.password && (
@@ -150,21 +167,38 @@ function LoginFormContent(): React.JSX.Element {
                   <>Entrar <ArrowRight className="w-4 h-4" /></>
                 )}
               </button>
+
+              {authError && (
+                <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 flex flex-col gap-1">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+                    <p className="text-sm text-red-700">{authError}</p>
+                  </div>
+                  {emailNaoConfirmado && (
+                    <Link
+                      href="/verifique-email"
+                      className="text-xs text-teal font-semibold hover:text-teal-dark transition-colors ml-6"
+                    >
+                      Reenviar email de verificação →
+                    </Link>
+                  )}
+                </div>
+              )}
             </form>
 
             <div className="relative my-6">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-border dark:border-zinc-700" />
+                <div className="w-full border-t border-border" />
               </div>
               <div className="relative flex justify-center text-xs">
-                <span className="bg-surface dark:bg-zinc-900 px-2 text-text-secondary dark:text-zinc-500 font-mono">ou</span>
+                <span className="bg-surface px-2 text-text-secondary font-mono">ou</span>
               </div>
             </div>
 
             <button
               type="button"
               onClick={handleGoogleLogin}
-              className="bg-surface dark:bg-zinc-800 border border-border dark:border-zinc-700 rounded-xl py-3 w-full flex items-center justify-center gap-3 text-sm font-medium text-text-primary dark:text-white hover:bg-surface-alt dark:hover:bg-zinc-700 transition-colors"
+              className="bg-surface border border-border rounded-xl py-3 w-full flex items-center justify-center gap-3 text-sm font-medium text-text-primary hover:bg-surface-alt transition-colors"
             >
               <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
                 <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
@@ -176,7 +210,7 @@ function LoginFormContent(): React.JSX.Element {
             </button>
 
             <div className="mt-6 text-center">
-              <p className="text-sm text-text-secondary dark:text-zinc-400">
+              <p className="text-sm text-text-secondary">
                 Não tem uma conta?{" "}
                 <Link href="/cadastro" className="text-teal font-semibold hover:text-teal-dark transition-colors">
                   Cadastre-se

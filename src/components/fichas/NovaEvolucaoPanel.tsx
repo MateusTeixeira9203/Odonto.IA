@@ -188,13 +188,13 @@ export function NovaEvolucaoPanel({ onCancel, onSave, clinicaId, patientId }: No
         <div className="flex-[3] flex flex-col gap-6">
           <div className="flex items-center gap-4">
             <div className="flex-1">
-              <label className="block text-[10px] font-bold text-gray-md uppercase tracking-[0.15em] mb-2">
+              <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-[0.15em] mb-2">
                 Tipo de Registro
               </label>
               <select
                 value={type}
                 onChange={(e) => setType(e.target.value)}
-                className="w-full bg-white border border-border rounded-xl px-4 py-2.5 text-sm font-medium text-black outline-none focus:border-teal transition-colors"
+                className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm font-medium text-text-primary outline-none focus:border-teal transition-colors"
               >
                 <option value="Avaliação">Avaliação</option>
                 <option value="Evolução">Evolução</option>
@@ -206,7 +206,7 @@ export function NovaEvolucaoPanel({ onCancel, onSave, clinicaId, patientId }: No
 
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="block text-[10px] font-bold text-gray-md uppercase tracking-[0.15em]">
+              <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-[0.15em]">
                 Observações Gerais
               </label>
               <button
@@ -231,7 +231,7 @@ export function NovaEvolucaoPanel({ onCancel, onSave, clinicaId, patientId }: No
               value={generalObs}
               onChange={(e) => setGeneralObs(e.target.value)}
               placeholder="Descreva os procedimentos realizados, queixas do paciente, etc..."
-              className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm font-medium text-black outline-none focus:border-teal transition-colors min-h-[120px] resize-y"
+              className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm font-medium text-text-primary outline-none focus:border-teal transition-colors min-h-[120px] resize-y"
             />
           </div>
 
@@ -243,7 +243,7 @@ export function NovaEvolucaoPanel({ onCancel, onSave, clinicaId, patientId }: No
                 animate={{ opacity: 1, y: 0 }}
                 className="space-y-4"
               >
-                <label className="block text-[10px] font-bold text-gray-md uppercase tracking-[0.15em]">
+                <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-[0.15em]">
                   Observações por Dente
                 </label>
                 <div className="space-y-3">
@@ -263,7 +263,7 @@ export function NovaEvolucaoPanel({ onCancel, onSave, clinicaId, patientId }: No
                         value={toothObs[tooth] ?? ''}
                         onChange={(e) => handleToothObsChange(tooth, e.target.value)}
                         placeholder={`Procedimento no dente ${tooth}...`}
-                        className="flex-1 bg-white border border-border rounded-xl px-4 py-2.5 text-sm font-medium text-black outline-none focus:border-teal transition-colors"
+                        className="flex-1 bg-surface border border-border rounded-xl px-4 py-2.5 text-sm font-medium text-text-primary outline-none focus:border-teal transition-colors"
                       />
                     </motion.div>
                   ))}
@@ -273,7 +273,7 @@ export function NovaEvolucaoPanel({ onCancel, onSave, clinicaId, patientId }: No
           </AnimatePresence>
 
           <div>
-            <label className="block text-[10px] font-bold text-gray-md uppercase tracking-[0.15em] mb-2">
+            <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-[0.15em] mb-2">
               Anexos
             </label>
             <input
@@ -286,7 +286,7 @@ export function NovaEvolucaoPanel({ onCancel, onSave, clinicaId, patientId }: No
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
-              className="w-full border-2 border-dashed border-border hover:border-teal bg-white rounded-xl py-6 flex flex-col items-center justify-center gap-2 text-gray-md hover:text-teal transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full border-2 border-dashed border-border hover:border-teal bg-surface rounded-xl py-6 flex flex-col items-center justify-center gap-2 text-text-secondary hover:text-teal transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isUploading ? (
                 <><Loader2 className="w-6 h-6 animate-spin" /><span className="text-sm font-medium">Enviando...</span></>
@@ -297,12 +297,12 @@ export function NovaEvolucaoPanel({ onCancel, onSave, clinicaId, patientId }: No
             {uploadedFiles.length > 0 && (
               <ul className="mt-3 space-y-2">
                 {uploadedFiles.map((f) => (
-                  <li key={f.docId} className="flex items-center gap-2 bg-white border border-border rounded-lg px-3 py-2">
+                  <li key={f.docId} className="flex items-center gap-2 bg-surface border border-border rounded-lg px-3 py-2">
                     <FileText className="w-4 h-4 text-teal shrink-0" />
-                    <span className="flex-1 text-sm font-medium text-black truncate">{f.name}</span>
+                    <span className="flex-1 text-sm font-medium text-text-primary truncate">{f.name}</span>
                     <button
                       onClick={() => handleRemoveFile(f.docId, f.storagePath)}
-                      className="text-gray-md hover:text-red-500 transition-colors"
+                      className="text-text-secondary hover:text-red-500 transition-colors"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -315,7 +315,7 @@ export function NovaEvolucaoPanel({ onCancel, onSave, clinicaId, patientId }: No
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
             <button
               onClick={onCancel}
-              className="px-5 py-2.5 rounded-xl font-semibold text-sm text-gray-md hover:text-black hover:bg-surface transition-colors"
+              className="px-5 py-2.5 rounded-xl font-semibold text-sm text-text-secondary hover:text-text-primary hover:bg-surface transition-colors"
             >
               Cancelar
             </button>
@@ -330,10 +330,10 @@ export function NovaEvolucaoPanel({ onCancel, onSave, clinicaId, patientId }: No
         </div>
 
         {/* Coluna Direita (40%) - Odontograma */}
-        <div className="flex-[2] bg-white rounded-xl border border-border p-6 flex flex-col">
+        <div className="flex-[2] bg-surface rounded-xl border border-border p-6 flex flex-col">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="font-heading text-lg text-black">Odontograma</h3>
-            <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-wider text-gray-md">
+            <h3 className="font-heading text-lg text-text-primary">Odontograma</h3>
+            <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
               <div className="flex items-center gap-1.5">
                 <div className="w-2.5 h-2.5 rounded-sm bg-teal" /> Selecionado
               </div>
@@ -359,7 +359,7 @@ export function NovaEvolucaoPanel({ onCancel, onSave, clinicaId, patientId }: No
                         ? 'bg-teal border-teal text-white shadow-md -translate-y-1'
                         : hasHistory
                           ? 'bg-amber-50 border-amber-400 text-amber-700 hover:bg-amber-100'
-                          : 'bg-surface-alt border-border text-gray-md hover:border-teal hover:text-teal'
+                          : 'bg-surface-alt border-border text-text-secondary hover:border-teal hover:text-teal'
                     }`}
                   >
                     {tooth}
@@ -383,7 +383,7 @@ export function NovaEvolucaoPanel({ onCancel, onSave, clinicaId, patientId }: No
                         ? 'bg-teal border-teal text-white shadow-md translate-y-1'
                         : hasHistory
                           ? 'bg-amber-50 border-amber-400 text-amber-700 hover:bg-amber-100'
-                          : 'bg-surface-alt border-border text-gray-md hover:border-teal hover:text-teal'
+                          : 'bg-surface-alt border-border text-text-secondary hover:border-teal hover:text-teal'
                     }`}
                   >
                     {tooth}
@@ -393,7 +393,7 @@ export function NovaEvolucaoPanel({ onCancel, onSave, clinicaId, patientId }: No
             </div>
           </div>
 
-          <div className="mt-8 text-center text-xs text-gray-md font-medium">
+          <div className="mt-8 text-center text-xs text-text-secondary font-medium">
             Clique nos dentes para adicionar observações específicas.
           </div>
         </div>

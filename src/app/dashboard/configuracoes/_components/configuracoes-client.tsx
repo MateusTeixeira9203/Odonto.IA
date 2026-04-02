@@ -1,9 +1,12 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Building, Clock, Stethoscope, Check, Plus, Loader2, Pencil, X } from 'lucide-react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { Building, Clock, Stethoscope, Check, Plus, Loader2, Pencil, X, Users } from 'lucide-react';
 import { motion } from 'motion/react';
 import type { ConfiguracaoClinica, HorarioDisponivel, Procedimento } from '@/types/database';
+import { HelpTooltip } from '@/components/ui/help-tooltip';
 import {
   salvarClinica,
   salvarHorarios,
@@ -40,6 +43,7 @@ interface Props {
 }
 
 export function ConfiguracoesClient({ dentista, config, horarios, procedimentos: procedimentosIniciais }: Props) {
+  const pathname = usePathname();
   const [abaAtiva, setAbaAtiva] = useState<Aba>('clinica');
   const [isPending, startTransition] = useTransition();
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -219,6 +223,17 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
               {label}
             </button>
           ))}
+          <Link
+            href="/dashboard/configuracoes/usuarios"
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm transition-colors ${
+              pathname === '/dashboard/configuracoes/usuarios'
+                ? 'bg-teal/10 text-teal border border-teal/20'
+                : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            Equipe
+          </Link>
         </motion.nav>
 
         {/* Conteúdo da aba */}
@@ -444,7 +459,10 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
             <div className="space-y-4">
               <div className="bg-card p-6 rounded-2xl border border-border shadow-sm">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="font-heading text-2xl text-foreground">Catálogo de Procedimentos</h2>
+                  <h2 className="font-heading text-2xl text-foreground flex items-center">
+                    Catálogo de Procedimentos
+                    <HelpTooltip content="Cadastre seus procedimentos e valores para uso nos orçamentos." />
+                  </h2>
                   <button
                     onClick={() => setShowNovoProcedimento(true)}
                     className="bg-teal text-white hover:bg-teal-lt px-4 py-2 rounded-xl font-semibold text-sm flex items-center gap-2 transition-colors"

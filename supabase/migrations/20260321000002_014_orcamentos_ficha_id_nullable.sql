@@ -1,0 +1,1 @@
+ALTER TABLE orcamentos ALTER COLUMN ficha_id DROP NOT NULL;

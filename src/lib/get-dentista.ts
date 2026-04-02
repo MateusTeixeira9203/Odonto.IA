@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import type { DentistaRole } from "@/types/database";
 
 export interface DentistaCache {
   id: string;
@@ -7,6 +8,7 @@ export interface DentistaCache {
   clinica_id: string;
   clinica: string;
   especialidade: string | null;
+  role: DentistaRole;
 }
 
 /**
@@ -25,7 +27,7 @@ export const getDentistaCached = cache(async (): Promise<DentistaCache | null> =
 
   const { data, error } = await supabase
     .from("dentistas")
-    .select("id, nome, clinica_id, especialidade, clinicas(nome)")
+    .select("id, nome, clinica_id, especialidade, role, clinicas(nome)")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -45,5 +47,6 @@ export const getDentistaCached = cache(async (): Promise<DentistaCache | null> =
     clinica_id: data.clinica_id,
     clinica: clinicaNome,
     especialidade: data.especialidade ?? null,
+    role: (data.role ?? 'dentista') as DentistaRole,
   };
 });

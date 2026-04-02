@@ -23,6 +23,7 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { createClient } from "@/lib/supabase/client";
+import { HelpTooltip } from "@/components/ui/help-tooltip";
 
 interface ToothNote {
   tooth: number;
@@ -419,8 +420,9 @@ export function FichasTab({ patientId, clinicaId, dentistaId }: FichasTabProps) 
 
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-[0.15em]">
+                    <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-[0.15em] flex items-center">
                       Observações Gerais
+                      <HelpTooltip content="Fale os procedimentos e a IA transcreve automaticamente." />
                     </label>
                     <button
                       onClick={() => {
@@ -568,7 +570,10 @@ export function FichasTab({ patientId, clinicaId, dentistaId }: FichasTabProps) 
               {/* Odontograma */}
               <div className="flex-[2] bg-background rounded-xl border border-border/60 p-6 flex flex-col">
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="font-heading text-lg text-foreground">Odontograma</h3>
+                  <h3 className="font-heading text-lg text-foreground flex items-center">
+                    Odontograma
+                    <HelpTooltip content="Clique nos dentes para marcar procedimentos." />
+                  </h3>
                   <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                     <div className="flex items-center gap-1.5">
                       <div className="w-2.5 h-2.5 rounded-sm bg-teal" /> Selecionado

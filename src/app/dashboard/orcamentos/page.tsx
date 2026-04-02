@@ -28,7 +28,7 @@ export type OrcamentoRow = {
   total: number | null;
   validade_dias: number;
   condicoes_pagamento: string | null;
-  paciente: { id: string; nome: string } | null;
+  paciente: { id: string; nome: string; telefone: string | null } | null;
   dentista: { id: string; nome: string } | null;
   itens: OrcamentoItemRow[];
   pagamentos: PagamentoRow[];
@@ -44,7 +44,7 @@ export default async function OrcamentosPage() {
   const { data: orcamentosRaw } = await supabase
     .from('orcamentos')
     .select(
-      'id, created_at, status, total, validade_dias, condicoes_pagamento, paciente:pacientes(id, nome), dentista:dentistas(id, nome)'
+      'id, created_at, status, total, validade_dias, condicoes_pagamento, paciente:pacientes(id, nome, telefone), dentista:dentistas(id, nome)'
     )
     .eq('clinica_id', dentista.clinica_id)
     .order('created_at', { ascending: false });

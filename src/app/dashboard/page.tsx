@@ -1,9 +1,9 @@
 import { redirect } from 'next/navigation';
 import { getDentistaCached } from '@/lib/get-dentista';
 import { createClient } from '@/lib/supabase/server';
-import { Plus, ArrowRight, Users, TrendingUp, Clock, Sparkles } from 'lucide-react';
+import { Plus, ArrowRight, Users, TrendingUp, Clock, Sparkles, Calendar, CircleDollarSign } from 'lucide-react';
 import Link from 'next/link';
-import { format } from 'date-fns';
+import { format, parseISO, isAfter, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 type FichaRecente = {
@@ -14,9 +14,231 @@ type FichaRecente = {
   paciente: { id: string; nome: string } | null;
 };
 
+type AgendamentoProximo = {
+  id: string;
+  data_hora: string;
+  status: string;
+  observacoes: string | null;
+  paciente: { id: string; nome: string } | null;
+  dentista: { nome: string } | null;
+};
+
+type PacienteRecente = {
+  id: string;
+  nome: string;
+  created_at: string;
+  telefone: string | null;
+};
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Dashboard para Secretária
+// ──────────────────────────────────────────────────────────────────────────────
+async function SecretaryDashboard({
+  clinicaId,
+  nome,
+}: {
+  clinicaId: string;
+  nome: string;
+}) {
+  const supabase = await createClient();
+  const now = new Date();
+  const nextWeek = addDays(now, 7).toISOString();
+
+  const [
+    { data: agendamentosRaw },
+    { data: pacientesRaw },
+    { count: orcamentosPendentes },
+  ] = await Promise.all([
+    supabase
+      .from('agendamentos')
+      .select('id, data_hora, status, observacoes, paciente:pacientes(id, nome), dentista:dentistas(nome)')
+      .eq('clinica_id', clinicaId)
+      .gte('data_hora', now.toISOString())
+      .lte('data_hora', nextWeek)
+      .order('data_hora', { ascending: true })
+      .limit(8),
+    supabase
+      .from('pacientes')
+      .select('id, nome, created_at, telefone')
+      .eq('clinica_id', clinicaId)
+      .order('created_at', { ascending: false })
+      .limit(5),
+    supabase
+      .from('orcamentos')
+      .select('*', { count: 'exact', head: true })
+      .eq('clinica_id', clinicaId)
+      .in('status', ['rascunho', 'enviado']),
+  ]);
+
+  const agendamentos = (agendamentosRaw ?? []) as unknown as AgendamentoProximo[];
+  const pacientes = (pacientesRaw ?? []) as PacienteRecente[];
+
+  const hora = now.getHours();
+  const saudacao = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite';
+
+  return (
+    <div className="p-8 max-w-6xl mx-auto w-full">
+      <header className="flex items-center justify-between mb-10">
+        <div>
+          <h1 className="font-heading text-4xl text-foreground mb-2">
+            {saudacao}, {nome.split(' ')[0]}!
+          </h1>
+          <p className="text-muted-foreground text-sm font-medium">
+            Painel da Secretaria — gerencie pacientes e agendamentos.
+          </p>
+        </div>
+      </header>
+
+      {/* Ações Rápidas */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
+        <Link
+          href="/dashboard/pacientes/novo"
+          className="bg-gradient-to-br from-teal to-teal-lt p-6 rounded-3xl text-white shadow-xl flex items-center gap-4 hover:shadow-2xl transition-all group"
+        >
+          <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <Users className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="text-[10px] font-mono uppercase tracking-widest text-white/70 mb-0.5">Ação rápida</div>
+            <div className="font-bold text-lg">Novo Paciente</div>
+          </div>
+        </Link>
+
+        <Link
+          href="/dashboard/agendamentos"
+          className="bg-card border border-border/60 p-6 rounded-3xl flex items-center gap-4 hover:shadow-md transition-all group"
+        >
+          <div className="w-12 h-12 rounded-2xl bg-teal/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <Calendar className="w-6 h-6 text-teal" />
+          </div>
+          <div>
+            <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-0.5">Ação rápida</div>
+            <div className="font-bold text-lg text-foreground">Novo Agendamento</div>
+          </div>
+        </Link>
+
+        <Link
+          href="/dashboard/orcamentos"
+          className="bg-card border border-border/60 p-6 rounded-3xl flex items-center gap-4 hover:shadow-md transition-all group"
+        >
+          <div className="w-12 h-12 rounded-2xl bg-teal/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <CircleDollarSign className="w-6 h-6 text-teal" />
+          </div>
+          <div>
+            <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-0.5">
+              {orcamentosPendentes ?? 0} pendente{(orcamentosPendentes ?? 0) !== 1 ? 's' : ''}
+            </div>
+            <div className="font-bold text-lg text-foreground">Orçamentos</div>
+          </div>
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Próximos Agendamentos */}
+        <div>
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="font-heading text-2xl text-foreground">Próximos Agendamentos</h2>
+            <Link
+              href="/dashboard/agendamentos"
+              className="text-teal text-sm font-semibold flex items-center gap-1 hover:text-teal-lt transition-colors"
+            >
+              Ver agenda <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+          <div className="bg-card rounded-2xl border border-border/60 shadow-sm overflow-hidden">
+            {agendamentos.length === 0 ? (
+              <div className="p-10 text-center text-muted-foreground text-sm">
+                Nenhum agendamento nos próximos 7 dias.
+              </div>
+            ) : (
+              <div className="divide-y divide-border">
+                {agendamentos.map((apt) => {
+                  const dataHora = parseISO(apt.data_hora);
+                  const hoje = isAfter(addDays(now, 1), dataHora);
+                  return (
+                    <div key={apt.id} className="p-4 flex items-center justify-between">
+                      <div>
+                        <div className="font-semibold text-sm text-foreground">
+                          {apt.paciente?.nome ?? 'Paciente'}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          Dr(a). {apt.dentista?.nome ?? '—'}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-mono text-xs text-foreground font-semibold">
+                          {format(dataHora, 'HH:mm')}
+                        </div>
+                        <div className={`text-[10px] font-mono mt-0.5 ${hoje ? 'text-teal font-bold' : 'text-muted-foreground'}`}>
+                          {format(dataHora, hoje ? "'Hoje'" : "dd/MM", { locale: ptBR })}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Últimos Pacientes */}
+        <div>
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="font-heading text-2xl text-foreground">Últimos Pacientes</h2>
+            <Link
+              href="/dashboard/pacientes"
+              className="text-teal text-sm font-semibold flex items-center gap-1 hover:text-teal-lt transition-colors"
+            >
+              Ver todos <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+          <div className="bg-card rounded-2xl border border-border/60 shadow-sm overflow-hidden">
+            {pacientes.length === 0 ? (
+              <div className="p-10 text-center text-muted-foreground text-sm">
+                Nenhum paciente cadastrado ainda.
+              </div>
+            ) : (
+              <div className="divide-y divide-border">
+                {pacientes.map((p) => {
+                  const iniciais = p.nome.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
+                  return (
+                    <Link
+                      key={p.id}
+                      href={`/dashboard/pacientes/${p.id}`}
+                      className="p-4 flex items-center gap-4 hover:bg-muted transition-colors"
+                    >
+                      <div className="w-10 h-10 rounded-xl bg-teal flex items-center justify-center text-white font-bold text-xs shrink-0">
+                        {iniciais}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-sm text-foreground truncate">{p.nome}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          {p.telefone ?? 'Sem telefone'}
+                        </div>
+                      </div>
+                      <div className="text-xs text-muted-foreground shrink-0">
+                        {format(parseISO(p.created_at), "dd/MM/yy")}
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default async function DashboardPage() {
   const dentista = await getDentistaCached();
   if (!dentista) redirect('/login');
+
+  // Secretária vê dashboard simplificado (sem fichas clínicas)
+  if (dentista.role === 'secretaria') {
+    return <SecretaryDashboard clinicaId={dentista.clinica_id} nome={dentista.nome} />;
+  }
 
   const supabase = await createClient();
   const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();

@@ -186,3 +186,77 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* ── Driver.js — tema Dent IA ────────────────────────── */
+.driver-popover.driverjs-theme {
+  border-radius: 16px;
+  border: 1.5px solid #2f9c85;
+  box-shadow: 0 20px 40px -10px rgba(47, 156, 133, 0.2);
+  padding: 20px;
+  font-family: var(--font-sans);
+  max-width: 320px;
+}
+.driver-popover.driverjs-theme .driver-popover-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0d0d0d;
+  margin-bottom: 6px;
+}
+.dark .driver-popover.driverjs-theme .driver-popover-title {
+  color: #ffffff;
+}
+.driver-popover.driverjs-theme .driver-popover-description {
+  font-size: 13px;
+  color: #8a8a8a;
+  line-height: 1.5;
+}
+.dark .driver-popover.driverjs-theme .driver-popover-description {
+  color: #a0a0a0;
+}
+.driver-popover.driverjs-theme .driver-popover-next-btn,
+.driver-popover.driverjs-theme .driver-popover-done-btn {
+  background-color: #2f9c85;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.driver-popover.driverjs-theme .driver-popover-next-btn:hover,
+.driver-popover.driverjs-theme .driver-popover-done-btn:hover {
+  background-color: #5dbeb0;
+}
+.driver-popover.driverjs-theme .driver-popover-prev-btn {
+  border-radius: 10px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  border: 1.5px solid #d4d1ca;
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.driver-popover.driverjs-theme .driver-popover-prev-btn:hover {
+  border-color: #2f9c85;
+  color: #2f9c85;
+}
+.driver-popover.driverjs-theme .driver-popover-progress-text {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: #8a8a8a;
+}
+.driver-popover.driverjs-theme .driver-popover-close-btn {
+  color: #8a8a8a;
+  transition: color 0.15s;
+}
+.driver-popover.driverjs-theme .driver-popover-close-btn:hover {
+  color: #0d0d0d;
+}
+.driver-overlay {
+  opacity: 0.6 !important;
+}

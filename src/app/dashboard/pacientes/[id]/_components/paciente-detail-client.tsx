@@ -47,6 +47,7 @@ import { PlanejamentoTab } from '@/components/pacientes/PlanejamentoTab';
 import { FichasTab } from '@/components/pacientes/FichasTab';
 import { createClient } from '@/lib/supabase/client';
 import { atualizarPaciente, salvarAnotacoes } from '../actions';
+import type { DentistaRole } from '@/types/database';
 import {
   atualizarStatusOrcamento,
   registrarPagamento,
@@ -122,6 +123,7 @@ interface PacienteDetailClientProps {
   orcamentos: OrcamentoComItens[];
   clinicaId: string;
   dentistaId: string;
+  role: DentistaRole;
 }
 
 const STATUS_ORCAMENTO: Record<string, { label: string; cls: string }> = {
@@ -137,9 +139,12 @@ export function PacienteDetailClient({
   orcamentos,
   clinicaId,
   dentistaId,
+  role,
 }: PacienteDetailClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+
+  const showClinicalTabs = role === 'admin' || role === 'dentista';
 
   const [activeTab, setActiveTab] = useState('visao-geral');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -577,9 +582,9 @@ export function PacienteDetailClient({
             <TabsList className="bg-muted/50 p-1 rounded-xl border border-border/40 mb-6 flex-wrap h-auto gap-1">
               {[
                 ['visao-geral', 'Visão Geral'],
-                ['fichas', 'Fichas Clínicas'],
+                ...(showClinicalTabs ? [['fichas', 'Fichas Clínicas']] : []),
                 ['documentos', 'Documentos'],
-                ['planejamento', 'Planejamento'],
+                ...(showClinicalTabs ? [['planejamento', 'Planejamento']] : []),
                 ['orcamentos', 'Orçamentos'],
               ].map(([val, label]) => (
                 <TabsTrigger

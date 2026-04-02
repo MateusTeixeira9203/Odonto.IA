@@ -41,6 +41,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { createClient } from '@/lib/supabase/client';
 import type { OrcamentoRow, OrcamentoItemRow, PagamentoRow } from '../page';
+import { BotaoDownloadPDF } from '@/components/orcamentos/botao-download-pdf';
+import { BotaoEnviarWhatsApp } from '@/components/orcamentos/botao-enviar-whatsapp';
 import {
   atualizarStatusOrcamento,
   registrarPagamento,
@@ -282,7 +284,7 @@ export function OrcamentosClient({
         total: novoOrcTotal,
         validade_dias: 30,
         condicoes_pagamento: null,
-        paciente: { id: novoOrcPacienteId, nome: novoOrcPacienteNome },
+        paciente: { id: novoOrcPacienteId, nome: novoOrcPacienteNome, telefone: null },
         dentista: null,
         itens: itensValidos.map(
           (i): OrcamentoItemRow => ({
@@ -610,6 +612,13 @@ export function OrcamentosClient({
                 <div className="flex items-center gap-1">
                   {!editMode && (
                     <>
+                      <BotaoDownloadPDF orcamentoId={selected.id} />
+                      <BotaoEnviarWhatsApp
+                        orcamentoId={selected.id}
+                        pacienteTelefone={selected.paciente?.telefone}
+                        pacienteNome={selected.paciente?.nome ?? ''}
+                        valorTotal={selected.total}
+                      />
                       <button
                         onClick={handleOpenEdit}
                         className="p-2 rounded-xl hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"

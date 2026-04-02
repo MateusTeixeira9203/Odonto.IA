@@ -7,6 +7,7 @@ import type { ConfiguracaoClinica, HorarioDisponivel, Procedimento } from '@/typ
 export default async function ConfiguracoesPage() {
   const dentista = await getDentistaCached();
   if (!dentista) redirect('/login');
+  if (dentista.role === 'secretaria') redirect('/dashboard');
 
   const supabase = await createClient();
 

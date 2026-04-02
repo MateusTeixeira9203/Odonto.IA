@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { createClient } from '@/lib/supabase/server';
+import { withRateLimit } from '@/lib/rate-limit';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY ?? '' });
 
 // Recebe o áudio diretamente como multipart/form-data e retorna a transcrição
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  const rateLimitResponse = await withRateLimit(req, 'transcrever', 20, 60_000);
+  if (rateLimitResponse) return rateLimitResponse;
+
   // Verifica autenticação
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

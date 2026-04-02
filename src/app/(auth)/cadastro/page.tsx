@@ -64,7 +64,11 @@ export default function CadastroPage(): React.JSX.Element {
       });
 
       if (error) {
-        toast.error(error.message);
+        if (error.message.includes("User already registered") || error.message.includes("already been registered")) {
+          toast.error("Este email já está cadastrado. Faça login ou use outro email.");
+        } else {
+          toast.error("Erro ao criar conta. Tente novamente.");
+        }
         return;
       }
 
@@ -78,9 +82,7 @@ export default function CadastroPage(): React.JSX.Element {
         router.push("/onboarding");
         router.refresh();
       } else {
-        toast.success("Conta criada! Verifique seu email para confirmar o cadastro.");
-        router.push("/login");
-        router.refresh();
+        router.push(`/verifique-email?email=${encodeURIComponent(data.email)}`);
       }
     } catch {
       toast.error("Erro ao criar conta");
@@ -90,7 +92,7 @@ export default function CadastroPage(): React.JSX.Element {
   }
 
   return (
-    <div className="min-h-screen bg-bg dark:bg-zinc-950 flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-bg flex flex-col items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -100,28 +102,28 @@ export default function CadastroPage(): React.JSX.Element {
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-teal text-white mb-4 shadow-lg">
             <DentIALogo className="w-7 h-7" />
           </div>
-          <h1 className="font-serif text-4xl text-text-primary dark:text-white mb-2">Crie sua conta</h1>
-          <p className="text-text-secondary dark:text-zinc-400 text-sm font-medium">
+          <h1 className="font-serif text-4xl text-text-primary mb-2">Crie sua conta</h1>
+          <p className="text-text-secondary text-sm font-medium">
             Comece a transformar a gestão da sua clínica.
           </p>
         </div>
 
-        <div className="bg-surface dark:bg-zinc-900 p-8 rounded-3xl border border-border dark:border-zinc-800 shadow-sm">
+        <div className="bg-surface p-8 rounded-3xl border border-border shadow-sm">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             {/* Nome */}
             <div>
-              <label className="block font-mono text-xs text-text-secondary dark:text-zinc-400 uppercase tracking-widest mb-1.5">
+              <label className="block font-mono text-xs text-text-secondary uppercase tracking-widest mb-1.5">
                 Nome
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <User className="h-4 w-4 text-text-secondary dark:text-zinc-500" />
+                  <User className="h-4 w-4 text-text-secondary" />
                 </div>
                 <input
                   type="text"
                   disabled={isLoading}
                   placeholder="Seu nome completo"
-                  className="bg-surface-alt dark:bg-zinc-800 border border-border dark:border-zinc-700 rounded-xl pl-11 pr-4 py-3 text-sm text-text-primary dark:text-white w-full focus:ring-2 focus:ring-teal/20 outline-none transition-all placeholder:text-text-secondary"
+                  className="bg-surface-alt border border-border rounded-xl pl-11 pr-4 py-3 text-sm text-text-primary w-full focus:ring-2 focus:ring-teal/20 outline-none transition-all placeholder:text-text-secondary"
                   {...register("nome")}
                 />
               </div>
@@ -132,18 +134,18 @@ export default function CadastroPage(): React.JSX.Element {
 
             {/* Email */}
             <div>
-              <label className="block font-mono text-xs text-text-secondary dark:text-zinc-400 uppercase tracking-widest mb-1.5">
+              <label className="block font-mono text-xs text-text-secondary uppercase tracking-widest mb-1.5">
                 E-mail
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Mail className="h-4 w-4 text-text-secondary dark:text-zinc-500" />
+                  <Mail className="h-4 w-4 text-text-secondary" />
                 </div>
                 <input
                   type="email"
                   disabled={isLoading}
                   placeholder="seu@email.com"
-                  className="bg-surface-alt dark:bg-zinc-800 border border-border dark:border-zinc-700 rounded-xl pl-11 pr-4 py-3 text-sm text-text-primary dark:text-white w-full focus:ring-2 focus:ring-teal/20 outline-none transition-all placeholder:text-text-secondary"
+                  className="bg-surface-alt border border-border rounded-xl pl-11 pr-4 py-3 text-sm text-text-primary w-full focus:ring-2 focus:ring-teal/20 outline-none transition-all placeholder:text-text-secondary"
                   {...register("email")}
                 />
               </div>
@@ -154,24 +156,24 @@ export default function CadastroPage(): React.JSX.Element {
 
             {/* Senha */}
             <div>
-              <label className="block font-mono text-xs text-text-secondary dark:text-zinc-400 uppercase tracking-widest mb-1.5">
+              <label className="block font-mono text-xs text-text-secondary uppercase tracking-widest mb-1.5">
                 Senha
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Lock className="h-4 w-4 text-text-secondary dark:text-zinc-500" />
+                  <Lock className="h-4 w-4 text-text-secondary" />
                 </div>
                 <input
                   type={showPassword ? "text" : "password"}
                   disabled={isLoading}
                   placeholder="Mínimo 8 caracteres"
-                  className="bg-surface-alt dark:bg-zinc-800 border border-border dark:border-zinc-700 rounded-xl pl-11 pr-11 py-3 text-sm text-text-primary dark:text-white w-full focus:ring-2 focus:ring-teal/20 outline-none transition-all"
+                  className="bg-surface-alt border border-border rounded-xl pl-11 pr-11 py-3 text-sm text-text-primary w-full focus:ring-2 focus:ring-teal/20 outline-none transition-all"
                   {...register("password")}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-text-secondary dark:text-zinc-400 hover:text-text-primary dark:hover:text-white transition-colors"
+                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-text-secondary hover:text-text-primary transition-colors"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -183,24 +185,24 @@ export default function CadastroPage(): React.JSX.Element {
 
             {/* Confirmar Senha */}
             <div>
-              <label className="block font-mono text-xs text-text-secondary dark:text-zinc-400 uppercase tracking-widest mb-1.5">
+              <label className="block font-mono text-xs text-text-secondary uppercase tracking-widest mb-1.5">
                 Confirmar Senha
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Lock className="h-4 w-4 text-text-secondary dark:text-zinc-500" />
+                  <Lock className="h-4 w-4 text-text-secondary" />
                 </div>
                 <input
                   type={showConfirmPassword ? "text" : "password"}
                   disabled={isLoading}
                   placeholder="Repita a senha"
-                  className="bg-surface-alt dark:bg-zinc-800 border border-border dark:border-zinc-700 rounded-xl pl-11 pr-11 py-3 text-sm text-text-primary dark:text-white w-full focus:ring-2 focus:ring-teal/20 outline-none transition-all"
+                  className="bg-surface-alt border border-border rounded-xl pl-11 pr-11 py-3 text-sm text-text-primary w-full focus:ring-2 focus:ring-teal/20 outline-none transition-all"
                   {...register("confirmPassword")}
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-text-secondary dark:text-zinc-400 hover:text-text-primary dark:hover:text-white transition-colors"
+                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-text-secondary hover:text-text-primary transition-colors"
                 >
                   {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -224,17 +226,17 @@ export default function CadastroPage(): React.JSX.Element {
 
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-border dark:border-zinc-700" />
+              <div className="w-full border-t border-border" />
             </div>
             <div className="relative flex justify-center text-xs">
-              <span className="bg-surface dark:bg-zinc-900 px-2 text-text-secondary dark:text-zinc-500 font-mono">ou</span>
+              <span className="bg-surface px-2 text-text-secondary font-mono">ou</span>
             </div>
           </div>
 
           <button
             type="button"
             onClick={handleGoogleSignup}
-            className="bg-surface dark:bg-zinc-800 border border-border dark:border-zinc-700 rounded-xl py-3 w-full flex items-center justify-center gap-3 text-sm font-medium text-text-primary dark:text-white hover:bg-surface-alt dark:hover:bg-zinc-700 transition-colors"
+            className="bg-surface border border-border rounded-xl py-3 w-full flex items-center justify-center gap-3 text-sm font-medium text-text-primary hover:bg-surface-alt transition-colors"
           >
             <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
               <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
@@ -246,7 +248,7 @@ export default function CadastroPage(): React.JSX.Element {
           </button>
 
           <div className="mt-6 text-center">
-            <p className="text-sm text-text-secondary dark:text-zinc-400">
+            <p className="text-sm text-text-secondary">
               Já tem uma conta?{" "}
               <Link href="/login" className="text-teal font-semibold hover:text-teal-dark transition-colors">
                 Fazer login

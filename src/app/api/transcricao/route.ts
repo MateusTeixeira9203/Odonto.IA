@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@/lib/supabase/server";
+import { withRateLimit } from "@/lib/rate-limit";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY ?? "" });
 
@@ -10,6 +11,9 @@ interface TranscricaoBody {
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  const rateLimitResponse = await withRateLimit(req, "transcricao", 20, 60_000);
+  if (rateLimitResponse) return rateLimitResponse;
+
   let body: TranscricaoBody;
 
   try {
