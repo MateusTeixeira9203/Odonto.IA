@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Camera, Trash2, Loader2, CheckCircle2, AlertCircle, User } from 'lucide-react';
+import { DentIALogo } from '@/components/ui/dent-ia-logo';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { salvarAvatarUrl, removerAvatar } from '../actions';
@@ -227,9 +228,7 @@ export function PerfilClient({ nome, email, role, clinica, avatarUrl: initialAva
 
             <div className="flex items-center gap-4 p-4 rounded-2xl bg-surface-alt">
               <div className="w-9 h-9 rounded-xl bg-teal-pale flex items-center justify-center shrink-0">
-                <svg width="16" height="16" viewBox="370 648 200 200" xmlns="http://www.w3.org/2000/svg">
-                  <path fill="#2f9c85" d="M511.668 653.836L497.934 653.836C487.77 653.836 477.957 657.668 470.457 664.355C462.961 657.668 453.145 653.836 442.984 653.836L429.246 653.836C398.949 653.836 374.301 678.488 374.301 708.785L374.301 735.59C374.301 768.543 382.086 801.535 396.824 831.023C401.504 840.352 410.891 846.152 421.324 846.152C433.137 846.152 443.574 838.629 447.305 827.426L458.895 792.656C460.559 787.68 465.191 784.336 470.484 784.336C475.723 784.336 480.359 787.68 482.023 792.656L493.605 827.426C497.34 838.629 507.777 846.152 519.59 846.152C530.027 846.152 539.41 840.352 544.094 831.016C558.828 801.535 566.617 768.543 566.617 735.59L566.617 708.785C566.617 678.488 541.965 653.836 511.668 653.836Z" />
-                </svg>
+                <DentIALogo className="w-4 h-4 text-teal" />
               </div>
               <div>
                 <p className="text-xs font-mono text-text-secondary uppercase tracking-widest mb-0.5">Clínica</p>

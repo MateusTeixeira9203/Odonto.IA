@@ -25,6 +25,7 @@ import { useTheme } from 'next-themes';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { DentistaRole } from '@/types/database';
+import { DentIALogo } from '@/components/ui/dent-ia-logo';
 
 export interface SidebarProps {
   isExpanded: boolean;
@@ -85,9 +86,7 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role, 
       </button>
 
       <div className={`p-6 flex items-center gap-3 mb-4 ${!isExpanded && 'justify-center px-0'}`}>
-        <svg width="28" height="28" viewBox="370 648 200 200" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
-          <path fill="#2f9c85" d="M511.668 653.836L497.934 653.836C487.77 653.836 477.957 657.668 470.457 664.355C462.961 657.668 453.145 653.836 442.984 653.836L429.246 653.836C398.949 653.836 374.301 678.488 374.301 708.785L374.301 735.59C374.301 768.543 382.086 801.535 396.824 831.023C401.504 840.352 410.891 846.152 421.324 846.152C433.137 846.152 443.574 838.629 447.305 827.426L458.895 792.656C460.559 787.68 465.191 784.336 470.484 784.336C475.723 784.336 480.359 787.68 482.023 792.656L493.605 827.426C497.34 838.629 507.777 846.152 519.59 846.152C530.027 846.152 539.41 840.352 544.094 831.016C558.828 801.535 566.617 768.543 566.617 735.59L566.617 708.785C566.617 678.488 541.965 653.836 511.668 653.836ZM552.879 735.59C552.879 766.414 545.594 797.289 531.805 824.863C529.477 829.527 524.797 832.418 519.59 832.418C513.707 832.418 508.504 828.668 506.637 823.082L495.047 788.309C491.512 777.719 481.641 770.602 470.43 770.602C459.277 770.602 449.402 777.719 445.867 788.309L434.273 823.082C432.414 828.668 427.207 832.418 421.324 832.418C416.121 832.418 411.438 829.527 409.113 824.871C395.32 797.289 388.035 766.414 388.035 735.59L388.035 708.785C388.035 686.059 406.523 667.574 429.246 667.574L442.984 667.574C451.57 667.574 459.785 671.688 464.973 678.574C467.563 682.023 473.355 682.023 475.945 678.574C481.129 671.688 489.348 667.574 497.934 667.574L511.668 667.574C534.395 667.574 552.879 686.059 552.879 708.785Z" />
-        </svg>
+        <DentIALogo className="w-7 h-7 text-teal shrink-0" />
         <AnimatePresence mode="wait">
           {isExpanded && (
             <motion.div
@@ -96,8 +95,8 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role, 
               exit={{ opacity: 0, x: -10 }}
               transition={{ duration: 0.2 }}
             >
-              <span className="font-bold text-xl tracking-tight text-white block leading-none whitespace-nowrap">
-                DENT <em className="text-teal-lt not-italic font-serif italic">IA</em>
+              <span className="font-heading text-xl tracking-widest text-white block leading-none whitespace-nowrap">
+                DENT <em className="italic text-teal-lt">IA</em>
               </span>
               <span className="font-mono text-[9px] tracking-[0.2em] text-zinc-500 uppercase mt-1 block whitespace-nowrap">Inteligência</span>
             </motion.div>

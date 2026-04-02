@@ -11,7 +11,7 @@ import { ArrowRight, AlertCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { hasDentistaRegistro } from "@/lib/auth";
 import { toast } from "sonner";
-import { DentIALogo } from "@/components/ui/dent-ia-logo";
+import { AuthBrandPanel } from "@/components/brand/brand-lockup";
 
 const AUTH_ERRORS: Record<string, string> = {
   "Invalid login credentials": "Email ou senha incorretos.",
@@ -95,17 +95,7 @@ function LoginFormContent(): React.JSX.Element {
 
   return (
     <div className="min-h-screen flex">
-      <div className="hidden md:flex flex-col items-center justify-center w-1/2 min-h-screen bg-teal">
-        <div className="flex flex-col items-center gap-6">
-          <div className="flex items-center gap-3">
-            <DentIALogo className="w-12 h-12 text-white" />
-            <span className="font-heading text-3xl text-white tracking-widest">DENT <em className="font-serif">IA</em></span>
-          </div>
-          <p className="font-serif text-2xl text-white text-center italic px-12">
-            Do atendimento ao orçamento, em segundos.
-          </p>
-        </div>
-      </div>
+      <AuthBrandPanel />
       <div className="flex-1 bg-bg flex flex-col items-center justify-center min-h-screen px-12">
         <motion.div
           initial={{ opacity: 0, y: 20 }}

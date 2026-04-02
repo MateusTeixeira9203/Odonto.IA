@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'motion/react';
 import { ArrowRight, AlertCircle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { DentIALogo } from '@/components/ui/dent-ia-logo';
+import { AuthBrandPanel } from '@/components/brand/brand-lockup';
 import { criarDentistaConvidado } from './actions';
 
 function AceitarConviteForm() {
@@ -85,19 +85,7 @@ function AceitarConviteForm() {
   if (!code && !token_hash) {
     return (
       <div className="min-h-screen flex">
-        <div className="hidden md:flex flex-col items-center justify-center w-1/2 bg-teal">
-          <div className="flex flex-col items-center gap-6">
-            <div className="flex items-center gap-3">
-              <DentIALogo className="w-12 h-12 text-white" />
-              <span className="font-heading text-3xl text-white tracking-widest">
-                DENT <em className="font-serif">IA</em>
-              </span>
-            </div>
-            <p className="font-serif text-2xl text-white text-center italic px-12">
-              Do atendimento ao orçamento, em segundos.
-            </p>
-          </div>
-        </div>
+        <AuthBrandPanel />
         <div className="flex-1 bg-bg flex flex-col items-center justify-center min-h-screen px-12">
           <div className="w-full max-w-md bg-surface rounded-3xl border border-border p-8 text-center">
             <p className="text-text-secondary mb-6">Link inválido ou expirado. Solicite um novo convite ao administrador.</p>
@@ -130,16 +118,7 @@ function AceitarConviteForm() {
   if (error && !sessionReady && !token_hash) {
     return (
       <div className="min-h-screen flex">
-        <div className="hidden md:flex flex-col items-center justify-center w-1/2 bg-teal">
-          <div className="flex flex-col items-center gap-6">
-            <div className="flex items-center gap-3">
-              <DentIALogo className="w-12 h-12 text-white" />
-              <span className="font-heading text-3xl text-white tracking-widest">
-                DENT <em className="font-serif">IA</em>
-              </span>
-            </div>
-          </div>
-        </div>
+        <AuthBrandPanel tagline={false} />
         <div className="flex-1 bg-bg flex flex-col items-center justify-center min-h-screen px-12">
           <div className="w-full max-w-md bg-surface rounded-3xl border border-border p-8 text-center">
             <p className="text-text-secondary mb-6">{error}</p>
@@ -158,20 +137,7 @@ function AceitarConviteForm() {
   // Formulário principal
   return (
     <div className="min-h-screen flex">
-      {/* Painel esquerdo — igual ao login */}
-      <div className="hidden md:flex flex-col items-center justify-center w-1/2 min-h-screen bg-teal">
-        <div className="flex flex-col items-center gap-6">
-          <div className="flex items-center gap-3">
-            <DentIALogo className="w-12 h-12 text-white" />
-            <span className="font-heading text-3xl text-white tracking-widest">
-              DENT <em className="font-serif">IA</em>
-            </span>
-          </div>
-          <p className="font-serif text-2xl text-white text-center italic px-12">
-            Do atendimento ao orçamento, em segundos.
-          </p>
-        </div>
-      </div>
+      <AuthBrandPanel />
 
       {/* Painel direito — formulário */}
       <div className="flex-1 bg-bg flex flex-col items-center justify-center min-h-screen px-12">
