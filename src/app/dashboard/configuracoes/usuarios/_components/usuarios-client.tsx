@@ -183,7 +183,7 @@ export function UsuariosClient({ usuarios, convitesPendentes, meuId, meuRole, li
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between"
+        className="flex items-start justify-between gap-4"
       >
         <div>
           <h1 className="font-serif text-3xl text-text-primary dark:text-white">Equipe</h1>
@@ -198,7 +198,7 @@ export function UsuariosClient({ usuarios, convitesPendentes, meuId, meuRole, li
         </div>
         <Button
           onClick={() => setShowConviteDialog(true)}
-          className="bg-teal hover:bg-teal-dark text-white gap-2"
+          className="bg-teal hover:bg-teal-dark text-white gap-2 shrink-0"
           style={{ boxShadow: '0 10px 30px -10px rgba(47,156,133,0.4)' }}
         >
           <UserPlus className="w-4 h-4" />
