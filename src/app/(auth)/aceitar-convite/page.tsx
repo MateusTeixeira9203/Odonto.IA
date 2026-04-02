@@ -2,17 +2,17 @@
 
 import { Suspense, useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { motion } from 'motion/react';
+import { ArrowRight, AlertCircle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { DentIALogo } from '@/components/ui/dent-ia-logo';
+import { criarDentistaConvidado } from './actions';
 
 function AceitarConviteForm() {
   const [nome, setNome] = useState('');
   const [senha, setSenha] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  // Fluxo PKCE: sessão já foi criada antes de mostrar o formulário
   const [sessionReady, setSessionReady] = useState(false);
   const [exchanging, setExchanging] = useState(false);
   const router = useRouter();
@@ -30,21 +30,15 @@ function AceitarConviteForm() {
 
     supabase.auth.exchangeCodeForSession(code)
       .then(({ error: err }) => {
-        if (err) {
-          setError('Link expirado ou inválido. Solicite um novo convite.');
-        } else {
-          setSessionReady(true);
-        }
+        if (err) setError('Link expirado ou inválido. Solicite um novo convite.');
+        else setSessionReady(true);
       })
       .finally(() => setExchanging(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code]);
 
-  // Fluxo token_hash: sem pré-processamento — sessão é criada no submit
   useEffect(() => {
-    if (!code && !token_hash) {
-      setError('Link inválido. Solicite um novo convite.');
-    }
+    if (!code && !token_hash) setError('Link inválido. Solicite um novo convite.');
   }, [code, token_hash]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -65,27 +59,7 @@ function AceitarConviteForm() {
       }
     }
 
-    // Neste ponto a sessão está ativa (seja via code ou token_hash)
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      setError('Erro ao recuperar dados do usuário.');
-      setLoading(false);
-      return;
-    }
-
-    const clinicaId = user.user_metadata?.clinica_id as string | undefined;
-
-    // Remover convite pendente (best-effort)
-    if (clinicaId) {
-      await supabase
-        .from('convites')
-        .delete()
-        .eq('email', user.email ?? '')
-        .eq('clinica_id', clinicaId);
-    }
-
-    // Salvar nome nos metadados + definir senha.
-    // O registro em `dentistas` é criado pelo dashboard/layout via service role.
+    // Define senha e salva nome nos metadados
     const { error: updateError } = await supabase.auth.updateUser({
       password: senha,
       data: { nome },
@@ -96,70 +70,175 @@ function AceitarConviteForm() {
       return;
     }
 
+    // Cria registro em dentistas via server action (service role)
+    const result = await criarDentistaConvidado(nome);
+    if (result.error) {
+      setError(result.error);
+      setLoading(false);
+      return;
+    }
+
     router.push('/dashboard');
   };
 
-  // Estados de carregamento / erro antes de mostrar o formulário
+  // Link inválido (sem token)
   if (!code && !token_hash) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="bg-surface p-8 rounded-2xl shadow-lg text-center">
-          <p className="text-red-600 mb-4">Link inválido</p>
-          <Button onClick={() => router.push('/login')}>Ir para login</Button>
+      <div className="min-h-screen flex">
+        <div className="hidden md:flex flex-col items-center justify-center w-1/2 bg-teal">
+          <div className="flex flex-col items-center gap-6">
+            <div className="flex items-center gap-3">
+              <DentIALogo className="w-12 h-12 text-white" />
+              <span className="font-heading text-3xl text-white tracking-widest">
+                DENT <em className="font-serif">IA</em>
+              </span>
+            </div>
+            <p className="font-serif text-2xl text-white text-center italic px-12">
+              Do atendimento ao orçamento, em segundos.
+            </p>
+          </div>
+        </div>
+        <div className="flex-1 bg-bg flex flex-col items-center justify-center min-h-screen px-12">
+          <div className="w-full max-w-md bg-surface rounded-3xl border border-border p-8 text-center">
+            <p className="text-text-secondary mb-6">Link inválido ou expirado. Solicite um novo convite ao administrador.</p>
+            <button
+              onClick={() => router.push('/login')}
+              className="bg-teal text-white rounded-xl font-bold py-3 px-6 hover:bg-teal-dark transition-all"
+            >
+              Ir para login
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
+  // Carregando troca de código PKCE
   if (exchanging) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="w-full max-w-md p-8 bg-surface rounded-2xl shadow-lg animate-pulse h-64" />
-      </div>
-    );
-  }
-
-  if (error && !sessionReady && !token_hash) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="bg-surface p-8 rounded-2xl shadow-lg text-center">
-          <p className="text-red-600 mb-4">{error}</p>
-          <Button onClick={() => router.push('/login')}>Ir para login</Button>
+      <div className="min-h-screen bg-bg flex items-center justify-center">
+        <div className="w-full max-w-md space-y-4 px-4">
+          <div className="h-12 rounded-xl bg-surface-alt animate-pulse" />
+          <div className="h-11 rounded-xl bg-surface-alt animate-pulse" />
+          <div className="h-11 rounded-xl bg-surface-alt animate-pulse" />
         </div>
       </div>
     );
   }
 
+  // Erro no código PKCE
+  if (error && !sessionReady && !token_hash) {
+    return (
+      <div className="min-h-screen flex">
+        <div className="hidden md:flex flex-col items-center justify-center w-1/2 bg-teal">
+          <div className="flex flex-col items-center gap-6">
+            <div className="flex items-center gap-3">
+              <DentIALogo className="w-12 h-12 text-white" />
+              <span className="font-heading text-3xl text-white tracking-widest">
+                DENT <em className="font-serif">IA</em>
+              </span>
+            </div>
+          </div>
+        </div>
+        <div className="flex-1 bg-bg flex flex-col items-center justify-center min-h-screen px-12">
+          <div className="w-full max-w-md bg-surface rounded-3xl border border-border p-8 text-center">
+            <p className="text-text-secondary mb-6">{error}</p>
+            <button
+              onClick={() => router.push('/login')}
+              className="bg-teal text-white rounded-xl font-bold py-3 px-6 hover:bg-teal-dark transition-all"
+            >
+              Ir para login
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Formulário principal
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="w-full max-w-md p-8 space-y-6 bg-surface rounded-2xl shadow-lg">
-        <h1 className="text-2xl font-serif text-center">Complete seu cadastro</h1>
-        {error && <p className="text-red-600 text-center text-sm">{error}</p>}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="nome">Nome completo</Label>
-            <Input
-              id="nome"
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-              required
-            />
+    <div className="min-h-screen flex">
+      {/* Painel esquerdo — igual ao login */}
+      <div className="hidden md:flex flex-col items-center justify-center w-1/2 min-h-screen bg-teal">
+        <div className="flex flex-col items-center gap-6">
+          <div className="flex items-center gap-3">
+            <DentIALogo className="w-12 h-12 text-white" />
+            <span className="font-heading text-3xl text-white tracking-widest">
+              DENT <em className="font-serif">IA</em>
+            </span>
           </div>
-          <div>
-            <Label htmlFor="senha">Senha</Label>
-            <Input
-              id="senha"
-              type="password"
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-              required
-              minLength={8}
-            />
+          <p className="font-serif text-2xl text-white text-center italic px-12">
+            Do atendimento ao orçamento, em segundos.
+          </p>
+        </div>
+      </div>
+
+      {/* Painel direito — formulário */}
+      <div className="flex-1 bg-bg flex flex-col items-center justify-center min-h-screen px-12">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-md"
+        >
+          <h1 className="font-serif text-4xl text-text-primary mb-2">Complete seu cadastro</h1>
+          <p className="text-text-secondary text-sm font-medium mb-8">
+            Defina seu nome e senha para acessar a clínica.
+          </p>
+
+          <div className="bg-surface rounded-3xl border border-border shadow-sm p-8">
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <label className="block font-mono text-xs text-text-secondary uppercase tracking-widest mb-1.5">
+                  Nome completo
+                </label>
+                <input
+                  type="text"
+                  value={nome}
+                  onChange={(e) => setNome(e.target.value)}
+                  placeholder="Seu nome"
+                  required
+                  disabled={loading}
+                  className="bg-surface-alt border border-border rounded-xl px-4 py-3 text-sm text-text-primary w-full focus:ring-2 focus:ring-teal/20 outline-none transition-all placeholder:text-text-secondary"
+                />
+              </div>
+
+              <div>
+                <label className="block font-mono text-xs text-text-secondary uppercase tracking-widest mb-1.5">
+                  Senha
+                </label>
+                <input
+                  type="password"
+                  value={senha}
+                  onChange={(e) => setSenha(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  minLength={8}
+                  disabled={loading}
+                  className="bg-surface-alt border border-border rounded-xl px-4 py-3 text-sm text-text-primary w-full focus:ring-2 focus:ring-teal/20 outline-none transition-all"
+                />
+                <p className="mt-1 text-xs text-text-secondary font-mono">Mínimo 8 caracteres</p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="bg-teal text-white rounded-xl font-bold py-3 w-full hover:bg-teal-dark transition-all mt-2 disabled:opacity-60 flex items-center justify-center gap-2"
+                style={{ boxShadow: '0 10px 30px -10px rgba(47, 156, 133, 0.4)' }}
+              >
+                {loading ? 'Salvando...' : (
+                  <>Criar conta e acessar <ArrowRight className="w-4 h-4" /></>
+                )}
+              </button>
+
+              {error && (
+                <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+                  <p className="text-sm text-red-700">{error}</p>
+                </div>
+              )}
+            </form>
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Salvando...' : 'Criar conta e acessar'}
-          </Button>
-        </form>
+        </motion.div>
       </div>
     </div>
   );
@@ -168,8 +247,12 @@ function AceitarConviteForm() {
 export default function AceitarConvite() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="w-full max-w-md p-8 bg-surface rounded-2xl shadow-lg animate-pulse h-64" />
+      <div className="min-h-screen bg-bg flex items-center justify-center p-4">
+        <div className="w-full max-w-md space-y-4">
+          <div className="h-12 rounded-xl bg-surface-alt animate-pulse" />
+          <div className="h-11 rounded-xl bg-surface-alt animate-pulse" />
+          <div className="h-11 rounded-xl bg-surface-alt animate-pulse" />
+        </div>
       </div>
     }>
       <AceitarConviteForm />

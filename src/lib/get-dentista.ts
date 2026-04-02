@@ -9,6 +9,7 @@ export interface DentistaCache {
   clinica: string;
   especialidade: string | null;
   role: DentistaRole;
+  avatar_url: string | null;
 }
 
 /**
@@ -27,7 +28,7 @@ export const getDentistaCached = cache(async (): Promise<DentistaCache | null> =
 
   const { data, error } = await supabase
     .from("dentistas")
-    .select("id, nome, clinica_id, especialidade, role, clinicas(nome)")
+    .select("id, nome, clinica_id, especialidade, role, avatar_url, clinicas(nome)")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -48,5 +49,6 @@ export const getDentistaCached = cache(async (): Promise<DentistaCache | null> =
     clinica: clinicaNome,
     especialidade: data.especialidade ?? null,
     role: (data.role ?? 'dentista') as DentistaRole,
+    avatar_url: (data as unknown as { avatar_url?: string | null }).avatar_url ?? null,
   };
 });

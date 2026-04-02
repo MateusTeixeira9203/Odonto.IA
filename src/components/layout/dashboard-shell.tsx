@@ -10,9 +10,10 @@ interface DashboardShellProps {
   nome: string;
   clinicaNome: string;
   role: DentistaRole;
+  avatarUrl?: string | null;
 }
 
-export function DashboardShell({ children, nome, clinicaNome, role }: DashboardShellProps) {
+export function DashboardShell({ children, nome, clinicaNome, role, avatarUrl }: DashboardShellProps) {
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
 
   return (
@@ -23,6 +24,7 @@ export function DashboardShell({ children, nome, clinicaNome, role }: DashboardS
         nome={nome}
         clinicaNome={clinicaNome}
         role={role}
+        avatarUrl={avatarUrl}
       />
       <main className="flex-1 flex flex-col h-screen overflow-y-auto transition-all duration-300">
         {children}

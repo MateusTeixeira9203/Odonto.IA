@@ -32,9 +32,10 @@ export interface SidebarProps {
   nome: string;
   clinicaNome: string;
   role: DentistaRole;
+  avatarUrl?: string | null;
 }
 
-export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role }: SidebarProps) {
+export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role, avatarUrl }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
@@ -220,8 +221,13 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role }
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
             <button className={`mt-4 px-3 flex items-center gap-3 w-full hover:bg-white/5 py-2 rounded-lg transition-colors cursor-pointer ${!isExpanded && 'justify-center'}`}>
-              <div className="w-8 h-8 rounded-full bg-teal flex items-center justify-center text-white font-bold text-xs shrink-0">
-                {nome.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+              <div className="w-8 h-8 rounded-full bg-teal flex items-center justify-center text-white font-bold text-xs shrink-0 overflow-hidden ring-2 ring-teal/30">
+                {avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={avatarUrl} alt={nome} className="w-full h-full object-cover" />
+                ) : (
+                  nome.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+                )}
               </div>
               <AnimatePresence mode="wait">
                 {isExpanded && (
@@ -247,7 +253,10 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role }
               align={isExpanded ? 'start' : 'center'}
               side="right"
             >
-              <DropdownMenu.Item className="flex items-center gap-2 px-3 py-2 text-sm text-zinc-400 hover:text-white hover:bg-white/5 rounded-lg outline-none cursor-pointer transition-colors">
+              <DropdownMenu.Item
+                className="flex items-center gap-2 px-3 py-2 text-sm text-zinc-400 hover:text-white hover:bg-white/5 rounded-lg outline-none cursor-pointer transition-colors"
+                onSelect={() => router.push('/dashboard/perfil')}
+              >
                 <User className="w-4 h-4" />
                 Meu Perfil
               </DropdownMenu.Item>

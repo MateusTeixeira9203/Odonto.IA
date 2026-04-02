@@ -15,7 +15,7 @@ export default async function DashboardLayout({
 
   if (dentista) {
     return (
-      <DashboardShell nome={dentista.nome} clinicaNome={dentista.clinica} role={dentista.role}>
+      <DashboardShell nome={dentista.nome} clinicaNome={dentista.clinica} role={dentista.role} avatarUrl={dentista.avatar_url}>
         {children}
       </DashboardShell>
     );
