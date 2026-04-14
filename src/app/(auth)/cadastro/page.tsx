@@ -43,12 +43,15 @@ export default function CadastroPage(): React.JSX.Element {
 
   const handleGoogleSignup = async (): Promise<void> => {
     const supabase = createClient();
-    await supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
       },
     });
+    if (error) {
+      toast.error("Erro ao iniciar cadastro com Google. Tente novamente.");
+    }
   };
 
   async function onSubmit(data: CadastroFormData): Promise<void> {

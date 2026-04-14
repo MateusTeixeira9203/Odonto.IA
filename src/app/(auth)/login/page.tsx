@@ -54,12 +54,15 @@ function LoginFormContent(): React.JSX.Element {
 
   const handleGoogleLogin = async (): Promise<void> => {
     const supabase = createClient();
-    await supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
       },
     });
+    if (error) {
+      toast.error("Erro ao iniciar login com Google. Tente novamente.");
+    }
   };
 
   async function onSubmit(data: LoginFormData): Promise<void> {
