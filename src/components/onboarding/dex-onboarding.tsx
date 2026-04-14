@@ -7,6 +7,7 @@ import { Bot, ArrowRight, ChevronRight, ChevronLeft, X, Loader2 } from 'lucide-r
 import { SimAgendamento } from './sim-agendamento';
 import { SimFicha }       from './sim-ficha';
 import { SimOrcamento }   from './sim-orcamento';
+import type { PlanoId }   from '@/lib/planos';
 
 // Chaves escopadas por dentista
 const onboardingKey = (id: string) => `dex_onboarding_v1_${id}`;
@@ -209,9 +210,9 @@ function NavRow({ onBack, onNext, showBack, label }: { onBack: () => void; onNex
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-interface DexOnboardingProps { nome: string; dentistaId: string; role?: string }
+interface DexOnboardingProps { nome: string; dentistaId: string; role?: string; plano?: PlanoId }
 
-export function DexOnboarding({ nome, dentistaId, role = 'owner' }: DexOnboardingProps) {
+export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOnboardingProps) {
   const router   = useRouter();
   const pathname = usePathname();
 
@@ -245,10 +246,28 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner' }: DexOnboardin
 
     if (role === 'secretaria') {
       return [
-        { id: 'INTRO',    path: '/dashboard',            title: '',                      description: `Olá, ${firstName}! Eu sou o DEX, seu assistente clínico. Vou te mostrar o sistema em 1 minuto. Vamos lá?` },
-        { id: 'AGENDA',   path: '/dashboard/agendamentos', title: 'Agenda & WhatsApp',   description: 'Aqui você gerencia a agenda de todos os dentistas. O bot do WhatsApp agenda consultas direto aqui.', simulacao: 'agendamento' as const },
-        orcamentoStep,
-        { id: 'FINALE',   path: '/dashboard',            title: 'Tudo pronto!',          description: 'Se precisar de ajuda, é só me chamar aqui no canto. Bom trabalho!' },
+        {
+          id: 'INTRO',
+          path: '/dashboard',
+          title: '',
+          description: `Olá, ${firstName}! Eu sou o DEX. Seu perfil é de secretária — vou te mostrar como usar o sistema no dia a dia. Vamos lá?`,
+        },
+        {
+          id: 'AGENDA',
+          path: '/dashboard/agendamentos',
+          title: 'Sua Principal Ferramenta',
+          description: 'Aqui você gerencia a agenda de todos os dentistas da clínica. Novos agendamentos chegam pelo bot do WhatsApp e aparecem aqui automaticamente.',
+          details: 'Você também pode criar, editar e cancelar consultas manualmente por esta tela.',
+          simulacao: 'agendamento' as const,
+        },
+        {
+          id: 'ORCAMENTOS',
+          path: '/dashboard/orcamentos',
+          title: 'Orçamentos dos Pacientes',
+          description: 'Acompanhe os orçamentos gerados pelos dentistas. Você pode consultar o status de cada um e registrar pagamentos recebidos.',
+          simulacao: 'orcamento' as const,
+        },
+        { id: 'FINALE', path: '/dashboard', title: 'Tudo pronto!', description: 'Se precisar de ajuda, é só me chamar aqui no canto. Bom trabalho!' },
       ];
     }
 
@@ -263,16 +282,25 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner' }: DexOnboardin
     }
 
     // admin (owner)
+    const temEquipe = plano === 'BASICO' || plano === 'CLINICA';
+
     return [
       { id: 'INTRO',        path: '/dashboard',              title: '',                         description: `Olá, Doutor(a) ${firstName}! Eu sou o DEX. Vou te mostrar o sistema em 1 minuto. Vamos lá?` },
       { id: 'AGENDA',       path: '/dashboard/agendamentos', title: 'Agenda Inteligente',       description: 'Sua agenda integrada ao bot de WhatsApp. Pacientes agendados lá aparecem aqui na hora.', simulacao: 'agendamento' as const },
       ahaMoment,
       orcamentoStep,
-      { id: 'CONFIG_EQUIPE',  path: '/dashboard/configuracoes', title: 'Adicione sua Secretária', description: 'Para aproveitar o DentIA ao máximo, cadastre sua secretária aqui. Com ela no sistema, o bot do WhatsApp agenda consultas automaticamente — você foca só nos atendimentos.', details: 'Sem uma secretária cadastrada, o agendamento automático via WhatsApp não funciona.', targetId: 'dex-tour-equipe' },
+      ...(temEquipe ? [{
+        id: 'CONFIG_EQUIPE' as const,
+        path: '/dashboard/configuracoes',
+        title: 'Adicione sua Secretária',
+        description: 'Seu plano inclui secretária. Cadastre-a aqui agora — com ela no sistema, o bot do WhatsApp agenda consultas automaticamente e você foca só nos atendimentos.',
+        details: 'Sem secretária cadastrada, o agendamento automático por WhatsApp não funciona.',
+        targetId: 'dex-tour-equipe',
+      }] : []),
       { id: 'CONFIG_CLINICA', path: '/dashboard/configuracoes', title: 'Configurações Essenciais', description: 'Defina seus horários e sua tabela de preços para que eu possa gerar orçamentos com precisão.', targetId: 'dex-tour-procedimentos' },
       { id: 'FINALE',       path: '/dashboard',              title: 'Tudo pronto!',             description: 'Se precisar de ajuda, é só me chamar aqui no canto. Bom trabalho, Doutor(a)!' },
     ];
-  }, [role, firstName]);
+  }, [role, firstName, plano]);
 
   const NAV_STEPS = useMemo(() => STEPS.filter(s => s.id !== 'INTRO' && s.id !== 'FINALE'), [STEPS]);
   const step = STEPS[stepIndex];

@@ -37,7 +37,7 @@ export function DashboardShell({ children, nome, clinicaNome, role, avatarUrl, p
       <main className="flex-1 flex flex-col h-screen overflow-y-auto transition-all duration-300">
         {children}
       </main>
-      <DexOnboarding nome={nome} dentistaId={dentistaId} role={role} />
+      <DexOnboarding nome={nome} dentistaId={dentistaId} role={role} plano={plano} />
       <DexWidget role={role} plano={plano} nome={nome} dentistaId={dentistaId} />
     </div>
   );
