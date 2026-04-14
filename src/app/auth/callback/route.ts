@@ -23,6 +23,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const type       = searchParams.get("type") as EmailOtpType | null;
   const next       = searchParams.get("next");
 
+  // Supabase manda ?error= quando o redirectTo não está na lista permitida
+  // ou quando o usuário cancela o consentimento OAuth
+  const oauthError = searchParams.get("error");
+  if (oauthError) {
+    const desc = searchParams.get("error_description") ?? oauthError;
+    console.error("[callback] erro OAuth recebido:", desc);
+    return NextResponse.redirect(`${origin}/login?error=oauth_failed`);
+  }
+
   const pendingCookies: Array<{ name: string; value: string; options: CookieOptions }> = [];
 
   const supabase = createServerClient(
