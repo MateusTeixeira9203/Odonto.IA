@@ -50,7 +50,8 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role, 
 
   const showClinical   = role === 'admin' || role === 'dentista';
   const showConfig     = role === 'admin' || role === 'dentista';
-  const showWhatsApp   = role === 'secretaria';
+  // Admin também acessa o bot (no Solo com mensagens fixas, nos demais personalizável)
+  const showWhatsApp   = role === 'secretaria' || role === 'admin';
 
   // Feature locks baseadas no plano
   const financeiroLocked = !temFeature(plano ?? 'CLINICA', 'financeiro');
@@ -176,7 +177,7 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role, 
           </AnimatePresence>
         </button>
 
-        {role === 'secretaria' && (
+        {(role === 'secretaria' || role === 'admin') && (
           <Link
             id="whatsapp-config-link"
             href="/dashboard/bot"
