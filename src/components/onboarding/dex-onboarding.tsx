@@ -17,7 +17,7 @@ export const DEX_ONBOARDING_KEY = 'dex_onboarding_v1'; // mantido para DexWidget
 // ── Constants ─────────────────────────────────────────────────────────────────
 const DEX_SIZE     = 76;
 const DEX_FAB_SIZE = 56;
-const BUBBLE_W     = 300;
+const BUBBLE_W     = 320;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type StepId = 'INTRO' | 'AGENDA' | 'PACIENTES' | 'FICHA_AHA' | 'ORCAMENTOS' | 'FINANCEIRO' | 'CONFIG_EQUIPE' | 'CONFIG_CLINICA' | 'FINALE';
@@ -29,6 +29,7 @@ interface TourStep {
   description: string;
   targetId?: string;
   simulacao?: 'agendamento' | 'ficha' | 'orcamento';
+  details?: string;
 }
 
 interface Rect { top: number; left: number; right: number; bottom: number; width: number; height: number }
@@ -228,8 +229,9 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner' }: DexOnboardin
     const ahaMoment: TourStep = {
       id: 'FICHA_AHA',
       path: '/dashboard/pacientes/demo',
-      title: 'Evolução Clínica',
-      description: 'Você fala ou digita a evolução — eu transcrevo e já separo os procedimentos para gerar o orçamento na hora.',
+      title: 'Ficha Clínica — o coração do sistema',
+      description: 'Fale ou digita a evolução e a IA transcreve, identifica cada procedimento — como "dente 46, restauração" — e já monta o orçamento com sua tabela de preços. Zero digitação manual.',
+      details: 'Na aba Documentos você centraliza fotos clínicas, raio-x e arquivos do paciente, tudo organizado por data e vinculado à ficha.',
       simulacao: 'ficha',
     };
 
@@ -266,7 +268,7 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner' }: DexOnboardin
       { id: 'AGENDA',       path: '/dashboard/agendamentos', title: 'Agenda Inteligente',       description: 'Sua agenda integrada ao bot de WhatsApp. Pacientes agendados lá aparecem aqui na hora.', simulacao: 'agendamento' as const },
       ahaMoment,
       orcamentoStep,
-      { id: 'CONFIG_EQUIPE',  path: '/dashboard/configuracoes', title: 'Sua Equipe',            description: 'Adicione sua secretária e outros dentistas. O DentIA cresce com a sua equipe!', targetId: 'dex-tour-equipe' },
+      { id: 'CONFIG_EQUIPE',  path: '/dashboard/configuracoes', title: 'Adicione sua Secretária', description: 'Para aproveitar o DentIA ao máximo, cadastre sua secretária aqui. Com ela no sistema, o bot do WhatsApp agenda consultas automaticamente — você foca só nos atendimentos.', details: 'Sem uma secretária cadastrada, o agendamento automático via WhatsApp não funciona.', targetId: 'dex-tour-equipe' },
       { id: 'CONFIG_CLINICA', path: '/dashboard/configuracoes', title: 'Configurações Essenciais', description: 'Defina seus horários e sua tabela de preços para que eu possa gerar orçamentos com precisão.', targetId: 'dex-tour-procedimentos' },
       { id: 'FINALE',       path: '/dashboard',              title: 'Tudo pronto!',             description: 'Se precisar de ajuda, é só me chamar aqui no canto. Bom trabalho, Doutor(a)!' },
     ];
@@ -617,7 +619,12 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner' }: DexOnboardin
                 <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#2f9c85' }}>
                   {step.title}
                 </p>
-                <p className="text-white/82 text-sm leading-relaxed mb-4">{step.description}</p>
+                <p className="text-white/82 text-sm leading-relaxed mb-3">{step.description}</p>
+                {step.details && (
+                  <p className="text-white/50 text-xs leading-relaxed mb-3 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                    {step.details}
+                  </p>
+                )}
                 <StepDots total={NAV_STEPS.length} current={navIdx} />
                 <NavRow onBack={back} onNext={next} showBack={stepIndex > 1} label={nextLabel} />
               </div>
@@ -696,7 +703,12 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner' }: DexOnboardin
                 <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#2f9c85' }}>
                   {step.title}
                 </p>
-                <p className="text-white/82 text-sm leading-relaxed mb-4">{step.description}</p>
+                <p className="text-white/82 text-sm leading-relaxed mb-3">{step.description}</p>
+                {step.details && (
+                  <p className="text-white/50 text-xs leading-relaxed mb-3 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                    {step.details}
+                  </p>
+                )}
                 <StepDots total={NAV_STEPS.length} current={navIdx} />
                 <NavRow onBack={back} onNext={next} showBack={stepIndex > 0} label={nextLabel} />
               </div>
