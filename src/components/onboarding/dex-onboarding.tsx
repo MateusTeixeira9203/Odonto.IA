@@ -4,6 +4,9 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { motion, AnimatePresence, LayoutGroup } from 'motion/react';
 import { Bot, ArrowRight, ChevronRight, ChevronLeft, X, Loader2 } from 'lucide-react';
+import { SimAgendamento } from './sim-agendamento';
+import { SimFicha }       from './sim-ficha';
+import { SimOrcamento }   from './sim-orcamento';
 
 // Chaves escopadas por dentista
 const onboardingKey = (id: string) => `dex_onboarding_v1_${id}`;
@@ -25,6 +28,7 @@ interface TourStep {
   title: string;
   description: string;
   targetId?: string;
+  simulacao?: 'agendamento' | 'ficha' | 'orcamento';
 }
 
 interface Rect { top: number; left: number; right: number; bottom: number; width: number; height: number }
@@ -224,38 +228,47 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner' }: DexOnboardin
     const ahaMoment: TourStep = {
       id: 'FICHA_AHA',
       path: '/dashboard/pacientes/demo',
-      title: 'Mágica da Evolução Clínica',
-      description: 'Aqui você digita ou dita sua evolução clínica. Baseado no que você escrever, eu puxo os procedimentos da sua tabela e gero o orçamento financeiro na mesma hora, sem você precisar calcular nada.',
-      targetId: 'nova-evolucao-panel', // Fallback gracefully if ID does not exist on page
+      title: 'Evolução Clínica',
+      description: 'Você fala ou digita a evolução — eu transcrevo e já separo os procedimentos para gerar o orçamento na hora.',
+      simulacao: 'ficha',
+    };
+
+    const orcamentoStep: TourStep = {
+      id: 'ORCAMENTOS',
+      path: '/dashboard/orcamentos',
+      title: 'Orçamentos Inteligentes',
+      description: 'Orçamento gerado em segundos pela IA com os preços da sua tabela. Pronto para enviar ao paciente.',
+      simulacao: 'orcamento',
     };
 
     if (role === 'secretaria') {
       return [
-        { id: 'INTRO', path: '/dashboard', title: '', description: `Olá, ${firstName}! Eu sou o DEX, seu assistente. Vou te ajudar a organizar a clínica, fazer triagem no WhatsApp e registrar despesas com facilidade.` },
-        { id: 'AGENDA', path: '/dashboard/agendamentos', title: 'Agenda & WhatsApp', description: 'Aqui você gerencia a agenda de todos os dentistas. O bot do WhatsApp já faz a triagem de pacientes e marca os horários direto aqui.' },
-        { id: 'ORCAMENTOS', path: '/dashboard/orcamentos', title: 'Acompanhamento de Orçamentos', description: 'Nesta tela você vê os orçamentos divididos por dentista, cobra os pendentes e gera links PIX.' },
-        { id: 'FINANCEIRO', path: '/dashboard/financeiro', title: 'Gestão de Despesas', description: 'Registre contas a pagar e despesas da clínica de forma rápida e organizada.' },
-        { id: 'FINALE', path: '/dashboard', title: 'Tudo pronto!', description: 'Se precisar de ajuda ou quiser enviar uma mensagem via WhatsApp, é só me chamar aqui no canto. Bom trabalho!' }
+        { id: 'INTRO',    path: '/dashboard',            title: '',                      description: `Olá, ${firstName}! Eu sou o DEX, seu assistente clínico. Vou te mostrar o sistema em 1 minuto. Vamos lá?` },
+        { id: 'AGENDA',   path: '/dashboard/agendamentos', title: 'Agenda & WhatsApp',   description: 'Aqui você gerencia a agenda de todos os dentistas. O bot do WhatsApp agenda consultas direto aqui.', simulacao: 'agendamento' as const },
+        orcamentoStep,
+        { id: 'FINALE',   path: '/dashboard',            title: 'Tudo pronto!',          description: 'Se precisar de ajuda, é só me chamar aqui no canto. Bom trabalho!' },
       ];
     }
 
     if (role === 'dentista') {
       return [
-        { id: 'INTRO', path: '/dashboard', title: '', description: `Olá, Doutor(a) ${firstName}! Eu sou o DEX. Vou simplificar sua rotina clínica para você focar apenas no paciente.` },
-        { id: 'AGENDA', path: '/dashboard/agendamentos', title: 'Sua Agenda', description: 'Acompanhe seus pacientes do dia e veja quem já está na recepção aguardando atendimento.' },
+        { id: 'INTRO',    path: '/dashboard',            title: '',                      description: `Olá, Doutor(a) ${firstName}! Eu sou o DEX. Vou te mostrar o sistema em 1 minuto. Vamos lá?` },
+        { id: 'AGENDA',   path: '/dashboard/agendamentos', title: 'Sua Agenda',          description: 'Acompanhe seus pacientes do dia. O bot do WhatsApp agenda consultas direto aqui.', simulacao: 'agendamento' as const },
         ahaMoment,
-        { id: 'FINALE', path: '/dashboard', title: 'Tudo pronto!', description: 'Se precisar de um resumo clínico ou ajuda, é só me chamar aqui no canto. Bom atendimento!' }
+        orcamentoStep,
+        { id: 'FINALE',   path: '/dashboard',            title: 'Tudo pronto!',          description: 'Se precisar de ajuda, é só me chamar aqui no canto. Bom atendimento!' },
       ];
     }
 
+    // admin (owner)
     return [
-      { id: 'INTRO', path: '/dashboard', title: '', description: `Olá, Doutor(a) ${firstName}! Eu sou o DEX. Vamos configurar sua clínica para automatizar processos, gerenciar sua equipe e aumentar seu lucro líquido?` },
-      { id: 'AGENDA', path: '/dashboard/agendamentos', title: 'Agenda Inteligente', description: 'Sua agenda é integrada ao meu bot de WhatsApp. Pacientes agendados lá aparecem aqui na hora.' },
+      { id: 'INTRO',        path: '/dashboard',              title: '',                         description: `Olá, Doutor(a) ${firstName}! Eu sou o DEX. Vou te mostrar o sistema em 1 minuto. Vamos lá?` },
+      { id: 'AGENDA',       path: '/dashboard/agendamentos', title: 'Agenda Inteligente',       description: 'Sua agenda integrada ao bot de WhatsApp. Pacientes agendados lá aparecem aqui na hora.', simulacao: 'agendamento' as const },
       ahaMoment,
-      { id: 'FINANCEIRO', path: '/dashboard/financeiro', title: 'Painel Financeiro', description: 'Acompanhe seu lucro líquido, faturamento e o status de todos os pagamentos em tempo real.' },
-      { id: 'CONFIG_EQUIPE', path: '/dashboard/configuracoes', title: 'Sua Equipe', description: 'Adicione sua secretária e outros dentistas. O DentIA cresce com a sua equipe!', targetId: 'dex-tour-equipe' },
+      orcamentoStep,
+      { id: 'CONFIG_EQUIPE',  path: '/dashboard/configuracoes', title: 'Sua Equipe',            description: 'Adicione sua secretária e outros dentistas. O DentIA cresce com a sua equipe!', targetId: 'dex-tour-equipe' },
       { id: 'CONFIG_CLINICA', path: '/dashboard/configuracoes', title: 'Configurações Essenciais', description: 'Defina seus horários e sua tabela de preços para que eu possa gerar orçamentos com precisão.', targetId: 'dex-tour-procedimentos' },
-      { id: 'FINALE', path: '/dashboard', title: 'Tudo pronto!', description: 'Se precisar de um resumo do dia ou ajuda com algum comando, é só me chamar aqui no canto. Bom trabalho, Doutor(a)!' }
+      { id: 'FINALE',       path: '/dashboard',              title: 'Tudo pronto!',             description: 'Se precisar de ajuda, é só me chamar aqui no canto. Bom trabalho, Doutor(a)!' },
     ];
   }, [role, firstName]);
 
@@ -306,8 +319,8 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner' }: DexOnboardin
     if (!navigatingRef.current) {
       navigatingRef.current = true;
       setTransitioning(true);
-      // Wait 850ms (transition shown) then route
-      const t = setTimeout(() => router.push(step.path), 850);
+      // Wait 1400ms (transition shown) then route
+      const t = setTimeout(() => router.push(step.path), 1400);
       return () => {
         clearTimeout(t);
         navigatingRef.current = false;
@@ -319,9 +332,11 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner' }: DexOnboardin
   useEffect(() => {
     setBubbleReady(false);
     if (!active) return;
-    const t = setTimeout(() => setBubbleReady(true), 520);
+    // Steps com simulação: tooltip aparece 1.4s depois (simulação começa primeiro)
+    const delay = step?.simulacao ? 1400 : 520;
+    const t = setTimeout(() => setBubbleReady(true), delay);
     return () => clearTimeout(t);
-  }, [stepIndex, active]);
+  }, [stepIndex, active, step?.simulacao]);
 
   // ── Measure spotlight target ──────────────────────────────────────────────
   useEffect(() => {
@@ -418,8 +433,15 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner' }: DexOnboardin
   if (step.id === 'INTRO') {
     return (
       <>
-        <motion.div className="fixed inset-0" style={{ background: 'rgba(0,0,0,0.90)', zIndex: 9990 }}
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }} />
+        <motion.div
+          className="fixed inset-0"
+          style={{
+            background: 'radial-gradient(ellipse at center, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0.68) 100%)',
+            backdropFilter: 'blur(3px)',
+            zIndex: 9990,
+          }}
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+        />
 
         <motion.div className="fixed inset-0 flex flex-col items-center justify-center"
           style={{ zIndex: 9999 }} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
@@ -452,8 +474,8 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner' }: DexOnboardin
                 <p className="text-white/85 text-sm leading-relaxed mb-6 text-center">
                   Olá,{' '}
                   <strong style={{ color: '#2f9c85' }}>{firstName}</strong>!{' '}
-                  Eu sou o <strong className="text-white">DEX</strong>, seu assistente clínico.
-                  Vamos configurar sua clínica para o sucesso?
+                  Eu sou o <strong className="text-white">DEX</strong>, a inteligência artificial do DentIA.{' '}
+                  Vou te mostrar como dominar sua clínica em 1 minuto. Vamos lá?
                 </p>
                 <button onClick={next}
                   className="w-full py-3 px-6 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-[0.98]"
@@ -536,10 +558,81 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner' }: DexOnboardin
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // SIMULATION steps — AGENDA / FICHA_AHA / ORCAMENTOS
+  // DEX fica no canto superior direito; simulação auto-play ao centro
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  if (step.simulacao) {
+    const dexPos    = { top: 80, left: dims.w - DEX_SIZE - 80 };
+    const bubblePos = bubbleNear(dexPos, dims);
+    const nextLabel = isLast ? 'Concluir' : 'Próximo';
+
+    return (
+      <>
+        {/* Overlay leve — simulação é o foco visual */}
+        <motion.div className="fixed inset-0"
+          style={{ background: 'rgba(0,0,0,0.52)', zIndex: 9990 }}
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+        />
+
+        {/* Componente de simulação */}
+        <AnimatePresence>
+          {step.simulacao === 'agendamento' && <SimAgendamento key="sim-ag" />}
+          {step.simulacao === 'ficha'       && <SimFicha       key="sim-fi" />}
+          {step.simulacao === 'orcamento'   && <SimOrcamento   key="sim-or" />}
+        </AnimatePresence>
+
+        {/* Skip */}
+        <div style={{ position: 'fixed', zIndex: 9999 }}>{SkipBtn}</div>
+
+        {/* DEX — canto superior direito, glide via layoutId */}
+        <motion.div
+          layoutId="dex-spotlight"
+          layout
+          style={{ position: 'fixed', top: dexPos.top, left: dexPos.left, zIndex: 9997 }}
+          transition={{ type: 'spring', damping: 22, stiffness: 180 }}
+        >
+          <motion.div animate={{ y: [0, -11, 0] }} transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}>
+            <DexIcon size={DEX_SIZE} />
+          </motion.div>
+        </motion.div>
+
+        {/* Bubble — aparece após delay estendido (simulação primeiro) */}
+        <AnimatePresence mode="wait">
+          {bubbleReady && (
+            <motion.div
+              key={`bubble-${step.id}`}
+              style={{ position: 'fixed', top: bubblePos.top, left: bubblePos.left, zIndex: 9999, width: BUBBLE_W }}
+              initial={{ opacity: 0, scale: 0.88, x: -10 }}
+              animate={{ opacity: 1, scale: 1, x: 0 }}
+              exit={{ opacity: 0, scale: 0.93, x: 8 }}
+              transition={{ type: 'spring', damping: 22, stiffness: 200 }}
+            >
+              <div className="rounded-2xl px-5 py-4"
+                style={{
+                  background: 'rgba(9,9,11,0.97)',
+                  border: '1.5px solid rgba(47,156,133,0.45)',
+                  boxShadow: '0 16px 48px rgba(0,0,0,0.65)',
+                }}
+              >
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#2f9c85' }}>
+                  {step.title}
+                </p>
+                <p className="text-white/82 text-sm leading-relaxed mb-4">{step.description}</p>
+                <StepDots total={NAV_STEPS.length} current={navIdx} />
+                <NavRow onBack={back} onNext={next} showBack={stepIndex > 1} label={nextLabel} />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </>
+    );
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // SPOTLIGHT steps — CONFIG_EQUIPE & CONFIG_CLINICA
   // DEX glides via layoutId; bubble appears after DEX settles
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  if (step.id === 'CONFIG_EQUIPE' || step.id === 'CONFIG_CLINICA' || step.id === 'FICHA_AHA') {
+  if (step.id === 'CONFIG_EQUIPE' || step.id === 'CONFIG_CLINICA') {
     const dexPos    = targetRect ? dexNear(targetRect, dims) : { top: centerTop, left: centerLeft };
     const bubblePos = bubbleNear(dexPos, dims);
     const arrowToX  = targetRect ? targetRect.left + targetRect.width  / 2 : dims.w / 2;
@@ -614,64 +707,5 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner' }: DexOnboardin
     );
   }
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // CENTERED steps — AGENDA / PACIENTES / FINANCEIRO
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  const nextLabel = isLast ? 'Concluir' : 'Próximo';
-
-  return (
-    <>
-      {/* Dark overlay */}
-      <motion.div className="fixed inset-0" style={{ background: 'rgba(0,0,0,0.74)', zIndex: 9990 }}
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} />
-
-      <motion.div className="fixed inset-0 flex flex-col items-center justify-center"
-        style={{ zIndex: 9999 }} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-      >
-        {SkipBtn}
-
-        {/* Floating DEX with layoutId to glide smoothly from transition screen */}
-        <motion.div layoutId="dex-spotlight" layout transition={{ type: 'spring', damping: 24, stiffness: 200 }}>
-          <motion.div animate={{ y: [0, -14, 0] }} transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}>
-            <DexIcon size={94} />
-          </motion.div>
-        </motion.div>
-
-        {/* Speech bubble — appears after DEX settles */}
-        <AnimatePresence mode="wait">
-          {bubbleReady && (
-            <motion.div
-              key={step.id}
-              initial={{ opacity: 0, y: 18, scale: 0.90 }}
-              animate={{ opacity: 1, y: 0,  scale: 1    }}
-              exit={{   opacity: 0, y: -10, scale: 0.94 }}
-              transition={{ type: 'spring', damping: 22, stiffness: 190 }}
-              className="mt-7 w-[340px] max-w-[90vw] rounded-3xl px-7 py-6 relative"
-              style={{
-                background: 'rgba(9,9,11,0.97)',
-                border: '1.5px solid rgba(47,156,133,0.4)',
-                boxShadow: '0 24px 64px -12px rgba(0,0,0,0.9), 0 0 48px rgba(47,156,133,0.10)',
-              }}
-            >
-              {/* Bubble tail pointing up */}
-              <div className="absolute -top-[10px] left-1/2 -translate-x-1/2 w-5 h-5 rotate-45"
-                style={{ background: 'rgba(9,9,11,0.97)', borderTop: '1.5px solid rgba(47,156,133,0.4)', borderLeft: '1.5px solid rgba(47,156,133,0.4)' }} />
-
-              {step.title && (
-                <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#2f9c85' }}>
-                  {step.title}
-                </p>
-              )}
-              <p className="text-white/82 text-sm leading-relaxed mb-5">{step.description}</p>
-
-              <div className="flex flex-col items-start gap-2">
-                <StepDots total={NAV_STEPS.length} current={navIdx} />
-                <NavRow onBack={back} onNext={next} showBack={stepIndex > 1} label={nextLabel} />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
-    </>
-  );
+  return null;
 }
