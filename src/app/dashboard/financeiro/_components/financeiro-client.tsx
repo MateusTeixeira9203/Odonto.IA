@@ -306,7 +306,7 @@ export function FinanceiroClient({
                       </Label>
                     <Select
                       value={form.dentistaId ?? ''}
-                      onValueChange={v => setForm(f => ({ ...f, dentistaId: v }))}
+                      onValueChange={v => setForm(f => ({ ...f, dentistaId: v || undefined }))}
                     >
                       <SelectTrigger className="w-full h-10 rounded-xl border border-[--color-border] bg-surface text-text-primary focus:ring-2 focus:ring-teal/50">
                         <SelectValue placeholder="Selecione o dentista..." />
