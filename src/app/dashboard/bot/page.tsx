@@ -1,7 +1,8 @@
 import { redirect } from 'next/navigation';
 import { getDentistaCached } from '@/lib/get-dentista';
 import { getInstanceForClinica } from '@/services/whatsapp.service';
-import { carregarMensagensBot, DEFAULTS_MENSAGENS } from './actions';
+import { carregarMensagensBot } from './actions';
+import { DEFAULTS_MENSAGENS } from '@/lib/whatsapp/template';
 import { BotPageClient } from './_components/bot-page-client';
 import { PageTransition } from '@/components/layout/page-transition';
 

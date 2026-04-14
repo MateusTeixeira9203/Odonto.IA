@@ -9,10 +9,8 @@ import {
   type BotMensagens,
 } from '@/lib/whatsapp/template';
 
-export { DEFAULTS_MENSAGENS };
-// Nota: BotMensagens NÃO é re-exportado daqui — arquivos 'use server' não devem
-// re-exportar tipos TypeScript porque o Turbopack os trata como server references
-// em runtime, causando ReferenceError. Importe diretamente de @/lib/whatsapp/template.
+// Nota: DEFAULTS_MENSAGENS e BotMensagens devem ser importados diretamente de
+// @/lib/whatsapp/template — arquivos 'use server' só podem exportar async functions.
 
 // ─── Guard ────────────────────────────────────────────────────────────────────
 
