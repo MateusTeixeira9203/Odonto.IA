@@ -719,7 +719,6 @@ export function OrcamentosClient({
           Exibindo {filtered.length} de {orcamentos.length} orçamento{orcamentos.length !== 1 ? 's' : ''}
         </div>
       </motion.div>
-      )}
 
       {/* Painel lateral de detalhe */}
       <AnimatePresence>
