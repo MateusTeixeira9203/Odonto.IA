@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { hasDentistaRegistro } from "@/lib/auth";
 import { LogoMark } from "@/components/dentai/Logo";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { NeuralBackground } from "@/components/layout/NeuralBackground";
 
 export default async function OnboardingLayout({
   children,
@@ -24,18 +25,17 @@ export default async function OnboardingLayout({
   }
 
   return (
-    <div
-      className="min-h-screen flex flex-col"
-      style={{ backgroundColor: "var(--bg)" }}
-    >
+    <div className="relative min-h-screen flex flex-col bg-bg">
+      <NeuralBackground />
+
       {/* Barra superior */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+      <div className="relative z-10 flex items-center justify-between px-6 py-4 border-b border-border bg-surface/70 backdrop-blur-sm">
         <LogoMark />
         <ThemeToggle />
       </div>
 
       {/* Conteúdo centralizado */}
-      <div className="flex flex-1 items-start justify-center px-4 py-10">
+      <div className="relative z-10 flex flex-1 items-start justify-center px-4 py-10">
         {children}
       </div>
     </div>

@@ -63,9 +63,9 @@ const ROLE_ICONS: Record<DentistaRole, React.FC<{ className?: string }>> = {
 };
 
 const ROLE_COLORS: Record<DentistaRole, string> = {
-  admin: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
-  dentista: 'bg-teal-pale text-teal dark:bg-teal/20 dark:text-teal-lt',
-  secretaria: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+  admin:     'bg-teal/10 text-teal',
+  dentista:  'bg-teal-pale text-teal dark:bg-teal/20 dark:text-teal-lt',
+  secretaria:'bg-surface-alt text-text-secondary',
 };
 
 interface Props {
@@ -211,9 +211,9 @@ export function UsuariosClient({ usuarios, convitesPendentes, meuId, meuRole, li
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.05 }}
-        className="bg-surface dark:bg-zinc-900 rounded-2xl border border-border dark:border-zinc-800"
+        className="bg-surface rounded-2xl border border-border"
       >
-        <div className="flex items-center gap-2 px-6 py-4 border-b border-border dark:border-zinc-800">
+        <div className="flex items-center gap-2 px-6 py-4 border-b border-border">
           <Users className="w-4 h-4 text-teal" />
           <h2 className="font-semibold text-text-primary dark:text-white text-sm">
             Membros da clínica ({usuariosAtivos.length})
@@ -259,7 +259,7 @@ export function UsuariosClient({ usuarios, convitesPendentes, meuId, meuRole, li
                 {/* Status */}
                 <div className="flex items-center gap-1">
                   {u.ativo ? (
-                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                    <CheckCircle2 className="w-4 h-4 text-teal" />
                   ) : (
                     <XCircle className="w-4 h-4 text-red-400" />
                   )}
@@ -287,20 +287,20 @@ export function UsuariosClient({ usuarios, convitesPendentes, meuId, meuRole, li
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="bg-surface dark:bg-zinc-900 rounded-2xl border border-border dark:border-zinc-800"
+          className="bg-surface rounded-2xl border border-border"
         >
-          <div className="flex items-center gap-2 px-6 py-4 border-b border-border dark:border-zinc-800">
-            <Clock className="w-4 h-4 text-amber-500" />
+          <div className="flex items-center gap-2 px-6 py-4 border-b border-border">
+            <Clock className="w-4 h-4 text-text-secondary" />
             <h2 className="font-semibold text-text-primary dark:text-white text-sm">
               Convites pendentes ({pendentes.length})
             </h2>
           </div>
 
-          <div className="divide-y divide-border dark:divide-zinc-800">
+          <div className="divide-y divide-border">
             {pendentes.map((c) => (
               <div key={c.id} className="flex items-center gap-4 px-6 py-4">
-                <div className="w-9 h-9 rounded-full bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center flex-shrink-0">
-                  <Mail className="w-4 h-4 text-amber-500" />
+                <div className="w-9 h-9 rounded-full bg-teal-pale dark:bg-teal/15 flex items-center justify-center flex-shrink-0">
+                  <Mail className="w-4 h-4 text-teal" />
                 </div>
 
                 <div className="flex-1 min-w-0">

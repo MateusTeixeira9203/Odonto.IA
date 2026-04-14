@@ -3,6 +3,7 @@ import { getDentistaCached } from '@/lib/get-dentista';
 import { createClient } from '@/lib/supabase/server';
 import { ConfiguracoesClient } from './_components/configuracoes-client';
 import type { ConfiguracaoClinica, HorarioDisponivel, Procedimento } from '@/types/database';
+import { PageTransition } from '@/components/layout/page-transition';
 
 export default async function ConfiguracoesPage() {
   const dentista = await getDentistaCached();
@@ -35,11 +36,13 @@ export default async function ConfiguracoesPage() {
   ]);
 
   return (
-    <ConfiguracoesClient
-      dentista={{ id: dentista.id, nome: dentista.nome, clinica: dentista.clinica }}
-      config={(configRaw as ConfiguracaoClinica | null) ?? null}
-      horarios={(horariosRaw as HorarioDisponivel[]) ?? []}
-      procedimentos={(procedimentosRaw as Procedimento[]) ?? []}
-    />
+    <PageTransition>
+      <ConfiguracoesClient
+        dentista={{ id: dentista.id, nome: dentista.nome, clinica: dentista.clinica }}
+        config={(configRaw as ConfiguracaoClinica | null) ?? null}
+        horarios={(horariosRaw as HorarioDisponivel[]) ?? []}
+        procedimentos={(procedimentosRaw as Procedimento[]) ?? []}
+      />
+    </PageTransition>
   );
 }

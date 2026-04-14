@@ -1588,7 +1588,13 @@ export function PacienteDetailClient({
                     }}
                   >
                     <SelectTrigger className="rounded-xl bg-card border-border text-foreground">
-                      <SelectValue placeholder="Selecionar (opcional)..." />
+                      <SelectValue>
+                        {(v: string | null) =>
+                          v
+                            ? (procedimentosClinica.find((p) => p.id === v)?.nome ?? v)
+                            : 'Selecionar (opcional)...'
+                        }
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent className="bg-card border-border">
                       {procedimentosClinica.map((p) => (

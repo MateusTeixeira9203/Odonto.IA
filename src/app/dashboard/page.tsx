@@ -1,18 +1,14 @@
+import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { getDentistaCached } from '@/lib/get-dentista';
 import { createClient } from '@/lib/supabase/server';
-import { Plus, ArrowRight, Users, TrendingUp, Clock, Sparkles, Calendar, CircleDollarSign } from 'lucide-react';
+import { Plus, ArrowRight, Users, TrendingUp, Clock, Sparkles, Calendar, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
-import { format, parseISO, isAfter, addDays } from 'date-fns';
+import { format, parseISO, isAfter, addDays, startOfWeek, endOfWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-
-type FichaRecente = {
-  id: string;
-  created_at: string;
-  status: 'aberta' | 'concluida';
-  queixa_principal: string | null;
-  paciente: { id: string; nome: string } | null;
-};
+import { GuidedTour } from './_components/guided-tour';
+import { PageTransition } from '@/components/layout/page-transition';
+import { DentistaDashboard, DashboardSkeleton } from './_components/dentista-dashboard';
 
 type AgendamentoProximo = {
   id: string;
@@ -43,11 +39,15 @@ async function SecretaryDashboard({
   const supabase = await createClient();
   const now = new Date();
   const nextWeek = addDays(now, 7).toISOString();
+  const weekStart = startOfWeek(now, { weekStartsOn: 1 }).toISOString();
+  const weekEnd = endOfWeek(now, { weekStartsOn: 1 }).toISOString();
 
   const [
     { data: agendamentosRaw },
     { data: pacientesRaw },
     { count: orcamentosPendentes },
+    { count: totalPacientes },
+    { count: agendamentosSemanais },
   ] = await Promise.all([
     supabase
       .from('agendamentos')
@@ -68,6 +68,17 @@ async function SecretaryDashboard({
       .select('*', { count: 'exact', head: true })
       .eq('clinica_id', clinicaId)
       .in('status', ['rascunho', 'enviado']),
+    supabase
+      .from('pacientes')
+      .select('*', { count: 'exact', head: true })
+      .eq('clinica_id', clinicaId),
+    supabase
+      .from('agendamentos')
+      .select('*', { count: 'exact', head: true })
+      .eq('clinica_id', clinicaId)
+      .eq('status', 'confirmado')
+      .gte('data_hora', weekStart)
+      .lte('data_hora', weekEnd),
   ]);
 
   const agendamentos = (agendamentosRaw ?? []) as unknown as AgendamentoProximo[];
@@ -77,6 +88,7 @@ async function SecretaryDashboard({
   const saudacao = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite';
 
   return (
+    <PageTransition>
     <div className="p-8 max-w-6xl mx-auto w-full">
       <header className="flex items-center justify-between mb-10">
         <div>
@@ -96,53 +108,81 @@ async function SecretaryDashboard({
         </div>
       </header>
 
-      {/* Ações Rápidas */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
-        <Link
-          href="/dashboard/pacientes/novo"
-          className="bg-gradient-to-br from-teal to-teal-lt p-6 rounded-3xl text-white flex items-center gap-4 hover:shadow-xl hover:-translate-y-0.5 transition-all group"
-          style={{ boxShadow: '0 10px 30px -10px rgba(47,156,133,0.35)' }}
-        >
-          <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center group-hover:scale-110 transition-transform shrink-0">
-            <Users className="w-6 h-6" />
+      {/* ── Row 1: Métricas + Ação Rápida (secretária sempre vê o botão) ─── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+        {/* Total Pacientes */}
+        <div className="bg-surface p-6 rounded-3xl border border-border shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-4 opacity-[0.04] group-hover:opacity-[0.07] transition-opacity pointer-events-none">
+            <Users className="w-20 h-20 text-text-primary" />
           </div>
-          <div>
-            <div className="text-[10px] font-mono uppercase tracking-widest text-white/70 mb-0.5">Ação rápida</div>
-            <div className="font-bold text-lg leading-tight">Novo Paciente</div>
+          <div className="text-[10px] font-bold text-text-secondary uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-teal" /> Pacientes
           </div>
-        </Link>
+          <div className="font-mono text-5xl font-medium text-text-primary tracking-tight">
+            {totalPacientes ?? 0}
+          </div>
+          <div className="text-[10px] text-teal mt-4 font-bold uppercase tracking-wider flex items-center gap-1 bg-teal-pale w-fit px-2 py-1 rounded-md">
+            <TrendingUp className="w-3 h-3" /> Total cadastrados
+          </div>
+        </div>
 
-        <Link
-          href="/dashboard/agendamentos"
-          className="bg-surface border border-border p-6 rounded-3xl flex items-center gap-4 hover:shadow-md hover:-translate-y-0.5 transition-all group"
-        >
-          <div className="w-12 h-12 rounded-2xl bg-teal-pale flex items-center justify-center group-hover:scale-110 transition-transform shrink-0">
-            <Calendar className="w-6 h-6 text-teal" />
+        {/* Agendamentos Confirmados Semana */}
+        <div className="bg-surface p-6 rounded-3xl border border-border shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-4 opacity-[0.04] group-hover:opacity-[0.07] transition-opacity pointer-events-none">
+            <Calendar className="w-20 h-20 text-text-primary" />
           </div>
-          <div>
-            <div className="text-[10px] font-mono uppercase tracking-widest text-text-secondary mb-0.5">Ação rápida</div>
-            <div className="font-bold text-lg text-text-primary leading-tight">Novo Agendamento</div>
+          <div className="text-[10px] font-bold text-text-secondary uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-teal" /> Agendamentos
           </div>
-        </Link>
+          <div className="font-mono text-5xl font-medium text-text-primary tracking-tight">
+            {agendamentosSemanais ?? 0}
+          </div>
+          <div className="text-[10px] text-text-secondary mt-4 font-bold uppercase tracking-wider flex items-center gap-1 bg-surface-alt w-fit px-2 py-1 rounded-md">
+            <CheckCircle2 className="w-3 h-3" /> Confirmados (semana)
+          </div>
+        </div>
 
-        <Link
-          href="/dashboard/orcamentos"
-          className="bg-surface border border-border p-6 rounded-3xl flex items-center gap-4 hover:shadow-md hover:-translate-y-0.5 transition-all group"
-        >
-          <div className="w-12 h-12 rounded-2xl bg-teal-pale flex items-center justify-center group-hover:scale-110 transition-transform shrink-0">
-            <CircleDollarSign className="w-6 h-6 text-teal" />
+        {/* Orçamentos Pendentes */}
+        <div className="bg-surface p-6 rounded-3xl border border-border shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-4 opacity-[0.04] group-hover:opacity-[0.07] transition-opacity pointer-events-none">
+            <Clock className="w-20 h-20 text-text-primary" />
+          </div>
+          <div className="text-[10px] font-bold text-text-secondary uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-teal" /> Orçamentos Pendentes
+          </div>
+          <div className="font-mono text-5xl font-medium text-text-primary tracking-tight">
+            {orcamentosPendentes ?? 0}
+          </div>
+          <div className={`text-[10px] mt-4 font-bold uppercase tracking-wider w-fit px-2 py-1 rounded-md ${(orcamentosPendentes ?? 0) > 0 ? 'bg-teal-pale text-teal' : 'bg-surface-alt text-text-secondary'}`}>
+            {(orcamentosPendentes ?? 0) > 0 ? 'Aguardando aprovação' : 'Tudo em dia'}
+          </div>
+        </div>
+
+        {/* Ação Rápida — secretária sempre vê */}
+        <div className="bg-gradient-to-br from-teal to-teal-lt p-6 rounded-3xl relative overflow-hidden group text-white flex flex-col justify-between hover:-translate-y-0.5 transition-all"
+          style={{ boxShadow: '0 10px 30px -10px rgba(47,156,133,0.4)' }}>
+          <div className="absolute -right-4 -top-4 opacity-15 group-hover:scale-110 transition-transform duration-500 pointer-events-none">
+            <Sparkles className="w-24 h-24 text-white" />
           </div>
           <div>
-            <div className="text-[10px] font-mono uppercase tracking-widest text-text-secondary mb-0.5">
-              {(orcamentosPendentes ?? 0) > 0
-                ? `${orcamentosPendentes} pendente${(orcamentosPendentes ?? 0) !== 1 ? 's' : ''}`
-                : 'Em dia'}
+            <div className="text-[10px] font-bold text-white/70 uppercase tracking-[0.2em] mb-2">
+              Ação Rápida
             </div>
-            <div className="font-bold text-lg text-text-primary leading-tight">Orçamentos</div>
+            <div className="font-heading text-3xl leading-tight mb-4">
+              Novo<br />Paciente
+            </div>
           </div>
-        </Link>
+          <Link
+            href="/dashboard/pacientes/novo"
+            className="bg-white text-teal px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-teal-pale transition-all shadow-sm w-full"
+          >
+            <Plus className="w-4 h-4" />
+            Cadastrar paciente
+          </Link>
+        </div>
       </div>
 
+      {/* ── Row 2: Próximos agendamentos + Últimos Pacientes ─── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Próximos Agendamentos */}
         <div>
@@ -243,261 +283,61 @@ async function SecretaryDashboard({
         </div>
       </div>
     </div>
+    </PageTransition>
   );
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// Page principal
+// ──────────────────────────────────────────────────────────────────────────────
 export default async function DashboardPage() {
   const dentista = await getDentistaCached();
   if (!dentista) redirect('/login');
 
-  // Secretária vê dashboard simplificado (sem fichas clínicas)
+  // Secretária vê dashboard simplificado (sem fichas clínicas e sem financeiro)
   if (dentista.role === 'secretaria') {
     return <SecretaryDashboard clinicaId={dentista.clinica_id} nome={dentista.nome} />;
   }
 
-  const supabase = await createClient();
-  const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
-
-  const [
-    { count: totalPacientes },
-    { count: orcamentosPendentes },
-    { data: fichasRaw },
-    { data: pagamentosRaw },
-  ] = await Promise.all([
-    supabase
-      .from('pacientes')
-      .select('*', { count: 'exact', head: true })
-      .eq('clinica_id', dentista.clinica_id),
-    supabase
-      .from('orcamentos')
-      .select('*', { count: 'exact', head: true })
-      .eq('clinica_id', dentista.clinica_id)
-      .in('status', ['rascunho', 'enviado']),
-    supabase
-      .from('fichas')
-      .select('id, created_at, status, queixa_principal, paciente:pacientes(id, nome)')
-      .eq('clinica_id', dentista.clinica_id)
-      .order('created_at', { ascending: false })
-      .limit(5),
-    supabase
-      .from('pagamentos')
-      .select('valor')
-      .eq('clinica_id', dentista.clinica_id)
-      .eq('status', 'pago')
-      .gte('created_at', startOfMonth),
-  ]);
-
-  const fichas = (fichasRaw ?? []) as unknown as FichaRecente[];
-  const faturamento = (pagamentosRaw ?? []).reduce(
-    (sum, p) => sum + ((p as { valor: number }).valor ?? 0),
-    0
-  );
-
-  const AVATAR_COLORS = ['bg-teal', 'bg-zinc-800', 'bg-zinc-600', 'bg-zinc-700', 'bg-teal'];
+  // canEdit determina se mostra 3 ou 4 cards no skeleton (sem precisar aguardar os dados)
+  const canEdit = dentista.plano === 'SOLO';
 
   return (
-    <div className="p-8 max-w-6xl mx-auto w-full">
-      <header className="flex items-center justify-between mb-10">
-        <div>
-          <h1 className="font-heading text-4xl text-text-primary mb-1">Visão Geral</h1>
-          <p className="text-text-secondary text-sm font-medium">
-            Monitoramento em tempo real da sua clínica.
-          </p>
-        </div>
-        <div className="hidden sm:flex items-center gap-2 bg-surface border border-border rounded-2xl px-4 py-2.5 shadow-sm">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal/40 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-teal" />
-          </span>
-          <span className="text-xs font-mono text-text-secondary uppercase tracking-widest">IA Operacional</span>
-        </div>
-      </header>
+    <PageTransition>
+      <div className="p-8 max-w-6xl mx-auto w-full">
+        <GuidedTour />
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-10">
-        {/* Pacientes Ativos */}
-        <div className="bg-surface p-6 rounded-3xl border border-border shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-4 opacity-[0.04] group-hover:opacity-[0.07] transition-opacity pointer-events-none">
-            <Users className="w-20 h-20 text-text-primary" />
-          </div>
-          <div className="text-[10px] font-bold text-text-secondary uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-teal" /> Pacientes
-          </div>
-          <div className="font-mono text-5xl font-medium text-text-primary tracking-tight">
-            {totalPacientes ?? 0}
-          </div>
-          <div className="text-[10px] text-teal mt-4 font-bold uppercase tracking-wider flex items-center gap-1 bg-teal-pale w-fit px-2 py-1 rounded-md">
-            <TrendingUp className="w-3 h-3" /> Total cadastrados
-          </div>
-        </div>
-
-        {/* Faturamento */}
-        <div className="bg-zinc-950 p-6 rounded-3xl border border-zinc-900 shadow-xl relative overflow-hidden hover:-translate-y-0.5 transition-all dark:bg-zinc-900/50 dark:border-white/10">
-          <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-teal" /> Faturamento (Mês)
-          </div>
-          <div className="font-mono text-4xl font-medium text-white tracking-tight">
-            <span className="text-teal text-xl mr-1">R$</span>
-            {faturamento.toLocaleString('pt-BR', {
-              minimumFractionDigits: 0,
-              maximumFractionDigits: 0,
-            })}
-          </div>
-          <div className="text-[10px] text-zinc-500 mt-4 font-mono uppercase tracking-widest">
-            Pagamentos recebidos
-          </div>
-        </div>
-
-        {/* Orçamentos Pendentes */}
-        <div className="bg-surface p-6 rounded-3xl border border-border shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-4 opacity-[0.04] group-hover:opacity-[0.07] transition-opacity pointer-events-none">
-            <Clock className="w-20 h-20 text-text-primary" />
-          </div>
-          <div className="text-[10px] font-bold text-text-secondary uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-teal" /> Orçamentos Pendentes
-          </div>
-          <div className="font-mono text-5xl font-medium text-text-primary tracking-tight">
-            {orcamentosPendentes ?? 0}
-          </div>
-          <div className={`text-[10px] mt-4 font-bold uppercase tracking-wider w-fit px-2 py-1 rounded-md ${(orcamentosPendentes ?? 0) > 0 ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400' : 'bg-surface-alt text-text-secondary'}`}>
-            {(orcamentosPendentes ?? 0) > 0 ? 'Aguardando aprovação' : 'Tudo em dia'}
-          </div>
-        </div>
-
-        {/* Quick Action */}
-        <div className="bg-gradient-to-br from-teal to-teal-lt p-6 rounded-3xl relative overflow-hidden group text-white flex flex-col justify-between hover:-translate-y-0.5 transition-all"
-          style={{ boxShadow: '0 10px 30px -10px rgba(47,156,133,0.4)' }}>
-          <div className="absolute -right-4 -top-4 opacity-15 group-hover:scale-110 transition-transform duration-500 pointer-events-none">
-            <Sparkles className="w-24 h-24 text-white" />
-          </div>
+        {/* Header — renderizado imediatamente, sem dependência de dados */}
+        <header className="flex items-center justify-between mb-10">
           <div>
-            <div className="text-[10px] font-bold text-white/70 uppercase tracking-[0.2em] mb-2">
-              Ação Rápida
-            </div>
-            <div className="font-heading text-3xl leading-tight mb-4">
-              Novo<br />Paciente
-            </div>
+            <h1 className="font-heading text-4xl text-text-primary mb-1">Visão Geral</h1>
+            <p className="text-text-secondary text-sm font-medium">
+              Monitoramento em tempo real da sua clínica.
+            </p>
           </div>
-          <Link
-            href="/dashboard/pacientes/novo"
-            className="bg-white text-teal px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-teal-pale transition-all shadow-sm w-full"
-          >
-            <Plus className="w-4 h-4" />
-            Cadastrar paciente
-          </Link>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Fichas Recentes */}
-        <div className="lg:col-span-2">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-heading text-2xl text-text-primary">Fichas Recentes</h2>
+          <div className="flex items-center gap-3">
             <Link
-              href="/dashboard/fichas"
-              className="text-teal text-sm font-semibold flex items-center gap-1 hover:gap-2 transition-all"
+              href="/dashboard?tour=true"
+              className="hidden sm:flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-teal/70 hover:text-teal transition-colors px-3 py-2 rounded-xl hover:bg-teal/5"
             >
-              Ver todas <ArrowRight className="w-4 h-4" />
+              <Sparkles className="w-3.5 h-3.5" />
+              Tour
             </Link>
-          </div>
-
-          <div className="bg-surface rounded-2xl border border-border shadow-sm overflow-hidden">
-            {fichas.length === 0 ? (
-              <div className="p-12 text-center">
-                <Clock className="w-8 h-8 text-border mx-auto mb-3" />
-                <p className="text-text-secondary text-sm font-medium">Nenhuma ficha cadastrada ainda.</p>
-                <p className="text-text-secondary text-xs mt-1">Comece atendendo um paciente.</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-border">
-                {fichas.map((ficha, i) => {
-                  const paciente = ficha.paciente;
-                  const nome = paciente?.nome ?? 'Paciente';
-                  const iniciais = nome.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
-                  const cor = AVATAR_COLORS[i % AVATAR_COLORS.length];
-                  const data = format(new Date(ficha.created_at), "dd 'de' MMM", { locale: ptBR });
-
-                  return (
-                    <Link
-                      key={ficha.id}
-                      href={paciente?.id ? `/dashboard/pacientes/${paciente.id}` : '/dashboard/fichas'}
-                      className="p-4 flex items-center justify-between hover:bg-surface-alt transition-colors group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-1.5 h-full min-h-[2.5rem] rounded-full shrink-0 ${ficha.status === 'aberta' ? 'bg-teal' : 'bg-border'}`} />
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm ${cor}`}>
-                          {iniciais}
-                        </div>
-                        <div>
-                          <div className="font-semibold text-sm text-text-primary group-hover:text-teal transition-colors">
-                            {nome}
-                          </div>
-                          <div className="text-xs text-text-secondary mt-0.5">
-                            {ficha.queixa_principal ?? 'Sem queixa registrada'}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-1.5 shrink-0">
-                        <div className="text-xs text-text-secondary font-mono">{data}</div>
-                        <div className={`font-mono text-[9px] uppercase tracking-widest px-2 py-0.5 rounded-md font-bold ${
-                          ficha.status === 'aberta' ? 'bg-teal-pale text-teal' : 'bg-surface-alt text-text-secondary'
-                        }`}>
-                          {ficha.status === 'aberta' ? 'Aberta' : 'Concluída'}
-                        </div>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Insights da IA */}
-        <div>
-          <h2 className="font-heading text-2xl text-text-primary mb-4">Insights da IA</h2>
-          <div className="space-y-4">
-            <div className="p-5 bg-zinc-950 rounded-2xl border border-zinc-900 shadow-lg text-white dark:bg-zinc-900/50 dark:border-white/10">
-              <div className="flex items-center gap-2 mb-3">
-                <Sparkles className="w-4 h-4 text-teal" />
-                <span className="font-mono text-[10px] uppercase tracking-widest text-teal font-bold">
-                  Sugestão
-                </span>
-              </div>
-              <p className="text-sm text-zinc-300 leading-relaxed mb-4">
-                {(orcamentosPendentes ?? 0) > 0
-                  ? `Você tem ${orcamentosPendentes} orçamento${(orcamentosPendentes ?? 0) > 1 ? 's' : ''} pendente${(orcamentosPendentes ?? 0) > 1 ? 's' : ''}. Acompanhe os pacientes para fechar mais tratamentos.`
-                  : 'Todos os orçamentos estão em dia. Continue o bom trabalho!'}
-              </p>
-              <Link
-                href="/dashboard/orcamentos"
-                className="block w-full bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl text-xs font-semibold transition-colors border border-white/10 text-center"
-              >
-                Ver Orçamentos
-              </Link>
-            </div>
-
-            <div className="p-5 bg-surface rounded-2xl border border-border shadow-sm">
-              <div className="flex items-center gap-2 mb-3">
-                <TrendingUp className="w-4 h-4 text-text-primary" />
-                <span className="font-mono text-[10px] uppercase tracking-widest text-text-secondary font-bold">
-                  Resumo
-                </span>
-              </div>
-              <p className="text-sm text-text-primary leading-relaxed">
-                Sua clínica tem{' '}
-                <strong className="text-teal">
-                  {totalPacientes ?? 0} paciente{(totalPacientes ?? 0) !== 1 ? 's' : ''}
-                </strong>{' '}
-                e{' '}
-                <strong className="text-teal">
-                  {fichas.length} ficha{fichas.length !== 1 ? 's' : ''} recente{fichas.length !== 1 ? 's' : ''}
-                </strong>
-                .
-              </p>
+            <div className="hidden sm:flex items-center gap-2 bg-surface border border-border rounded-2xl px-4 py-2.5 shadow-sm">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal/40 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-teal" />
+              </span>
+              <span className="text-xs font-mono text-text-secondary uppercase tracking-widest">IA Operacional</span>
             </div>
           </div>
-        </div>
+        </header>
+
+        {/* Conteúdo com dados — entra via streaming após o header */}
+        <Suspense fallback={<DashboardSkeleton canEdit={canEdit} />}>
+          <DentistaDashboard dentista={dentista} />
+        </Suspense>
       </div>
-    </div>
+    </PageTransition>
   );
 }

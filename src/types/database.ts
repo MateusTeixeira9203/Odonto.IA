@@ -25,6 +25,7 @@ export interface Dentista {
 export interface Paciente {
   id: string;
   clinica_id: string;
+  dentista_id: string | null;
   nome: string;
   cpf: string | null;
   email: string | null;

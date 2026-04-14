@@ -10,7 +10,7 @@ const SidebarContent = dynamic<SidebarProps>(
   {
     ssr: false,
     loading: () => (
-      <aside className="w-20 bg-zinc-950 h-screen shrink-0 border-r border-white/5" />
+      <aside className="w-20 bg-brand-charcoal h-screen shrink-0 border-r border-white/5" />
     ),
   }
 );

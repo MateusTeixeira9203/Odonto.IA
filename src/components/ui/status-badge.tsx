@@ -8,19 +8,19 @@ interface StatusBadgeProps {
 
 const STATUS_CONFIG = {
   connected: {
-    color: "bg-green-500",
+    color: "bg-teal",
     text: "Conectado",
     icon: Wifi,
     pulse: false,
   },
   connecting: {
-    color: "bg-yellow-500",
+    color: "bg-teal/50",
     text: "Conectando...",
     icon: RefreshCw,
     pulse: true,
   },
   disconnected: {
-    color: "bg-zinc-400 dark:bg-zinc-600",
+    color: "bg-border",
     text: "Desconectado",
     icon: WifiOff,
     pulse: false,

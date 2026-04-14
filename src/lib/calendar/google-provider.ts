@@ -231,3 +231,162 @@ export async function isGoogleCalendarConnected(dentistaId: string): Promise<boo
     .maybeSingle();
   return !!data;
 }
+
+/**
+ * Retorna um mapa de dentistaId → conectado para uma lista de dentistas.
+ * Usado pela secretária para saber quais dentistas têm GCal conectado.
+ */
+export async function getCalendarConnectedMap(
+  dentistaIds: string[],
+): Promise<Record<string, boolean>> {
+  if (!dentistaIds.length) return {};
+  const supabase = createServiceClient();
+  const { data } = await supabase
+    .from('google_tokens')
+    .select('dentista_id')
+    .in('dentista_id', dentistaIds);
+
+  const connected = new Set((data ?? []).map((r) => r.dentista_id as string));
+  return Object.fromEntries(dentistaIds.map((id) => [id, connected.has(id)]));
+}
+
+export interface ImportResult {
+  imported: number;
+  skipped:  number;
+  errors:   string[];
+}
+
+/**
+ * Importa eventos do Google Calendar primário do dentista para a tabela
+ * `agendamentos`. Usa `ical_uid` do Google como chave de deduplicação.
+ *
+ * Estratégia de matching de paciente:
+ *   1. Tenta extrair o nome do padrão "Consulta — Nome"
+ *   2. Busca paciente por nome (case-insensitive) na clínica
+ *   3. Se não encontrar, cria novo paciente com esse nome
+ *
+ * @param dentistaId  ID do dentista cujo GCal será lido
+ * @param clinicaId   ID da clínica onde os agendamentos serão criados
+ * @param janelaDias  Quantos dias a partir de hoje buscar (default: 90)
+ */
+export async function importGoogleCalendarEvents(
+  dentistaId: string,
+  clinicaId:  string,
+  janelaDias  = 90,
+): Promise<ImportResult> {
+  const auth = await getAuthenticatedClient(dentistaId);
+  if (!auth) throw new Error('Google Calendar não conectado para este dentista');
+
+  const calendar = google.calendar({ version: 'v3', auth });
+  const supabase = createServiceClient();
+
+  const now = new Date();
+  const fim = new Date(now.getTime() + janelaDias * 86_400_000);
+
+  const { data: gcData } = await calendar.events.list({
+    calendarId:   'primary',
+    timeMin:      now.toISOString(),
+    timeMax:      fim.toISOString(),
+    singleEvents: true,
+    orderBy:      'startTime',
+    maxResults:   500,
+  });
+
+  const events = gcData.items ?? [];
+  let imported = 0;
+  let skipped  = 0;
+  const errors: string[] = [];
+
+  for (const event of events) {
+    // Ignorar eventos de dia inteiro (sem horário)
+    if (!event.start?.dateTime || !event.end?.dateTime) {
+      skipped++;
+      continue;
+    }
+
+    const gcEventId = event.id;
+    const iCalUID   = event.iCalUID ?? gcEventId;
+    if (!gcEventId || !iCalUID) { skipped++; continue; }
+
+    // Deduplicação — pular se ical_uid já importado
+    const { data: existente } = await supabase
+      .from('agendamentos')
+      .select('id')
+      .eq('clinica_id', clinicaId)
+      .eq('ical_uid', iCalUID)
+      .maybeSingle();
+
+    if (existente) { skipped++; continue; }
+
+    // Também pular se google_event_id já existe (eventos criados pelo DentIA)
+    const { data: existenteGE } = await supabase
+      .from('agendamentos')
+      .select('id')
+      .eq('clinica_id', clinicaId)
+      .eq('google_event_id', gcEventId)
+      .maybeSingle();
+
+    if (existenteGE) { skipped++; continue; }
+
+    // Extrair nome do paciente do título do evento
+    let pacienteNome = (event.summary ?? '').trim() || 'Paciente Importado';
+    const consultaMatch = pacienteNome.match(/^Consulta\s*[—\-]\s*(.+)$/i);
+    if (consultaMatch?.[1]) pacienteNome = consultaMatch[1].trim();
+
+    // Encontrar ou criar paciente
+    let pacienteId: string;
+    try {
+      const { data: pacienteExistente } = await supabase
+        .from('pacientes')
+        .select('id')
+        .eq('clinica_id', clinicaId)
+        .ilike('nome', pacienteNome)
+        .limit(1)
+        .maybeSingle();
+
+      if (pacienteExistente) {
+        pacienteId = pacienteExistente.id as string;
+      } else {
+        const { data: novoPaciente, error: errP } = await supabase
+          .from('pacientes')
+          .insert({ clinica_id: clinicaId, nome: pacienteNome })
+          .select('id')
+          .single();
+        if (errP || !novoPaciente) throw new Error(errP?.message ?? 'Erro ao criar paciente');
+        pacienteId = (novoPaciente as { id: string }).id;
+      }
+    } catch (err) {
+      errors.push(`"${pacienteNome}": ${err instanceof Error ? err.message : String(err)}`);
+      continue;
+    }
+
+    // Calcular duração em minutos
+    const dtStart = new Date(event.start.dateTime);
+    const dtEnd   = new Date(event.end.dateTime);
+    const duracaoMinutos = Math.max(15, Math.round((dtEnd.getTime() - dtStart.getTime()) / 60_000));
+
+    // Criar agendamento
+    const { error: errA } = await supabase
+      .from('agendamentos')
+      .insert({
+        clinica_id:      clinicaId,
+        dentista_id:     dentistaId,
+        paciente_id:     pacienteId,
+        data_hora:       event.start.dateTime,
+        duracao_minutos: duracaoMinutos,
+        status:          'agendado',
+        origem:          'app',
+        observacoes:     event.description?.substring(0, 500) ?? null,
+        google_event_id: gcEventId,
+        ical_uid:        iCalUID,
+      });
+
+    if (errA) {
+      errors.push(`Agendamento "${pacienteNome}": ${errA.message}`);
+    } else {
+      imported++;
+    }
+  }
+
+  return { imported, skipped, errors };
+}

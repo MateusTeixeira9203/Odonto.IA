@@ -13,9 +13,19 @@ import {
   Check,
   User,
   Loader2,
+  Sparkles,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -24,6 +34,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { createClient } from "@/lib/supabase/client";
 import { HelpTooltip } from "@/components/ui/help-tooltip";
+import { criarOrcamento } from "@/app/dashboard/orcamentos/actions";
 
 interface ToothNote {
   tooth: number;
@@ -89,6 +100,7 @@ interface FichasTabProps {
 }
 
 export function FichasTab({ patientId, clinicaId, dentistaId }: FichasTabProps) {
+  const router = useRouter();
   const [evolutions, setEvolutions] = React.useState<Evolution[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSaving, setIsSaving] = React.useState(false);
@@ -111,6 +123,61 @@ export function FichasTab({ patientId, clinicaId, dentistaId }: FichasTabProps) 
     observation: "",
     teethNotes: [] as ToothNote[],
   });
+
+  // ── Orçamento sugerido pela IA ────────────────────────────────────────────
+  type ItemSugerido = { descricao: string; quantidade: number; preco: number };
+  const [isDexAnalyzing, setIsDexAnalyzing] = React.useState(false);
+  const [orcamentoSugerido, setOrcamentoSugerido] = React.useState<ItemSugerido[] | null>(null);
+  const [criandoOrcamento, setCriandoOrcamento] = React.useState(false);
+  const dexDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Listener DEX com debounce de 2 s — analisa o texto enquanto o dentista digita
+  React.useEffect(() => {
+    const texto = formData.observation.trim();
+
+    // Só analisa novas fichas (não edições) com texto mínimo e painel aberto
+    if (!isPanelOpen || editingId || texto.length < 30) {
+      setIsDexAnalyzing(false);
+      if (dexDebounceRef.current) clearTimeout(dexDebounceRef.current);
+      return;
+    }
+
+    // Mostra indicador após 300 ms de pausa (feedback visual imediato)
+    if (dexDebounceRef.current) clearTimeout(dexDebounceRef.current);
+    setIsDexAnalyzing(true);
+
+    dexDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch('/api/sugerir-orcamento', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ texto, clinicaId }),
+        });
+        if (!res.ok) return;
+        const data = await res.json() as {
+          itens?: Array<{ descricao: string; quantidade: number; precoSugerido: number | null }>;
+        };
+        if (data.itens && data.itens.length > 0) {
+          setOrcamentoSugerido(
+            data.itens.map((i) => ({
+              descricao: i.descricao,
+              quantidade: i.quantidade,
+              preco: i.precoSugerido ?? 0,
+            })),
+          );
+        }
+      } catch (err) {
+        console.error('[DEX] Erro ao analisar evolução:', err);
+      } finally {
+        setIsDexAnalyzing(false);
+      }
+    }, 2000);
+
+    return () => {
+      if (dexDebounceRef.current) clearTimeout(dexDebounceRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.observation, isPanelOpen, editingId]);
 
   // Busca fichas do Supabase
   const fetchFichas = React.useCallback(async () => {
@@ -220,6 +287,8 @@ export function FichasTab({ patientId, clinicaId, dentistaId }: FichasTabProps) 
 
   const handleSave = async () => {
     setIsSaving(true);
+    const isNovaFicha = !editingId;
+
     try {
       const supabase = createClient();
       const dentesAfetados = selectedTeeth;
@@ -257,11 +326,47 @@ export function FichasTab({ patientId, clinicaId, dentistaId }: FichasTabProps) 
       }
 
       await fetchFichas();
-      closePanel();
+      // Se o DEX já preparou sugestão durante a digitação, ela aparece automaticamente
+      // via orcamentoSugerido state. Limpa o debounce pendente ao fechar o painel.
+      if (dexDebounceRef.current) clearTimeout(dexDebounceRef.current);
+      setIsDexAnalyzing(false);
+      if (!isNovaFicha) {
+        // Edição: apenas fecha o painel, não sugere orçamento
+        closePanel();
+      } else {
+        closePanel();
+        // orcamentoSugerido já pode estar preenchido pelo listener de digitação
+      }
     } catch (err) {
       console.error("Erro ao salvar ficha:", err);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleConfirmarOrcamento = async () => {
+    if (!orcamentoSugerido) return;
+    const itensValidos = orcamentoSugerido.filter((i) => i.descricao.trim() && i.preco > 0);
+    if (itensValidos.length === 0) return;
+    setCriandoOrcamento(true);
+    try {
+      const result = await criarOrcamento({
+        pacienteId: patientId,
+        itens: itensValidos.map((i) => ({
+          procedimentoId: null,
+          descricao: i.descricao,
+          quantidade: i.quantidade,
+          precoUnitario: i.preco,
+        })),
+      });
+      if (!result.error) {
+        setOrcamentoSugerido(null);
+        router.push('/dashboard/orcamentos');
+      }
+    } catch (err) {
+      console.error('Erro ao criar orçamento:', err);
+    } finally {
+      setCriandoOrcamento(false);
     }
   };
 
@@ -457,6 +562,21 @@ export function FichasTab({ patientId, clinicaId, dentistaId }: FichasTabProps) 
                     placeholder="Descreva os procedimentos realizados, queixas do paciente, etc..."
                     className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm font-medium text-foreground outline-none focus:border-teal transition-colors min-h-[120px] resize-y"
                   />
+                  {/* Indicador do DEX escutando */}
+                  <AnimatePresence>
+                    {isDexAnalyzing && !editingId && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -4 }}
+                        className="flex items-center gap-1.5 text-[11px] mt-1"
+                        style={{ color: 'rgba(47,156,133,0.7)' }}
+                      >
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        DEX analisando procedimentos...
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
 
                 <AnimatePresence>
@@ -712,6 +832,123 @@ export function FichasTab({ patientId, clinicaId, dentistaId }: FichasTabProps) 
           </motion.div>
         ))}
       </div>
+
+      {/* Modal: Orçamento sugerido pela IA */}
+      <Dialog
+        open={isDexAnalyzing || !!orcamentoSugerido}
+        onOpenChange={(open) => {
+          if (!open) {
+            setOrcamentoSugerido(null);
+            setIsDexAnalyzing(false);
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg rounded-2xl bg-card border-border max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-xl text-foreground flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-teal" />
+              Orçamento sugerido pela IA
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              Com base na evolução registrada, identifiquei os seguintes procedimentos.
+              Ajuste os valores e confirme para criar o rascunho de orçamento.
+            </DialogDescription>
+          </DialogHeader>
+
+          {isDexAnalyzing ? (
+            <div className="py-10 flex flex-col items-center gap-3 text-muted-foreground">
+              <Loader2 className="w-7 h-7 animate-spin text-teal" />
+              <p className="text-sm font-medium">Analisando procedimentos...</p>
+            </div>
+          ) : orcamentoSugerido && (
+            <div className="space-y-3 my-2">
+              {orcamentoSugerido.map((item, idx) => (
+                <div key={idx} className="bg-muted rounded-xl border border-border/60 p-3 space-y-2">
+                  <input
+                    type="text"
+                    value={item.descricao}
+                    onChange={(e) =>
+                      setOrcamentoSugerido((prev) =>
+                        prev?.map((it, i) => i === idx ? { ...it, descricao: e.target.value } : it) ?? null
+                      )
+                    }
+                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:border-teal transition-colors"
+                  />
+                  <div className="flex gap-2">
+                    <div className="space-y-0.5">
+                      <label className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">
+                        Qtd
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={item.quantidade}
+                        onChange={(e) =>
+                          setOrcamentoSugerido((prev) =>
+                            prev?.map((it, i) =>
+                              i === idx ? { ...it, quantidade: parseInt(e.target.value) || 1 } : it
+                            ) ?? null
+                          )
+                        }
+                        className="w-16 bg-background border border-border rounded-lg px-2 py-2 text-sm font-mono text-foreground outline-none focus:border-teal"
+                      />
+                    </div>
+                    <div className="space-y-0.5 flex-1">
+                      <label className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">
+                        Valor (R$)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={item.preco}
+                        onChange={(e) =>
+                          setOrcamentoSugerido((prev) =>
+                            prev?.map((it, i) =>
+                              i === idx ? { ...it, preco: parseFloat(e.target.value) || 0 } : it
+                            ) ?? null
+                          )
+                        }
+                        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm font-mono text-foreground outline-none focus:border-teal"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <div className="bg-teal/10 rounded-xl p-3 flex justify-between items-center border border-teal/20">
+                <span className="text-sm font-bold text-foreground">Total estimado</span>
+                <span className="font-mono font-bold text-teal">
+                  {orcamentoSugerido
+                    .reduce((s, i) => s + i.quantidade * i.preco, 0)
+                    .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </span>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => setOrcamentoSugerido(null)}
+              disabled={criandoOrcamento || isDexAnalyzing}
+              className="rounded-xl border-border text-foreground hover:bg-muted"
+            >
+              Ignorar
+            </Button>
+            <Button
+              onClick={() => void handleConfirmarOrcamento()}
+              disabled={criandoOrcamento || !orcamentoSugerido}
+              className="bg-teal text-white hover:bg-teal-lt rounded-xl"
+            >
+              {criandoOrcamento ? (
+                <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Criando...</>
+              ) : (
+                'Criar Orçamento'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal Excluir */}
       <AnimatePresence>

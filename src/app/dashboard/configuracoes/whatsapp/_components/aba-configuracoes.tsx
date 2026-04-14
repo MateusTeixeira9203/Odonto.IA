@@ -51,7 +51,7 @@ function ToggleTeal({
         focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[--color-teal]/30
         ${checked
           ? "border-[--color-teal] bg-[--color-teal]"
-          : "border-zinc-300 bg-zinc-200 dark:border-zinc-600 dark:bg-zinc-700"
+          : "border-border bg-surface-alt"
         }
       `}
     >

@@ -230,6 +230,50 @@ export async function editarOrcamento(
 }
 
 /**
+ * Registra pagamento rápido (dinheiro ou pix) e marca o orçamento como aprovado.
+ * Usada pela secretária via botões de ação rápida.
+ */
+export async function registrarPagamentoRapido(dados: {
+  orcamentoId: string;
+  pacienteId: string;
+  total: number;
+  formaPagamento: FormaPagamento;
+}): Promise<{ error?: string; id?: string }> {
+  const dentista = await getDentistaCached();
+  if (!dentista) redirect("/login");
+
+  const supabase = await createClient();
+  const hoje = new Date().toISOString().split("T")[0];
+
+  const { data, error } = await supabase
+    .from("pagamentos")
+    .insert({
+      orcamento_id: dados.orcamentoId,
+      paciente_id: dados.pacienteId,
+      dentista_id: dentista.id,
+      clinica_id: dentista.clinica_id,
+      valor: dados.total,
+      status: "pago",
+      forma_pagamento: dados.formaPagamento,
+      data_pagamento: hoje,
+    })
+    .select("id")
+    .single();
+
+  if (error) return { error: error.message };
+
+  // Marca orçamento como aprovado automaticamente
+  await supabase
+    .from("orcamentos")
+    .update({ status: "aprovado" })
+    .eq("id", dados.orcamentoId)
+    .eq("clinica_id", dentista.clinica_id);
+
+  revalidatePath("/dashboard/orcamentos");
+  return { id: data.id };
+}
+
+/**
  * Exclui um orçamento junto com seus itens e pagamentos.
  */
 export async function excluirOrcamento(

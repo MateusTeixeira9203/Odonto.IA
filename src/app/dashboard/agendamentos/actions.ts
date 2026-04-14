@@ -8,6 +8,7 @@ import {
   createGoogleCalendarEvent,
   updateGoogleCalendarEvent,
   deleteGoogleCalendarEvent,
+  importGoogleCalendarEvents,
 } from "@/lib/calendar/google-provider";
 
 export type StatusAgendamento =
@@ -238,4 +239,42 @@ export async function deletarAgendamento(id: string): Promise<{ error?: string }
 
   revalidatePath("/dashboard/agendamentos");
   return {};
+}
+
+/**
+ * Importa eventos do Google Calendar de um dentista para a tabela agendamentos.
+ * Secretária pode importar para qualquer dentista da clínica.
+ * Dentista só pode importar para si mesmo.
+ */
+export async function importarEventosGoogle(
+  dentistaAlvoId: string,
+): Promise<{ imported: number; skipped: number; error?: string }> {
+  const dentista = await getDentistaCached();
+  if (!dentista) redirect("/login");
+
+  const isSecretaria = dentista.role === "secretaria";
+
+  if (!isSecretaria && dentistaAlvoId !== dentista.id) {
+    return { imported: 0, skipped: 0, error: "Não autorizado" };
+  }
+
+  if (isSecretaria) {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("dentistas")
+      .select("id")
+      .eq("id", dentistaAlvoId)
+      .eq("clinica_id", dentista.clinica_id)
+      .maybeSingle();
+    if (!data) return { imported: 0, skipped: 0, error: "Dentista não encontrado" };
+  }
+
+  try {
+    const result = await importGoogleCalendarEvents(dentistaAlvoId, dentista.clinica_id);
+    revalidatePath("/dashboard/agendamentos");
+    return { imported: result.imported, skipped: result.skipped };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Erro desconhecido";
+    return { imported: 0, skipped: 0, error: msg };
+  }
 }

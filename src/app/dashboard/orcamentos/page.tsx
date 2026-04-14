@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getDentistaCached } from '@/lib/get-dentista';
 import { createClient } from '@/lib/supabase/server';
 import { OrcamentosClient } from './_components/orcamentos-client';
+import { PageTransition } from '@/components/layout/page-transition';
 
 export type OrcamentoItemRow = {
   id: string;
@@ -40,6 +41,14 @@ export default async function OrcamentosPage() {
 
   const supabase = await createClient();
 
+  // Verifica se há secretária na clínica
+  const { count: secretariaCount } = await supabase
+    .from('dentistas')
+    .select('id', { count: 'exact', head: true })
+    .eq('clinica_id', dentista.clinica_id)
+    .eq('role', 'secretaria');
+  const temSecretaria = (secretariaCount ?? 0) > 0;
+
   // Busca orçamentos com joins de paciente e dentista
   const { data: orcamentosRaw } = await supabase
     .from('orcamentos')
@@ -48,6 +57,19 @@ export default async function OrcamentosPage() {
     )
     .eq('clinica_id', dentista.clinica_id)
     .order('created_at', { ascending: false });
+
+  // Busca dentistas da clínica para as abas da secretária
+  let dentistasClinica: { id: string; nome: string }[] = [];
+  if (dentista.role === 'secretaria') {
+    const { data } = await supabase
+      .from('dentistas')
+      .select('id, nome')
+      .eq('clinica_id', dentista.clinica_id)
+      .neq('role', 'secretaria')
+      .eq('ativo', true)
+      .order('nome', { ascending: true });
+    dentistasClinica = data ?? [];
+  }
 
   // Busca itens e pagamentos em paralelo
   const [{ data: itensRaw }, { data: pagamentosRaw }] = await Promise.all([
@@ -71,5 +93,19 @@ export default async function OrcamentosPage() {
     pagamentos: pagamentos.filter((p) => p.orcamento_id === o.id),
   }));
 
-  return <OrcamentosClient orcamentos={orcamentos} clinicaId={dentista.clinica_id} />;
+  // Solo: dentista cria orçamentos manualmente. BASICO/CLINICA: cria via perfil do paciente.
+  const canEdit = dentista.plano === 'SOLO';
+
+  return (
+    <PageTransition>
+      <OrcamentosClient 
+        orcamentos={orcamentos} 
+        clinicaId={dentista.clinica_id} 
+        role={dentista.role} 
+        temSecretaria={temSecretaria} 
+        canEdit={canEdit} 
+        dentistas={dentistasClinica}
+      />
+    </PageTransition>
+  );
 }

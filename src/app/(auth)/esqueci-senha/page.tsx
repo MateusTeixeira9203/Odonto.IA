@@ -54,7 +54,7 @@ export default function EsqueciSenhaPage(): React.JSX.Element {
   }
 
   return (
-    <div className="min-h-screen bg-bg flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

@@ -29,14 +29,14 @@ type PacienteRow = {
 // Paleta de avatar: teal + tons neutros refinados
 const AVATAR_COLORS = [
   'bg-teal',
-  'bg-zinc-700',
-  'bg-zinc-600',
-  'bg-zinc-800',
+  'bg-teal/70',
+  'bg-teal-lt',
+  'bg-teal-dark',
   'bg-teal-sym',
-  'bg-zinc-500',
+  'bg-teal/50',
 ];
 
-export function PacientesTable({ pacientes }: { pacientes: PacienteRow[] }) {
+export function PacientesTable({ pacientes, canCreate }: { pacientes: PacienteRow[]; canCreate: boolean }) {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -102,7 +102,9 @@ export function PacientesTable({ pacientes }: { pacientes: PacienteRow[] }) {
                     </p>
                     {!searchTerm && (
                       <p className="text-text-secondary text-xs mt-1">
-                        Clique em &ldquo;Novo Paciente&rdquo; para começar.
+                        {canCreate
+                          ? 'Clique em \u201cNovo Paciente\u201d para começar.'
+                          : 'Aguarde o cadastro pela recepção.'}
                       </p>
                     )}
                   </td>

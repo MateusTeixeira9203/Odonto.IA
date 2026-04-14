@@ -96,7 +96,7 @@ function LoginFormContent(): React.JSX.Element {
   return (
     <div className="min-h-screen flex">
       <AuthBrandPanel />
-      <div className="flex-1 bg-bg flex flex-col items-center justify-center min-h-screen px-12">
+      <div className="flex-1 flex flex-col items-center justify-center min-h-screen px-12">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -218,7 +218,7 @@ export default function LoginPage(): React.JSX.Element {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-bg flex items-center justify-center p-4">
+        <div className="min-h-screen flex items-center justify-center p-4">
           <div className="w-full max-w-md space-y-4">
             <div className="h-12 rounded-xl bg-surface-alt animate-pulse" />
             <div className="h-11 rounded-xl bg-surface-alt animate-pulse" />

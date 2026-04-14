@@ -26,7 +26,7 @@ export function ToggleSwitch({
         "relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[--color-teal]/30 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
         checked
           ? "border-[--color-teal] bg-[--color-teal]"
-          : "border-gray-400 bg-gray-300 dark:border-zinc-500 dark:bg-zinc-600",
+          : "border-border bg-surface-alt",
         className
       )}
     >

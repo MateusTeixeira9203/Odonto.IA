@@ -544,7 +544,7 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] bg-zinc-950 flex flex-col"
+            className="fixed inset-0 z-[200] bg-brand-charcoal flex flex-col"
           >
             {/* Barra superior */}
             <div className="flex items-center justify-between px-8 py-5 border-b border-white/10">

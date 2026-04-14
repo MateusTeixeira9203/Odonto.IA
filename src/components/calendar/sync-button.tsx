@@ -20,7 +20,7 @@ export function GoogleCalendarSyncButton({ connected }: Props) {
   if (connected) {
     return (
       <div className="flex items-center gap-2">
-        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400 text-sm font-semibold">
+        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-teal/10 border border-teal/20 text-teal text-sm font-semibold">
           <CalendarCheck className="w-4 h-4 shrink-0" />
           <span>Google Calendar</span>
         </div>

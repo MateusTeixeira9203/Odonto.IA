@@ -5,11 +5,21 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  /* ── Brand Palette ─── */
   --color-teal: #2f9c85;
   --color-teal-lt: #5dbeb0;
   --color-teal-sym: #3a9e90;
   --color-teal-pale: #e4f4f1;
   --color-teal-dark: #1e7060;
+
+  /* Coral — substitui rose/red nos valores financeiros negativos */
+  --color-coral: #e57373;
+  --color-coral-pale: #fce8e8;
+
+  /* Aliases canônicos da identidade visual */
+  --color-brand-offwhite: #f5f3ef;
+  --color-brand-charcoal: #0d0d0d;
+  --color-brand-teal: #2f9c85;
 
   --color-bg: #f5f3ef;
   --color-surface: #ffffff;
@@ -62,6 +72,9 @@
   --color-text-secondary: #a0a0a0;
   --color-text-muted: #404040;
   --color-teal-pale: #1e3a35;
+  /* Coral mais claro em dark mode */
+  --color-coral: #ef9a9a;
+  --color-coral-pale: #3d1f1f;
 
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
@@ -103,6 +116,15 @@
   --color-teal-pale: var(--color-teal-pale);
   --color-teal-dark: var(--color-teal-dark);
 
+  /* Coral — cor canônica para negativos/despesas */
+  --color-coral: var(--color-coral);
+  --color-coral-pale: var(--color-coral-pale);
+
+  /* Brand aliases disponíveis via text-brand-*, bg-brand-* */
+  --color-brand-offwhite: var(--color-brand-offwhite);
+  --color-brand-charcoal: var(--color-brand-charcoal);
+  --color-brand-teal: var(--color-brand-teal);
+
   --color-bg: var(--color-bg);
   --color-surface: var(--color-surface);
   --color-surface-alt: var(--color-surface-alt);
@@ -129,11 +151,26 @@
 }
 
 .glass-card {
-  @apply bg-white/80 dark:bg-black/80 backdrop-blur-md border border-white/20 dark:border-white/10 shadow-sm;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(47, 156, 133, 0.2);
+  border-radius: 16px;
+}
+
+.dark .glass-card {
+  background: rgba(0, 0, 0, 0.25);
 }
 
 .premium-shadow {
   box-shadow: 0 10px 30px -10px rgba(47, 156, 133, 0.1);
+}
+
+/* Micro-glow teal — aplicar no valor positivo de Lucro Líquido */
+.teal-glow {
+  text-shadow:
+    0 0 12px rgba(47, 156, 133, 0.55),
+    0 0 28px rgba(47, 156, 133, 0.25);
 }
 
 @theme inline {
@@ -185,6 +222,97 @@
 }
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
+}
+
+/* ── Padrão neural (landing page / planos) ─────────────────── */
+@layer utilities {
+  .bg-neural-pattern {
+    background-image: radial-gradient(circle at 2px 2px, rgba(47, 156, 133, 0.15) 1px, transparent 0);
+    background-size: 32px 32px;
+  }
+}
+
+/* ── Glow em botões primários ──────────────────────────────── */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: inset 0 0 8px rgba(255, 255, 255, 0.1), 0 0 15px rgba(47, 156, 133, 0.3);
+  }
+  50% {
+    box-shadow: inset 0 0 16px rgba(255, 255, 255, 0.3), 0 0 25px rgba(47, 156, 133, 0.6);
+  }
+}
+
+.btn-glow {
+  animation: pulse-glow 3s infinite ease-in-out;
+  transition: box-shadow 0.2s ease;
+}
+
+.btn-glow:hover {
+  box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.25), 0 0 25px rgba(47, 156, 133, 0.65);
+}
+
+/* ── Borda premium (light + dark) ──────────────────────────── */
+.border-premium {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.dark .border-premium {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ── Glassmorfismo ──────────────────────────────────────────── */
+.glass-surface {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  background-color: rgba(255, 255, 255, 0.75);
+}
+
+.dark .glass-surface {
+  background-color: rgba(15, 15, 15, 0.75);
+}
+
+/* ── Blobs decorativos das páginas públicas ─────────────────── */
+.blob-shape {
+  background-color: var(--color-teal-pale);
+  border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+  animation: blob-morph 18s ease-in-out infinite, blob-float 20s ease-in-out infinite;
+  filter: blur(150px);
+  position: fixed;
+  z-index: -1;
+  pointer-events: none;
+}
+
+@keyframes blob-float {
+  0%   { transform: translate(0, 0) scale(1); }
+  33%  { transform: translate(30px, -50px) scale(1.1); }
+  66%  { transform: translate(-20px, 20px) scale(0.9); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+@keyframes blob-morph {
+  0%, 100% { border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; }
+  34%      { border-radius: 70% 30% 50% 50% / 30% 30% 70% 70%; }
+  67%      { border-radius: 100% 60% 60% 100% / 100% 100% 60% 60%; }
+}
+
+/* ── Feedback tátil — botões primários ──────────────────── */
+.btn-scale {
+  @apply active:scale-[0.98] transition-transform;
+}
+
+/* ── Skeleton com cor teal-pale ─────────────────────────── */
+.skeleton-teal {
+  background-color: var(--color-teal-pale);
+  animation: pulse-teal 1.8s ease-in-out infinite;
+}
+
+@keyframes pulse-teal {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
+}
+
+.dark .skeleton-teal {
+  background-color: #1e3a35;
 }
 
 /* ── Driver.js — tema Dent IA ────────────────────────── */

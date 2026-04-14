@@ -1,0 +1,81 @@
+'use server';
+
+import { redirect } from 'next/navigation';
+import { getDentistaCached } from '@/lib/get-dentista';
+import { createServiceClient } from '@/lib/supabase/service';
+import {
+  getBotMensagens,
+  DEFAULTS_MENSAGENS,
+  type BotMensagens,
+} from '@/lib/whatsapp/template';
+
+export { DEFAULTS_MENSAGENS };
+// Nota: BotMensagens NÃO é re-exportado daqui — arquivos 'use server' não devem
+// re-exportar tipos TypeScript porque o Turbopack os trata como server references
+// em runtime, causando ReferenceError. Importe diretamente de @/lib/whatsapp/template.
+
+// ─── Guard ────────────────────────────────────────────────────────────────────
+
+async function verificarAcesso() {
+  const dentista = await getDentistaCached();
+  if (!dentista) redirect('/login');
+  if (dentista.role !== 'admin' && dentista.role !== 'secretaria') redirect('/dashboard');
+  return dentista;
+}
+
+// ─── Actions ──────────────────────────────────────────────────────────────────
+
+/**
+ * Carrega as mensagens configuradas para a clínica do usuário autenticado.
+ */
+export async function carregarMensagensBot(): Promise<BotMensagens> {
+  const dentista = await verificarAcesso();
+  return getBotMensagens(dentista.clinica_id);
+}
+
+/**
+ * Salva as mensagens personalizadas para a clínica.
+ * Preserva os outros campos de bot_config (whatsapp_number, horários, etc.).
+ */
+export async function salvarMensagensBot(
+  form: BotMensagens,
+): Promise<{ ok: boolean; erro?: string }> {
+  const dentista = await verificarAcesso();
+  const db = createServiceClient();
+
+  // Verifica se já existe uma linha para esta clínica
+  const { data: existing } = await db
+    .from('bot_config')
+    .select('clinica_id')
+    .eq('clinica_id', dentista.clinica_id)
+    .maybeSingle();
+
+  if (existing) {
+    // Atualiza apenas os campos de mensagem
+    const { error } = await db
+      .from('bot_config')
+      .update({
+        msg_novo_paciente:     form.msg_novo_paciente.trim()    || DEFAULTS_MENSAGENS.msg_novo_paciente,
+        msg_paciente_antigo:   form.msg_paciente_antigo.trim()  || DEFAULTS_MENSAGENS.msg_paciente_antigo,
+        titulo_menu_principal: form.titulo_menu_principal.trim() || DEFAULTS_MENSAGENS.titulo_menu_principal,
+        updated_at:            new Date().toISOString(),
+      })
+      .eq('clinica_id', dentista.clinica_id);
+
+    if (error) return { ok: false, erro: error.message };
+  } else {
+    // Cria a linha inicial com apenas os campos de mensagem
+    const { error } = await db
+      .from('bot_config')
+      .insert({
+        clinica_id:            dentista.clinica_id,
+        msg_novo_paciente:     form.msg_novo_paciente.trim()    || DEFAULTS_MENSAGENS.msg_novo_paciente,
+        msg_paciente_antigo:   form.msg_paciente_antigo.trim()  || DEFAULTS_MENSAGENS.msg_paciente_antigo,
+        titulo_menu_principal: form.titulo_menu_principal.trim() || DEFAULTS_MENSAGENS.titulo_menu_principal,
+      });
+
+    if (error) return { ok: false, erro: error.message };
+  }
+
+  return { ok: true };
+}

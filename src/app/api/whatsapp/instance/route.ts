@@ -5,7 +5,7 @@
  * GET    — retorna status + QR Code da instância ativa
  * DELETE — desconecta e remove a instância
  *
- * Todos os métodos exigem role = 'admin'.
+ * Todos os métodos exigem role = 'admin' ou 'secretaria'.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -21,7 +21,7 @@ import {
 
 // ─── Guard de autenticação ────────────────────────────────────────────────────
 
-async function getAdminClinica(): Promise<{ clinicaId: string } | null> {
+async function getAuthorizedClinica(): Promise<{ clinicaId: string } | null> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
@@ -32,14 +32,14 @@ async function getAdminClinica(): Promise<{ clinicaId: string } | null> {
     .eq('user_id', user.id)
     .maybeSingle();
 
-  if (!data || data.role !== 'admin') return null;
+  if (!data || (data.role !== 'admin' && data.role !== 'secretaria')) return null;
   return { clinicaId: data.clinica_id as string };
 }
 
 // ─── POST — criar instância ───────────────────────────────────────────────────
 
 export async function POST(_req: NextRequest): Promise<NextResponse> {
-  const auth = await getAdminClinica();
+  const auth = await getAuthorizedClinica();
   if (!auth) return NextResponse.json({ error: 'Não autorizado' }, { status: 403 });
 
   const db = createServiceClient();
@@ -85,7 +85,7 @@ export async function POST(_req: NextRequest): Promise<NextResponse> {
 // ─── GET — status e QR Code ───────────────────────────────────────────────────
 
 export async function GET(_req: NextRequest): Promise<NextResponse> {
-  const auth = await getAdminClinica();
+  const auth = await getAuthorizedClinica();
   if (!auth) return NextResponse.json({ error: 'Não autorizado' }, { status: 403 });
 
   const db = createServiceClient();
@@ -131,7 +131,7 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
 // ─── DELETE — desconectar ─────────────────────────────────────────────────────
 
 export async function DELETE(_req: NextRequest): Promise<NextResponse> {
-  const auth = await getAdminClinica();
+  const auth = await getAuthorizedClinica();
   if (!auth) return NextResponse.json({ error: 'Não autorizado' }, { status: 403 });
 
   const db = createServiceClient();

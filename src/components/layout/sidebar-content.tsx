@@ -6,7 +6,6 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   Users,
-  FileText,
   CircleDollarSign,
   Settings,
   Calendar,
@@ -18,7 +17,11 @@ import {
   Moon,
   MessageCircle,
   BotMessageSquare,
+  Wallet,
+  Lock,
 } from 'lucide-react';
+import type { PlanoId } from '@/lib/planos';
+import { temFeature } from '@/lib/planos';
 import { motion, AnimatePresence } from 'motion/react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useTheme } from 'next-themes';
@@ -26,6 +29,8 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { DentistaRole } from '@/types/database';
 import { DentIALogo } from '@/components/ui/dent-ia-logo';
+import { WhatsAppStatusDot } from '@/components/layout/whatsapp-status-dot';
+import Image from 'next/image';
 
 export interface SidebarProps {
   isExpanded: boolean;
@@ -34,9 +39,10 @@ export interface SidebarProps {
   clinicaNome: string;
   role: DentistaRole;
   avatarUrl?: string | null;
+  plano?: PlanoId;
 }
 
-export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role, avatarUrl }: SidebarProps) {
+export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role, avatarUrl, plano }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
@@ -45,6 +51,10 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role, 
   const showClinical   = role === 'admin' || role === 'dentista';
   const showConfig     = role === 'admin' || role === 'dentista';
   const showWhatsApp   = role === 'secretaria';
+
+  // Feature locks baseadas no plano
+  const financeiroLocked = !temFeature(plano ?? 'CLINICA', 'financeiro');
+  const botLocked        = !temFeature(plano ?? 'CLINICA', 'botCustomizavel');
 
   const handleLogout = async () => {
     const supabase = createClient();
@@ -59,12 +69,12 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role, 
   }, []);
 
   const allNavItems = [
-    { href: '/dashboard', icon: LayoutDashboard, label: 'Início', id: 'dashboard-link', visible: true },
-    { href: '/dashboard/agendamentos', icon: Calendar, label: 'Agendamentos', id: 'agendamentos-link', visible: true },
-    { href: '/dashboard/pacientes', icon: Users, label: 'Pacientes', id: 'pacientes-link', visible: true },
-    { href: '/dashboard/fichas', icon: FileText, label: 'Fichas', id: 'fichas-link', visible: showClinical },
-    { href: '/dashboard/orcamentos', icon: CircleDollarSign, label: 'Orçamentos', id: 'orcamentos-link', visible: true },
-    { href: '/dashboard/whatsapp',   icon: MessageCircle,   label: 'WhatsApp',   id: 'whatsapp-link',  visible: showWhatsApp },
+    { href: '/dashboard',             icon: LayoutDashboard,  label: 'Início',       id: 'dashboard-link',     visible: true,        locked: false },
+    { href: '/dashboard/agendamentos',icon: Calendar,         label: 'Agendamentos', id: 'agendamentos-link',  visible: true,        locked: false },
+    { href: '/dashboard/pacientes',   icon: Users,            label: 'Pacientes',    id: 'pacientes-link',     visible: true,        locked: false },
+{ href: '/dashboard/orcamentos',  icon: CircleDollarSign, label: 'Orçamentos',   id: 'orcamentos-link',    visible: true,        locked: false },
+    { href: '/dashboard/financeiro',  icon: Wallet,           label: 'Financeiro',   id: 'financeiro-link',    visible: true,        locked: financeiroLocked },
+    { href: '/dashboard/whatsapp',    icon: MessageCircle,    label: 'WhatsApp',     id: 'whatsapp-link',      visible: showWhatsApp,locked: false },
   ];
 
   const navItems = allNavItems.filter((item) => item.visible);
@@ -75,12 +85,12 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role, 
       animate={{ width: isExpanded ? 256 : 80 }}
       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
       id="sidebar"
-    className="bg-zinc-950 text-zinc-400 border-r border-white/5 flex flex-col h-screen sticky top-0 shadow-2xl z-20 relative dark:bg-black dark:border-white/10"
+    className="bg-brand-charcoal text-white/40 border-r border-white/5 flex flex-col h-screen sticky top-0 shadow-2xl z-20 relative"
     >
       {/* Toggle Button */}
       <button
         onClick={onToggle}
-        className="absolute -right-3 top-10 w-6 h-6 bg-teal rounded-full flex items-center justify-center text-white border-2 border-zinc-950 hover:bg-teal-lt transition-colors z-30 dark:border-black"
+        className="absolute -right-3 top-10 w-6 h-6 bg-teal rounded-full flex items-center justify-center text-white border-2 border-brand-charcoal hover:bg-teal-lt transition-colors z-30"
       >
         {isExpanded ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
       </button>
@@ -115,10 +125,12 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role, 
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium text-sm transition-all group ${
                 isActive
                   ? 'bg-teal/10 text-teal-lt shadow-inner border-l-2 border-teal-lt'
-                  : 'text-zinc-400 hover:bg-white/5 hover:text-white border-l-2 border-transparent'
+                  : item.locked
+                    ? 'text-zinc-600 hover:bg-white/5 hover:text-zinc-400 border-l-2 border-transparent'
+                    : 'text-zinc-400 hover:bg-white/5 hover:text-white border-l-2 border-transparent'
               } ${!isExpanded && 'justify-center'}`}
             >
-              <item.icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-teal-lt' : 'text-zinc-400 group-hover:text-white'}`} />
+              <item.icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-teal-lt' : item.locked ? 'text-zinc-600' : 'text-zinc-400 group-hover:text-white'}`} />
               <AnimatePresence mode="wait">
                 {isExpanded && (
                   <motion.span
@@ -126,9 +138,10 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role, 
                     animate={{ opacity: 1, width: 'auto' }}
                     exit={{ opacity: 0, width: 0 }}
                     transition={{ duration: 0.2 }}
-                    className="whitespace-nowrap overflow-hidden"
+                    className="whitespace-nowrap overflow-hidden flex items-center gap-1.5 flex-1"
                   >
                     {item.label}
+                    {item.locked && <Lock className="w-3 h-3 text-teal/60 ml-auto shrink-0" />}
                   </motion.span>
                 )}
               </AnimatePresence>
@@ -166,14 +179,16 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role, 
         {role === 'secretaria' && (
           <Link
             id="whatsapp-config-link"
-            href="/dashboard/configuracoes/whatsapp"
+            href="/dashboard/bot"
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium text-sm transition-all group ${
-              pathname === '/dashboard/configuracoes/whatsapp'
+              pathname === '/dashboard/bot'
                 ? 'bg-teal/10 text-teal-lt border-l-2 border-teal-lt'
-                : 'text-zinc-400 hover:bg-white/5 hover:text-white border-l-2 border-transparent'
+                : botLocked
+                  ? 'text-zinc-600 hover:bg-white/5 hover:text-zinc-400 border-l-2 border-transparent'
+                  : 'text-zinc-400 hover:bg-white/5 hover:text-white border-l-2 border-transparent'
             } ${!isExpanded && 'justify-center'}`}
           >
-            <BotMessageSquare className={`w-4 h-4 shrink-0 ${pathname === '/dashboard/configuracoes/whatsapp' ? 'text-teal-lt' : 'text-zinc-400 group-hover:text-white'}`} />
+            <BotMessageSquare className={`w-4 h-4 shrink-0 ${pathname === '/dashboard/bot' ? 'text-teal-lt' : botLocked ? 'text-zinc-600' : 'text-zinc-400 group-hover:text-white'}`} />
             <AnimatePresence mode="wait">
               {isExpanded && (
                 <motion.span
@@ -181,9 +196,10 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role, 
                   animate={{ opacity: 1, width: 'auto' }}
                   exit={{ opacity: 0, width: 0 }}
                   transition={{ duration: 0.2 }}
-                  className="whitespace-nowrap overflow-hidden"
+                  className="whitespace-nowrap overflow-hidden flex items-center gap-2 flex-1"
                 >
                   Bot WhatsApp
+                  {botLocked ? <Lock className="w-3 h-3 text-teal/60 ml-auto shrink-0" /> : <WhatsAppStatusDot />}
                 </motion.span>
               )}
             </AnimatePresence>
@@ -222,8 +238,7 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role, 
             <button className={`mt-4 px-3 flex items-center gap-3 w-full hover:bg-white/5 py-2 rounded-lg transition-colors cursor-pointer ${!isExpanded && 'justify-center'}`}>
               <div className="w-8 h-8 rounded-full bg-teal flex items-center justify-center text-white font-bold text-xs shrink-0 overflow-hidden ring-2 ring-teal/30">
                 {avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={avatarUrl} alt={nome} className="w-full h-full object-cover" />
+                  <Image src={avatarUrl} alt={nome} width={32} height={32} className="w-full h-full object-cover" />
                 ) : (
                   nome.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
                 )}
@@ -247,7 +262,8 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role, 
 
           <DropdownMenu.Portal>
             <DropdownMenu.Content
-              className="min-w-[160px] bg-zinc-900 border border-white/10 rounded-xl p-1.5 shadow-2xl z-[100] animate-in fade-in zoom-in duration-200 text-white"
+              className="min-w-[160px] rounded-xl p-1.5 shadow-2xl z-[100] animate-in fade-in zoom-in duration-200 text-white"
+              style={{ background: 'rgba(13,13,13,0.97)', border: '1px solid rgba(47,156,133,0.2)' }}
               sideOffset={10}
               align={isExpanded ? 'start' : 'center'}
               side="right"

@@ -15,15 +15,15 @@ export interface BotConfigForm {
   reminder_message: string;
 }
 
-async function verificarAdmin() {
+async function verificarAcesso() {
   const dentista = await getDentistaCached();
   if (!dentista) redirect('/login');
-  if (dentista.role !== 'admin') redirect('/dashboard');
+  if (dentista.role !== 'secretaria') redirect('/dashboard');
   return dentista;
 }
 
 export async function salvarBotConfig(form: BotConfigForm): Promise<{ ok: boolean; erro?: string }> {
-  const dentista = await verificarAdmin();
+  const dentista = await verificarAcesso();
   const db = createServiceClient();
 
   const { error } = await db
@@ -49,7 +49,7 @@ export async function salvarBotConfig(form: BotConfigForm): Promise<{ ok: boolea
 }
 
 export async function carregarBotConfig(): Promise<BotConfigForm | null> {
-  const dentista = await verificarAdmin();
+  const dentista = await verificarAcesso();
   const db = createServiceClient();
 
   const { data } = await db

@@ -209,6 +209,7 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
           transition={{ delay: 0.1 }}
           className="md:col-span-1 space-y-2"
         >
+          <div id="dex-tour-procedimentos" className="space-y-2">
           {ABAS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -223,7 +224,9 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
               {label}
             </button>
           ))}
+          </div>
           <Link
+            id="dex-tour-equipe"
             href="/dashboard/configuracoes/usuarios"
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm transition-colors ${
               pathname === '/dashboard/configuracoes/usuarios'

@@ -1,6 +1,9 @@
+import { NeuralBackground } from "@/components/layout/NeuralBackground";
+
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <div
+      className="relative min-h-screen bg-bg"
       style={{
         "--color-bg": "#f5f3ef",
         "--color-surface": "#ffffff",
@@ -12,6 +15,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         "--color-teal-pale": "#e4f4f1",
       } as React.CSSProperties}
     >
+      <NeuralBackground />
       {children}
     </div>
   );

@@ -338,7 +338,7 @@ export function NovaEvolucaoPanel({ onCancel, onSave, clinicaId, patientId }: No
                 <div className="w-2.5 h-2.5 rounded-sm bg-teal" /> Selecionado
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-sm bg-amber-400" /> C/ Histórico
+                <div className="w-2.5 h-2.5 rounded-sm bg-teal-pale border border-teal/30" /> C/ Histórico
               </div>
             </div>
           </div>
@@ -358,7 +358,7 @@ export function NovaEvolucaoPanel({ onCancel, onSave, clinicaId, patientId }: No
                       isSelected
                         ? 'bg-teal border-teal text-white shadow-md -translate-y-1'
                         : hasHistory
-                          ? 'bg-amber-50 border-amber-400 text-amber-700 hover:bg-amber-100'
+                          ? 'bg-teal-pale border-teal/30 text-teal-dark hover:bg-teal/10'
                           : 'bg-surface-alt border-border text-text-secondary hover:border-teal hover:text-teal'
                     }`}
                   >
@@ -382,7 +382,7 @@ export function NovaEvolucaoPanel({ onCancel, onSave, clinicaId, patientId }: No
                       isSelected
                         ? 'bg-teal border-teal text-white shadow-md translate-y-1'
                         : hasHistory
-                          ? 'bg-amber-50 border-amber-400 text-amber-700 hover:bg-amber-100'
+                          ? 'bg-teal-pale border-teal/30 text-teal-dark hover:bg-teal/10'
                           : 'bg-surface-alt border-border text-text-secondary hover:border-teal hover:text-teal'
                     }`}
                   >

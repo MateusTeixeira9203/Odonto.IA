@@ -2,8 +2,9 @@ import { redirect } from 'next/navigation';
 import { startOfMonth, endOfMonth, format, parseISO } from 'date-fns';
 import { getDentistaCached } from '@/lib/get-dentista';
 import { createClient } from '@/lib/supabase/server';
-import { isGoogleCalendarConnected } from '@/lib/calendar/google-provider';
+import { isGoogleCalendarConnected, getCalendarConnectedMap } from '@/lib/calendar/google-provider';
 import { AgendamentosClient } from './_components/agendamentos-client';
+import { PageTransition } from '@/components/layout/page-transition';
 
 export type AgendamentoRow = {
   id: string;
@@ -13,6 +14,8 @@ export type AgendamentoRow = {
   data_hora: string;
   duracao_minutos: number;
   status: string;
+  /** 'manual' | 'bot' | 'app' — origem do agendamento */
+  origem: string;
   observacoes: string | null;
   created_at: string;
   paciente: { id: string; nome: string } | null;
@@ -44,7 +47,7 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
   const query = supabase
     .from('agendamentos')
     .select(
-      'id, clinica_id, paciente_id, dentista_id, data_hora, duracao_minutos, status, observacoes, created_at, paciente:pacientes(id, nome), dentista:dentistas(id, nome)'
+      'id, clinica_id, paciente_id, dentista_id, data_hora, duracao_minutos, status, origem, observacoes, created_at, paciente:pacientes(id, nome), dentista:dentistas(id, nome)'
     )
     .eq('clinica_id', dentista.clinica_id)
     .gte('data_hora', inicioMes)
@@ -55,14 +58,25 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
     query.eq('dentista_id', dentista.id);
   }
 
-  const [{ data: agendamentosRaw }, calendarConnected] = await Promise.all([
-    query,
-    // Secretária não tem calendário próprio — mostrar botão apenas para dentistas
-    isSecretaria ? Promise.resolve(false) : isGoogleCalendarConnected(dentista.id),
-  ]);
+  // Dados em paralelo: agendamentos + GCal status + contagem de secretárias
+  const [{ data: agendamentosRaw }, calendarConnected, { count: secretariaCount }] =
+    await Promise.all([
+      query,
+      isSecretaria ? Promise.resolve(false) : isGoogleCalendarConnected(dentista.id),
+      supabase
+        .from('dentistas')
+        .select('id', { count: 'exact', head: true })
+        .eq('clinica_id', dentista.clinica_id)
+        .eq('role', 'secretaria')
+        .eq('ativo', true),
+    ]);
 
-  // Lista de dentistas da clínica (apenas para secretária montar o filtro/form)
+  const temSecretaria = (secretariaCount ?? 0) > 0;
+
+  // Lista de dentistas + mapa de GCal conectado (apenas para secretária)
   let dentistasClinica: { id: string; nome: string }[] = [];
+  let calendarConnectedPerDentista: Record<string, boolean> = {};
+
   if (isSecretaria) {
     const { data } = await supabase
       .from('dentistas')
@@ -72,20 +86,29 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
       .eq('ativo', true)
       .order('nome', { ascending: true });
     dentistasClinica = data ?? [];
+    calendarConnectedPerDentista = await getCalendarConnectedMap(
+      dentistasClinica.map((d) => d.id),
+    );
   }
 
+  // Solo: dentista cria sozinho. Secretária: cria em nome do dentista. BASICO/CLINICA dentista: leitura.
+  const canEdit = dentista.plano === 'SOLO' || dentista.role === 'secretaria';
+
   return (
-    // key={mesAtual} força remount ao trocar de mês — estado do cliente reseta
-    // e useState(inicial) recebe os novos agendamentos do servidor
-    <AgendamentosClient
-      key={mesAtual}
-      agendamentos={(agendamentosRaw ?? []) as unknown as AgendamentoRow[]}
-      clinicaId={dentista.clinica_id}
-      role={dentista.role}
-      dentistaAtualId={dentista.id}
-      dentistas={dentistasClinica}
-      calendarConnected={calendarConnected}
-      mesAtual={mesAtual}
-    />
+    <PageTransition>
+      <AgendamentosClient
+        key={mesAtual}
+        agendamentos={(agendamentosRaw ?? []) as unknown as AgendamentoRow[]}
+        clinicaId={dentista.clinica_id}
+        role={dentista.role}
+        dentistaAtualId={dentista.id}
+        dentistas={dentistasClinica}
+        calendarConnected={calendarConnected}
+        calendarConnectedPerDentista={calendarConnectedPerDentista}
+        temSecretaria={temSecretaria}
+        mesAtual={mesAtual}
+        canEdit={canEdit}
+      />
+    </PageTransition>
   );
 }

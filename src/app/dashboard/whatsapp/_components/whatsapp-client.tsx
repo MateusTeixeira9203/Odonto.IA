@@ -64,11 +64,11 @@ function etapaLabel(etapa: string): string {
 
 function BadgeStatus({ ativo }: { ativo: boolean }) {
   return ativo ? (
-    <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400 font-medium">
+    <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-teal/10 text-teal font-medium">
       <Bot className="w-3 h-3" /> Bot
     </span>
   ) : (
-    <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400 font-medium">
+    <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-surface-alt text-text-secondary font-medium">
       <User className="w-3 h-3" /> Humano
     </span>
   );
@@ -274,7 +274,7 @@ export function WhatsAppClient({ initialConversas, clinicaId }: Props) {
         className={`
           w-full sm:w-80 lg:w-96 flex-shrink-0
           flex flex-col border-r border-[--color-border]
-          bg-[--color-surface] dark:bg-zinc-900
+          bg-surface
           ${conversaSelecionada ? 'hidden sm:flex' : 'flex'}
         `}
       >
@@ -366,7 +366,7 @@ export function WhatsAppClient({ initialConversas, clinicaId }: Props) {
             className="flex-1 flex flex-col overflow-hidden"
           >
             {/* Header da conversa */}
-            <div className="px-4 py-3 border-b border-[--color-border] bg-[--color-surface] dark:bg-zinc-900 flex items-center gap-3">
+            <div className="px-4 py-3 border-b border-[--color-border] bg-surface flex items-center gap-3">
               {/* Botão voltar (mobile) */}
               <button
                 onClick={() => setSelecionada(null)}
@@ -399,7 +399,7 @@ export function WhatsAppClient({ initialConversas, clinicaId }: Props) {
                     variant="outline"
                     onClick={handleAssumir}
                     disabled={isPending}
-                    className="text-xs gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
+                    className="text-xs gap-1.5 border-border text-text-secondary hover:bg-surface-alt hover:text-teal"
                   >
                     <UserCheck className="w-3.5 h-3.5" />
                     Assumir
@@ -410,7 +410,7 @@ export function WhatsAppClient({ initialConversas, clinicaId }: Props) {
                     variant="outline"
                     onClick={handleFinalizar}
                     disabled={isPending}
-                    className="text-xs gap-1.5 border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400"
+                    className="text-xs gap-1.5 border-teal/30 text-teal hover:bg-teal/5"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" />
                     Devolver ao bot
@@ -428,7 +428,7 @@ export function WhatsAppClient({ initialConversas, clinicaId }: Props) {
                   exit={{ height: 0, opacity: 0 }}
                   className="overflow-hidden"
                 >
-                  <div className="px-4 py-2 bg-amber-50 dark:bg-amber-950/50 border-b border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 text-xs flex justify-between items-center">
+                  <div className="px-4 py-2 bg-teal-pale dark:bg-teal/10 border-b border-teal/20 text-teal text-xs flex justify-between items-center">
                     <span>{aviso}</span>
                     <button onClick={() => setAviso(null)} className="ml-2 opacity-70 hover:opacity-100">×</button>
                   </div>
@@ -449,7 +449,7 @@ export function WhatsAppClient({ initialConversas, clinicaId }: Props) {
             </div>
 
             {/* Input de resposta */}
-            <div className="border-t border-[--color-border] bg-[--color-surface] dark:bg-zinc-900 p-3">
+            <div className="border-t border-[--color-border] bg-surface p-3">
               <form onSubmit={(e) => void handleEnviar(e)} className="flex gap-2 items-end">
                 <Textarea
                   ref={textareaRef}

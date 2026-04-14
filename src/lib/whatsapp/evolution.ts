@@ -69,6 +69,51 @@ export async function sendWhatsAppFile(
   }
 }
 
+// ─── List Messages ────────────────────────────────────────────────────────────
+
+export interface ListRow {
+  rowId: string;
+  title: string;
+  description?: string;
+}
+
+export interface ListSection {
+  title: string;
+  rows: ListRow[];
+}
+
+/**
+ * Envia uma List Message interativa (balão com opções clicáveis).
+ * Disponível para todos os números no WhatsApp (personal e Business).
+ */
+export async function sendWhatsAppList(
+  instance: string,
+  number: string,
+  title: string,
+  description: string,
+  buttonText: string,
+  sections: ListSection[],
+  footer?: string,
+): Promise<void> {
+  const res = await fetch(`${baseUrl()}/message/sendList/${instance}`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({
+      number,
+      title,
+      description,
+      buttonText,
+      footerText: footer ?? '',
+      sections,
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Evolution API erro ${res.status}: ${body}`);
+  }
+}
+
 /**
  * Envia mensagem com botões de resposta rápida.
  * Nota: botões requerem número com canal Business na Evolution API.

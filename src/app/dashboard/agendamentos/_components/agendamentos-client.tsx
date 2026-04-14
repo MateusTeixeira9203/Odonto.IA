@@ -11,8 +11,12 @@ import {
   Pencil,
   Trash2,
   ArrowLeft,
+  BotMessageSquare,
+  CalendarDays,
+  Loader2,
+  CheckCircle2,
 } from 'lucide-react';
-import { useState, useMemo, useCallback, useTransition } from 'react';
+import { useState, useMemo, useCallback, useTransition, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   format,
@@ -54,40 +58,48 @@ import {
   atualizarAgendamento,
   deletarAgendamento,
   criarAgendamento,
+  importarEventosGoogle,
   type StatusAgendamento,
 } from '../actions';
 import { createClient } from '@/lib/supabase/client';
 import { HelpTooltip } from '@/components/ui/help-tooltip';
 import { GoogleCalendarSyncButton } from '@/components/calendar/sync-button';
 import type { DentistaRole } from '@/types/database';
+import { toast } from 'sonner';
 
 // Mapeamento de status do banco (lowercase) para exibição
 const STATUS_DISPLAY: Record<string, string> = {
-  agendado: 'Agendado',
-  confirmado: 'Confirmado',
-  cancelado: 'Cancelado',
-  realizado: 'Realizado',
-  faltou: 'Faltou',
+  agendado:       'Agendado',
+  confirmado:     'Confirmado',
+  cancelado:      'Cancelado',
+  realizado:      'Realizado',
+  faltou:         'Faltou',
+  na_recepcao:    'Na Recepção',
+  em_atendimento: 'Em Atendimento',
 };
 
 const getStatusColor = (status: string) => {
   switch (status) {
-    case 'confirmado': return 'bg-teal/10 text-teal';
-    case 'agendado': return 'bg-blue-500/10 text-blue-600 dark:text-blue-400';
-    case 'cancelado': return 'bg-red-500/10 text-red-600 dark:text-red-400';
-    case 'realizado': return 'bg-green-500/10 text-green-600 dark:text-green-400';
-    case 'faltou': return 'bg-orange-500/10 text-orange-600 dark:text-orange-400';
+    case 'confirmado':     return 'bg-teal/10 text-teal';
+    case 'agendado':       return 'bg-surface-alt text-text-secondary';
+    case 'cancelado':      return 'bg-coral/10 text-coral';
+    case 'realizado':      return 'bg-teal/10 text-teal';
+    case 'faltou':         return 'bg-coral/10 text-coral';
+    case 'na_recepcao':    return 'bg-teal/20 text-teal';
+    case 'em_atendimento': return 'bg-teal text-white';
     default: return 'bg-muted text-muted-foreground';
   }
 };
 
 const getTimelineDotColor = (status: string) => {
   switch (status) {
-    case 'confirmado': return 'bg-teal';
-    case 'agendado': return 'bg-blue-500';
-    case 'cancelado': return 'bg-red-500';
-    case 'realizado': return 'bg-green-500';
-    case 'faltou': return 'bg-orange-500';
+    case 'confirmado':     return 'bg-teal';
+    case 'agendado':       return 'bg-border';
+    case 'cancelado':      return 'bg-coral';
+    case 'realizado':      return 'bg-teal';
+    case 'faltou':         return 'bg-coral';
+    case 'na_recepcao':    return 'bg-teal';
+    case 'em_atendimento': return 'bg-teal';
     default: return 'bg-muted';
   }
 };
@@ -100,18 +112,27 @@ interface Props {
   /** Lista de dentistas para filtro/form (apenas preenchida para secretária) */
   dentistas: { id: string; nome: string }[];
   calendarConnected: boolean;
+  /** Mapa dentistaId → GCal conectado (secretária) */
+  calendarConnectedPerDentista: Record<string, boolean>;
+  /** Clínica tem pelo menos uma secretária ativa */
+  temSecretaria: boolean;
   /** Mês atual no formato 'YYYY-MM' — controlado via URL search param */
   mesAtual: string;
+  /** Pode criar agendamentos: plano SOLO ou secretária */
+  canEdit: boolean;
 }
 
 export function AgendamentosClient({
   agendamentos: inicial,
   clinicaId: _clinicaId,
   role,
-  dentistaAtualId: _dentistaAtualId,
+  dentistaAtualId,
   dentistas,
   calendarConnected,
+  calendarConnectedPerDentista,
+  temSecretaria,
   mesAtual,
+  canEdit,
 }: Props) {
   const router = useRouter();
   const isSecretaria = role === 'secretaria';
@@ -146,6 +167,22 @@ export function AgendamentosClient({
 
   // Filtro por dentista (somente secretária)
   const [filtroDentistaId, setFiltroDentistaId] = useState<string>('todos');
+
+  // MANTÉM SINCRONIA: Garante que os dados locais reflitam o banco após F5 ou revalidatePath
+  useEffect(() => {
+    setAgendamentos(inicial);
+  }, [inicial]);
+
+  // Importação do Google Calendar
+  const [isImporting, setIsImporting]           = useState(false);
+  const [importProgress, setImportProgress]     = useState(0);
+  const [importDone, setImportDone]             = useState(false);
+  const progressIntervalRef                     = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Limpa o interval ao desmontar
+  useEffect(() => () => {
+    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+  }, []);
 
   // Estado do formulário de novo agendamento
   const [novoForm, setNovoForm] = useState({
@@ -237,6 +274,64 @@ export function AgendamentosClient({
     setShowSugestoes(false);
   };
 
+  // ── Importação do Google Calendar ──────────────────────────────────────────
+  const handleImportCalendar = async () => {
+    const targetId = isSecretaria
+      ? filtroDentistaId !== 'todos' ? filtroDentistaId : null
+      : dentistaAtualId;
+
+    if (!targetId) {
+      toast.error('Selecione um dentista antes de importar.');
+      return;
+    }
+
+    setIsImporting(true);
+    setImportProgress(0);
+    setImportDone(false);
+
+    // Barra de progresso animada até 85%
+    let prog = 0;
+    progressIntervalRef.current = setInterval(() => {
+      prog = Math.min(prog + 12, 85);
+      setImportProgress(prog);
+      if (prog >= 85 && progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+    }, 350);
+
+    try {
+      const result = await importarEventosGoogle(targetId);
+
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+      setImportProgress(100);
+      setImportDone(true);
+
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success(
+          result.imported > 0
+            ? `${result.imported} evento${result.imported !== 1 ? 's' : ''} importado${result.imported !== 1 ? 's' : ''}! (${result.skipped} já existiam)`
+            : `Nenhum evento novo. ${result.skipped} já importado${result.skipped !== 1 ? 's' : ''}.`,
+        );
+        router.refresh();
+      }
+    } catch {
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+      toast.error('Erro ao conectar com o Google Calendar.');
+    } finally {
+      setTimeout(() => {
+        setIsImporting(false);
+        setImportProgress(0);
+        setImportDone(false);
+      }, 2000);
+    }
+  };
+
   // Cria novo agendamento via server action
   const handleCriarAgendamento = async () => {
     if (!novoForm.pacienteId) {
@@ -250,7 +345,10 @@ export function AgendamentosClient({
     setSaveError(null);
     setIsSaving(true);
 
-    const dataHora = `${novoForm.data}T${novoForm.hora}:00`;
+    // Converte para ISO (UTC) de forma segura para não sumir do calendário por erro de Timezone
+    const [ano, mes, dia] = novoForm.data.split('-').map(Number);
+    const [hora, minuto] = novoForm.hora.split(':').map(Number);
+    const dataHora = new Date(ano, mes - 1, dia, hora, minuto).toISOString();
     const observacoesCombinadas =
       [novoForm.tipo, novoForm.observacoes].filter(Boolean).join(' — ') || null;
 
@@ -277,6 +375,7 @@ export function AgendamentosClient({
         data_hora: dataHora,
         duracao_minutos: parseInt(novoForm.duracao, 10) || 30,
         status: 'agendado',
+        origem: 'manual',
         observacoes: observacoesCombinadas,
         created_at: new Date().toISOString(),
         paciente: { id: novoForm.pacienteId, nome: novoForm.pacienteNome },
@@ -314,7 +413,11 @@ export function AgendamentosClient({
     setSaveError(null);
     setIsSaving(true);
 
-    const dataHora = `${editForm.data}T${editForm.hora}:00`;
+    // Converte para ISO (UTC) de forma segura para não sumir do calendário por erro de Timezone
+    const [ano, mes, dia] = editForm.data.split('-').map(Number);
+    const [hora, minuto] = editForm.hora.split(':').map(Number);
+    const dataHora = new Date(ano, mes - 1, dia, hora, minuto).toISOString();
+
     const result = await atualizarAgendamento(selectedApt.id, {
       dataHora,
       duracaoMinutos: parseInt(editForm.duracao, 10) || 30,
@@ -398,17 +501,43 @@ export function AgendamentosClient({
             </div>
           )}
 
-          {!isSecretaria && (
-            <GoogleCalendarSyncButton connected={calendarConnected} />
+          {/* Botão importar Google Calendar — secretária (dentista selecionado com GCal) */}
+          {isSecretaria &&
+            filtroDentistaId !== 'todos' &&
+            calendarConnectedPerDentista[filtroDentistaId] && (
+              <ImportCalendarButton
+                isImporting={isImporting}
+                progress={importProgress}
+                done={importDone}
+                onClick={() => void handleImportCalendar()}
+              />
+            )}
+
+          {/* Google Calendar — apenas plano SOLO (dentista autônomo) */}
+          {canEdit && !isSecretaria && (
+            <>
+              <GoogleCalendarSyncButton connected={calendarConnected} />
+              {calendarConnected && (
+                <ImportCalendarButton
+                  isImporting={isImporting}
+                  progress={importProgress}
+                  done={importDone}
+                  onClick={() => void handleImportCalendar()}
+                />
+              )}
+            </>
           )}
 
-          <button
-            onClick={() => { setSaveError(null); setIsNewModalOpen(true); }}
-            className="bg-teal text-white hover:bg-teal-lt px-5 py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(47,156,133,0.3)] w-full sm:w-auto"
-          >
-            <Plus className="w-4 h-4" />
-            Novo Agendamento
-          </button>
+          {/* Novo Agendamento — plano SOLO ou secretária */}
+          {canEdit && (
+            <button
+              onClick={() => { setSaveError(null); setIsNewModalOpen(true); }}
+              className="bg-teal text-white hover:bg-teal-lt px-5 py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(47,156,133,0.3)] w-full sm:w-auto"
+            >
+              <Plus className="w-4 h-4" />
+              Novo Agendamento
+            </button>
+          )}
         </div>
       </motion.header>
 
@@ -569,17 +698,25 @@ export function AgendamentosClient({
                                     <SelectContent className="bg-card border-border">
                                       <SelectItem value="agendado">Agendado</SelectItem>
                                       <SelectItem value="confirmado">Confirmado</SelectItem>
-                                      <SelectItem value="cancelado">Cancelado</SelectItem>
+                                      <SelectItem value="na_recepcao">Na Recepção</SelectItem>
+                                      <SelectItem value="em_atendimento">Em Atendimento</SelectItem>
                                       <SelectItem value="realizado">Realizado</SelectItem>
+                                      <SelectItem value="cancelado">Cancelado</SelectItem>
                                       <SelectItem value="faltou">Faltou</SelectItem>
                                     </SelectContent>
                                   </Select>
                                 </div>
                               </div>
 
-                              <h3 className="font-semibold text-lg text-foreground flex items-center gap-2">
+                              <h3 className="font-semibold text-lg text-foreground flex items-center gap-2 flex-wrap">
                                 <User className="w-4 h-4 text-muted-foreground" />
                                 {apt.paciente?.nome ?? '—'}
+                                {apt.origem === 'bot' && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 border border-violet-200 dark:border-violet-700">
+                                    <BotMessageSquare className="w-3 h-3" />
+                                    Via Bot
+                                  </span>
+                                )}
                               </h3>
 
                               {/* Nome do dentista — visível para secretária */}
@@ -620,15 +757,19 @@ export function AgendamentosClient({
                     </div>
                     <h3 className="text-lg font-semibold text-foreground">Nenhum agendamento</h3>
                     <p className="text-sm text-muted-foreground max-w-xs mx-auto mt-1">
-                      Não há compromissos marcados para este dia.
+                      {canEdit
+                        ? 'Nenhum compromisso para este dia. Clique abaixo para agendar.'
+                        : 'Nenhum compromisso marcado para este dia.'}
                     </p>
-                    <Button
-                      variant="outline"
-                      className="mt-6 rounded-xl border-border text-foreground hover:bg-muted"
-                      onClick={() => setIsNewModalOpen(true)}
-                    >
-                      Agendar agora
-                    </Button>
+                    {canEdit && (
+                      <Button
+                        variant="outline"
+                        className="mt-6 rounded-xl border-border text-foreground hover:bg-muted"
+                        onClick={() => setIsNewModalOpen(true)}
+                      >
+                        Agendar agora
+                      </Button>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -661,7 +802,13 @@ export function AgendamentosClient({
                   onValueChange={(v) => v && setNovoForm((f) => ({ ...f, dentistaId: v }))}
                 >
                   <SelectTrigger className="rounded-xl bg-muted border-border text-foreground">
-                    <SelectValue placeholder="Selecione o dentista..." />
+                    <SelectValue>
+                      {(v: string | null) =>
+                        v
+                          ? (dentistas.find((d) => d.id === v)?.nome ?? v)
+                          : 'Selecione o dentista...'
+                      }
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="bg-card border-border">
                     {dentistas.map((d) => (
@@ -894,8 +1041,10 @@ export function AgendamentosClient({
                         <SelectContent className="bg-card border-border">
                           <SelectItem value="agendado">Agendado</SelectItem>
                           <SelectItem value="confirmado">Confirmado</SelectItem>
-                          <SelectItem value="cancelado">Cancelado</SelectItem>
+                          <SelectItem value="na_recepcao">Na Recepção</SelectItem>
+                          <SelectItem value="em_atendimento">Em Atendimento</SelectItem>
                           <SelectItem value="realizado">Realizado</SelectItem>
+                          <SelectItem value="cancelado">Cancelado</SelectItem>
                           <SelectItem value="faltou">Faltou</SelectItem>
                         </SelectContent>
                       </Select>
@@ -1069,6 +1218,62 @@ export function AgendamentosClient({
           )}
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+// ─── ImportCalendarButton ─────────────────────────────────────────────────────
+
+interface ImportCalendarButtonProps {
+  isImporting: boolean;
+  progress:    number;
+  done:        boolean;
+  onClick:     () => void;
+}
+
+function ImportCalendarButton({ isImporting, progress, done, onClick }: ImportCalendarButtonProps) {
+  return (
+    <div className="relative">
+      <button
+        onClick={onClick}
+        disabled={isImporting}
+        className={`
+          relative overflow-hidden flex items-center gap-2 px-4 py-2.5 rounded-xl
+          border text-sm font-semibold transition-all duration-200
+          ${done
+            ? 'bg-teal/10 border-teal/30 text-teal'
+            : 'bg-surface border-border text-text-secondary hover:border-teal/40 hover:text-teal'
+          }
+          disabled:cursor-not-allowed
+        `}
+        style={isImporting ? { boxShadow: '0 0 20px -5px rgba(47,156,133,0.3)' } : {}}
+      >
+        {/* Ícone */}
+        {done ? (
+          <CheckCircle2 className="w-4 h-4 text-teal shrink-0" />
+        ) : isImporting ? (
+          <Loader2 className="w-4 h-4 animate-spin text-teal shrink-0" />
+        ) : (
+          <CalendarDays className="w-4 h-4 shrink-0" />
+        )}
+
+        {/* Label */}
+        <span className="whitespace-nowrap">
+          {done
+            ? 'Importado!'
+            : isImporting
+              ? 'Sincronizando...'
+              : 'Importar do Google'}
+        </span>
+
+        {/* Barra de progresso embutida no botão */}
+        {isImporting && (
+          <span
+            className="absolute bottom-0 left-0 h-[2px] bg-teal rounded-full transition-all duration-500 ease-out"
+            style={{ width: `${progress}%` }}
+          />
+        )}
+      </button>
     </div>
   );
 }

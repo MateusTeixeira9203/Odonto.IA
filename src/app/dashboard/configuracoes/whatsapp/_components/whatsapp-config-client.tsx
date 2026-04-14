@@ -38,7 +38,7 @@ export default function WhatsAppConfigClient({
 
       {/* Abas */}
       <Tabs defaultValue="conexao" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 h-14 p-1.5 bg-[--color-surface-alt] dark:bg-zinc-800 rounded-2xl border border-[--color-border]">
+        <TabsList className="grid w-full grid-cols-2 h-14 p-1.5 bg-surface-alt rounded-2xl border border-[--color-border]">
           <TabsTrigger
             value="conexao"
             className="flex items-center justify-center gap-2 rounded-xl text-base font-medium h-11 text-[--color-text-secondary] data-[state=active]:bg-[--color-surface] data-[state=active]:text-[--color-teal] data-[state=active]:shadow-md data-[state=active]:border-b-2 data-[state=active]:border-b-[--color-teal] transition-all"

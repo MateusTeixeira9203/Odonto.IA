@@ -36,10 +36,14 @@ export async function createInstance(instanceName: string): Promise<InstanceCrea
     body: JSON.stringify({
       instanceName,
       qrcode: true,
-      number: null,
-      webhook: webhookUrl,
-      webhook_by_events: true,
-      events: ['messages'],
+      integration: 'WHATSAPP-BAILEYS',
+      webhook: {
+        enabled: true,
+        url: webhookUrl,
+        webhookByEvents: true,
+        webhookBase64: false,
+        events: ['MESSAGES_UPSERT'],
+      },
     }),
   });
 
@@ -50,9 +54,13 @@ export async function createInstance(instanceName: string): Promise<InstanceCrea
 
   const data = await res.json() as Record<string, unknown>;
 
-  // A Evolution API pode retornar o qrcode em diferentes caminhos
-  const qrcode =
-    (data.qrcode as string | null) ??
+  // v2: data.qrcode é objeto { base64, code } — extrair .base64
+  // fallback para versões legadas onde qrcode é string direta
+  const qrcodeObj = data.qrcode as Record<string, unknown> | string | null | undefined;
+  const qrcode: string | null =
+    (typeof qrcodeObj === 'object' && qrcodeObj !== null
+      ? (qrcodeObj.base64 as string | null)
+      : (qrcodeObj as string | null)) ??
     ((data.hash as Record<string, unknown> | undefined)?.qrcode as string | null) ??
     null;
 
@@ -65,12 +73,14 @@ export async function createInstance(instanceName: string): Promise<InstanceCrea
  */
 export async function getQRCode(instanceName: string): Promise<string | null> {
   try {
-    const res = await fetch(`${baseUrl()}/instance/qrcode/${instanceName}`, {
+    // v2: endpoint correto para obter QR code é /instance/connect/
+    const res = await fetch(`${baseUrl()}/instance/connect/${instanceName}`, {
       headers: adminHeaders(),
     });
     if (!res.ok) return null;
 
     const data = await res.json() as Record<string, unknown>;
+    // v2 retorna { base64, code, pairingCode } diretamente
     return (
       (data.base64 as string | null) ??
       ((data.qrcode as Record<string, unknown> | undefined)?.base64 as string | null) ??

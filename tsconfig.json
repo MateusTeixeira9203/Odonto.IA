@@ -30,5 +30,14 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "src/app/landing-page",
+    "src/app/planos/_app",
+    "src/app/planos/components",
+    "src/app/planos/hooks",
+    "src/app/planos/lib",
+    "src/app/planos/next.config.ts",
+    "src/app/planos/next-env.d.ts"
+  ]
 }

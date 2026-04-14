@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   CircleDollarSign,
   Search,
@@ -16,7 +16,12 @@ import {
   Plus,
   Trash2,
   Edit2,
+  Banknote,
+  QrCode,
+  User,
 } from 'lucide-react';
+import QRCode from 'react-qr-code';
+import type { DentistaRole } from '@/types/database';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -37,6 +42,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { createClient } from '@/lib/supabase/client';
@@ -46,6 +52,7 @@ import { BotaoEnviarWhatsApp } from '@/components/orcamentos/botao-enviar-whatsa
 import {
   atualizarStatusOrcamento,
   registrarPagamento,
+  registrarPagamentoRapido,
   criarOrcamento,
   editarOrcamento,
   excluirOrcamento,
@@ -59,9 +66,9 @@ const STATUS_MAP: Record<
   { label: string; icon: React.ElementType; color: string; bg: string }
 > = {
   aprovado: { label: 'Aprovado', icon: CheckCircle2, color: 'text-teal', bg: 'bg-teal/10' },
-  enviado: { label: 'Enviado', icon: Clock, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-  rascunho: { label: 'Rascunho', icon: FileText, color: 'text-muted-foreground', bg: 'bg-muted' },
-  recusado: { label: 'Recusado', icon: XCircle, color: 'text-red-500', bg: 'bg-red-500/10' },
+  enviado:  { label: 'Enviado',  icon: Clock,     color: 'text-text-secondary', bg: 'bg-surface-alt' },
+  rascunho: { label: 'Rascunho', icon: FileText,  color: 'text-muted-foreground', bg: 'bg-muted' },
+  recusado: { label: 'Recusado', icon: XCircle,   color: 'text-coral',          bg: 'bg-coral/10' },
 };
 
 const formatCurrency = (value: number | null) =>
@@ -83,10 +90,18 @@ interface NovoOrcItem {
 export function OrcamentosClient({
   orcamentos: inicial,
   clinicaId,
+  role,
+  temSecretaria = false,
+  canEdit = false,
 }: {
   orcamentos: OrcamentoRow[];
   clinicaId: string;
+  role: DentistaRole;
+  temSecretaria?: boolean;
+  canEdit?: boolean;
+  dentistas?: { id: string; nome: string }[];
 }) {
+  const isSecretaria = role === 'secretaria';
   const router = useRouter();
   const [orcamentos, setOrcamentos] = useState(inicial);
   const [searchTerm, setSearchTerm] = useState('');
@@ -129,6 +144,20 @@ export function OrcamentosClient({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleteSaving, setDeleteSaving] = useState(false);
 
+  // Secretaria: controles extras
+  const [filterDentista, setFilterDentista] = useState<string>('todos');
+  const [viewedIds, setViewedIds] = useState<Set<string>>(new Set());
+  const [pixModalOrc, setPixModalOrc] = useState<OrcamentoRow | null>(null);
+  const [pagRapidoSaving, setPagRapidoSaving] = useState(false);
+
+  // Estado das Abas (Tabs) da Secretária
+  const [activeTabId, setActiveTabId] = useState<string>('');
+  useEffect(() => {
+    if (isSecretaria && (dentistas?.length ?? 0) > 0 && !activeTabId) {
+      setActiveTabId(dentistas![0].id);
+    }
+  }, [isSecretaria, dentistas, activeTabId]);
+
   // Busca procedimentos da clínica ao montar
   useEffect(() => {
     const supabase = createClient();
@@ -160,19 +189,40 @@ export function OrcamentosClient({
 
   const novoOrcTotal = novoOrcItens.reduce((s, i) => s + i.quantidade * i.preco, 0);
 
-  // Filtra por busca e status
-  const filtered = useMemo(
-    () =>
-      orcamentos.filter((o) => {
-        const nome = o.paciente?.nome ?? '';
-        const matchesSearch =
-          nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          o.id.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesStatus = filterStatus === 'todos' || o.status === filterStatus;
-        return matchesSearch && matchesStatus;
-      }),
-    [orcamentos, searchTerm, filterStatus]
-  );
+  // Dentistas únicos para o dropdown da secretaria
+  const dentistasUnicos = useMemo(() => {
+    const map = new Map<string, string>();
+    orcamentos.forEach((o) => {
+      if (o.dentista?.id) map.set(o.dentista.id, o.dentista.nome);
+    });
+    return Array.from(map.entries()).map(([id, nome]) => ({ id, nome }));
+  }, [orcamentos]);
+
+  // Hoje para filtro "Pagos hoje"
+  const hoje = new Date().toISOString().split('T')[0];
+
+  // Filtra por busca, status, dentista e filtros rápidos da secretaria
+  const filtered = useMemo(() => {
+    return orcamentos.filter((o) => {
+      const nome = o.paciente?.nome ?? '';
+      const matchesSearch =
+        nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        o.id.toLowerCase().includes(searchTerm.toLowerCase());
+
+      let matchesStatus = filterStatus === 'todos' || o.status === filterStatus;
+      // Filtros rápidos exclusivos da secretaria
+      if (filterStatus === 'pendentes') {
+        matchesStatus = o.status === 'enviado' || o.status === 'rascunho';
+      } else if (filterStatus === 'pagos_hoje') {
+        matchesStatus = o.pagamentos.some((p) => p.data_pagamento === hoje);
+      }
+
+      const matchesDentista =
+        filterDentista === 'todos' || o.dentista?.id === filterDentista;
+
+      return matchesSearch && matchesStatus && matchesDentista;
+    });
+  }, [orcamentos, searchTerm, filterStatus, filterDentista, hoje]);
 
   // Métricas do mês atual
   const agora = new Date();
@@ -189,6 +239,21 @@ export function OrcamentosClient({
   const totalValidos = orcamentos.filter((o) => o.status !== 'rascunho').length;
   const totalAprovadosCount = orcamentos.filter((o) => o.status === 'aprovado').length;
   const taxaConversao = totalValidos > 0 ? Math.round((totalAprovadosCount / totalValidos) * 100) : 0;
+
+  // DEX: Dispara notificação se houver orçamentos novos (somente secretária)
+  const notifiedIds = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (isSecretaria) {
+      orcamentos.forEach(o => {
+        if (o.status === 'enviado' && !viewedIds.has(o.id) && !notifiedIds.current.has(o.id)) {
+          notifiedIds.current.add(o.id);
+          toast(`🤖 DEX: Novo orçamento de ${o.paciente?.nome} gerado por Dr(a). ${o.dentista?.nome}`, {
+            style: { background: '#131313', color: '#2f9c85', borderColor: '#2f9c85' }
+          });
+        }
+      });
+    }
+  }, [orcamentos, isSecretaria, viewedIds]);
 
   // Atualiza status via server action
   const handleStatusChange = async (id: string, status: StatusOrcamento) => {
@@ -361,6 +426,39 @@ export function OrcamentosClient({
     setEditSaving(false);
   };
 
+  const handlePagamentoRapido = async (formaPagamento: FormaPagamento) => {
+    if (!selected) return;
+    setPagRapidoSaving(true);
+    const result = await registrarPagamentoRapido({
+      orcamentoId: selected.id,
+      pacienteId: selected.paciente?.id ?? '',
+      total: selected.total ?? 0,
+      formaPagamento,
+    });
+    if (!result.error) {
+      const novoPag: PagamentoRow = {
+        id: result.id ?? crypto.randomUUID(),
+        orcamento_id: selected.id,
+        valor: selected.total ?? 0,
+        status: 'pago',
+        forma_pagamento: formaPagamento,
+        data_pagamento: hoje,
+      };
+      setOrcamentos((prev) =>
+        prev.map((o) =>
+          o.id === selected.id
+            ? { ...o, status: 'aprovado', pagamentos: [...o.pagamentos, novoPag] }
+            : o
+        )
+      );
+      setSelected((prev) =>
+        prev ? { ...prev, status: 'aprovado', pagamentos: [...prev.pagamentos, novoPag] } : prev
+      );
+      router.refresh();
+    }
+    setPagRapidoSaving(false);
+  };
+
   const handleExcluir = async () => {
     if (!confirmDeleteId) return;
     setDeleteSaving(true);
@@ -386,68 +484,75 @@ export function OrcamentosClient({
           <h1 className="font-heading text-4xl text-foreground mb-2">Orçamentos</h1>
           <p className="text-muted-foreground text-sm font-medium">Acompanhe propostas e conversões.</p>
         </div>
-        <button
-          onClick={() => {
-            setOrcError(null);
-            setNovoOrcItens([{ procedimentoId: '', descricao: '', quantidade: 1, preco: 0 }]);
-            setNovoOrcPacienteSearch('');
-            setNovoOrcPacienteId('');
-            setNovoOrcPacienteNome('');
-            setIsNovoOrcOpen(true);
-          }}
-          className="bg-teal hover:bg-teal-lt text-white px-5 py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-colors shadow-[0_0_15px_rgba(47,156,133,0.3)] w-full sm:w-auto"
-        >
-          <Plus className="w-4 h-4" />
-          Novo Orçamento
-        </button>
+        {canEdit && (
+          <button
+            onClick={() => {
+              setOrcError(null);
+              setNovoOrcItens([{ procedimentoId: '', descricao: '', quantidade: 1, preco: 0 }]);
+              setNovoOrcPacienteSearch('');
+              setNovoOrcPacienteId('');
+              setNovoOrcPacienteNome('');
+              setIsNovoOrcOpen(true);
+            }}
+            className="bg-teal hover:bg-teal-lt text-white px-5 py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-colors shadow-[0_0_15px_rgba(47,156,133,0.3)] w-full sm:w-auto"
+          >
+            <Plus className="w-4 h-4" />
+            Novo Orçamento
+          </button>
+        )}
       </motion.header>
 
-      {/* Cards de métricas */}
+      {/* Cards de métricas (dentista/admin) ou filtros rápidos (secretaria) */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8"
+        className="mb-8"
       >
-        <div className="bg-card p-5 rounded-2xl border border-border shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-teal/10 text-teal flex items-center justify-center">
-            <CheckCircle2 className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.15em] mb-1">
-              Aprovados (Mês)
+        {!isSecretaria && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-card p-5 rounded-2xl border border-border shadow-sm flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-teal/10 text-teal flex items-center justify-center">
+                <CheckCircle2 className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.15em] mb-1">
+                  Aprovados (Mês)
+                </div>
+                <div className="font-mono text-2xl font-semibold text-foreground">
+                  {formatCurrency(totalAprovados)}
+                </div>
+              </div>
             </div>
-            <div className="font-mono text-2xl font-semibold text-foreground">
-              {formatCurrency(totalAprovados)}
-            </div>
-          </div>
-        </div>
 
-        <div className="bg-card p-5 rounded-2xl border border-border shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center">
-            <Clock className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.15em] mb-1">
-              Aguardando
+            <div className="bg-card p-5 rounded-2xl border border-border shadow-sm flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-surface-alt text-text-secondary flex items-center justify-center">
+                <Clock className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.15em] mb-1">
+                  Aguardando
+                </div>
+                <div className="font-mono text-2xl font-semibold text-foreground">
+                  {formatCurrency(totalAguardando)}
+                </div>
+              </div>
             </div>
-            <div className="font-mono text-2xl font-semibold text-foreground">
-              {formatCurrency(totalAguardando)}
-            </div>
-          </div>
-        </div>
 
-        <div className="bg-zinc-950 dark:bg-zinc-900 p-5 rounded-2xl border border-zinc-950 dark:border-white/10 shadow-lg flex items-center gap-4 text-white">
-          <div className="w-12 h-12 rounded-full bg-white/10 text-teal-lt flex items-center justify-center">
-            <CircleDollarSign className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] mb-1">
-              Taxa de Conversão
+            <div className="p-5 rounded-2xl shadow-lg flex items-center gap-4 text-white backdrop-blur-md"
+              style={{ background: 'rgba(13,13,13,0.92)', border: '1px solid rgba(47,156,133,0.25)' }}>
+              <div className="w-12 h-12 rounded-full bg-teal/15 text-teal flex items-center justify-center">
+                <CircleDollarSign className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="text-[10px] font-bold text-white/40 uppercase tracking-[0.15em] mb-1">
+                  Taxa de Conversão
+                </div>
+                <div className="font-mono text-2xl font-semibold text-white">{taxaConversao}%</div>
+              </div>
             </div>
-            <div className="font-mono text-2xl font-semibold text-white">{taxaConversao}%</div>
           </div>
-        </div>
+        )}
       </motion.div>
 
       {/* Tabela */}
@@ -457,9 +562,9 @@ export function OrcamentosClient({
         transition={{ delay: 0.2 }}
         className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden"
       >
-        {/* Barra de busca e filtro */}
-        <div className="p-4 border-b border-border flex flex-col sm:flex-row gap-4 items-center justify-between bg-muted/30">
-          <div className="relative w-full sm:max-w-md">
+        {/* Barra de busca e filtros */}
+        <div className="p-4 border-b border-border flex flex-col sm:flex-row gap-3 items-center bg-muted/30">
+          <div className="relative w-full sm:max-w-xs">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
               type="text"
@@ -469,20 +574,41 @@ export function OrcamentosClient({
               className="w-full pl-9 pr-4 py-2.5 bg-card border border-border rounded-xl text-sm outline-none focus:border-teal transition-colors font-sans text-foreground"
             />
           </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <Filter className="w-4 h-4 text-muted-foreground shrink-0" />
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="border border-border bg-card rounded-xl px-3 py-2 text-sm font-semibold text-foreground outline-none focus:border-teal transition-colors w-full sm:w-auto"
-            >
-              <option value="todos">Todos</option>
-              <option value="aprovado">Aprovados</option>
-              <option value="enviado">Enviados</option>
-              <option value="rascunho">Rascunhos</option>
-              <option value="recusado">Recusados</option>
-            </select>
-          </div>
+
+          {/* Filtro de status — visível apenas para dentista/admin */}
+          {!isSecretaria && (
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <Filter className="w-4 h-4 text-muted-foreground shrink-0" />
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="border border-border bg-card rounded-xl px-3 py-2 text-sm font-semibold text-foreground outline-none focus:border-teal transition-colors w-full sm:w-auto"
+              >
+                <option value="todos">Todos</option>
+                <option value="aprovado">Aprovados</option>
+                <option value="enviado">Enviados</option>
+                <option value="rascunho">Rascunhos</option>
+                <option value="recusado">Recusados</option>
+              </select>
+            </div>
+          )}
+
+          {/* Filtro por dentista — visível para todos quando há mais de um dentista */}
+          {dentistasUnicos.length > 1 && (
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <User className="w-4 h-4 text-muted-foreground shrink-0" />
+              <select
+                value={filterDentista}
+                onChange={(e) => setFilterDentista(e.target.value)}
+                className="border border-border bg-card rounded-xl px-3 py-2 text-sm font-semibold text-foreground outline-none focus:border-teal transition-colors w-full sm:w-auto"
+              >
+                <option value="todos">Todos os dentistas</option>
+                {dentistasUnicos.map((d) => (
+                  <option key={d.id} value={d.id}>{d.nome}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         <div className="overflow-x-auto">
@@ -494,6 +620,9 @@ export function OrcamentosClient({
                 </th>
                 <th className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-[0.15em]">
                   Paciente
+                </th>
+                <th className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-[0.15em]">
+                  Dentista
                 </th>
                 <th className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-[0.15em]">
                   Valor Total
@@ -515,6 +644,7 @@ export function OrcamentosClient({
               {filtered.map((o, i) => {
                 const s = STATUS_MAP[o.status] ?? STATUS_MAP.rascunho;
                 const Icon = s.icon;
+                const isNovo = isSecretaria && o.status === 'enviado' && !viewedIds.has(o.id);
                 return (
                   <motion.tr
                     initial={{ opacity: 0, x: -10 }}
@@ -529,12 +659,22 @@ export function OrcamentosClient({
                         formaPagamento: 'pix',
                         data: new Date().toISOString().split('T')[0],
                       });
+                      // Marca como visto ao abrir
+                      setViewedIds((prev) => new Set([...prev, o.id]));
                     }}
                     className="hover:bg-muted/50 transition-colors group cursor-pointer"
                   >
                     <td className="px-6 py-4">
-                      <div className="font-mono text-xs font-semibold text-foreground">
-                        {o.id.slice(0, 8).toUpperCase()}
+                      <div className="flex items-center gap-2">
+                        <div className="font-mono text-xs font-semibold text-foreground">
+                          {o.id.slice(0, 8).toUpperCase()}
+                        </div>
+                        {isNovo && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-teal/15 text-teal text-[9px] font-bold uppercase tracking-wider">
+                            <span className="w-1.5 h-1.5 rounded-full bg-teal animate-pulse" />
+                            Novo
+                          </span>
+                        )}
                       </div>
                       <div className="text-[10px] text-muted-foreground mt-1">
                         {format(parseISO(o.created_at), "dd 'de' MMM 'de' yyyy", { locale: ptBR })}
@@ -543,6 +683,11 @@ export function OrcamentosClient({
                     <td className="px-6 py-4">
                       <div className="font-semibold text-sm text-foreground group-hover:text-teal transition-colors">
                         {o.paciente?.nome ?? '—'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-muted-foreground">
+                        {o.dentista?.nome ?? '—'}
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -574,6 +719,7 @@ export function OrcamentosClient({
           Exibindo {filtered.length} de {orcamentos.length} orçamento{orcamentos.length !== 1 ? 's' : ''}
         </div>
       </motion.div>
+      )}
 
       {/* Painel lateral de detalhe */}
       <AnimatePresence>
@@ -610,7 +756,7 @@ export function OrcamentosClient({
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  {!editMode && (
+                  {!editMode && !isSecretaria && (
                     <>
                       <BotaoDownloadPDF orcamentoId={selected.id} />
                       <BotaoEnviarWhatsApp
@@ -645,7 +791,41 @@ export function OrcamentosClient({
               </div>
 
               <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                {/* Alterar status */}
+                {/* Ações rápidas da secretária */}
+                {isSecretaria && selected.status !== 'aprovado' && (
+                  <div className="bg-muted/40 border border-border rounded-2xl p-5 space-y-3">
+                    <label className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest block">
+                      Ações Rápidas
+                    </label>
+                    <div className="grid grid-cols-1 gap-2">
+                      <button
+                        onClick={() => void handlePagamentoRapido('dinheiro')}
+                        disabled={pagRapidoSaving}
+                        className="flex items-center gap-3 px-4 py-3 bg-teal/10 hover:bg-teal/20 border border-teal/20 text-teal rounded-xl text-sm font-semibold transition-all disabled:opacity-50"
+                      >
+                        <Banknote className="w-4 h-4 shrink-0" />
+                        Registrar Dinheiro
+                      </button>
+                      <button
+                        onClick={() => setPixModalOrc(selected)}
+                        className="flex items-center gap-3 px-4 py-3 bg-teal/10 hover:bg-teal/20 border border-teal/20 text-teal rounded-xl text-sm font-semibold transition-all"
+                      >
+                        <QrCode className="w-4 h-4 shrink-0" />
+                        Gerar QR Code PIX
+                      </button>
+                      <BotaoEnviarWhatsApp
+                        orcamentoId={selected.id}
+                        pacienteTelefone={selected.paciente?.telefone}
+                        pacienteNome={selected.paciente?.nome ?? ''}
+                        valorTotal={selected.total}
+                        variant="full"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Alterar status (apenas dentista/admin) */}
+                {!isSecretaria && (
                 <div>
                   <label className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest mb-2 block">
                     Status do Orçamento
@@ -667,19 +847,57 @@ export function OrcamentosClient({
                     ))}
                   </div>
                 </div>
+                )}
 
-                {/* Valor total */}
-                <div className="bg-teal/10 rounded-2xl p-5 border border-teal/20">
-                  <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">
-                    Valor Total
-                  </div>
-                  <div className="font-mono text-3xl font-bold text-teal">
-                    {formatCurrency(selected.total)}
-                  </div>
-                  {selected.condicoes_pagamento && (
-                    <div className="text-xs text-muted-foreground mt-2">{selected.condicoes_pagamento}</div>
-                  )}
-                </div>
+                {/* Valor total / Pago / Restante */}
+                {(() => {
+                  const valorPago = selected.pagamentos
+                    .filter((p) => p.status === 'pago')
+                    .reduce((s, p) => s + p.valor, 0);
+                  const valorRestante = Math.max(0, (selected.total ?? 0) - valorPago);
+                  return (
+                    <div className="bg-teal/10 rounded-2xl p-5 border border-teal/20 space-y-3">
+                      <div>
+                        <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">
+                          Valor Total
+                        </div>
+                        <div className="font-mono text-3xl font-bold text-teal">
+                          {formatCurrency(selected.total)}
+                        </div>
+                        {selected.condicoes_pagamento && (
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {selected.condicoes_pagamento}
+                          </div>
+                        )}
+                      </div>
+
+                      {valorPago > 0 && (
+                        <div className="border-t border-teal/20 pt-3 grid grid-cols-2 gap-3">
+                          <div>
+                            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-0.5">
+                              Pago
+                            </div>
+                            <div className="font-mono text-lg font-bold text-teal">
+                              {formatCurrency(valorPago)}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-0.5">
+                              Restante
+                            </div>
+                            <div
+                              className={`font-mono text-lg font-bold ${
+                                valorRestante > 0 ? 'text-amber-500' : 'text-teal'
+                              }`}
+                            >
+                              {formatCurrency(valorRestante)}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Itens do orçamento */}
                 <div>
@@ -855,7 +1073,8 @@ export function OrcamentosClient({
                   </div>
                 )}
 
-                {/* Registrar pagamento */}
+                {/* Registrar pagamento (dentista/admin) */}
+                {!isSecretaria && (
                 <div className="bg-muted/40 border border-border rounded-2xl p-5 space-y-4">
                   <label className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest flex items-center gap-2">
                     <CreditCard className="w-3 h-3" /> Registrar Pagamento
@@ -925,6 +1144,7 @@ export function OrcamentosClient({
                     {pagSaving ? 'Salvando...' : 'Confirmar Pagamento'}
                   </Button>
                 </div>
+                )}
 
                 {/* Link para o paciente */}
                 {selected.paciente?.id && (
@@ -940,6 +1160,42 @@ export function OrcamentosClient({
           </>
         )}
       </AnimatePresence>
+
+      {/* Dialog: QR Code PIX */}
+      <Dialog open={!!pixModalOrc} onOpenChange={(open) => { if (!open) setPixModalOrc(null); }}>
+        <DialogContent className="max-w-sm rounded-2xl bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-xl text-foreground">QR Code PIX</DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              Apresente ao paciente para pagamento no balcão.
+            </DialogDescription>
+          </DialogHeader>
+          {pixModalOrc && (
+            <div className="flex flex-col items-center gap-4 py-2">
+              <div className="bg-white p-4 rounded-2xl border border-border">
+                <QRCode
+                  value={`DentIA | Paciente: ${pixModalOrc.paciente?.nome ?? ''} | Valor: ${formatCurrency(pixModalOrc.total)} | ID: ${pixModalOrc.id.slice(0, 8).toUpperCase()}`}
+                  size={180}
+                />
+              </div>
+              <div className="text-center space-y-1">
+                <div className="font-semibold text-foreground">{pixModalOrc.paciente?.nome ?? '—'}</div>
+                <div className="font-mono text-2xl font-bold text-teal">{formatCurrency(pixModalOrc.total)}</div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Configure a chave PIX da clínica nas configurações para gerar o QR oficial.
+                </p>
+              </div>
+              <Button
+                onClick={() => void handlePagamentoRapido('pix').then(() => setPixModalOrc(null))}
+                disabled={pagRapidoSaving}
+                className="w-full bg-teal text-white hover:bg-teal-lt rounded-xl"
+              >
+                {pagRapidoSaving ? 'Registrando...' : 'Confirmar Pagamento PIX'}
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog: Confirmar exclusão de orçamento */}
       <Dialog
@@ -1073,7 +1329,13 @@ export function OrcamentosClient({
                     }}
                   >
                     <SelectTrigger className="rounded-xl bg-card border-border text-foreground">
-                      <SelectValue placeholder="Selecionar da clínica (opcional)..." />
+                      <SelectValue>
+                        {(v: string | null) =>
+                          v
+                            ? (procedimentosClinica.find((p) => p.id === v)?.nome ?? v)
+                            : 'Selecionar da clínica (opcional)...'
+                        }
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent className="bg-card border-border">
                       {procedimentosClinica.map((p) => (

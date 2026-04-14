@@ -5,6 +5,17 @@ import type { NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import type { CookieOptions } from "@supabase/ssr";
 
+/**
+ * Auth callback — ponto único de entrada pós-autenticação.
+ *
+ * Responsabilidades:
+ *  1. Trocar token por sessão (code ou token_hash)
+ *  2. Identificar se o usuário tem convite pendente na tabela `convites`
+ *  3. Criar/vincular dentista à clínica correta — status_convite sempre 'aceito'
+ *  4. Redirecionar:
+ *       - Tem clinica_id  → /dashboard?welcome=true
+ *       - Sem clinica_id  → /onboarding
+ */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const { searchParams, origin } = new URL(request.url);
   const code       = searchParams.get("code");
@@ -12,8 +23,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const type       = searchParams.get("type") as EmailOtpType | null;
   const next       = searchParams.get("next");
 
-  // Coleta os cookies que o Supabase precisa escrever durante o exchange.
-  // Serão copiados para a resposta final — padrão obrigatório em Route Handlers.
   const pendingCookies: Array<{ name: string; value: string; options: CookieOptions }> = [];
 
   const supabase = createServerClient(
@@ -21,9 +30,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
+        getAll() { return request.cookies.getAll(); },
         setAll(cookiesToSet) {
           cookiesToSet.forEach((c) => pendingCookies.push(c));
         },
@@ -33,101 +40,115 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   // ── 1. TROCAR TOKEN POR SESSÃO ─────────────────────────────────────────────
   if (code) {
-    // Fluxo PKCE — gerado pelo Supabase para signIn/signUp/invite via código
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) {
       console.error("[callback] exchangeCodeForSession falhou:", error.message);
       return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`);
     }
   } else if (token_hash && type) {
-    // Fluxo OTP — convites e magic links enviam token_hash + type
     const { error } = await supabase.auth.verifyOtp({ token_hash, type });
     if (error) {
       console.error("[callback] verifyOtp falhou:", error.message);
       return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`);
     }
   } else {
-    // Sem código — redirect direto ao login
     return NextResponse.redirect(`${origin}/login`);
   }
 
-  // ── 2. OBTER USUÁRIO E DECIDIR REDIRECIONAMENTO ───────────────────────────
+  // ── 2. OBTER USUÁRIO DA SESSÃO ─────────────────────────────────────────────
   const { data: { user } } = await supabase.auth.getUser();
-  console.log("[callback] user id:", user?.id ?? "null");
-  console.log("[callback] user metadata:", JSON.stringify(user?.user_metadata ?? {}));
+  if (!user) return NextResponse.redirect(`${origin}/login`);
 
-  if (!user) {
-    return NextResponse.redirect(`${origin}/login`);
-  }
+  const service = createServiceClient();
 
-  const meta = user.user_metadata as {
-    role?: string;
-    clinica_id?: string;
-    nome?: string;
-  };
-
-  let redirectTo = `${origin}/dashboard`;
-
-  // ── FLUXO DE CONVITE ───────────────────────────────────────────────────────
-  // Verifica ANTES do `next` para evitar redirect prematuro sem criar dentista.
-  if (meta.role && meta.clinica_id) {
-    console.log("[callback] convite — role:", meta.role, "clinica_id:", meta.clinica_id);
-
-    const { data: existing } = await supabase
-      .from("dentistas")
-      .select("id")
-      .eq("user_id", user.id)
+  // ── 3. IDENTIFICAÇÃO DE CONVITE ────────────────────────────────────────────
+  // Busca na tabela convites pelo email — fonte de verdade independente do JWT.
+  if (user.email) {
+    const { data: convite } = await service
+      .from("convites")
+      .select("role, clinica_id")
+      .eq("email", user.email)
+      .gt("expires_at", new Date().toISOString())
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
-    if (!existing) {
-      const service = createServiceClient();
-      const { error: insertError } = await service.from("dentistas").insert({
-        user_id:    user.id,
-        clinica_id: meta.clinica_id,
-        nome:       meta.nome ?? user.email?.split("@")[0] ?? "Usuário",
-        email:      user.email ?? null,
-        role:       meta.role,
-        ativo:      true,
-      });
+    if (convite) {
+      const role       = convite.role as string;
+      const clinica_id = convite.clinica_id as string;
 
-      if (insertError) {
-        console.error("[callback] erro ao inserir dentista:", insertError.message);
-      } else {
-        console.log("[callback] dentista criado — role:", meta.role);
+      // Todo convidado entra diretamente com status aceito — boas-vindas no dashboard
+      const status_convite = "aceito";
+
+      // Cria o dentista apenas se ainda não existe (proteção contra dupla execução)
+      const { data: existing } = await service
+        .from("dentistas")
+        .select("id, clinica_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (!existing) {
+        const { error: insertError } = await service.from("dentistas").insert({
+          user_id:        user.id,
+          clinica_id,
+          nome:           (user.user_metadata?.nome as string | undefined)
+                          ?? user.email.split("@")[0],
+          email:          user.email,
+          role,
+          ativo:          true,
+          status_convite,
+        });
+
+        if (insertError) {
+          console.error("[callback] erro ao criar dentista:", insertError.message);
+          // Continua mesmo com erro — o layout fará fallback via service role
+        }
       }
 
+      // Remove convite após uso
       await service
         .from("convites")
         .delete()
-        .eq("clinica_id", meta.clinica_id)
-        .eq("email", user.email ?? "");
-    } else {
-      console.log("[callback] dentista já existe:", existing.id);
+        .eq("email", user.email)
+        .eq("clinica_id", clinica_id);
+
+      // Tem clinica_id → dashboard com modal de boas-vindas
+      const redirectTo = existing?.clinica_id ?? clinica_id
+        ? `${origin}/dashboard?welcome=true`
+        : `${origin}/onboarding`;
+
+      const response = NextResponse.redirect(redirectTo);
+      pendingCookies.forEach(({ name, value, options }) =>
+        response.cookies.set(name, value, options)
+      );
+      return response;
     }
-
-    redirectTo = `${origin}/dashboard`;
-  }
-  // ── FLUXO COM PARÂMETRO `next` (ex: redefinição de senha) ─────────────────
-  else if (next && next.startsWith("/") && !next.startsWith("//")) {
-    redirectTo = `${origin}${next}`;
-  }
-  // ── CONFIRMAÇÃO DE EMAIL (novo usuário sem convite) ───────────────────────
-  else {
-    const { data: dentista } = await supabase
-      .from("dentistas")
-      .select("id")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    redirectTo = dentista ? `${origin}/dashboard` : `${origin}/email-confirmado`;
   }
 
-  // ── 3. RETORNAR REDIRECT COM COOKIES DE SESSÃO ────────────────────────────
-  // Os cookies são escritos direto na resposta de redirect para garantir que
-  // a sessão seja transmitida ao browser no mesmo round-trip.
+  // ── 4. OUTROS FLUXOS (reset de senha, confirmação de email, etc.) ──────────
+  // Parâmetro `next` tem prioridade (ex: redefinir-senha)
+  if (next && next.startsWith("/") && !next.startsWith("//")) {
+    const response = NextResponse.redirect(`${origin}${next}`);
+    pendingCookies.forEach(({ name, value, options }) =>
+      response.cookies.set(name, value, options)
+    );
+    return response;
+  }
+
+  // Sem convite e sem next → verifica se o usuário já tem dentista
+  const { data: dentista } = await supabase
+    .from("dentistas")
+    .select("clinica_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const redirectTo = dentista?.clinica_id
+    ? `${origin}/dashboard`
+    : `${origin}/onboarding`;
+
   const response = NextResponse.redirect(redirectTo);
-  pendingCookies.forEach(({ name, value, options }) => {
-    response.cookies.set(name, value, options);
-  });
+  pendingCookies.forEach(({ name, value, options }) =>
+    response.cookies.set(name, value, options)
+  );
   return response;
 }

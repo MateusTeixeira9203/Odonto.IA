@@ -8,6 +8,8 @@ interface BotaoEnviarWhatsAppProps {
   pacienteTelefone: string | null | undefined;
   pacienteNome: string;
   valorTotal: number | null;
+  /** "full" exibe botão largo com texto (usado nas ações rápidas da secretária) */
+  variant?: 'icon' | 'full';
 }
 
 function formatarTelefone(telefone: string): string {
@@ -25,6 +27,7 @@ export function BotaoEnviarWhatsApp({
   pacienteTelefone,
   pacienteNome,
   valorTotal,
+  variant = 'icon',
 }: BotaoEnviarWhatsAppProps) {
   function handleEnviar() {
     if (!pacienteTelefone) {
@@ -36,10 +39,12 @@ export function BotaoEnviarWhatsApp({
     const valorFormatado = formatarMoeda(valorTotal ?? 0);
     const codigoOrc = orcamentoId.slice(0, 8).toUpperCase();
 
+    const pdfUrl = `${window.location.origin}/api/orcamentos/${orcamentoId}/pdf`;
+
     const mensagem = encodeURIComponent(
       `Olá ${pacienteNome}! 👋\n\n` +
         `Segue o orçamento #${codigoOrc} no valor de ${valorFormatado}.\n\n` +
-        `Você pode visualizar e baixar o PDF do orçamento acessando sua área do paciente.\n\n` +
+        `📄 Acesse o PDF aqui: ${pdfUrl}\n\n` +
         `Qualquer dúvida, estamos à disposição! 😊\n\n` +
         `_Enviado via Dent IA_`
     );
@@ -50,11 +55,26 @@ export function BotaoEnviarWhatsApp({
 
   const semTelefone = !pacienteTelefone;
 
+  if (variant === 'full') {
+    return (
+      <button
+        onClick={handleEnviar}
+        disabled={semTelefone}
+        className="flex items-center gap-3 px-4 py-3 bg-teal/10 hover:bg-teal/20 border border-teal/20 text-teal rounded-xl text-sm font-semibold transition-all disabled:opacity-50 w-full"
+        title={semTelefone ? "Paciente sem telefone cadastrado" : "Enviar por WhatsApp"}
+      >
+        <MessageCircle className="w-4 h-4 shrink-0" />
+        Enviar por WhatsApp
+        {semTelefone && <span className="ml-auto text-[10px] font-normal text-muted-foreground">sem telefone</span>}
+      </button>
+    );
+  }
+
   return (
     <button
       onClick={handleEnviar}
       disabled={semTelefone}
-      className="p-2 rounded-xl hover:bg-green-500/10 transition-colors text-muted-foreground hover:text-green-600 disabled:opacity-40"
+      className="p-2 rounded-xl hover:bg-teal/10 transition-colors text-muted-foreground hover:text-teal disabled:opacity-40"
       title={semTelefone ? "Paciente sem telefone cadastrado" : "Enviar por WhatsApp"}
     >
       <MessageCircle className="w-4 h-4" />

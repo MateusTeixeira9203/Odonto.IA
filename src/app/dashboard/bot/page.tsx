@@ -1,0 +1,29 @@
+import { redirect } from 'next/navigation';
+import { getDentistaCached } from '@/lib/get-dentista';
+import { getInstanceForClinica } from '@/services/whatsapp.service';
+import { carregarMensagensBot, DEFAULTS_MENSAGENS } from './actions';
+import { BotPageClient } from './_components/bot-page-client';
+import { PageTransition } from '@/components/layout/page-transition';
+
+export default async function BotPage() {
+  const dentista = await getDentistaCached();
+  if (!dentista) redirect('/login');
+  if (dentista.role !== 'secretaria' && dentista.role !== 'admin') redirect('/dashboard');
+
+  const [instancia, mensagens] = await Promise.all([
+    getInstanceForClinica(dentista.clinica_id),
+    carregarMensagensBot().catch(() => DEFAULTS_MENSAGENS),
+  ]);
+
+  return (
+    <PageTransition>
+      <BotPageClient
+        initialStatus={instancia?.status ?? 'disconnected'}
+        initialQrcode={instancia?.qrcode ?? null}
+        initialInstanceName={instancia?.instanceName ?? null}
+        initialMensagens={mensagens}
+        role={dentista.role}
+      />
+    </PageTransition>
+  );
+}
