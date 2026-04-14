@@ -93,6 +93,7 @@ export function OrcamentosClient({
   role,
   temSecretaria = false,
   canEdit = false,
+  dentistas = [],
 }: {
   orcamentos: OrcamentoRow[];
   clinicaId: string;
@@ -149,14 +150,6 @@ export function OrcamentosClient({
   const [viewedIds, setViewedIds] = useState<Set<string>>(new Set());
   const [pixModalOrc, setPixModalOrc] = useState<OrcamentoRow | null>(null);
   const [pagRapidoSaving, setPagRapidoSaving] = useState(false);
-
-  // Estado das Abas (Tabs) da Secretária
-  const [activeTabId, setActiveTabId] = useState<string>('');
-  useEffect(() => {
-    if (isSecretaria && (dentistas?.length ?? 0) > 0 && !activeTabId) {
-      setActiveTabId(dentistas![0].id);
-    }
-  }, [isSecretaria, dentistas, activeTabId]);
 
   // Busca procedimentos da clínica ao montar
   useEffect(() => {
