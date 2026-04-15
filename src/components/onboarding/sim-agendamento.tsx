@@ -27,14 +27,14 @@ export function SimAgendamento({ onComplete }: SimAgendamentoProps) {
   const [visible,   setVisible]   = useState(true);
   const [showSave,  setShowSave]  = useState(false);
 
-  const paciente = useTypingText('Ana Souza',          400,  75);
-  const data     = useTypingText('15/05/2025',          1600, 65);
-  const horario  = useTypingText('14:30',               2700, 80);
-  const proc     = useTypingText('Limpeza + Avaliação', 3600, 55);
+  const paciente = useTypingText('Ana Souza',          400,  90);
+  const data     = useTypingText('15/05/2025',          2200, 80);
+  const horario  = useTypingText('14:30',               4200, 110);
+  const proc     = useTypingText('Limpeza + Avaliação', 6000, 75);
 
   useEffect(() => {
-    const t1 = setTimeout(() => setShowSave(true),                     4900);
-    const t2 = setTimeout(() => { setVisible(false); onComplete?.(); }, 6200);
+    const t1 = setTimeout(() => setShowSave(true),                     8500);
+    const t2 = setTimeout(() => { setVisible(false); onComplete?.(); }, 10000);
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [onComplete]);
 

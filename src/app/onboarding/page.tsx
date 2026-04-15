@@ -37,13 +37,13 @@ const PLANOS = [
   {
     id: "BASICO" as PlanoClinica,
     label: "Básico",
-    descricao: "Até 2 dentistas, sem gestão avançada",
+    descricao: "1 dentista + 1 secretária",
     icon: Users,
   },
   {
     id: "CLINICA" as PlanoClinica,
     label: "Clínica",
-    descricao: "Equipe completa, convites e gestão",
+    descricao: "Até 5 dentistas + secretária — R$147 por dentista adicionado",
     icon: Building2,
   },
 ] as const;
@@ -121,8 +121,8 @@ export default function OnboardingPage(): React.JSX.Element {
 
       if (result.success) {
         toast.success("Tudo pronto! Seu consultório está configurado.");
-        router.push("/dashboard");
-        router.refresh();
+        // Hard redirect garante session atualizada sem conflito com router.refresh()
+        window.location.href = '/dashboard';
       } else {
         toast.error(result.error ?? "Erro ao salvar. Tente novamente.");
       }

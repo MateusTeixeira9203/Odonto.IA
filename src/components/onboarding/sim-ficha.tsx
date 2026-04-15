@@ -24,8 +24,8 @@ function useTypingText(text: string, startDelay: number, speed = 38): string {
 const EVOLUCAO =
   'Paciente relata dor ao mastigar no lado direito. Verificado desgaste em dente 46 com necessidade de restauração. Solicitado raio-x periapical.';
 
-// 38ms × 145 chars ≈ 5510ms + 500ms delay = ~6s para o texto terminar
-const TYPING_DURATION = 500 + EVOLUCAO.length * 38;
+// 50ms × 145 chars ≈ 7250ms + 500ms delay = ~7.75s para o texto terminar
+const TYPING_DURATION = 500 + EVOLUCAO.length * 50;
 
 interface SimFichaProps { onComplete?: () => void }
 
@@ -34,12 +34,12 @@ export function SimFicha({ onComplete }: SimFichaProps) {
   const [showTooth, setShowTooth] = useState(false);
   const [showBadge, setShowBadge] = useState(false);
 
-  const evolucao = useTypingText(EVOLUCAO, 500, 38);
+  const evolucao = useTypingText(EVOLUCAO, 500, 50);
 
   useEffect(() => {
     const t1 = setTimeout(() => setShowTooth(true),                     TYPING_DURATION);
-    const t2 = setTimeout(() => setShowBadge(true),                     TYPING_DURATION + 900);
-    const t3 = setTimeout(() => { setVisible(false); onComplete?.(); }, TYPING_DURATION + 2000);
+    const t2 = setTimeout(() => setShowBadge(true),                     TYPING_DURATION + 1000);
+    const t3 = setTimeout(() => { setVisible(false); onComplete?.(); }, TYPING_DURATION + 2250);
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, [onComplete]);
 

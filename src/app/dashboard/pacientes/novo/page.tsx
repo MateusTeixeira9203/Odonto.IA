@@ -22,5 +22,5 @@ export default async function NovoPacientePage() {
     dentistas = data ?? [];
   }
 
-  return <NovoPacienteForm isSecretaria={isSecretaria} dentistas={dentistas} />;
+  return <NovoPacienteForm isSecretaria={isSecretaria} dentistas={dentistas} clinicaId={dentista.clinica_id} />;
 }

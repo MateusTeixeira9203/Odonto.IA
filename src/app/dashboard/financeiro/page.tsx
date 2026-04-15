@@ -14,6 +14,9 @@ export default async function FinanceiroPage({ searchParams }: PageProps) {
   const dentista = await getDentistaCached();
   if (!dentista) redirect('/login');
 
+  // Override para usuário específico ter acesso a features de plano superior
+  const isUserOverride = dentista.email === 'clenio21@gmail.com';
+
   const { mes } = await searchParams;
   const mesAtual = mes && /^\d{4}-\d{2}$/.test(mes) ? mes : format(new Date(), 'yyyy-MM');
 
@@ -46,7 +49,7 @@ export default async function FinanceiroPage({ searchParams }: PageProps) {
         saldoInicial={saldo}
         chartData={chartData}
         role={dentista.role}
-        plano={dentista.plano}
+        plano={isUserOverride ? 'BASICO' : dentista.plano}
         dentistaId={dentista.id}
         dentistasClinica={dentistasClinica}
       />

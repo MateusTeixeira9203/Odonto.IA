@@ -6,6 +6,14 @@ export type PlanoId = 'SOLO' | 'BASICO' | 'CLINICA';
 export interface PlanoFeatures {
   /** Bot com mensagens customizáveis (BASICO+) */
   botCustomizavel: boolean;
+  /** Bot pode criar agendamentos automáticos via WhatsApp (BASICO+) */
+  botAgendamento: boolean;
+  /** Transcrição de voz por IA na ficha clínica (BASICO+) */
+  transcricaoVoz: boolean;
+  /** Geração automática de orçamento por IA (BASICO+) */
+  orcamentoIA: boolean;
+  /** Aba de Planejamento com IA no perfil do paciente (BASICO+) */
+  planejamentoIA: boolean;
   /** Acesso ao módulo Financeiro com lançamento de despesas (BASICO+) */
   financeiro: boolean;
   /** Pode ter secretária na equipe (BASICO+) */
@@ -36,6 +44,10 @@ export const PLANOS: Record<PlanoId, PlanoConfig> = {
     limiteDentistas: 1,
     features: {
       botCustomizavel: false,
+      botAgendamento: false,
+      transcricaoVoz: false,
+      orcamentoIA: false,
+      planejamentoIA: false,
       financeiro: false,
       equipe: false,
       multiDentistas: false,
@@ -47,9 +59,13 @@ export const PLANOS: Record<PlanoId, PlanoConfig> = {
     label: 'Básico',
     preco: 247,
     precoPorDentistaExtra: null,
-    limiteDentistas: 2,
+    limiteDentistas: 1,   // 1 dentista + 1 secretária (secretárias não contam)
     features: {
       botCustomizavel: true,
+      botAgendamento: true,
+      transcricaoVoz: true,
+      orcamentoIA: true,
+      planejamentoIA: true,
       financeiro: true,
       equipe: true,
       multiDentistas: false,
@@ -61,9 +77,13 @@ export const PLANOS: Record<PlanoId, PlanoConfig> = {
     label: 'Clínica',
     preco: 397,
     precoPorDentistaExtra: 147,
-    limiteDentistas: 999,
+    limiteDentistas: 5,   // até 5 dentistas + 1 secretária; R$147 por dentista adicionado (a partir do 2º)
     features: {
       botCustomizavel: true,
+      botAgendamento: true,
+      transcricaoVoz: true,
+      orcamentoIA: true,
+      planejamentoIA: true,
       financeiro: true,
       equipe: true,
       multiDentistas: true,

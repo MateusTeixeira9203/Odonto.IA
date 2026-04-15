@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import type { PlanoId } from '@/lib/planos';
 import { temFeature } from '@/lib/planos';
+import { canViewWhatsApp } from '@/lib/access-control';
 import { motion, AnimatePresence } from 'motion/react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useTheme } from 'next-themes';
@@ -48,10 +49,9 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role, 
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
-  const showClinical   = role === 'admin' || role === 'dentista';
-  const showConfig     = role === 'admin' || role === 'dentista';
-  // Admin também acessa o bot (no Solo com mensagens fixas, nos demais personalizável)
-  const showWhatsApp   = role === 'secretaria' || role === 'admin';
+  const showClinical = role === 'admin' || role === 'dentista';
+  const showConfig   = role === 'admin' || role === 'dentista';
+  const showWhatsApp = canViewWhatsApp(role, plano);
 
   // Feature locks baseadas no plano
   const financeiroLocked = !temFeature(plano ?? 'CLINICA', 'financeiro');
@@ -177,7 +177,7 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role, 
           </AnimatePresence>
         </button>
 
-        {(role === 'secretaria' || role === 'admin') && (
+        {canViewWhatsApp(role, plano) && (
           <Link
             id="whatsapp-config-link"
             href="/dashboard/bot"

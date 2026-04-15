@@ -4,9 +4,10 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { motion, AnimatePresence, LayoutGroup } from 'motion/react';
 import { Bot, ArrowRight, ChevronRight, ChevronLeft, X, Loader2 } from 'lucide-react';
-import { SimAgendamento } from './sim-agendamento';
-import { SimFicha }       from './sim-ficha';
-import { SimOrcamento }   from './sim-orcamento';
+import { SimAgendamento }     from './sim-agendamento';
+import { SimFicha }           from './sim-ficha';
+import { SimOrcamento }       from './sim-orcamento';
+import { SimOrcamentoPerfil } from './sim-orcamento-perfil';
 import type { PlanoId }   from '@/lib/planos';
 
 // Chaves escopadas por dentista
@@ -21,7 +22,7 @@ const DEX_FAB_SIZE = 56;
 const BUBBLE_W     = 320;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type StepId = 'INTRO' | 'AGENDA' | 'PACIENTES' | 'FICHA_AHA' | 'ORCAMENTOS' | 'FINANCEIRO' | 'CONFIG_EQUIPE' | 'CONFIG_CLINICA' | 'FINALE';
+type StepId = 'INTRO' | 'AGENDA' | 'PACIENTES' | 'FICHA_AHA' | 'ORCAMENTO_PERFIL' | 'ORCAMENTOS' | 'FINANCEIRO' | 'CONFIG_EQUIPE' | 'CONFIG_CLINICA' | 'FINALE';
 
 interface TourStep {
   id: StepId;
@@ -29,7 +30,7 @@ interface TourStep {
   title: string;
   description: string;
   targetId?: string;
-  simulacao?: 'agendamento' | 'ficha' | 'orcamento';
+  simulacao?: 'agendamento' | 'ficha' | 'orcamento' | 'orcamentoPerfil';
   details?: string;
 }
 
@@ -231,16 +232,25 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
       id: 'FICHA_AHA',
       path: '/dashboard/pacientes/demo',
       title: 'Ficha Clínica — o coração do sistema',
-      description: 'Fale ou digita a evolução e a IA transcreve, identifica cada procedimento — como "dente 46, restauração" — e já monta o orçamento com sua tabela de preços. Zero digitação manual.',
-      details: 'Na aba Documentos você centraliza fotos clínicas, raio-x e arquivos do paciente, tudo organizado por data e vinculado à ficha.',
+      description: 'Fale ou digita a evolução e a IA transcreve, identifica cada procedimento — como "dente 46, restauração" — e marca no odontograma automaticamente. Zero digitação manual.',
+      details: 'Na aba Documentos você centraliza fotos clínicas, raio-x e arquivos do paciente — tudo organizado por data e vinculado à ficha.',
       simulacao: 'ficha',
+    };
+
+    const orcamentoPerfilStep: TourStep = {
+      id: 'ORCAMENTO_PERFIL',
+      path: '/dashboard/pacientes/demo',
+      title: 'Orçamento no Perfil do Paciente',
+      description: 'No perfil do paciente você tem três abas principais: Fichas Clínicas, Planejamento e Orçamentos. Com um clique em "Gerar Orçamento com IA", o sistema lê a ficha, cruza com sua tabela de preços e monta o orçamento completo em segundos.',
+      details: 'O orçamento sai em linguagem simples, com os valores da sua clínica — pronto para enviar pelo WhatsApp com um clique.',
+      simulacao: 'orcamentoPerfil',
     };
 
     const orcamentoStep: TourStep = {
       id: 'ORCAMENTOS',
       path: '/dashboard/orcamentos',
-      title: 'Orçamentos Inteligentes',
-      description: 'Orçamento gerado em segundos pela IA com os preços da sua tabela. Pronto para enviar ao paciente.',
+      title: 'Painel de Orçamentos',
+      description: 'Aqui você acompanha todos os orçamentos gerados — com filtros por status, data e valor. Veja quais foram aprovados, enviados ou estão aguardando retorno do paciente.',
       simulacao: 'orcamento',
     };
 
@@ -256,15 +266,15 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
           id: 'AGENDA',
           path: '/dashboard/agendamentos',
           title: 'Sua Principal Ferramenta',
-          description: 'Aqui você gerencia a agenda de todos os dentistas da clínica. Novos agendamentos chegam pelo bot do WhatsApp e aparecem aqui automaticamente.',
-          details: 'Você também pode criar, editar e cancelar consultas manualmente por esta tela.',
+          description: 'Aqui você organiza a agenda de todos os dentistas. Novos pedidos chegam pelo bot do WhatsApp e aparecem aqui na hora — basta confirmar, editar ou reagendar com um clique. Você tem controle total da clínica.',
+          details: 'Use os filtros por dentista e por dia para visualizar rapidamente quem atende o quê.',
           simulacao: 'agendamento' as const,
         },
         {
           id: 'ORCAMENTOS',
           path: '/dashboard/orcamentos',
           title: 'Orçamentos dos Pacientes',
-          description: 'Acompanhe os orçamentos gerados pelos dentistas. Você pode consultar o status de cada um e registrar pagamentos recebidos.',
+          description: 'Acompanhe os orçamentos gerados pelos dentistas. Consulte o status de cada um e registre os pagamentos recebidos diretamente por aqui.',
           simulacao: 'orcamento' as const,
         },
         { id: 'FINALE', path: '/dashboard', title: 'Tudo pronto!', description: 'Se precisar de ajuda, é só me chamar aqui no canto. Bom trabalho!' },
@@ -273,11 +283,12 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
 
     if (role === 'dentista') {
       return [
-        { id: 'INTRO',    path: '/dashboard',            title: '',                      description: `Olá, Doutor(a) ${firstName}! Eu sou o DEX. Vou te mostrar o sistema em 1 minuto. Vamos lá?` },
-        { id: 'AGENDA',   path: '/dashboard/agendamentos', title: 'Sua Agenda',          description: 'Acompanhe seus pacientes do dia. O bot do WhatsApp agenda consultas direto aqui.', simulacao: 'agendamento' as const },
+        { id: 'INTRO',  path: '/dashboard',              title: '',             description: `Olá, Doutor(a) ${firstName}! Eu sou o DEX. Vou te mostrar o sistema em 1 minuto. Vamos lá?` },
+        { id: 'AGENDA', path: '/dashboard/agendamentos', title: 'Sua Agenda',   description: 'Acompanhe sua agenda do dia em tempo real. A secretária e o bot de WhatsApp organizam tudo aqui — você só foca no atendimento, sem precisar gerenciar ligações ou conflitos de horário.', simulacao: 'agendamento' as const },
         ahaMoment,
+        orcamentoPerfilStep,
         orcamentoStep,
-        { id: 'FINALE',   path: '/dashboard',            title: 'Tudo pronto!',          description: 'Se precisar de ajuda, é só me chamar aqui no canto. Bom atendimento!' },
+        { id: 'FINALE', path: '/dashboard',              title: 'Tudo pronto!', description: 'Se precisar de ajuda, é só me chamar aqui no canto. Bom atendimento!' },
       ];
     }
 
@@ -285,9 +296,10 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
     const temEquipe = plano === 'BASICO' || plano === 'CLINICA';
 
     return [
-      { id: 'INTRO',        path: '/dashboard',              title: '',                         description: `Olá, Doutor(a) ${firstName}! Eu sou o DEX. Vou te mostrar o sistema em 1 minuto. Vamos lá?` },
-      { id: 'AGENDA',       path: '/dashboard/agendamentos', title: 'Agenda Inteligente',       description: 'Sua agenda integrada ao bot de WhatsApp. Pacientes agendados lá aparecem aqui na hora.', simulacao: 'agendamento' as const },
+      { id: 'INTRO',        path: '/dashboard',              title: '',                   description: `Olá, Doutor(a) ${firstName}! Eu sou o DEX. Vou te mostrar o sistema em 1 minuto. Vamos lá?` },
+      { id: 'AGENDA',       path: '/dashboard/agendamentos', title: 'Agenda Inteligente', description: 'A secretária gerencia toda a agenda por aqui. Quando um paciente agenda pelo bot do WhatsApp, o pedido cai direto nesta tela — sem ligação e sem conflito de horário. Você abre o sistema e sua agenda já está organizada.', details: 'Cada card mostra paciente, horário, procedimento e status — tudo em um lugar só.', simulacao: 'agendamento' as const },
       ahaMoment,
+      orcamentoPerfilStep,
       orcamentoStep,
       ...(temEquipe ? [{
         id: 'CONFIG_EQUIPE' as const,
@@ -606,9 +618,10 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
 
         {/* Componente de simulação */}
         <AnimatePresence>
-          {step.simulacao === 'agendamento' && <SimAgendamento key="sim-ag" />}
-          {step.simulacao === 'ficha'       && <SimFicha       key="sim-fi" />}
-          {step.simulacao === 'orcamento'   && <SimOrcamento   key="sim-or" />}
+          {step.simulacao === 'agendamento'    && <SimAgendamento     key="sim-ag" />}
+          {step.simulacao === 'ficha'          && <SimFicha           key="sim-fi" />}
+          {step.simulacao === 'orcamento'      && <SimOrcamento       key="sim-or" />}
+          {step.simulacao === 'orcamentoPerfil' && <SimOrcamentoPerfil key="sim-or-perf" />}
         </AnimatePresence>
 
         {/* Skip */}

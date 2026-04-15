@@ -39,6 +39,9 @@ export default async function OrcamentosPage() {
   const dentista = await getDentistaCached();
   if (!dentista) redirect('/login');
 
+  // Override para usuário específico ter acesso a features de plano superior
+  const isUserOverride = dentista.email === 'clenio21@gmail.com';
+
   const supabase = await createClient();
 
   // Verifica se há secretária na clínica
@@ -94,7 +97,7 @@ export default async function OrcamentosPage() {
   }));
 
   // Solo: dentista cria orçamentos manualmente. BASICO/CLINICA: cria via perfil do paciente.
-  const canEdit = dentista.plano === 'SOLO';
+  const canEdit = !isUserOverride && dentista.plano === 'SOLO';
 
   return (
     <PageTransition>

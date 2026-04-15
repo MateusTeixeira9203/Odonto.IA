@@ -47,12 +47,12 @@ export function SimOrcamento({ onComplete }: SimOrcamentoProps) {
 
   useEffect(() => {
     const timers = [
-      setTimeout(() => setVisibleItems(1),   500),
-      setTimeout(() => setVisibleItems(2),   1600),
-      setTimeout(() => setVisibleItems(3),   2700),
-      setTimeout(() => setCountActive(true), 3600),
-      setTimeout(() => setShowBadge(true),   4700),
-      setTimeout(() => { setVisible(false); onComplete?.(); }, 6000),
+      setTimeout(() => setVisibleItems(1),   900),
+      setTimeout(() => setVisibleItems(2),   2900),
+      setTimeout(() => setVisibleItems(3),   4900),
+      setTimeout(() => setCountActive(true), 6500),
+      setTimeout(() => setShowBadge(true),   8500),
+      setTimeout(() => { setVisible(false); onComplete?.(); }, 10000),
     ];
     return () => timers.forEach(clearTimeout);
   }, [onComplete]);

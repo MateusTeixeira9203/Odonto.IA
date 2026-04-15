@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useTransition } from 'react';
-import { ArrowLeft, Loader2, User } from 'lucide-react';
+import { useState, useTransition, useRef } from 'react';
+import { ArrowLeft, Loader2, User, Upload, X } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import { createPaciente } from '../actions';
 import { Input } from '@/components/ui/input';
@@ -17,12 +18,15 @@ import {
 interface Props {
   isSecretaria: boolean;
   dentistas: { id: string; nome: string }[];
+  clinicaId: string;
 }
 
-export default function NovoPacienteForm({ isSecretaria, dentistas }: Props) {
+export default function NovoPacienteForm({ isSecretaria, dentistas, clinicaId }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
     nome: '',
@@ -41,6 +45,39 @@ export default function NovoPacienteForm({ isSecretaria, dentistas }: Props) {
 
   const set = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
+
+  const handleAvatarSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    if (!file.type.startsWith('image/')) {
+      setError('Selecione apenas imagens (JPG, PNG, WEBP).');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Imagem muito grande. Máximo 5 MB.');
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    setError(null);
+    try {
+      const supabase = createClient();
+      const storagePath = `avatares/${clinicaId}/${Date.now()}_${file.name}`;
+      const { error: storageErr } = await supabase.storage
+        .from('fichas')
+        .upload(storagePath, file, { upsert: false });
+      if (storageErr) throw storageErr;
+      const { data: urlData } = supabase.storage.from('fichas').getPublicUrl(storagePath);
+      setForm((prev) => ({ ...prev, avatar_url: urlData.publicUrl }));
+    } catch (err) {
+      console.error('Erro ao fazer upload da foto:', err);
+      setError('Erro ao fazer upload da foto. Tente novamente.');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,14 +169,38 @@ export default function NovoPacienteForm({ isSecretaria, dentistas }: Props) {
               )}
             </div>
             <div className="flex-1 space-y-2">
-              <Label htmlFor="avatar_url" className="text-foreground">Foto de Perfil (URL da Imagem)</Label>
-              <Input
-                id="avatar_url"
-                value={form.avatar_url}
-                onChange={set('avatar_url')}
-                placeholder="https://exemplo.com/foto.jpg"
-                className="rounded-xl bg-muted border-border text-foreground"
+              <Label className="text-foreground">
+                Foto de Perfil <span className="text-muted-foreground font-normal">(opcional)</span>
+              </Label>
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(e) => void handleAvatarSelect(e)}
               />
+              {form.avatar_url ? (
+                <button
+                  type="button"
+                  onClick={() => setForm((prev) => ({ ...prev, avatar_url: '' }))}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl border border-border bg-muted text-sm font-medium text-muted-foreground hover:text-red-500 hover:border-red-300 transition-colors"
+                >
+                  <X className="w-4 h-4" /> Remover foto
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={isUploadingAvatar}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl border border-dashed border-border bg-muted text-sm font-medium text-muted-foreground hover:border-teal hover:text-teal transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isUploadingAvatar ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Enviando...</>
+                  ) : (
+                    <><Upload className="w-4 h-4" /> Selecionar foto</>
+                  )}
+                </button>
+              )}
             </div>
           </div>
 

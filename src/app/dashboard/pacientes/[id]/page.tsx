@@ -84,6 +84,7 @@ export default async function PacienteDetalhePage({
       clinicaId={dentista.clinica_id}
       dentistaId={dentista.id}
       role={dentista.role}
+      plano={dentista.plano}
     />
   );
 }

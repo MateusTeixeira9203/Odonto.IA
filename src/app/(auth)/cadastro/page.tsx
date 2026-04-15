@@ -82,8 +82,8 @@ export default function CadastroPage(): React.JSX.Element {
 
       if (authData.session) {
         toast.success("Conta criada com sucesso!");
-        router.push("/onboarding");
-        router.refresh();
+        // Hard redirect garante session atualizada sem conflito com router.refresh()
+        window.location.href = '/onboarding';
       } else {
         router.push(`/verifique-email?email=${encodeURIComponent(data.email)}`);
       }

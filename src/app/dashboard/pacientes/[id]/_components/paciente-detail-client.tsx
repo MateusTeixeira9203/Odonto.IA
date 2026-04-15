@@ -21,6 +21,7 @@ import {
   FileText,
   Trash2,
   Loader2,
+  Lock,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -45,9 +46,12 @@ import { Label } from '@/components/ui/label';
 import { DocumentosTab } from '@/components/pacientes/DocumentosTab';
 import { PlanejamentoTab } from '@/components/pacientes/PlanejamentoTab';
 import { FichasTab } from '@/components/pacientes/FichasTab';
+import { PatientDexTour } from '@/components/pacientes/PatientDexTour';
 import { createClient } from '@/lib/supabase/client';
 import { atualizarPaciente, salvarAnotacoes } from '../actions';
 import type { DentistaRole } from '@/types/database';
+import type { PlanoId } from '@/lib/planos';
+import { temFeature } from '@/lib/planos';
 import {
   atualizarStatusOrcamento,
   registrarPagamento,
@@ -124,6 +128,7 @@ interface PacienteDetailClientProps {
   clinicaId: string;
   dentistaId: string;
   role: DentistaRole;
+  plano: PlanoId;
 }
 
 const STATUS_ORCAMENTO: Record<string, { label: string; cls: string }> = {
@@ -140,6 +145,7 @@ export function PacienteDetailClient({
   clinicaId,
   dentistaId,
   role,
+  plano,
 }: PacienteDetailClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -505,6 +511,9 @@ export function PacienteDetailClient({
 
   return (
     <div className="p-8 max-w-7xl mx-auto w-full">
+      {/* Tour guiado — inicia automaticamente na primeira visita */}
+      <PatientDexTour autoStart />
+
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
@@ -577,18 +586,21 @@ export function PacienteDetailClient({
             </div>
           </div>
 
-          {/* Tabs */}
+          {/* Tabs — IDs usados pelo PatientDexTour */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="bg-muted/50 p-1 rounded-xl border border-border/40 mb-6 flex-wrap h-auto gap-1">
-              {[
-                ['visao-geral', 'Visão Geral'],
-                ...(showClinicalTabs ? [['fichas', 'Fichas Clínicas']] : []),
-                ['documentos', 'Documentos'],
-                ...(showClinicalTabs ? [['planejamento', 'Planejamento']] : []),
-                ['orcamentos', 'Orçamentos'],
-              ].map(([val, label]) => (
+              {(
+                [
+                  ['visao-geral',  'Visão Geral',      undefined],
+                  ...(showClinicalTabs ? [['fichas',      'Fichas Clínicas', 'tab-fichas'      ] as const] : []),
+                  ['documentos',   'Documentos',       'tab-documentos'  ],
+                  ...(showClinicalTabs ? [['planejamento', 'Planejamento',    'tab-apresentacao'] as const] : []),
+                  ['orcamentos',   'Orçamentos',       'tab-orcamento'   ],
+                ] as [string, string, string | undefined][]
+              ).map(([val, label, tourId]) => (
                 <TabsTrigger
                   key={val}
+                  id={tourId}
                   value={val}
                   className="rounded-lg px-4 py-2 text-xs font-bold data-[state=active]:bg-card data-[state=active]:shadow-sm text-muted-foreground data-[state=active]:text-foreground"
                 >
@@ -757,6 +769,7 @@ export function PacienteDetailClient({
                     patientId={paciente.id}
                     clinicaId={clinicaId}
                     dentistaId={dentistaId}
+                    plano={plano}
                   />
                 </TabsContent>
 
@@ -765,7 +778,19 @@ export function PacienteDetailClient({
                 </TabsContent>
 
                 <TabsContent value="planejamento" className="mt-0">
-                  <PlanejamentoTab patientId={paciente.id} clinicaId={clinicaId} patientName={paciente.nome} />
+                  {temFeature(plano, 'planejamentoIA') ? (
+                    <PlanejamentoTab patientId={paciente.id} clinicaId={clinicaId} patientName={paciente.nome} />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
+                      <div className="w-14 h-14 rounded-2xl bg-teal/10 border border-teal/20 flex items-center justify-center">
+                        <Lock className="w-6 h-6 text-teal" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-foreground mb-1">Disponível no Plano Básico</p>
+                        <p className="text-sm text-muted-foreground max-w-xs">Faça upgrade para acessar o Planejamento com IA — apresentações visuais e planos de tratamento completos.</p>
+                      </div>
+                    </div>
+                  )}
                 </TabsContent>
 
                 {/* Orçamentos */}

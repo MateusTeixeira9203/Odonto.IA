@@ -12,9 +12,7 @@ import {
 import { ptBR } from 'date-fns/locale';
 import { createClient } from '@/lib/supabase/server';
 import type { DentistaCache } from '@/lib/get-dentista';
-import { calcularSaldoMes, listarUltimos7Dias } from '../financeiro/actions';
 import { AtendimentosHoje, type AtendimentoHoje } from './atendimentos-hoje';
-import { FinanceiroHub } from './financeiro-hub';
 
 // ── Componente assíncrono — renderizado dentro de <Suspense> no page.tsx ──────
 
@@ -33,8 +31,6 @@ export async function DentistaDashboard({ dentista }: { dentista: DentistaCache 
     { count: orcamentosPendentes },
     { count: agendamentosConfirmados },
     { data: atendimentosHojeRaw },
-    saldoMes,
-    chartData,
     { data: orcamentosStatsRaw },
   ] = await Promise.all([
     supabase
@@ -62,8 +58,6 @@ export async function DentistaDashboard({ dentista }: { dentista: DentistaCache 
       .lte('data_hora', todayEnd)
       .not('status', 'in', '(cancelado,faltou)')
       .order('data_hora', { ascending: true }),
-    calcularSaldoMes(mesAtual),
-    listarUltimos7Dias(),
     supabase
       .from('orcamentos')
       .select('status')
@@ -313,10 +307,6 @@ export async function DentistaDashboard({ dentista }: { dentista: DentistaCache 
         </div>
       </div>
 
-      {/* ── Saúde Financeira — apenas plano SOLO ────────────────────────────── */}
-      {canEdit && (
-        <FinanceiroHub saldoMes={saldoMes} chartData={chartData} />
-      )}
     </>
   );
 }
@@ -371,10 +361,6 @@ export function DashboardSkeleton({ canEdit }: { canEdit: boolean }) {
         </div>
       </div>
 
-      {/* Linha 3: FinanceiroHub (SOLO) */}
-      {canEdit && (
-        <div className="rounded-3xl h-56 bg-surface border border-border" />
-      )}
     </div>
   );
 }

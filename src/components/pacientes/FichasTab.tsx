@@ -14,6 +14,7 @@ import {
   User,
   Loader2,
   Sparkles,
+  Lock,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useRouter } from "next/navigation";
@@ -35,6 +36,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { HelpTooltip } from "@/components/ui/help-tooltip";
 import { criarOrcamento } from "@/app/dashboard/orcamentos/actions";
+import { temFeature, type PlanoId } from "@/lib/planos";
 
 interface ToothNote {
   tooth: number;
@@ -97,9 +99,10 @@ interface FichasTabProps {
   patientId: string;
   clinicaId: string;
   dentistaId: string;
+  plano?: PlanoId;
 }
 
-export function FichasTab({ patientId, clinicaId, dentistaId }: FichasTabProps) {
+export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTabProps) {
   const router = useRouter();
   const [evolutions, setEvolutions] = React.useState<Evolution[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -133,6 +136,9 @@ export function FichasTab({ patientId, clinicaId, dentistaId }: FichasTabProps) 
 
   // Listener DEX com debounce de 2 s — analisa o texto enquanto o dentista digita
   React.useEffect(() => {
+    // Geração de orçamento por IA não disponível no plano Solo
+    if (!temFeature(plano, 'orcamentoIA')) return;
+
     const texto = formData.observation.trim();
 
     // Só analisa novas fichas (não edições) com texto mínimo e painel aberto
@@ -529,32 +535,41 @@ export function FichasTab({ patientId, clinicaId, dentistaId }: FichasTabProps) 
                       Observações Gerais
                       <HelpTooltip content="Fale os procedimentos e a IA transcreve automaticamente." />
                     </label>
-                    <button
-                      onClick={() => {
-                        void (isRecording ? stopRecording() : startRecording());
-                      }}
-                      disabled={isTranscribing}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                        isRecording
-                          ? "bg-red-100 text-red-600 hover:bg-red-200 animate-pulse"
-                          : "bg-teal/10 text-teal hover:bg-teal/20"
-                      }`}
-                    >
-                      {isTranscribing ? (
-                        <>
-                          <span className="w-3.5 h-3.5 inline-block border-2 border-teal border-t-transparent rounded-full animate-spin" />{" "}
-                          Transcrevendo...
-                        </>
-                      ) : isRecording ? (
-                        <>
-                          <MicOff className="w-3.5 h-3.5" /> Parar Gravação
-                        </>
-                      ) : (
-                        <>
-                          <Mic className="w-3.5 h-3.5" /> Gravar Voz (IA)
-                        </>
-                      )}
-                    </button>
+                    {temFeature(plano, 'transcricaoVoz') ? (
+                      <button
+                        onClick={() => {
+                          void (isRecording ? stopRecording() : startRecording());
+                        }}
+                        disabled={isTranscribing}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                          isRecording
+                            ? "bg-red-100 text-red-600 hover:bg-red-200 animate-pulse"
+                            : "bg-teal/10 text-teal hover:bg-teal/20"
+                        }`}
+                      >
+                        {isTranscribing ? (
+                          <>
+                            <span className="w-3.5 h-3.5 inline-block border-2 border-teal border-t-transparent rounded-full animate-spin" />{" "}
+                            Transcrevendo...
+                          </>
+                        ) : isRecording ? (
+                          <>
+                            <MicOff className="w-3.5 h-3.5" /> Parar Gravação
+                          </>
+                        ) : (
+                          <>
+                            <Mic className="w-3.5 h-3.5" /> Gravar Voz (IA)
+                          </>
+                        )}
+                      </button>
+                    ) : (
+                      <span
+                        title="Disponível no Plano Básico"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-muted text-muted-foreground cursor-not-allowed select-none"
+                      >
+                        <Lock className="w-3.5 h-3.5" /> Gravar Voz (IA)
+                      </span>
+                    )}
                   </div>
                   <textarea
                     value={formData.observation}
