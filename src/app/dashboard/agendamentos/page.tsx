@@ -91,8 +91,8 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
     );
   }
 
-  // Solo: dentista cria sozinho. Secretária: cria em nome do dentista. BASICO/CLINICA dentista: leitura.
-  const canEdit = dentista.plano === 'SOLO' || dentista.role === 'secretaria';
+  // Solo/Clinica: dentista cria. Secretária: cria em nome do dentista. BASICO dentista: leitura.
+  const canEdit = dentista.plano === 'SOLO' || dentista.plano === 'CLINICA' || dentista.role === 'secretaria';
 
   return (
     <PageTransition>

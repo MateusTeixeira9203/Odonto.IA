@@ -10,8 +10,8 @@ export default async function PacientesPage() {
   const dentista = await getDentistaCached();
   if (!dentista) redirect('/login');
 
-  // Solo: dentista cria sozinho. Secretária: cria em nome do dentista. BASICO/CLINICA dentista: leitura.
-  const canCreate = dentista.plano === 'SOLO' || dentista.role === 'secretaria';
+  // Solo/Clinica: dentista cria. Secretária: cria em nome do dentista. BASICO dentista: leitura.
+  const canCreate = dentista.plano === 'SOLO' || dentista.plano === 'CLINICA' || dentista.role === 'secretaria';
 
   return (
     <PageTransition>
