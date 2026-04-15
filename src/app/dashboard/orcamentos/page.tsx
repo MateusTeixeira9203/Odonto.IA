@@ -40,9 +40,9 @@ export default async function OrcamentosPage() {
   if (!dentista) redirect('/login');
 
   // Override para usuário específico ter acesso a features de plano superior
-  const isUserOverride = dentista.email === 'clenio21@gmail.com';
-
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const isUserOverride = user?.email === 'clenio21@gmail.com';
 
   // Verifica se há secretária na clínica
   const { count: secretariaCount } = await supabase

@@ -15,7 +15,9 @@ export default async function FinanceiroPage({ searchParams }: PageProps) {
   if (!dentista) redirect('/login');
 
   // Override para usuário específico ter acesso a features de plano superior
-  const isUserOverride = dentista.email === 'clenio21@gmail.com';
+  const supabaseAuth = await createClient();
+  const { data: { user } } = await supabaseAuth.auth.getUser();
+  const isUserOverride = user?.email === 'clenio21@gmail.com';
 
   const { mes } = await searchParams;
   const mesAtual = mes && /^\d{4}-\d{2}$/.test(mes) ? mes : format(new Date(), 'yyyy-MM');
