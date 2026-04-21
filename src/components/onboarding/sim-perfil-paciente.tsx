@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { FileText, Image as ImageIcon, CircleDollarSign, Mic, Sparkles, User, Phone, Calendar, Stethoscope } from 'lucide-react';
+import { FileText, Image as ImageIcon, CircleDollarSign, Mic, Sparkles, User, Phone, Calendar, Stethoscope, Presentation } from 'lucide-react';
 
 // ── Typing hook ───────────────────────────────────────────────────────────────
 function useTypingText(text: string, startDelay: number, speed = 40): string {
@@ -24,12 +24,13 @@ function useTypingText(text: string, startDelay: number, speed = 40): string {
 }
 
 // ── Tab IDs ───────────────────────────────────────────────────────────────────
-type TabId = 'fichas' | 'documentos' | 'orcamentos';
+type TabId = 'fichas' | 'documentos' | 'planejamento' | 'orcamentos';
 
 const TABS: { id: TabId; label: string; icon: typeof FileText }[] = [
-  { id: 'fichas',     label: 'Fichas Clínicas', icon: FileText          },
-  { id: 'documentos', label: 'Documentos',       icon: ImageIcon         },
-  { id: 'orcamentos', label: 'Orçamentos',        icon: CircleDollarSign  },
+  { id: 'fichas',       label: 'Fichas Clínicas', icon: FileText          },
+  { id: 'documentos',   label: 'Documentos',       icon: ImageIcon         },
+  { id: 'planejamento', label: 'Planejamento',      icon: Presentation      },
+  { id: 'orcamentos',   label: 'Orçamentos',        icon: CircleDollarSign  },
 ];
 
 // ── Orçamento items ───────────────────────────────────────────────────────────
@@ -57,29 +58,34 @@ const DOCS = [
 const EVOLUCAO = 'Paciente relata dor ao mastigar no lado direito. Verificado desgaste em dente 46 com necessidade de restauração. Solicitado raio-x periapical.';
 
 // Timeline
-// 0ms     : perfil header + tab "fichas" ativo
-// 400ms   : evolução começa a ser digitada
-// typing  : ~5.5s (EVOLUCAO.length * 40ms + 400ms)
-// 5900ms  : dente 46 badge aparece
-// 7200ms  : tab "documentos" clicada
-// 8000ms  : grid de docs aparece
-// 10200ms : tab "orcamentos" clicada
-// 11000ms : itens aparecem um por um
-// 13500ms : total + badge IA
-// 15200ms : fecha
+// 0ms       : perfil header + tab "fichas" ativo
+// 400ms     : evolução começa a ser digitada
+// typing    : ~5.5s (EVOLUCAO.length * 40ms + 400ms)
+// TYPING_END+200  : dente 46 badge aparece
+// TYPING_END+1400 : tab "documentos" clicada
+// TYPING_END+2200 : grid de docs aparece
+// TYPING_END+4000 : tab "planejamento" clicada
+// TYPING_END+4600 : spinner de geração IA aparece
+// TYPING_END+6000 : seção 1 aparece
+// TYPING_END+7200 : seção 2 aparece
+// TYPING_END+8600 : tab "orcamentos" clicada
+// TYPING_END+9400 : itens aparecem um por um
+// TYPING_END+12000: total + badge IA
+// TYPING_END+13500: fecha
 
 interface SimPerfilPacienteProps { onComplete?: () => void }
 
 export function SimPerfilPaciente({ onComplete }: SimPerfilPacienteProps) {
-  const [visible,      setVisible]      = useState(true);
-  const [activeTab,    setActiveTab]    = useState<TabId>('fichas');
-  const [showTooth,    setShowTooth]    = useState(false);
-  const [showDocs,     setShowDocs]     = useState(false);
-  const [visibleOrc,   setVisibleOrc]   = useState(0);
-  const [showTotal,    setShowTotal]    = useState(false);
-  const [showAI,       setShowAI]       = useState(false);
-  // Simulates a cursor highlight on the tab being clicked
-  const [tabPulse,     setTabPulse]     = useState<TabId | null>(null);
+  const [visible,        setVisible]        = useState(true);
+  const [activeTab,      setActiveTab]      = useState<TabId>('fichas');
+  const [showTooth,      setShowTooth]      = useState(false);
+  const [showGenBtn,     setShowGenBtn]     = useState(false);
+  const [showDocs,       setShowDocs]       = useState(false);
+  const [visibleSections,setVisibleSections] = useState(0);
+  const [visibleOrc,     setVisibleOrc]     = useState(0);
+  const [showTotal,      setShowTotal]      = useState(false);
+  const [showAI,         setShowAI]         = useState(false);
+  const [tabPulse,       setTabPulse]       = useState<TabId | null>(null);
 
   const evolucao = useTypingText(EVOLUCAO, 400, 42);
 
@@ -90,22 +96,31 @@ export function SimPerfilPaciente({ onComplete }: SimPerfilPacienteProps) {
       // Ficha tab — tooth badge
       setTimeout(() => setShowTooth(true),  TYPING_END + 200),
 
-      // Switch to Documentos
-      setTimeout(() => setTabPulse('documentos'), TYPING_END + 1400),
-      setTimeout(() => { setActiveTab('documentos'); setTabPulse(null); }, TYPING_END + 1700),
-      setTimeout(() => setShowDocs(true),   TYPING_END + 2200),
+      // Fichas — dente 46 → botão gerar orçamento
+      setTimeout(() => setShowGenBtn(true),                                   TYPING_END + 1400),
 
-      // Switch to Orçamentos
-      setTimeout(() => setTabPulse('orcamentos'), TYPING_END + 4000),
-      setTimeout(() => { setActiveTab('orcamentos'); setTabPulse(null); }, TYPING_END + 4300),
-      setTimeout(() => setVisibleOrc(1),    TYPING_END + 4900),
-      setTimeout(() => setVisibleOrc(2),    TYPING_END + 5700),
-      setTimeout(() => setVisibleOrc(3),    TYPING_END + 6400),
-      setTimeout(() => setShowTotal(true),  TYPING_END + 7200),
-      setTimeout(() => setShowAI(true),     TYPING_END + 8200),
+      // Switch to Documentos
+      setTimeout(() => setTabPulse('documentos'),                             TYPING_END + 2800),
+      setTimeout(() => { setActiveTab('documentos'); setTabPulse(null); },    TYPING_END + 3100),
+      setTimeout(() => setShowDocs(true),                                     TYPING_END + 3600),
+
+      // Switch to Planejamento (só visual)
+      setTimeout(() => setTabPulse('planejamento'),                           TYPING_END + 5400),
+      setTimeout(() => { setActiveTab('planejamento'); setTabPulse(null); },  TYPING_END + 5700),
+      setTimeout(() => setVisibleSections(1),                                 TYPING_END + 6000),
+      setTimeout(() => setVisibleSections(2),                                 TYPING_END + 7000),
+
+      // Switch to Orçamentos (gerado a partir da ficha)
+      setTimeout(() => setTabPulse('orcamentos'),                             TYPING_END + 8400),
+      setTimeout(() => { setActiveTab('orcamentos'); setTabPulse(null); },    TYPING_END + 8700),
+      setTimeout(() => setVisibleOrc(1),                                      TYPING_END + 9300),
+      setTimeout(() => setVisibleOrc(2),                                      TYPING_END + 10100),
+      setTimeout(() => setVisibleOrc(3),                                      TYPING_END + 10800),
+      setTimeout(() => setShowTotal(true),                                    TYPING_END + 11600),
+      setTimeout(() => setShowAI(true),                                       TYPING_END + 12600),
 
       // Close
-      setTimeout(() => { setVisible(false); onComplete?.(); }, TYPING_END + 9800),
+      setTimeout(() => { setVisible(false); onComplete?.(); },                TYPING_END + 14200),
     ];
     return () => timers.forEach(clearTimeout);
   }, [onComplete, TYPING_END]);
@@ -221,7 +236,7 @@ export function SimPerfilPaciente({ onComplete }: SimPerfilPacienteProps) {
                           initial={{ opacity: 0, y: 8, scale: 0.88 }}
                           animate={{ opacity: 1, y: 0, scale: 1 }}
                           transition={{ type: 'spring', damping: 18 }}
-                          className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
+                          className="flex items-center gap-3 px-3 py-2.5 rounded-xl mb-2.5"
                           style={{ background: 'rgba(47,156,133,0.07)', border: '1px solid rgba(47,156,133,0.2)' }}
                         >
                           <motion.div
@@ -237,6 +252,22 @@ export function SimPerfilPaciente({ onComplete }: SimPerfilPacienteProps) {
                             <p className="text-[10px] text-gray-400">Restauração necessária · marcado no odontograma</p>
                           </div>
                           <Stethoscope className="w-3.5 h-3.5 ml-auto shrink-0" style={{ color: '#2f9c85' }} />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {/* Botão gerar orçamento — gerado a partir da ficha */}
+                    <AnimatePresence>
+                      {showGenBtn && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 6, scale: 0.93 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          transition={{ type: 'spring', damping: 18 }}
+                          className="flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-sm text-white cursor-default"
+                          style={{ background: 'linear-gradient(135deg,#2f9c85 0%,#1e7a67 100%)', boxShadow: '0 6px 20px -4px rgba(47,156,133,0.45)' }}
+                        >
+                          <Sparkles className="w-4 h-4" />
+                          Gerar Orçamento com IA
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -269,6 +300,45 @@ export function SimPerfilPaciente({ onComplete }: SimPerfilPacienteProps) {
                             </motion.div>
                           )}
                         </AnimatePresence>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* PLANEJAMENTO tab */}
+                {activeTab === 'planejamento' && (
+                  <motion.div key="planejamento"
+                    initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }}
+                    transition={{ duration: 0.22 }}
+                  >
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">Plano de Tratamento</p>
+
+                    {/* Seções visuais do planejamento */}
+                    <div className="space-y-2.5">
+                      {[
+                        {
+                          title: '1. Restauração Dente 46',
+                          content: 'Realizar restauração em resina composta no dente 46 com desgaste oclusal identificado. Sessão única estimada de 60 min.',
+                        },
+                        {
+                          title: '2. Profilaxia e Orientação',
+                          content: 'Limpeza profissional e instrução de higiene oral. Indicado retorno em 6 meses para manutenção preventiva.',
+                        },
+                      ].slice(0, visibleSections).map((sec, i) => (
+                        <motion.div
+                          key={i}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ type: 'spring', damping: 22, stiffness: 200 }}
+                          className="rounded-xl p-3.5"
+                          style={{ background: 'rgba(47,156,133,0.05)', border: '1px solid rgba(47,156,133,0.18)' }}
+                        >
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <Presentation className="w-3 h-3 shrink-0" style={{ color: '#2f9c85' }} />
+                            <p className="text-[11px] font-bold" style={{ color: '#2f9c85' }}>{sec.title}</p>
+                          </div>
+                          <p className="text-[11px] text-gray-600 leading-relaxed">{sec.content}</p>
+                        </motion.div>
                       ))}
                     </div>
                   </motion.div>

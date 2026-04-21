@@ -25,6 +25,7 @@ export default async function BotPage() {
         initialInstanceName={instancia?.instanceName ?? null}
         initialMensagens={mensagens}
         role={dentista.role}
+        clinicaNome={dentista.clinica}
       />
     </PageTransition>
   );

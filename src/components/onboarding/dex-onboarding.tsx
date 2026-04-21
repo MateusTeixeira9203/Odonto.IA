@@ -7,6 +7,7 @@ import { Bot, ArrowRight, ChevronRight, ChevronLeft, X, Loader2, Sparkles, Check
 import { SimAgendamento }     from './sim-agendamento';
 import { SimOrcamento }       from './sim-orcamento';
 import { SimPerfilPaciente }  from './sim-perfil-paciente';
+import { SimBot }             from './sim-bot';
 import type { PlanoId }   from '@/lib/planos';
 
 // Chaves escopadas por dentista
@@ -29,7 +30,7 @@ interface TourStep {
   title: string;
   description: string;
   targetId?: string;
-  simulacao?: 'agendamento' | 'perfilPaciente' | 'orcamento';
+  simulacao?: 'agendamento' | 'perfilPaciente' | 'orcamento' | 'bot';
   details?: string;
   bullets?: string[];
 }
@@ -347,14 +348,14 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
       financeiroStep,
       {
         id: 'WHATSAPP',
-        path: '/dashboard/bot',
-        title: 'Bot WhatsApp 24h',
-        description: 'O bot atende seus pacientes a qualquer hora: identifica quem é, coleta dados, mostra os dentistas disponíveis e confirma o horário — tudo automático.',
-        targetId: 'whatsapp-link',
+        path: '/dashboard',
+        title: 'Bot WhatsApp 24h — DEX',
+        description: 'O DEX atende seus pacientes a qualquer hora: identifica quem é, coleta dados, mostra os dentistas disponíveis e confirma o horário — tudo automático no WhatsApp.',
+        simulacao: 'bot' as const,
         bullets: [
           'Funciona 24h sem precisar de ninguém na recepção',
-          'Cria o perfil do paciente novo automaticamente',
-          'Conecte seu WhatsApp em menos de 1 minuto aqui',
+          'Paciente novo é cadastrado automaticamente',
+          'Personalize as mensagens e o nome do assistente',
         ],
       },
       ...(temEquipe ? [{
@@ -808,6 +809,7 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
             {step.simulacao === 'agendamento'    && <SimAgendamento    key="sim-ag" />}
             {step.simulacao === 'perfilPaciente' && <SimPerfilPaciente key="sim-perfil" />}
             {step.simulacao === 'orcamento'      && <SimOrcamento      key="sim-or" />}
+            {step.simulacao === 'bot'            && <SimBot            key="sim-bot" />}
           </AnimatePresence>
         </div>
       </motion.div>
