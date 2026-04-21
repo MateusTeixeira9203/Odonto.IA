@@ -817,7 +817,7 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // SPOTLIGHT steps — CONFIG_EQUIPE & CONFIG_CLINICA
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  if (!step.simulacao && step.id !== 'INTRO' && step.id !== 'FINALE') {
+  if (!step.simulacao) {
     const dexPos    = targetRect ? dexNear(targetRect, dims) : { top: centerTop, left: centerLeft };
     const bubblePos = bubbleNear(dexPos, dims);
     const arrowToX  = targetRect ? targetRect.left + targetRect.width  / 2 : dims.w / 2;
