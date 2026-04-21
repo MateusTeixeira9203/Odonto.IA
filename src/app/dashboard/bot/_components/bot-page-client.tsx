@@ -15,6 +15,9 @@ import {
   Sparkles,
   MessageSquare,
   Zap,
+  Bot,
+  CalendarCheck,
+  Ban,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -292,15 +295,33 @@ export function BotPageClient({
         <div className="flex items-start gap-3 rounded-2xl bg-teal/5 border border-teal/15 px-4 py-3">
           <Sparkles className="w-4 h-4 text-teal shrink-0 mt-0.5" />
           <p className="text-xs text-text-secondary leading-relaxed">
-            Use{' '}
-            <code className="font-mono bg-teal/10 text-teal px-1.5 py-0.5 rounded-md text-[11px]">{'{{nome}}'}</code>
-            {' '}para o nome do paciente e{' '}
-            <code className="font-mono bg-teal/10 text-teal px-1.5 py-0.5 rounded-md text-[11px]">{'{{clinica}}'}</code>
-            {' '}para o nome da clínica — o bot substitui automaticamente.
+            Variáveis substituídas automaticamente:{' '}
+            {(['{{nome}}', '{{clinica}}', '{{assistente}}', '{{dentista}}', '{{data_hora}}'] as const).map((v, i) => (
+              <span key={v}><code className="font-mono bg-teal/10 text-teal px-1.5 py-0.5 rounded-md">{v}</code>{i < 4 ? ' · ' : ''}</span>
+            ))}
           </p>
         </div>
 
         <div className="space-y-5">
+          {/* Nome do assistente */}
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <Bot className="w-3.5 h-3.5 text-teal" />
+              <label className="text-sm font-semibold text-text-primary">Nome do Assistente</label>
+            </div>
+            <Input
+              value={mensagens.nome_assistente}
+              onChange={e => setMensagens(prev => ({ ...prev, nome_assistente: e.target.value }))}
+              placeholder="Ex: DEX"
+              className="rounded-xl"
+            />
+            <p className="text-xs text-text-secondary pl-0.5">
+              Nome com o qual o bot se apresenta. Usado automaticamente em todas as mensagens via <code className="font-mono text-teal text-[11px]">{'{{assistente}}'}</code>.
+            </p>
+          </div>
+
+          <div className="h-px bg-border" />
+
           {/* Título do Menu */}
           <div className="space-y-1.5">
             <div className="flex items-center gap-2">
@@ -329,12 +350,12 @@ export function BotPageClient({
             <Textarea
               value={mensagens.msg_novo_paciente}
               onChange={e => setMensagens(prev => ({ ...prev, msg_novo_paciente: e.target.value }))}
-              placeholder="Ex: Olá! Seja bem-vindo(a) à {{clinica}}! Sou o assistente virtual e estou aqui para ajudar com seu agendamento."
+              placeholder="Ex: Olá! Seja bem-vindo(a) à {{clinica}}! Sou o {{assistente}}, assistente virtual da clínica."
               rows={3}
               className="rounded-xl resize-none"
             />
             <p className="text-xs text-text-secondary pl-0.5">
-              Enviada na primeira mensagem de quem nunca entrou em contato com a clínica.
+              Enviada na primeira mensagem de quem nunca entrou em contato.
             </p>
           </div>
 
@@ -347,12 +368,50 @@ export function BotPageClient({
             <Textarea
               value={mensagens.msg_paciente_antigo}
               onChange={e => setMensagens(prev => ({ ...prev, msg_paciente_antigo: e.target.value }))}
-              placeholder="Ex: Que bom ter você de volta, {{nome}}! Como posso te ajudar hoje?"
+              placeholder="Ex: Olá, {{nome}}! Sou o {{assistente}}. Como posso te ajudar hoje?"
               rows={3}
               className="rounded-xl resize-none"
             />
             <p className="text-xs text-text-secondary pl-0.5">
-              Enviada quando um paciente já cadastrado envia uma nova mensagem.
+              Enviada quando um paciente já cadastrado manda nova mensagem.
+            </p>
+          </div>
+
+          <div className="h-px bg-border" />
+
+          {/* Mensagem de confirmação */}
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <CalendarCheck className="w-3.5 h-3.5 text-teal" />
+              <label className="text-sm font-semibold text-text-primary">Mensagem de Confirmação</label>
+            </div>
+            <Textarea
+              value={mensagens.msg_confirmacao}
+              onChange={e => setMensagens(prev => ({ ...prev, msg_confirmacao: e.target.value }))}
+              placeholder="Ex: ✅ Agendamento confirmado pelo {{assistente}}! Dentista: {{dentista}} | Data: {{data_hora}}"
+              rows={4}
+              className="rounded-xl resize-none"
+            />
+            <p className="text-xs text-text-secondary pl-0.5">
+              Enviada após o paciente confirmar o horário. Variáveis: <code className="font-mono text-teal text-[11px]">{'{{dentista}}'}</code> e <code className="font-mono text-teal text-[11px]">{'{{data_hora}}'}</code>.
+            </p>
+          </div>
+
+          {/* Mensagem sem horário */}
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <Ban className="w-3.5 h-3.5 text-teal" />
+              <label className="text-sm font-semibold text-text-primary">Sem Horários Disponíveis</label>
+            </div>
+            <Textarea
+              value={mensagens.msg_sem_horario}
+              onChange={e => setMensagens(prev => ({ ...prev, msg_sem_horario: e.target.value }))}
+              placeholder="Ex: Não encontrei horários disponíveis. Tente outro dentista ou outra data!"
+              rows={2}
+              className="rounded-xl resize-none"
+            />
+            <p className="text-xs text-text-secondary pl-0.5">
+              Enviada quando não há horários livres para o dentista ou data selecionada.
             </p>
           </div>
         </div>

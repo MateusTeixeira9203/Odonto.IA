@@ -24,6 +24,7 @@ import {
   type HoraListResult,
 } from '@/services/whatsapp.service';
 import { inserirNotificacao } from '@/lib/notificacoes';
+import { getBotMensagens, parseTemplate, type BotMensagens } from './template';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -148,20 +149,18 @@ export async function processMessage(
 ): Promise<BotResponse> {
   await salvarMensagem(conversa, 'entrada', texto);
 
-  const input = texto.trim();
-  const ctx   = (conversa.contexto ?? {}) as BotContexto;
+  const input  = texto.trim();
+  const ctx    = (conversa.contexto ?? {}) as BotContexto;
+  const config = await getBotMensagens(conversa.clinica_id);
 
   // ── Atalho global: transferir para humano ────────────────────────────────────
   if (
     input === ROW_HUMANO ||
     /^(humano|atendente|pessoa|ajuda|falar com atendente)$/i.test(input)
   ) {
-    await sendWhatsAppText(
-      instancia,
-      conversa.telefone,
-      'Certo! Vou chamar nossa equipe. Um momento... 👩‍⚕️',
-    );
-    await salvarMensagem(conversa, 'saida', 'Certo! Vou chamar nossa equipe. Um momento... 👩‍⚕️');
+    const msg = `Certo! Vou chamar a equipe da clínica. Um momento... 👩‍⚕️`;
+    await sendWhatsAppText(instancia, conversa.telefone, msg);
+    await salvarMensagem(conversa, 'saida', msg);
     await transferirParaHumano(conversa.id);
     await atualizarConversa(conversa.id, STATES.HUMANO, {});
     return { texto: '', novoEstado: STATES.HUMANO };
@@ -169,7 +168,7 @@ export async function processMessage(
 
   // ── Atalho global: reiniciar ─────────────────────────────────────────────────
   if (/^(cancelar|recomeçar|restart|menu|inicio)$/i.test(input)) {
-    return iniciarFluxo(conversa, ctx.paciente_nome ?? 'você', instancia);
+    return iniciarFluxo(conversa, ctx.paciente_nome ?? 'você', instancia, config);
   }
 
   // ── Estados do fluxo de lista ────────────────────────────────────────────────
@@ -224,7 +223,9 @@ export async function processMessage(
       await salvarMensagem(conversa, 'saida', label);
 
       if (!datas.length) {
-        // Sem datas disponíveis — volta ao início
+        const semHorario = parseTemplate(config.msg_sem_horario, { dentista: dentista.nome as string, assistente: config.nome_assistente });
+        await sendWhatsAppText(instancia, conversa.telefone, semHorario);
+        await salvarMensagem(conversa, 'saida', semHorario);
         await atualizarConversa(conversa.id, STATES.INICIO, {});
         return { texto: '', novoEstado: STATES.INICIO };
       }
@@ -340,12 +341,12 @@ export async function processMessage(
         );
 
         const slotFormatado = formatarSlotParaConfirmacao(input);
-        const confirmacao =
-          `✅ *Agendamento Confirmado!*\n\n` +
-          `🦷 Dentista: *${dentistaNome}*\n` +
-          `📅 Data/hora: *${slotFormatado}*\n\n` +
-          'Até lá! Qualquer dúvida, é só chamar. 😊\n\n' +
-          '_Para agendar novamente, envie qualquer mensagem._';
+        const confirmacao = parseTemplate(config.msg_confirmacao, {
+          assistente: config.nome_assistente,
+          dentista:   dentistaNome,
+          data_hora:  slotFormatado,
+          nome:       ctx.paciente_nome ?? '',
+        });
 
         // Notifica o dentista e a secretária sobre o novo agendamento
         const db2 = createServiceClient();
@@ -373,8 +374,7 @@ export async function processMessage(
 
     // ── CONFIRMADO ────────────────────────────────────────────────────────────
     case STATES.CONFIRMADO: {
-      // Paciente voltou a falar → reinicia fluxo
-      return iniciarFluxo(conversa, ctx.paciente_nome ?? 'você', instancia);
+      return iniciarFluxo(conversa, ctx.paciente_nome ?? 'você', instancia, config);
     }
 
     // ── HUMANO ────────────────────────────────────────────────────────────────
@@ -442,7 +442,7 @@ export async function processMessage(
     // ── Estados legados / INICIO ──────────────────────────────────────────────
     case STATES.INICIO:
     default: {
-      return iniciarFluxo(conversa, ctx.paciente_nome ?? 'você', instancia);
+      return iniciarFluxo(conversa, ctx.paciente_nome ?? 'você', instancia, config);
     }
   }
 }
@@ -456,12 +456,14 @@ async function iniciarFluxo(
   conversa: ConversaBot,
   pacienteNome: string,
   instancia: string,
+  config: BotMensagens,
 ): Promise<BotResponse> {
   const ctx = (conversa.contexto ?? {}) as BotContexto;
 
   if (ctx.is_novo_paciente) {
     const saudacao =
       `Olá, ${pacienteNome}! 😊 Seja bem-vindo(a)!\n\n` +
+      `Sou o *${config.nome_assistente}*, assistente virtual da clínica.\n\n` +
       'Para agendar sua consulta, preciso de alguns dados rápidos.\n\n' +
       'Por favor, informe seu *CPF* (apenas os números):';
     await sendWhatsAppText(instancia, conversa.telefone, saudacao);
@@ -485,6 +487,9 @@ async function iniciarFluxo(
   await salvarMensagem(conversa, 'saida', '[Lista de dentistas enviada]');
 
   if (!dentistas.length) {
+    const semHorario = parseTemplate(config.msg_sem_horario, { assistente: config.nome_assistente });
+    await sendWhatsAppText(instancia, conversa.telefone, semHorario);
+    await salvarMensagem(conversa, 'saida', semHorario);
     await atualizarConversa(conversa.id, STATES.INICIO, {});
     return { texto: '', novoEstado: STATES.INICIO };
   }
