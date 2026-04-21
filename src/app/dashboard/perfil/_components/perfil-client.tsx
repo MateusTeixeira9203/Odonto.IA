@@ -37,9 +37,10 @@ interface Props {
   especialidade: string | null;
   telefone: string | null;
   cpf: string | null;
+  chavePix: string | null;
 }
 
-export function PerfilClient({ nome, email, role, clinica, avatarUrl: initialAvatarUrl, cro, especialidade, telefone, cpf }: Props) {
+export function PerfilClient({ nome, email, role, clinica, avatarUrl: initialAvatarUrl, cro, especialidade, telefone, cpf, chavePix }: Props) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatarUrl);
   const [uploading, setUploading] = useState(false);
   const [removing, setRemoving] = useState(false);
@@ -51,6 +52,7 @@ export function PerfilClient({ nome, email, role, clinica, avatarUrl: initialAva
   const [formCro, setFormCro]                     = useState(cro ?? '');
   const [formEspecialidade, setFormEspecialidade] = useState(especialidade ?? '');
   const [formCpf, setFormCpf]                     = useState(cpf ?? '');
+  const [formChavePix, setFormChavePix]           = useState(chavePix ?? '');
   const [formClinica, setFormClinica]             = useState(clinica);
 
   const iniciais = nome.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
@@ -122,6 +124,7 @@ export function PerfilClient({ nome, email, role, clinica, avatarUrl: initialAva
           cro:           formCro.trim(),
           especialidade: formEspecialidade.trim(),
           cpf:           formCpf.trim(),
+          chavePix:      formChavePix.trim(),
         }),
         // Atualiza nome da clínica só se admin e se mudou
         isAdmin && formClinica.trim() !== clinica
@@ -311,6 +314,26 @@ export function PerfilClient({ nome, email, role, clinica, avatarUrl: initialAva
                         <option key={esp} value={esp}>{esp}</option>
                       ))}
                     </select>
+                  </div>
+
+                  <div className="pt-2 pb-1 border-t border-border">
+                    <p className="text-[11px] font-bold text-text-secondary uppercase tracking-widest">Pagamentos</p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase tracking-widest">
+                      Chave PIX
+                    </label>
+                    <input
+                      value={formChavePix}
+                      onChange={(e) => setFormChavePix(e.target.value)}
+                      placeholder="CPF, e-mail, telefone ou chave aleatória"
+                      disabled={saving}
+                      className={inputClass}
+                    />
+                    <p className="text-[10px] text-text-secondary font-mono">
+                      Sua chave PIX pessoal para receber pagamentos via bot e orçamentos.
+                    </p>
                   </div>
                 </>
               )}

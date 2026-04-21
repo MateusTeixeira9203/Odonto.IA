@@ -23,6 +23,7 @@ import {
   type SlotInfo,
   type HoraListResult,
 } from '@/services/whatsapp.service';
+import { inserirNotificacao } from '@/lib/notificacoes';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -50,6 +51,8 @@ interface BotContexto {
   paciente_nome?: string;
   /** true = primeiro contato do paciente; usa msg_novo_paciente no template */
   is_novo_paciente?: boolean;
+  /** CPF coletado durante cadastro — salvo no banco após confirmação da data de nascimento */
+  cpf?: string;
   dentista_id?: string;
   dentista_nome?: string;
   /** Datas disponíveis para o dentista selecionado — "YYYY-MM-DD" */
@@ -344,6 +347,18 @@ export async function processMessage(
           'Até lá! Qualquer dúvida, é só chamar. 😊\n\n' +
           '_Para agendar novamente, envie qualquer mensagem._';
 
+        // Notifica o dentista e a secretária sobre o novo agendamento
+        const db2 = createServiceClient();
+        await inserirNotificacao(db2, {
+          clinicaId:    conversa.clinica_id,
+          paraRole:     'all',
+          deDentistaId: dentistaId,
+          tipo:         'briefing',
+          titulo:       `Novo agendamento — ${ctx.paciente_nome ?? 'Paciente'}`,
+          mensagem:     `${ctx.paciente_nome ?? 'Paciente'} agendou via bot para ${slotFormatado} com ${dentistaNome}.`,
+          href:         '/dashboard/agendamentos',
+        });
+
         await salvarMensagem(conversa, 'saida', confirmacao);
         await atualizarConversa(conversa.id, STATES.CONFIRMADO, {});
         return { texto: confirmacao, novoEstado: STATES.CONFIRMADO };
@@ -368,6 +383,62 @@ export async function processMessage(
       return { texto: '', novoEstado: STATES.HUMANO };
     }
 
+    // ── COLETANDO_CPF ─────────────────────────────────────────────────────────
+    case STATES.COLETANDO_CPF: {
+      const cpfLimpo = input.replace(/\D/g, '');
+      if (cpfLimpo.length !== 11) {
+        const erro = 'CPF inválido. 😕 Por favor, informe os *11 dígitos* do CPF (sem pontos ou traços):';
+        await sendWhatsAppText(instancia, conversa.telefone, erro);
+        await salvarMensagem(conversa, 'saida', erro);
+        await atualizarConversa(conversa.id, etapa, ctx as Record<string, unknown>);
+        return { texto: '', novoEstado: etapa };
+      }
+      const novoCtx: BotContexto = { ...ctx, cpf: cpfLimpo };
+      const pergunta = 'Ótimo! 📋 Agora informe sua *data de nascimento* (formato DD/MM/AAAA):';
+      await sendWhatsAppText(instancia, conversa.telefone, pergunta);
+      await salvarMensagem(conversa, 'saida', pergunta);
+      await atualizarConversa(conversa.id, STATES.COLETANDO_DATA_NASC, novoCtx as Record<string, unknown>);
+      return { texto: '', novoEstado: STATES.COLETANDO_DATA_NASC };
+    }
+
+    // ── COLETANDO_DATA_NASC ───────────────────────────────────────────────────
+    case STATES.COLETANDO_DATA_NASC: {
+      const match = input.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+      if (!match) {
+        const erro = 'Data inválida. 😕 Use o formato *DD/MM/AAAA* (ex: 15/03/1990):';
+        await sendWhatsAppText(instancia, conversa.telefone, erro);
+        await salvarMensagem(conversa, 'saida', erro);
+        await atualizarConversa(conversa.id, etapa, ctx as Record<string, unknown>);
+        return { texto: '', novoEstado: etapa };
+      }
+      const [, dia, mes, ano] = match;
+      const dataNasc = `${ano}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
+
+      // Persiste CPF e data de nascimento no perfil do paciente
+      if (conversa.paciente_id && ctx.cpf) {
+        const db = createServiceClient();
+        await db.from('pacientes')
+          .update({ cpf: ctx.cpf, data_nascimento: dataNasc })
+          .eq('id', conversa.paciente_id);
+      }
+
+      // Avança para o fluxo de dentistas
+      const dentistas = await sendDentistList(
+        instancia, conversa.telefone, conversa.clinica_id,
+        ctx.paciente_nome ?? 'você', true,
+      );
+      await salvarMensagem(conversa, 'saida', '[Lista de dentistas enviada]');
+
+      if (!dentistas.length) {
+        await atualizarConversa(conversa.id, STATES.INICIO, {});
+        return { texto: '', novoEstado: STATES.INICIO };
+      }
+
+      const ctx2: BotContexto = { ...ctx, cpf: undefined, is_novo_paciente: false };
+      await atualizarConversa(conversa.id, STATES.AGUARDANDO_DENTISTA, ctx2 as Record<string, unknown>);
+      return { texto: '', novoEstado: STATES.AGUARDANDO_DENTISTA };
+    }
+
     // ── Estados legados / INICIO ──────────────────────────────────────────────
     case STATES.INICIO:
     default: {
@@ -378,35 +449,47 @@ export async function processMessage(
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Dispara o sendDentistList e avança para AGUARDANDO_DENTISTA. */
+/** Inicia o fluxo de agendamento.
+ * Novos pacientes passam por coleta de CPF e data de nascimento antes da lista de dentistas.
+ */
 async function iniciarFluxo(
   conversa: ConversaBot,
   pacienteNome: string,
   instancia: string,
 ): Promise<BotResponse> {
   const ctx = (conversa.contexto ?? {}) as BotContexto;
+
+  if (ctx.is_novo_paciente) {
+    const saudacao =
+      `Olá, ${pacienteNome}! 😊 Seja bem-vindo(a)!\n\n` +
+      'Para agendar sua consulta, preciso de alguns dados rápidos.\n\n' +
+      'Por favor, informe seu *CPF* (apenas os números):';
+    await sendWhatsAppText(instancia, conversa.telefone, saudacao);
+    await salvarMensagem(conversa, 'saida', saudacao);
+    await atualizarConversa(
+      conversa.id,
+      STATES.COLETANDO_CPF,
+      { ...ctx, paciente_nome: pacienteNome } as Record<string, unknown>,
+    );
+    return { texto: '', novoEstado: STATES.COLETANDO_CPF };
+  }
+
   const dentistas = await sendDentistList(
     instancia,
     conversa.telefone,
     conversa.clinica_id,
     pacienteNome,
-    ctx.is_novo_paciente ?? false,
+    false,
   );
 
-  const label = '[Lista de dentistas enviada]';
-  await salvarMensagem(conversa, 'saida', label);
+  await salvarMensagem(conversa, 'saida', '[Lista de dentistas enviada]');
 
   if (!dentistas.length) {
     await atualizarConversa(conversa.id, STATES.INICIO, {});
     return { texto: '', novoEstado: STATES.INICIO };
   }
 
-  // Preserva is_novo_paciente para que re-nudges no estado AGUARDANDO_DENTISTA
-  // continuem usando a mensagem correta (novo vs. antigo paciente).
-  const novoCtx: BotContexto = {
-    paciente_nome:    pacienteNome,
-    is_novo_paciente: ctx.is_novo_paciente,
-  };
+  const novoCtx: BotContexto = { paciente_nome: pacienteNome, is_novo_paciente: false };
   await atualizarConversa(
     conversa.id,
     STATES.AGUARDANDO_DENTISTA,

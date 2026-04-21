@@ -9,7 +9,8 @@ import { PageTransition } from '@/components/layout/page-transition';
 export default async function BotPage() {
   const dentista = await getDentistaCached();
   if (!dentista) redirect('/login');
-  if (dentista.role !== 'secretaria' && dentista.role !== 'admin') redirect('/dashboard');
+  if (dentista.role === 'dentista') redirect('/dashboard');
+  if (dentista.role !== 'admin' && dentista.role !== 'secretaria') redirect('/dashboard');
 
   const [instancia, mensagens] = await Promise.all([
     getInstanceForClinica(dentista.clinica_id),

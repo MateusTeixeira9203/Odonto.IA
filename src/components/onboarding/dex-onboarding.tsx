@@ -3,11 +3,10 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { motion, AnimatePresence, LayoutGroup } from 'motion/react';
-import { Bot, ArrowRight, ChevronRight, ChevronLeft, X, Loader2 } from 'lucide-react';
+import { Bot, ArrowRight, ChevronRight, ChevronLeft, X, Loader2, Sparkles, Check } from 'lucide-react';
 import { SimAgendamento }     from './sim-agendamento';
-import { SimFicha }           from './sim-ficha';
 import { SimOrcamento }       from './sim-orcamento';
-import { SimOrcamentoPerfil } from './sim-orcamento-perfil';
+import { SimPerfilPaciente }  from './sim-perfil-paciente';
 import type { PlanoId }   from '@/lib/planos';
 
 // Chaves escopadas por dentista
@@ -22,7 +21,7 @@ const DEX_FAB_SIZE = 56;
 const BUBBLE_W     = 320;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type StepId = 'INTRO' | 'AGENDA' | 'PACIENTES' | 'FICHA_AHA' | 'ORCAMENTO_PERFIL' | 'ORCAMENTOS' | 'FINANCEIRO' | 'CONFIG_EQUIPE' | 'CONFIG_CLINICA' | 'FINALE';
+type StepId = 'INTRO' | 'AGENDA' | 'PACIENTES' | 'PERFIL_PACIENTE' | 'ORCAMENTOS' | 'CONFIG_EQUIPE' | 'CONFIG_CLINICA' | 'FINALE';
 
 interface TourStep {
   id: StepId;
@@ -30,8 +29,9 @@ interface TourStep {
   title: string;
   description: string;
   targetId?: string;
-  simulacao?: 'agendamento' | 'ficha' | 'orcamento' | 'orcamentoPerfil';
+  simulacao?: 'agendamento' | 'perfilPaciente' | 'orcamento';
   details?: string;
+  bullets?: string[];
 }
 
 interface Rect { top: number; left: number; right: number; bottom: number; width: number; height: number }
@@ -44,30 +44,24 @@ function getRect(id: string): Rect | null {
   return { top: r.top, left: r.left, right: r.right, bottom: r.bottom, width: r.width, height: r.height };
 }
 
-/** Position DEX as close to the target as possible, above or to its right */
 function dexNear(rect: Rect, dims: { w: number; h: number }): { top: number; left: number } {
   const centX = Math.max(8, Math.min(rect.left + rect.width / 2 - DEX_SIZE / 2, dims.w - DEX_SIZE - 8));
   const aboveTop = rect.top - DEX_SIZE - 22;
   if (aboveTop > 60) return { top: aboveTop, left: centX };
-
   const rightLeft = rect.right + 22;
   if (rightLeft + DEX_SIZE < dims.w - 8)
     return { top: Math.max(8, rect.top + rect.height / 2 - DEX_SIZE / 2), left: rightLeft };
-
   return { top: rect.bottom + 22, left: centX };
 }
 
-/** Position bubble near DEX without overflowing */
 function bubbleNear(
   dexPos: { top: number; left: number },
   dims: { w: number; h: number },
 ): { top: number; left: number } {
   const rightLeft = dexPos.left + DEX_SIZE + 14;
   if (rightLeft + BUBBLE_W < dims.w - 8) return { top: dexPos.top, left: rightLeft };
-
   const leftLeft = dexPos.left - BUBBLE_W - 14;
   if (leftLeft > 8) return { top: dexPos.top, left: leftLeft };
-
   return {
     top: dexPos.top + DEX_SIZE + 14,
     left: Math.max(8, Math.min(dexPos.left - BUBBLE_W / 2 + DEX_SIZE / 2, dims.w - BUBBLE_W - 8)),
@@ -76,7 +70,6 @@ function bubbleNear(
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-/** Bold, solid DEX robot — circular with teal gradient and glowing ring */
 function DexIcon({ size }: { size: number }) {
   return (
     <div style={{
@@ -92,7 +85,6 @@ function DexIcon({ size }: { size: number }) {
       ].join(', '),
     }}>
       <Bot style={{ width: size * 0.48, height: size * 0.48, color: '#fff', strokeWidth: 1.75 }} />
-      {/* Pulsing glow ring */}
       <motion.span
         className="absolute inset-0 rounded-full pointer-events-none"
         style={{ border: '2px solid rgba(47,156,133,0.6)' }}
@@ -103,33 +95,22 @@ function DexIcon({ size }: { size: number }) {
   );
 }
 
-/** DEX with continuous float — use layoutId for same-page glide */
 function FloatingDex({ layoutId, size }: { layoutId?: string; size?: number }) {
   const s = size ?? DEX_SIZE;
   return (
-    <motion.div
-      layoutId={layoutId}
-      layout
-      transition={{ type: 'spring', damping: 24, stiffness: 200 }}
-    >
-      <motion.div
-        animate={{ y: [0, -13, 0] }}
-        transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
-      >
+    <motion.div layoutId={layoutId} layout transition={{ type: 'spring', damping: 24, stiffness: 200 }}>
+      <motion.div animate={{ y: [0, -13, 0] }} transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}>
         <DexIcon size={s} />
       </motion.div>
     </motion.div>
   );
 }
 
-/** Spotlight cutout — box-shadow dims everything outside the rect */
 function Spotlight({ rect }: { rect: Rect }) {
   const pad = 10;
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       style={{
         position: 'fixed',
         top: rect.top - pad, left: rect.left - pad,
@@ -144,7 +125,6 @@ function Spotlight({ rect }: { rect: Rect }) {
   );
 }
 
-/** Self-drawing curved arrow */
 function CurvedArrow({ fromX, fromY, toX, toY }: { fromX: number; fromY: number; toX: number; toY: number }) {
   const cp1x = fromX + (toX - fromX) * 0.30;
   const cp1y = fromY;
@@ -172,7 +152,6 @@ function CurvedArrow({ fromX, fromY, toX, toY }: { fromX: number; fromY: number;
   );
 }
 
-/** Progress dots */
 function StepDots({ total, current }: { total: number; current: number }) {
   return (
     <div className="flex items-center gap-1.5">
@@ -187,7 +166,6 @@ function StepDots({ total, current }: { total: number; current: number }) {
   );
 }
 
-/** Reusable nav row */
 function NavRow({ onBack, onNext, showBack, label }: { onBack: () => void; onNext: () => void; showBack: boolean; label: string }) {
   return (
     <div className="flex items-center gap-2 mt-0.5">
@@ -217,40 +195,40 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
   const router   = useRouter();
   const pathname = usePathname();
 
-  const [active,       setActive]       = useState(false);
-  const [stepIndex,    setStepIndex]    = useState(0);
-  const [targetRect,   setTargetRect]   = useState<Rect | null>(null);
-  const [dims,         setDims]         = useState({ w: 1440, h: 900 });
+  const [active,        setActive]        = useState(false);
+  const [stepIndex,     setStepIndex]     = useState(0);
+  const [targetRect,    setTargetRect]    = useState<Rect | null>(null);
+  const [dims,          setDims]          = useState({ w: 1440, h: 900 });
   const [transitioning, setTransitioning] = useState(false);
-  const [bubbleReady,  setBubbleReady]  = useState(false);
+  const [bubbleReady,   setBubbleReady]   = useState(false);
   const navigatingRef = useRef(false);
 
   const firstName = nome.split(' ')[0];
 
   const STEPS = useMemo<TourStep[]>(() => {
-    const ahaMoment: TourStep = {
-      id: 'FICHA_AHA',
+    const perfilPacienteStep: TourStep = {
+      id: 'PERFIL_PACIENTE',
       path: '/dashboard/pacientes/demo',
-      title: 'Ficha Clínica — o coração do sistema',
-      description: 'Fale ou digita a evolução e a IA transcreve, identifica cada procedimento — como "dente 46, restauração" — e marca no odontograma automaticamente. Zero digitação manual.',
-      details: 'Na aba Documentos você centraliza fotos clínicas, raio-x e arquivos do paciente — tudo organizado por data e vinculado à ficha.',
-      simulacao: 'ficha',
-    };
-
-    const orcamentoPerfilStep: TourStep = {
-      id: 'ORCAMENTO_PERFIL',
-      path: '/dashboard/pacientes/demo',
-      title: 'Orçamento no Perfil do Paciente',
-      description: 'No perfil do paciente você tem três abas principais: Fichas Clínicas, Planejamento e Orçamentos. Com um clique em "Gerar Orçamento com IA", o sistema lê a ficha, cruza com sua tabela de preços e monta o orçamento completo em segundos.',
-      details: 'O orçamento sai em linguagem simples, com os valores da sua clínica — pronto para enviar pelo WhatsApp com um clique.',
-      simulacao: 'orcamentoPerfil',
+      title: 'Perfil Completo do Paciente',
+      description: 'Ficha clínica, documentos e orçamentos em um só lugar. O DEX navega pelas abas e preenche tudo com IA.',
+      bullets: [
+        'Fichas: evolução por voz, IA identifica dentes no odontograma',
+        'Documentos: fotos, raio-x e PDFs organizados por data',
+        'Orçamentos: gerado em segundos e enviado pelo WhatsApp',
+      ],
+      simulacao: 'perfilPaciente',
     };
 
     const orcamentoStep: TourStep = {
       id: 'ORCAMENTOS',
       path: '/dashboard/orcamentos',
       title: 'Painel de Orçamentos',
-      description: 'Aqui você acompanha todos os orçamentos gerados — com filtros por status, data e valor. Veja quais foram aprovados, enviados ou estão aguardando retorno do paciente.',
+      description: 'Todos os orçamentos em um só lugar. Filtre por status, acompanhe aprovações e registre pagamentos na recepção.',
+      bullets: [
+        'Status em tempo real: rascunho, enviado, aprovado',
+        'Secretária registra pagamentos na recepção',
+        'Histórico completo por paciente',
+      ],
       simulacao: 'orcamento',
     };
 
@@ -260,35 +238,59 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
           id: 'INTRO',
           path: '/dashboard',
           title: '',
-          description: `Olá, ${firstName}! Eu sou o DEX. Seu perfil é de secretária — vou te mostrar como usar o sistema no dia a dia. Vamos lá?`,
+          description: `Olá, ${firstName}! Eu sou o DEX — a IA do DentIA. Seu perfil é de secretária e em 1 minuto você vai entender tudo o que precisa para dominar a recepção. Vamos lá?`,
         },
         {
           id: 'AGENDA',
           path: '/dashboard/agendamentos',
-          title: 'Sua Principal Ferramenta',
-          description: 'Aqui você organiza a agenda de todos os dentistas. Novos pedidos chegam pelo bot do WhatsApp e aparecem aqui na hora — basta confirmar, editar ou reagendar com um clique. Você tem controle total da clínica.',
-          details: 'Use os filtros por dentista e por dia para visualizar rapidamente quem atende o quê.',
+          title: 'Sua Central de Comando',
+          description: 'Tudo que você precisa para organizar a clínica está aqui. Pedidos do WhatsApp chegam automaticamente — basta confirmar ou reagendar com um clique.',
+          bullets: [
+            'Pedidos do bot do WhatsApp caem direto aqui',
+            'Veja a agenda de todos os dentistas',
+            'Confirme, edite ou cancele sem ligar para ninguém',
+          ],
           simulacao: 'agendamento' as const,
         },
         {
           id: 'ORCAMENTOS',
           path: '/dashboard/orcamentos',
-          title: 'Orçamentos dos Pacientes',
-          description: 'Acompanhe os orçamentos gerados pelos dentistas. Consulte o status de cada um e registre os pagamentos recebidos diretamente por aqui.',
+          title: 'Orçamentos e Pagamentos',
+          description: 'Acompanhe os orçamentos gerados pelos dentistas e registre pagamentos diretamente na recepção — sem planilhas.',
+          bullets: [
+            'Veja o valor pago e o que ainda falta',
+            'Registre pagamentos em 2 cliques',
+            'Histórico automático por paciente',
+          ],
           simulacao: 'orcamento' as const,
         },
-        { id: 'FINALE', path: '/dashboard', title: 'Tudo pronto!', description: 'Se precisar de ajuda, é só me chamar aqui no canto. Bom trabalho!' },
+        { id: 'FINALE', path: '/dashboard', title: 'Tudo pronto!', description: 'Qualquer dúvida, é só me chamar aqui no canto. Bom trabalho e bom atendimento!' },
       ];
     }
 
     if (role === 'dentista') {
       return [
-        { id: 'INTRO',  path: '/dashboard',              title: '',             description: `Olá, Doutor(a) ${firstName}! Eu sou o DEX. Vou te mostrar o sistema em 1 minuto. Vamos lá?` },
-        { id: 'AGENDA', path: '/dashboard/agendamentos', title: 'Sua Agenda',   description: 'Acompanhe sua agenda do dia em tempo real. A secretária e o bot de WhatsApp organizam tudo aqui — você só foca no atendimento, sem precisar gerenciar ligações ou conflitos de horário.', simulacao: 'agendamento' as const },
-        ahaMoment,
-        orcamentoPerfilStep,
+        {
+          id: 'INTRO',
+          path: '/dashboard',
+          title: '',
+          description: `Olá, Doutor(a) ${firstName}! Eu sou o DEX. Em 1 minuto você vai ver como atender mais, escrever menos e receber mais rápido. Pronto?`,
+        },
+        {
+          id: 'AGENDA',
+          path: '/dashboard/agendamentos',
+          title: 'Sua Agenda no Piloto Automático',
+          description: 'A secretária e o bot organizam tudo aqui. Você abre o sistema e a agenda já está pronta — sem ligação, sem conflito.',
+          bullets: [
+            'Agendamentos via WhatsApp chegam automaticamente',
+            'Conflitos de horário detectados na hora',
+            'Você só foca no atendimento',
+          ],
+          simulacao: 'agendamento' as const,
+        },
+        perfilPacienteStep,
         orcamentoStep,
-        { id: 'FINALE', path: '/dashboard',              title: 'Tudo pronto!', description: 'Se precisar de ajuda, é só me chamar aqui no canto. Bom atendimento!' },
+        { id: 'FINALE', path: '/dashboard', title: 'Tudo pronto!', description: 'Se precisar de ajuda, é só me chamar aqui no canto. Bom atendimento, Doutor(a)!' },
       ];
     }
 
@@ -296,28 +298,49 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
     const temEquipe = plano === 'BASICO' || plano === 'CLINICA';
 
     return [
-      { id: 'INTRO',        path: '/dashboard',              title: '',                   description: `Olá, Doutor(a) ${firstName}! Eu sou o DEX. Vou te mostrar o sistema em 1 minuto. Vamos lá?` },
-      { id: 'AGENDA',       path: '/dashboard/agendamentos', title: 'Agenda Inteligente', description: 'A secretária gerencia toda a agenda por aqui. Quando um paciente agenda pelo bot do WhatsApp, o pedido cai direto nesta tela — sem ligação e sem conflito de horário. Você abre o sistema e sua agenda já está organizada.', details: 'Cada card mostra paciente, horário, procedimento e status — tudo em um lugar só.', simulacao: 'agendamento' as const },
-      ahaMoment,
-      orcamentoPerfilStep,
+      {
+        id: 'INTRO',
+        path: '/dashboard',
+        title: '',
+        description: `Olá, Doutor(a) ${firstName}! Eu sou o DEX, a IA do DentIA. Em 90 segundos você vai ver como sua clínica vai rodar no piloto automático — agenda, fichas, orçamentos e muito mais. Vamos?`,
+      },
+      {
+        id: 'AGENDA',
+        path: '/dashboard/agendamentos',
+        title: 'Agenda Que Se Organiza Sozinha',
+        description: 'Pacientes agendam pelo WhatsApp a qualquer hora. O bot verifica disponibilidade, evita conflitos e registra tudo aqui — sem uma ligação sequer.',
+        bullets: [
+          'Agendamentos 24h pelo bot do WhatsApp',
+          'Conflitos de horário bloqueados automaticamente',
+          'Secretária confirma com um clique',
+        ],
+        simulacao: 'agendamento' as const,
+      },
+      perfilPacienteStep,
       orcamentoStep,
       ...(temEquipe ? [{
         id: 'CONFIG_EQUIPE' as const,
         path: '/dashboard/configuracoes',
-        title: 'Adicione sua Secretária',
-        description: 'Seu plano inclui secretária. Cadastre-a aqui agora — com ela no sistema, o bot do WhatsApp agenda consultas automaticamente e você foca só nos atendimentos.',
-        details: 'Sem secretária cadastrada, o agendamento automático por WhatsApp não funciona.',
+        title: 'Adicione sua Equipe',
+        description: 'Cadastre sua secretária agora — com ela no sistema, o bot do WhatsApp funciona no piloto automático e você não precisa gerenciar mais nada.',
+        details: 'Sem secretária cadastrada, o agendamento automático não funciona.',
         targetId: 'dex-tour-equipe',
       }] : []),
-      { id: 'CONFIG_CLINICA', path: '/dashboard/configuracoes', title: 'Configurações Essenciais', description: 'Defina seus horários e sua tabela de preços para que eu possa gerar orçamentos com precisão.', targetId: 'dex-tour-procedimentos' },
-      { id: 'FINALE',       path: '/dashboard',              title: 'Tudo pronto!',             description: 'Se precisar de ajuda, é só me chamar aqui no canto. Bom trabalho, Doutor(a)!' },
+      {
+        id: 'CONFIG_CLINICA',
+        path: '/dashboard/configuracoes',
+        title: 'Configure em 2 Minutos',
+        description: 'Defina seus horários e tabela de preços — são esses dados que o DEX usa para gerar orçamentos com precisão.',
+        targetId: 'dex-tour-procedimentos',
+      },
+      { id: 'FINALE', path: '/dashboard', title: 'Tudo pronto!', description: 'Me chame sempre que precisar. Bom trabalho, Doutor(a)! Sua clínica inteligente começa agora.' },
     ];
   }, [role, firstName, plano]);
 
   const NAV_STEPS = useMemo(() => STEPS.filter(s => s.id !== 'INTRO' && s.id !== 'FINALE'), [STEPS]);
   const step = STEPS[stepIndex];
 
-  // ── Init (first visit only) ───────────────────────────────────────────────
+  // ── Init ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (localStorage.getItem(onboardingKey(dentistaId))) return;
@@ -327,15 +350,10 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
     const idx   = saved ? parseInt(saved, 10) : 0;
     setStepIndex(isNaN(idx) ? 0 : idx);
 
-    // Usuários convidados chegam com ?welcome=true na URL, o que faz o
-    // WelcomeModal abrir ao mesmo tempo que o tour DEX. Para evitar sobreposição,
-    // aguardamos o modal ser dispensado antes de ativar o tour.
     const welcomeOpen = new URLSearchParams(window.location.search).get('welcome') === 'true';
-
     if (welcomeOpen) {
       let postWelcomeTimer: ReturnType<typeof setTimeout> | null = null;
       const onDismissed = () => {
-        // Pequena pausa para o modal terminar sua animação de saída
         postWelcomeTimer = setTimeout(() => setActive(true), 600);
       };
       window.addEventListener('welcome-modal-dismissed', onDismissed, { once: true });
@@ -345,12 +363,11 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
       };
     }
 
-    // Fluxo normal: dentista que criou a clínica, sem modal de boas-vindas
     const t = setTimeout(() => setActive(true), 900);
     return () => clearTimeout(t);
   }, [dentistaId]);
 
-  // ── Navigate to correct page with transition message ──────────────────────
+  // ── Navigate to correct page ──────────────────────────────────────────────
   useEffect(() => {
     if (!active || !step) return;
     if (pathname === step.path) {
@@ -361,7 +378,6 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
     if (!navigatingRef.current) {
       navigatingRef.current = true;
       setTransitioning(true);
-      // Wait 1400ms (transition shown) then route
       const t = setTimeout(() => router.push(step.path), 1400);
       return () => {
         clearTimeout(t);
@@ -374,8 +390,7 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
   useEffect(() => {
     setBubbleReady(false);
     if (!active) return;
-    // Steps com simulação: tooltip aparece 1.4s depois (simulação começa primeiro)
-    const delay = step?.simulacao ? 1400 : 520;
+    const delay = step?.simulacao ? 1200 : 520;
     const t = setTimeout(() => setBubbleReady(true), delay);
     return () => clearTimeout(t);
   }, [stepIndex, active, step?.simulacao]);
@@ -416,8 +431,8 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
 
   if (!active || !step) return null;
 
-  const navIdx = NAV_STEPS.findIndex(s => s.id === step.id);
-  const isLast = stepIndex === STEPS.length - 1;
+  const navIdx    = NAV_STEPS.findIndex(s => s.id === step.id);
+  const isLast    = stepIndex === STEPS.length - 1;
   const centerLeft = dims.w / 2 - DEX_SIZE / 2;
   const centerTop  = dims.h / 2 - DEX_SIZE / 2 - 90;
   const fabLeft    = dims.w - 24 - DEX_FAB_SIZE;
@@ -434,7 +449,7 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
   );
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // TRANSITION OVERLAY — shows while navigating to next page
+  // TRANSITION OVERLAY
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   if (transitioning) {
     return (
@@ -442,9 +457,7 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
         key="transition"
         className="fixed inset-0 flex flex-col items-center justify-center gap-6"
         style={{ background: 'rgba(0,0,0,0.90)', zIndex: 9999 }}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       >
         {SkipBtn}
         <motion.div layoutId="dex-spotlight" layout transition={{ type: 'spring', damping: 24, stiffness: 200 }}>
@@ -453,9 +466,7 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
           </motion.div>
         </motion.div>
         <motion.p
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
+          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
           className="flex items-center gap-2 text-sm font-medium"
           style={{ color: 'rgba(255,255,255,0.6)' }}
         >
@@ -466,11 +477,10 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
     );
   }
 
-  // Guard: only render the step UI when on its page
   if (pathname !== step.path) return null;
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // INTRO
+  // INTRO — full-screen with dramatic entrance
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   if (step.id === 'INTRO') {
     return (
@@ -478,52 +488,75 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
         <motion.div
           className="fixed inset-0"
           style={{
-            background: 'radial-gradient(ellipse at center, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0.68) 100%)',
-            backdropFilter: 'blur(3px)',
+            background: 'radial-gradient(ellipse at 50% 40%, rgba(47,156,133,0.08) 0%, rgba(0,0,0,0.82) 70%)',
+            backdropFilter: 'blur(4px)',
             zIndex: 9990,
           }}
           initial={{ opacity: 0 }} animate={{ opacity: 1 }}
         />
+
+        {/* Particle dots background */}
+        <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 9991 }}>
+          {[...Array(6)].map((_, i) => (
+            <motion.div key={i}
+              className="absolute rounded-full"
+              style={{
+                width: 3, height: 3,
+                background: 'rgba(47,156,133,0.4)',
+                left: `${15 + i * 14}%`,
+                top: `${20 + (i % 3) * 20}%`,
+              }}
+              animate={{ y: [0, -18, 0], opacity: [0.2, 0.7, 0.2] }}
+              transition={{ duration: 2.8 + i * 0.4, repeat: Infinity, ease: 'easeInOut', delay: i * 0.3 }}
+            />
+          ))}
+        </div>
 
         <motion.div className="fixed inset-0 flex flex-col items-center justify-center"
           style={{ zIndex: 9999 }} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
         >
           {SkipBtn}
 
-          <motion.div layoutId="dex-spotlight" layout transition={{ type: 'spring', damping: 24, stiffness: 200 }}>
+          <motion.div
+            layoutId="dex-spotlight" layout
+            transition={{ type: 'spring', damping: 24, stiffness: 200 }}
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+          >
             <motion.div animate={{ y: [0, -15, 0] }} transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}>
-              <DexIcon size={108} />
+              <DexIcon size={110} />
             </motion.div>
           </motion.div>
 
           <AnimatePresence>
             {bubbleReady && (
               <motion.div
-                initial={{ opacity: 0, y: 22, scale: 0.88 }}
+                initial={{ opacity: 0, y: 28, scale: 0.85 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ type: 'spring', damping: 20, stiffness: 170 }}
-                className="mt-8 w-[340px] max-w-[90vw] rounded-3xl px-8 py-7 relative"
+                transition={{ type: 'spring', damping: 18, stiffness: 160 }}
+                className="mt-8 w-[380px] max-w-[92vw] rounded-3xl px-8 py-7 relative"
                 style={{
-                  background: 'rgba(9,9,11,0.97)',
-                  border: '1.5px solid rgba(47,156,133,0.4)',
-                  boxShadow: '0 24px 64px -12px rgba(0,0,0,0.9), 0 0 48px rgba(47,156,133,0.12)',
+                  background: 'linear-gradient(160deg, rgba(13,13,15,0.99) 0%, rgba(9,22,20,0.99) 100%)',
+                  border: '1.5px solid rgba(47,156,133,0.45)',
+                  boxShadow: '0 32px 80px -12px rgba(0,0,0,0.95), 0 0 60px rgba(47,156,133,0.14)',
                 }}
               >
-                {/* Bubble tail pointing up */}
+                {/* Tail pointing up */}
                 <div className="absolute -top-[10px] left-1/2 -translate-x-1/2 w-5 h-5 rotate-45"
-                  style={{ background: 'rgba(9,9,11,0.97)', borderTop: '1.5px solid rgba(47,156,133,0.4)', borderLeft: '1.5px solid rgba(47,156,133,0.4)' }} />
+                  style={{ background: 'rgba(13,13,15,0.99)', borderTop: '1.5px solid rgba(47,156,133,0.45)', borderLeft: '1.5px solid rgba(47,156,133,0.45)' }} />
 
-                <p className="text-white/85 text-sm leading-relaxed mb-6 text-center">
-                  Olá,{' '}
-                  <strong style={{ color: '#2f9c85' }}>{firstName}</strong>!{' '}
-                  Eu sou o <strong className="text-white">DEX</strong>, a inteligência artificial do DentIA.{' '}
-                  Vou te mostrar como dominar sua clínica em 1 minuto. Vamos lá?
-                </p>
+                <div className="flex items-center gap-2 mb-4 justify-center">
+                  <Sparkles className="w-3.5 h-3.5" style={{ color: '#2f9c85' }} />
+                  <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#2f9c85' }}>DEX — IA do DentIA</span>
+                </div>
+
+                <p className="text-white/90 text-sm leading-relaxed mb-6 text-center">{step.description}</p>
+
                 <button onClick={next}
-                  className="w-full py-3 px-6 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-[0.98]"
-                  style={{ background: 'linear-gradient(135deg, #2f9c85 0%, #1e7a67 100%)', boxShadow: '0 8px 28px -4px rgba(47,156,133,0.55)' }}
+                  className="w-full py-3.5 px-6 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-[0.98]"
+                  style={{ background: 'linear-gradient(135deg, #2f9c85 0%, #1e7a67 100%)', boxShadow: '0 8px 32px -4px rgba(47,156,133,0.60)' }}
                 >
-                  Iniciar Tour <ArrowRight className="w-4 h-4" />
+                  Ver o sistema em ação <ArrowRight className="w-4 h-4" />
                 </button>
               </motion.div>
             )}
@@ -539,13 +572,30 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
   if (step.id === 'FINALE') {
     return (
       <>
-        <motion.div className="fixed inset-0" style={{ background: 'rgba(0,0,0,0.52)', zIndex: 9990, pointerEvents: 'none' }}
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }} />
+        <motion.div className="fixed inset-0"
+          style={{ background: 'rgba(0,0,0,0.55)', zIndex: 9990, pointerEvents: 'none' }}
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+        />
 
         <motion.div className="fixed inset-0" style={{ zIndex: 9999, pointerEvents: 'none' }}
           initial={{ opacity: 0 }} animate={{ opacity: 1 }}
         >
-          {/* DEX glides from center to FAB corner */}
+          {/* Center success badge */}
+          <motion.div
+            initial={{ opacity: 0, y: -30, scale: 0.7 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ type: 'spring', damping: 18, stiffness: 160 }}
+            className="fixed top-[30%] left-1/2 -translate-x-1/2 flex flex-col items-center gap-3"
+            style={{ pointerEvents: 'none' }}
+          >
+            <div className="w-16 h-16 rounded-full flex items-center justify-center"
+              style={{ background: 'linear-gradient(135deg, #2f9c85 0%, #1e7a67 100%)', boxShadow: '0 0 40px rgba(47,156,133,0.5)' }}>
+              <Check className="w-8 h-8 text-white" />
+            </div>
+            <p className="text-white font-bold text-xl tracking-wide">Tour concluído!</p>
+          </motion.div>
+
+          {/* DEX glides to FAB corner */}
           <motion.div
             style={{ position: 'fixed', width: DEX_SIZE, height: DEX_SIZE }}
             initial={{ x: centerLeft, y: centerTop, scale: 1 }}
@@ -554,16 +604,14 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
               y: fabTop  - (DEX_SIZE - DEX_FAB_SIZE) / 2,
               scale: DEX_FAB_SIZE / DEX_SIZE,
             }}
-            transition={{ type: 'spring', damping: 18, stiffness: 90, delay: 0.15 }}
+            transition={{ type: 'spring', damping: 18, stiffness: 90, delay: 0.3 }}
           >
             <DexIcon size={DEX_SIZE} />
           </motion.div>
 
           {/* Bubble to the left of FAB */}
           <motion.div
-            initial={{ opacity: 0, x: 18 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 1.55 }}
+            initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1.6 }}
             className="fixed rounded-2xl px-5 py-4"
             style={{
               right: 24 + DEX_FAB_SIZE + 14, bottom: 16, width: 240,
@@ -574,24 +622,21 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
           >
             <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#2f9c85' }}>Eu moro aqui!</p>
             <p className="text-white/80 text-sm leading-relaxed">{step.description}</p>
-            {/* Tail pointing right */}
             <div className="absolute right-[-9px] top-1/2 -translate-y-1/2 w-4 h-4 rotate-45"
               style={{ background: 'rgba(9,9,11,0.97)', borderTop: '1.5px solid rgba(47,156,133,0.5)', borderRight: '1.5px solid rgba(47,156,133,0.5)' }} />
           </motion.div>
 
           {/* CTA */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 2.1 }}
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 2.2 }}
             className="fixed bottom-10 left-1/2 -translate-x-1/2"
             style={{ pointerEvents: 'auto' }}
           >
             <button onClick={complete}
-              className="flex items-center gap-2 py-3 px-8 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 active:scale-[0.98]"
-              style={{ background: 'linear-gradient(135deg, #2f9c85 0%, #1e7a67 100%)', boxShadow: '0 8px 28px -4px rgba(47,156,133,0.55)' }}
+              className="flex items-center gap-2 py-3.5 px-10 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 active:scale-[0.98]"
+              style={{ background: 'linear-gradient(135deg, #2f9c85 0%, #1e7a67 100%)', boxShadow: '0 8px 32px -4px rgba(47,156,133,0.60)' }}
             >
-              Começar a usar o DEX <ArrowRight className="w-4 h-4" />
+              Começar a usar agora <ArrowRight className="w-4 h-4" />
             </button>
           </motion.div>
         </motion.div>
@@ -600,85 +645,133 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // SIMULATION steps — AGENDA / FICHA_AHA / ORCAMENTOS
-  // DEX fica no canto superior direito; simulação auto-play ao centro
+  // SIMULATION steps — FULL-SCREEN SPLIT PANEL
+  // Left 40%: DEX + content card | Right 60%: simulation at full scale
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   if (step.simulacao) {
-    const dexPos    = { top: 80, left: dims.w - DEX_SIZE - 80 };
-    const bubblePos = bubbleNear(dexPos, dims);
     const nextLabel = isLast ? 'Concluir' : 'Próximo';
 
     return (
-      <>
-        {/* Overlay leve — simulação é o foco visual */}
-        <motion.div className="fixed inset-0"
-          style={{ background: 'rgba(0,0,0,0.52)', zIndex: 9990 }}
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-        />
-
-        {/* Componente de simulação */}
-        <AnimatePresence>
-          {step.simulacao === 'agendamento'    && <SimAgendamento     key="sim-ag" />}
-          {step.simulacao === 'ficha'          && <SimFicha           key="sim-fi" />}
-          {step.simulacao === 'orcamento'      && <SimOrcamento       key="sim-or" />}
-          {step.simulacao === 'orcamentoPerfil' && <SimOrcamentoPerfil key="sim-or-perf" />}
-        </AnimatePresence>
-
-        {/* Skip */}
-        <div style={{ position: 'fixed', zIndex: 9999 }}>{SkipBtn}</div>
-
-        {/* DEX — canto superior direito, glide via layoutId */}
-        <motion.div
-          layoutId="dex-spotlight"
-          layout
-          style={{ position: 'fixed', top: dexPos.top, left: dexPos.left, zIndex: 9997 }}
-          transition={{ type: 'spring', damping: 22, stiffness: 180 }}
+      <motion.div
+        key={`sim-panel-${step.id}`}
+        className="fixed inset-0 flex"
+        style={{ zIndex: 9990 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        {/* ── LEFT PANEL ── */}
+        <div
+          className="relative flex flex-col items-center justify-center shrink-0 px-10"
+          style={{
+            width: '40%',
+            background: 'linear-gradient(160deg, rgba(5,14,12,0.99) 0%, rgba(0,0,0,0.99) 100%)',
+            borderRight: '1px solid rgba(47,156,133,0.18)',
+          }}
         >
-          <motion.div animate={{ y: [0, -11, 0] }} transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}>
-            <DexIcon size={DEX_SIZE} />
-          </motion.div>
-        </motion.div>
+          {/* Ambient glow */}
+          <div className="absolute inset-0 pointer-events-none" style={{
+            background: 'radial-gradient(ellipse at 50% 30%, rgba(47,156,133,0.07) 0%, transparent 65%)',
+          }} />
 
-        {/* Bubble — aparece após delay estendido (simulação primeiro) */}
-        <AnimatePresence mode="wait">
-          {bubbleReady && (
-            <motion.div
-              key={`bubble-${step.id}`}
-              style={{ position: 'fixed', top: bubblePos.top, left: bubblePos.left, zIndex: 9999, width: BUBBLE_W }}
-              initial={{ opacity: 0, scale: 0.88, x: -10 }}
-              animate={{ opacity: 1, scale: 1, x: 0 }}
-              exit={{ opacity: 0, scale: 0.93, x: 8 }}
-              transition={{ type: 'spring', damping: 22, stiffness: 200 }}
-            >
-              <div className="rounded-2xl px-5 py-4"
-                style={{
-                  background: 'rgba(9,9,11,0.97)',
-                  border: '1.5px solid rgba(47,156,133,0.45)',
-                  boxShadow: '0 16px 48px rgba(0,0,0,0.65)',
-                }}
+          <div className="relative w-full max-w-[320px] flex flex-col items-start gap-6">
+            {/* DEX icon + label */}
+            <div className="flex items-center gap-3">
+              <motion.div
+                layoutId="dex-spotlight"
+                layout
+                transition={{ type: 'spring', damping: 22, stiffness: 180 }}
               >
-                <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#2f9c85' }}>
-                  {step.title}
-                </p>
-                <p className="text-white/82 text-sm leading-relaxed mb-3">{step.description}</p>
-                {step.details && (
-                  <p className="text-white/50 text-xs leading-relaxed mb-3 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                    {step.details}
-                  </p>
-                )}
-                <StepDots total={NAV_STEPS.length} current={navIdx} />
-                <NavRow onBack={back} onNext={next} showBack={stepIndex > 1} label={nextLabel} />
+                <motion.div animate={{ y: [0, -10, 0] }} transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}>
+                  <DexIcon size={52} />
+                </motion.div>
+              </motion.div>
+              <div>
+                <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: '#2f9c85' }}>DEX</p>
+                <p className="text-white/40 text-[10px]">Inteligência Artificial</p>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </>
+            </div>
+
+            {/* Step tag */}
+            <div>
+              <AnimatePresence>
+                {bubbleReady && (
+                  <motion.div
+                    initial={{ opacity: 0, x: -16 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 8 }}
+                    transition={{ type: 'spring', damping: 22, stiffness: 200 }}
+                  >
+                    <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: '#2f9c85' }}>
+                      {step.title}
+                    </p>
+                    <p className="text-white/85 text-sm leading-relaxed mb-5">
+                      {step.description}
+                    </p>
+
+                    {/* Bullet points */}
+                    {step.bullets && step.bullets.length > 0 && (
+                      <ul className="flex flex-col gap-2.5 mb-6">
+                        {step.bullets.map((bullet, i) => (
+                          <motion.li
+                            key={i}
+                            initial={{ opacity: 0, x: -12 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.15 + i * 0.12, type: 'spring', damping: 22, stiffness: 200 }}
+                            className="flex items-start gap-2.5"
+                          >
+                            <div className="mt-0.5 w-4 h-4 rounded-full flex items-center justify-center shrink-0"
+                              style={{ background: 'rgba(47,156,133,0.18)', border: '1px solid rgba(47,156,133,0.35)' }}>
+                              <Check className="w-2.5 h-2.5" style={{ color: '#2f9c85' }} />
+                            </div>
+                            <span className="text-white/65 text-xs leading-relaxed">{bullet}</span>
+                          </motion.li>
+                        ))}
+                      </ul>
+                    )}
+
+                    <div className="flex flex-col gap-3">
+                      <StepDots total={NAV_STEPS.length} current={navIdx} />
+                      <NavRow onBack={back} onNext={next} showBack={stepIndex > 1} label={nextLabel} />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+
+          {/* Skip btn */}
+          <button onClick={skip}
+            className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors hover:bg-white/10"
+            style={{ color: 'rgba(255,255,255,0.3)' }}
+          >
+            <X className="w-3.5 h-3.5" /> Pular Tour
+          </button>
+        </div>
+
+        {/* ── RIGHT PANEL ── */}
+        <div
+          className="flex-1 relative flex items-center justify-center overflow-hidden"
+          style={{ background: 'rgba(0,0,0,0.75)' }}
+        >
+          {/* Subtle radial glow behind simulation */}
+          <div className="absolute inset-0 pointer-events-none" style={{
+            background: 'radial-gradient(ellipse at center, rgba(47,156,133,0.06) 0%, transparent 65%)',
+          }} />
+
+          <AnimatePresence mode="wait">
+            {step.simulacao === 'agendamento'    && <SimAgendamento    key="sim-ag" />}
+            {step.simulacao === 'perfilPaciente' && <SimPerfilPaciente key="sim-perfil" />}
+            {step.simulacao === 'orcamento'      && <SimOrcamento      key="sim-or" />}
+          </AnimatePresence>
+        </div>
+      </motion.div>
     );
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // SPOTLIGHT steps — CONFIG_EQUIPE & CONFIG_CLINICA
-  // DEX glides via layoutId; bubble appears after DEX settles
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   if (step.id === 'CONFIG_EQUIPE' || step.id === 'CONFIG_CLINICA') {
     const dexPos    = targetRect ? dexNear(targetRect, dims) : { top: centerTop, left: centerLeft };
@@ -689,7 +782,6 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
 
     return (
       <LayoutGroup>
-        {/* Spotlight or fallback overlay */}
         {targetRect
           ? <Spotlight key={`spot-${step.id}`} rect={targetRect} />
           : <motion.div key="spot-fallback" className="fixed inset-0"
@@ -697,13 +789,10 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
         }
 
-        {/* Skip */}
         <div style={{ position: 'fixed', zIndex: 9999 }}>{SkipBtn}</div>
 
-        {/* DEX — uses layoutId so it glides when stepIndex changes on same page */}
         <motion.div
-          layoutId="dex-spotlight"
-          layout
+          layoutId="dex-spotlight" layout
           style={{ position: 'fixed', top: dexPos.top, left: dexPos.left, zIndex: 9997 }}
           transition={{ type: 'spring', damping: 24, stiffness: 200 }}
         >
@@ -712,26 +801,23 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
           </motion.div>
         </motion.div>
 
-        {/* Curved arrow DEX → target */}
         <AnimatePresence>
           {targetRect && bubbleReady && (
             <CurvedArrow key={`arrow-${step.id}`}
-              fromX={dexPos.left + DEX_SIZE / 2}
-              fromY={dexPos.top  + DEX_SIZE / 2}
+              fromX={dexPos.left + DEX_SIZE / 2} fromY={dexPos.top  + DEX_SIZE / 2}
               toX={arrowToX} toY={arrowToY}
             />
           )}
         </AnimatePresence>
 
-        {/* Speech bubble — appears after DEX settles */}
         <AnimatePresence mode="wait">
           {bubbleReady && (
             <motion.div
               key={`bubble-${step.id}`}
               style={{ position: 'fixed', top: bubblePos.top, left: bubblePos.left, zIndex: 9999, width: BUBBLE_W }}
               initial={{ opacity: 0, scale: 0.88, x: -12 }}
-              animate={{ opacity: 1, scale: 1,    x: 0 }}
-              exit={{   opacity: 0, scale: 0.92,  x: 8 }}
+              animate={{ opacity: 1, scale: 1, x: 0 }}
+              exit={{ opacity: 0, scale: 0.92, x: 8 }}
               transition={{ type: 'spring', damping: 22, stiffness: 200 }}
             >
               <div className="rounded-2xl px-5 py-4"

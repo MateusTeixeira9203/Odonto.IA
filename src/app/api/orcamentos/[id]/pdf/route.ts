@@ -30,6 +30,7 @@ export async function GET(
         status,
         condicoes_pagamento,
         total,
+        desconto,
         paciente:pacientes (
           nome,
           cpf,
@@ -125,7 +126,7 @@ export async function GET(
         })
       ),
       subtotal,
-      desconto: 0,
+      desconto: orcamento.desconto ?? 0,
       total: orcamento.total ?? subtotal,
       forma_pagamento: orcamento.condicoes_pagamento ?? undefined,
     };

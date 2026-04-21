@@ -1,18 +1,19 @@
 'use client';
 
-import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 
+type NodeData = {
+  id: number;
+  x: number;
+  y: number;
+  duration: number;
+  delay: number;
+  lineDurations: number[];
+  lineDelays: number[];
+};
+
 export function NeuralBackground({ opacity = 1 }: { opacity?: number }) {
-  const [nodes, setNodes] = useState<{
-    id: number;
-    x: number;
-    y: number;
-    duration: number;
-    delay: number;
-    lineDurations: number[];
-    lineDelays: number[];
-  }[]>([]);
+  const [nodes, setNodes] = useState<NodeData[]>([]);
 
   useEffect(() => {
     const newNodes = Array.from({ length: 20 }).map((_, i) => ({
@@ -36,10 +37,19 @@ export function NeuralBackground({ opacity = 1 }: { opacity?: number }) {
       className="absolute inset-0 overflow-hidden pointer-events-none -z-10 bg-bg"
       style={opacity !== 1 ? { opacity } : undefined}
     >
-      {/* Gradiente radial suave */}
+      <style>{`
+        @keyframes neural-fade {
+          0%, 100% { opacity: 0.05; }
+          50%       { opacity: 0.5;  }
+        }
+        @keyframes neural-pulse {
+          0%, 100% { opacity: 0.2; }
+          50%      { opacity: 0.8; }
+        }
+      `}</style>
+
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-teal/5 via-bg/80 to-bg" />
 
-      {/* Rede neural animada */}
       <svg className="absolute inset-0 w-full h-full opacity-30">
         {nodes.map((node, i) => {
           const connections = [
@@ -50,7 +60,7 @@ export function NeuralBackground({ opacity = 1 }: { opacity?: number }) {
           return (
             <g key={node.id}>
               {connections.map((target, j) => (
-                <motion.line
+                <line
                   key={`${node.id}-${target.id}-${j}`}
                   x1={`${node.x}%`}
                   y1={`${node.y}%`}
@@ -58,31 +68,27 @@ export function NeuralBackground({ opacity = 1 }: { opacity?: number }) {
                   y2={`${target.y}%`}
                   stroke="var(--color-teal)"
                   strokeWidth="0.5"
-                  initial={{ pathLength: 0, opacity: 0 }}
-                  animate={{ pathLength: [0, 1, 1, 0], opacity: [0, 0.5, 0.5, 0] }}
-                  transition={{
-                    duration: node.lineDurations[j],
-                    repeat: Infinity,
-                    ease: 'linear',
-                    delay: node.lineDelays[j],
+                  style={{
+                    animation: `neural-fade ${node.lineDurations[j]}s ${node.lineDelays[j]}s infinite ease-in-out`,
+                    opacity: 0.05,
                   }}
                 />
               ))}
-              <motion.circle
+              <circle
                 cx={`${node.x}%`}
                 cy={`${node.y}%`}
                 r="1.5"
                 fill="var(--color-teal)"
-                initial={{ opacity: 0.2 }}
-                animate={{ opacity: [0.2, 0.8, 0.2] }}
-                transition={{ duration: node.duration, repeat: Infinity, ease: 'easeInOut' }}
+                style={{
+                  animation: `neural-pulse ${node.duration}s ${node.delay}s infinite ease-in-out`,
+                  opacity: 0.2,
+                }}
               />
             </g>
           );
         })}
       </svg>
 
-      {/* Textura de padrão neural */}
       <div className="absolute inset-0 bg-neural-pattern opacity-50 mix-blend-multiply" />
     </div>
   );

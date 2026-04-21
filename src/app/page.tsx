@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { motion, AnimatePresence, useScroll, useTransform } from 'motion/react';
 import {
   Mic,
@@ -18,8 +19,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
 import Link from 'next/link';
-import ParticleNetwork from '@/components/ParticleNetwork';
 import { cn } from '@/lib/utils';
+
+// Lazy-load canvas — doesn't block initial paint, no SSR needed
+const ParticleNetwork = dynamic(() => import('@/components/ParticleNetwork'), {
+  ssr: false,
+  loading: () => null,
+});
 
 const words = ['Inteligência.', 'Velocidade.', 'Qualidade.'];
 
@@ -41,7 +47,6 @@ const faqs = [
   },
 ];
 
-// Classes comuns reutilizáveis
 const btnPrimary = cn(
   'inline-flex items-center justify-center font-medium transition-all duration-300',
   'bg-teal hover:bg-teal-lt text-white rounded-full btn-glow',
@@ -52,11 +57,14 @@ const btnOutline = cn(
   'border border-border hover:bg-surface-alt rounded-full bg-bg/50 backdrop-blur-sm text-text-primary',
 );
 
+// Shared easing — ease-out-quart feels snappy on scroll, smooth on entrance
+const ease = [0.22, 1, 0.36, 1] as const;
+
 export default function LandingPage() {
   const [wordIndex, setWordIndex] = useState(0);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const { scrollYProgress } = useScroll();
-  const yParallax = useTransform(scrollYProgress, [0, 1], [0, -100]);
+  const yParallax = useTransform(scrollYProgress, [0, 1], [0, -80]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -65,18 +73,18 @@ export default function LandingPage() {
     return () => clearInterval(interval);
   }, []);
 
-  const fadeIn = {
-    initial: { opacity: 0, y: 20 },
+  const fadeUp = {
+    initial: { opacity: 0, y: 24 },
     whileInView: { opacity: 1, y: 0 },
-    viewport: { once: true },
-    transition: { duration: 0.6 },
+    viewport: { once: true, margin: '-60px' },
+    transition: { duration: 0.6, ease },
   };
 
   return (
     <div className="min-h-screen bg-bg selection:bg-teal/20 relative overflow-hidden">
       <ParticleNetwork />
 
-      {/* Blobs decorativos */}
+      {/* Decorative blobs */}
       <div className="blob-shape top-[-10%] left-[-10%] w-[40vw] h-[40vw] opacity-60" />
       <div className="blob-shape top-[40%] right-[-10%] w-[35vw] h-[35vw] opacity-50" style={{ animationDelay: '-5s' }} />
       <div className="blob-shape bottom-[-10%] left-[20%] w-[45vw] h-[45vw] opacity-60" style={{ animationDelay: '-10s' }} />
@@ -91,15 +99,15 @@ export default function LandingPage() {
           </div>
 
           <div className="hidden md:flex items-center gap-8 justify-self-center">
-            <a href="#funcionalidades" className="text-sm font-medium text-text-secondary hover:text-teal transition-colors">
-              Funcionalidades
-            </a>
-            <a href="#vantagens" className="text-sm font-medium text-text-secondary hover:text-teal transition-colors">
-              Vantagens
-            </a>
-            <a href="#faq" className="text-sm font-medium text-text-secondary hover:text-teal transition-colors">
-              FAQ
-            </a>
+            {(['#funcionalidades', '#vantagens', '#faq'] as const).map((href, i) => (
+              <a
+                key={i}
+                href={href}
+                className="text-sm font-medium text-text-secondary hover:text-teal transition-colors"
+              >
+                {['Funcionalidades', 'Vantagens', 'FAQ'][i]}
+              </a>
+            ))}
           </div>
 
           <div className="flex items-center gap-4 justify-self-end">
@@ -117,13 +125,13 @@ export default function LandingPage() {
       </nav>
 
       <main className="pt-32 relative z-10">
-        {/* Hero */}
+        {/* ── Hero ── */}
         <section className="relative px-6 py-20 md:py-32">
           <div className="max-w-7xl mx-auto text-center relative z-10">
             <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
+              initial={{ opacity: 0, scale: 0.92 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5 }}
+              transition={{ duration: 0.5, ease }}
               className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-teal/10 text-teal text-xs font-semibold mb-8 border border-teal/20 backdrop-blur-sm"
             >
               <Sparkles className="w-3.5 h-3.5" />
@@ -131,17 +139,21 @@ export default function LandingPage() {
             </motion.div>
 
             <div className="text-5xl md:text-7xl lg:text-8xl font-heading font-medium leading-[1.1] tracking-tight mb-8 h-[3.3em] md:h-[2.2em]">
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
+              <motion.div
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.65, ease }}
+              >
                 A Odontologia na <br />
                 <span className="text-teal italic">Era da </span>
                 <span className="inline-block relative text-teal italic">
                   <AnimatePresence mode="wait">
                     <motion.span
                       key={words[wordIndex]}
-                      initial={{ opacity: 0, y: 20 }}
+                      initial={{ opacity: 0, y: 18 }}
                       animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -20 }}
-                      transition={{ duration: 0.5 }}
+                      exit={{ opacity: 0, y: -18 }}
+                      transition={{ duration: 0.38, ease }}
                       className="absolute left-0"
                     >
                       {words[wordIndex]}
@@ -155,7 +167,7 @@ export default function LandingPage() {
             <motion.p
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
+              transition={{ duration: 0.6, delay: 0.18, ease }}
               className="max-w-3xl mx-auto text-lg md:text-xl text-text-secondary mb-12 leading-relaxed text-balance"
             >
               Otimize o seu atendimento, maximize o seu tempo. <br className="hidden md:block" />
@@ -165,7 +177,7 @@ export default function LandingPage() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
+              transition={{ duration: 0.6, delay: 0.3, ease }}
               className="flex flex-col sm:flex-row items-center justify-center gap-4"
             >
               <Link href="/planos" className={cn(btnPrimary, 'h-14 px-10 text-lg group')}>
@@ -179,11 +191,11 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Features */}
+        {/* ── Features ── */}
         <section id="funcionalidades" className="px-6 py-24 relative">
           <div className="absolute inset-0 bg-surface-alt/30 backdrop-blur-md -z-10" />
           <div className="max-w-7xl mx-auto">
-            <motion.div {...fadeIn} className="text-center mb-20">
+            <motion.div {...fadeUp} className="text-center mb-20">
               <h2 className="text-3xl md:text-5xl font-heading mb-6 text-text-primary">
                 O Poder da <span className="italic text-teal">IA</span> no seu Consultório
               </h2>
@@ -214,7 +226,13 @@ export default function LandingPage() {
                   color: 'bg-teal-pale text-teal-dark',
                 },
               ].map((feature, i) => (
-                <motion.div key={i} {...fadeIn} transition={{ duration: 0.6, delay: i * 0.1 }}>
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 28 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: '-40px' }}
+                  transition={{ duration: 0.55, delay: i * 0.1, ease }}
+                >
                   <Card className="h-full border-none shadow-sm hover:shadow-xl transition-all duration-500 group bg-surface/60 backdrop-blur-xl">
                     <CardContent className="p-8">
                       <div className={`w-14 h-14 rounded-2xl ${feature.color} flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500`}>
@@ -230,16 +248,17 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Vantagens */}
+        {/* ── Vantagens ── */}
         <section id="vantagens" className="px-6 py-24">
           <div className="max-w-7xl mx-auto">
             <div className="grid lg:grid-cols-2 gap-16 items-center">
               <motion.div
-                initial={{ opacity: 0, x: -30 }}
+                initial={{ opacity: 0, x: -32 }}
                 whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
+                viewport={{ once: true, margin: '-80px' }}
+                transition={{ duration: 0.65, ease }}
                 className="relative"
-                style={{ y: yParallax }}
+                style={{ y: yParallax, willChange: 'transform' }}
               >
                 <div className="aspect-square rounded-3xl bg-gradient-to-br from-teal/20 to-teal-lt/20 overflow-hidden relative backdrop-blur-md">
                   <Image
@@ -272,9 +291,10 @@ export default function LandingPage() {
               </motion.div>
 
               <motion.div
-                initial={{ opacity: 0, x: 30 }}
+                initial={{ opacity: 0, x: 32 }}
                 whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
+                viewport={{ once: true, margin: '-80px' }}
+                transition={{ duration: 0.65, ease }}
               >
                 <Badge variant="outline" className="mb-6 border-teal/30 text-teal px-4 py-1 rounded-full backdrop-blur-sm bg-teal/5">
                   A Nova Era
@@ -299,15 +319,22 @@ export default function LandingPage() {
                       desc: 'Fluxo de caixa e agenda sincronizados sem que você precise tocar num teclado.',
                     },
                   ].map((item, i) => (
-                    <div key={i} className="flex gap-4">
-                      <div className="mt-1">
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, x: 16 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 0.45, delay: i * 0.1, ease }}
+                      className="flex gap-4"
+                    >
+                      <div className="mt-1 shrink-0">
                         <CheckCircle2 className="w-6 h-6 text-teal" />
                       </div>
                       <div>
                         <h4 className="text-lg font-semibold mb-1 text-text-primary">{item.title}</h4>
                         <p className="text-text-secondary">{item.desc}</p>
                       </div>
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
 
@@ -319,16 +346,16 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* FAQ */}
+        {/* ── FAQ ── */}
         <section id="faq" className="px-6 py-24 relative">
           <div className="absolute inset-0 bg-surface-alt/20 backdrop-blur-md -z-10" />
           <div className="max-w-3xl mx-auto">
-            <motion.div {...fadeIn} className="text-center mb-16">
+            <motion.div {...fadeUp} className="text-center mb-16">
               <h2 className="text-3xl md:text-4xl font-heading mb-4 text-text-primary">Dúvidas Frequentes</h2>
               <p className="text-text-secondary">Tudo o que você precisa saber sobre o DentIA.</p>
             </motion.div>
 
-            <motion.div {...fadeIn}>
+            <motion.div {...fadeUp}>
               <div className="bg-surface/50 backdrop-blur-xl rounded-2xl p-6 shadow-xl border border-border/50 space-y-1">
                 {faqs.map((faq, i) => (
                   <div key={i} className="border-b border-border/40 last:border-b-0">
@@ -337,16 +364,30 @@ export default function LandingPage() {
                       className="w-full text-left py-4 flex items-center justify-between gap-4 font-semibold hover:text-teal transition-colors text-text-primary"
                     >
                       <span>{faq.question}</span>
-                      <ChevronDown
-                        className={cn(
-                          'w-4 h-4 shrink-0 transition-transform duration-200',
-                          openFaq === i ? 'rotate-180 text-teal' : 'text-text-secondary',
-                        )}
-                      />
+                      <motion.div
+                        animate={{ rotate: openFaq === i ? 180 : 0 }}
+                        transition={{ duration: 0.22, ease }}
+                      >
+                        <ChevronDown
+                          className={cn('w-4 h-4 shrink-0', openFaq === i ? 'text-teal' : 'text-text-secondary')}
+                        />
+                      </motion.div>
                     </button>
-                    {openFaq === i && (
-                      <div className="pb-4 text-text-secondary leading-relaxed">{faq.answer}</div>
-                    )}
+
+                    <AnimatePresence initial={false}>
+                      {openFaq === i && (
+                        <motion.div
+                          key="answer"
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.28, ease }}
+                          className="overflow-hidden"
+                        >
+                          <p className="pb-4 text-text-secondary leading-relaxed">{faq.answer}</p>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 ))}
               </div>
@@ -354,14 +395,14 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* CTA Final */}
+        {/* ── CTA Final ── */}
         <section className="px-6 py-24">
-          <motion.div {...fadeIn} className="max-w-5xl mx-auto">
+          <motion.div {...fadeUp} className="max-w-5xl mx-auto">
             <div
               className="rounded-3xl p-12 md:p-20 text-center text-white relative overflow-hidden"
               style={{
                 background: 'linear-gradient(135deg, #2f9c85 0%, #1e7060 100%)',
-                boxShadow: '0 20px 60px -20px rgba(47, 156, 133, 0.5)',
+                boxShadow: '0 20px 60px -20px rgba(47,156,133,0.5)',
               }}
             >
               <div className="relative z-10">
@@ -399,9 +440,11 @@ export default function LandingPage() {
             </div>
 
             <div className="flex gap-8">
-              <a href="#" className="text-sm text-text-secondary hover:text-teal transition-colors">Termos</a>
-              <a href="#" className="text-sm text-text-secondary hover:text-teal transition-colors">Privacidade</a>
-              <a href="#" className="text-sm text-text-secondary hover:text-teal transition-colors">Contato</a>
+              {['Termos', 'Privacidade', 'Contato'].map(label => (
+                <a key={label} href="#" className="text-sm text-text-secondary hover:text-teal transition-colors">
+                  {label}
+                </a>
+              ))}
             </div>
 
             <div className="flex gap-4">

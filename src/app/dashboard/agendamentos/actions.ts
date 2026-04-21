@@ -33,6 +33,29 @@ export async function criarAgendamento(dados: {
   const dentistaAlvo = dados.dentistaId ?? dentista.id;
 
   const supabase = await createClient();
+
+  // Verificar conflito de horário para o dentista alvo
+  const novoInicioMs = new Date(dados.dataHora).getTime();
+  const novoFimMs = novoInicioMs + dados.duracaoMinutos * 60_000;
+  const dateOnly = dados.dataHora.split('T')[0];
+
+  const { data: agendamentosNoDia } = await supabase
+    .from('agendamentos')
+    .select('data_hora, duracao_minutos')
+    .eq('dentista_id', dentistaAlvo)
+    .eq('clinica_id', dentista.clinica_id)
+    .or('status.eq.agendado,status.eq.confirmado,status.eq.realizado')
+    .gte('data_hora', `${dateOnly}T00:00:00.000Z`)
+    .lt('data_hora', `${dateOnly}T23:59:59.999Z`);
+
+  for (const ag of agendamentosNoDia ?? []) {
+    const agInicioMs = new Date(ag.data_hora).getTime();
+    const agFimMs = agInicioMs + (ag.duracao_minutos ?? 30) * 60_000;
+    if (agInicioMs < novoFimMs && agFimMs > novoInicioMs) {
+      return { error: 'Este horário conflita com outro agendamento existente. Escolha outro horário.' };
+    }
+  }
+
   const { data, error } = await supabase
     .from("agendamentos")
     .insert({

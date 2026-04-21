@@ -46,7 +46,6 @@ import { Label } from '@/components/ui/label';
 import { DocumentosTab } from '@/components/pacientes/DocumentosTab';
 import { PlanejamentoTab } from '@/components/pacientes/PlanejamentoTab';
 import { FichasTab } from '@/components/pacientes/FichasTab';
-import { PatientDexTour } from '@/components/pacientes/PatientDexTour';
 import { createClient } from '@/lib/supabase/client';
 import { atualizarPaciente, salvarAnotacoes } from '../actions';
 import type { DentistaRole } from '@/types/database';
@@ -65,6 +64,7 @@ import { criarAgendamento } from '@/app/dashboard/agendamentos/actions';
 import type { Paciente } from '@/types/database';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { toast } from 'sonner';
 
 type FichaRecente = {
   id: string;
@@ -72,6 +72,14 @@ type FichaRecente = {
   queixa_principal: string | null;
   anotacoes: string | null;
   dentista: { nome: string } | null;
+};
+
+type FichaParaOrc = {
+  id: string;
+  created_at: string;
+  queixa_principal: string | null;
+  dentes_afetados: number[];
+  dentes_observacoes: Record<string, string>;
 };
 
 type AgendamentoProximo = {
@@ -186,6 +194,8 @@ export function PacienteDetailClient({
   const [orcError, setOrcError] = useState<string | null>(null);
   const [pagError, setPagError] = useState<string | null>(null);
   const [isLoadingFichaParaOrc, setIsLoadingFichaParaOrc] = useState(false);
+  const [fichasParaOrc, setFichasParaOrc] = useState<FichaParaOrc[]>([]);
+  const [etapaNovoOrc, setEtapaNovoOrc] = useState<'selecionar' | 'itens'>('itens');
 
   // Edição de orçamento
   const [orcEditMode, setOrcEditMode] = useState(false);
@@ -212,6 +222,34 @@ export function PacienteDetailClient({
 
   // Atividades recentes (visão geral)
   const [fichasRecentes, setFichasRecentes] = useState<FichaRecente[]>([]);
+
+  // Tab highlight + switch — acionados pelo tour DEX via CustomEvent
+  const [highlightedTab, setHighlightedTab] = useState<string | null>(null);
+
+  useEffect(() => {
+    let clearTimer: ReturnType<typeof setTimeout>;
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<string | null>).detail;
+      setHighlightedTab(detail);
+      if (detail) {
+        clearTimer = setTimeout(() => setHighlightedTab(null), 3000);
+      }
+    };
+    window.addEventListener('dex:highlight-tab', handler);
+    return () => {
+      window.removeEventListener('dex:highlight-tab', handler);
+      clearTimeout(clearTimer);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const tabValue = (e as CustomEvent<string>).detail;
+      if (tabValue) setActiveTab(tabValue);
+    };
+    window.addEventListener('dex:switch-tab', handler);
+    return () => window.removeEventListener('dex:switch-tab', handler);
+  }, []);
 
   const iniciais = paciente.nome
     .split(' ')
@@ -352,56 +390,93 @@ export function PacienteDetailClient({
     setPagSaving(false);
   };
 
+  // Converte dentes_afetados + dentes_observacoes de uma ficha em itens de orçamento.
+  // Suporta múltiplos procedimentos por dente (separados por '\n').
+  const fichaParaItens = (ficha: FichaParaOrc): NovoOrcItem[] => {
+    const dentes = ficha.dentes_afetados ?? [];
+    const obs = ficha.dentes_observacoes ?? {};
+    if (dentes.length === 0) return [{ procedimentoId: '', descricao: '', quantidade: 1, preco: 0 }];
+
+    const itens: NovoOrcItem[] = [];
+    for (const tooth of dentes) {
+      const rawObs = obs[String(tooth)] ?? '';
+      const procs = rawObs.split('\n').filter(Boolean);
+      if (procs.length === 0) {
+        itens.push({ procedimentoId: '', descricao: `Dente ${tooth}`, quantidade: 1, preco: 0 });
+      } else {
+        for (const proc of procs) {
+          const match = procedimentosClinica.find(
+            (p) =>
+              p.nome.toLowerCase().includes(proc.toLowerCase()) ||
+              proc.toLowerCase().includes(p.nome.toLowerCase()),
+          );
+          itens.push({
+            procedimentoId: match?.id ?? '',
+            descricao: match?.nome ?? `Dente ${tooth} — ${proc}`,
+            quantidade: 1,
+            preco: match?.preco_padrao ?? 0,
+          });
+        }
+      }
+    }
+    return itens;
+  };
+
   const abrirNovoOrcamento = async () => {
     setOrcError(null);
     setIsLoadingFichaParaOrc(true);
     try {
       const supabase = createClient();
-      const { data: ficha } = await supabase
+      const { data } = await supabase
         .from('fichas')
-        .select('dentes_afetados, dentes_observacoes')
+        .select('id, created_at, queixa_principal, dentes_afetados, dentes_observacoes')
         .eq('paciente_id', paciente.id)
         .eq('clinica_id', clinicaId)
         .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(10);
 
-      const dentes = (ficha?.dentes_afetados as number[] | null) ?? [];
-      const obs = (ficha?.dentes_observacoes as Record<string, string> | null) ?? {};
+      const fichas = (data as unknown as FichaParaOrc[]) ?? [];
+      setFichasParaOrc(fichas);
 
-      if (dentes.length > 0) {
-        const itens: NovoOrcItem[] = dentes.map((tooth) => {
-          const toothObs = obs[String(tooth)] ?? '';
-          const match = toothObs
-            ? procedimentosClinica.find(
-                (p) =>
-                  p.nome.toLowerCase().includes(toothObs.toLowerCase()) ||
-                  toothObs.toLowerCase().includes(p.nome.toLowerCase())
-              )
-            : undefined;
-          return {
-            procedimentoId: match?.id ?? '',
-            descricao: `Dente ${tooth}${toothObs ? ` — ${match?.nome ?? toothObs}` : ''}`,
-            quantidade: 1,
-            preco: match?.preco_padrao ?? 0,
-          };
-        });
-        setNovoOrcItens(itens);
-      } else {
+      if (fichas.length > 1) {
+        // Mais de uma ficha: dentista escolhe qual usar
+        setEtapaNovoOrc('selecionar');
         setNovoOrcItens([{ procedimentoId: '', descricao: '', quantidade: 1, preco: 0 }]);
+      } else {
+        // 0 ou 1 ficha: vai direto para os itens
+        setNovoOrcItens(fichas.length === 1 ? fichaParaItens(fichas[0]) : [{ procedimentoId: '', descricao: '', quantidade: 1, preco: 0 }]);
+        setEtapaNovoOrc('itens');
       }
     } catch {
+      setFichasParaOrc([]);
       setNovoOrcItens([{ procedimentoId: '', descricao: '', quantidade: 1, preco: 0 }]);
+      setEtapaNovoOrc('itens');
     } finally {
       setIsLoadingFichaParaOrc(false);
     }
     setIsNovoOrcOpen(true);
   };
 
+  const selecionarFichaParaOrc = (fichaId: string | null) => {
+    if (!fichaId) {
+      setNovoOrcItens([{ procedimentoId: '', descricao: '', quantidade: 1, preco: 0 }]);
+    } else {
+      const ficha = fichasParaOrc.find((f) => f.id === fichaId);
+      setNovoOrcItens(ficha ? fichaParaItens(ficha) : [{ procedimentoId: '', descricao: '', quantidade: 1, preco: 0 }]);
+    }
+    setEtapaNovoOrc('itens');
+  };
+
   const handleCriarOrcamento = async () => {
-    const itensValidos = novoOrcItens.filter((i) => i.descricao.trim() && i.preco > 0);
+    // Exige ao menos descrição — preço pode ser 0 (dentista define depois)
+    const itensValidos = novoOrcItens.filter((i) => i.descricao.trim());
     if (itensValidos.length === 0) {
-      setOrcError('Adicione ao menos um procedimento com descrição e valor.');
+      setOrcError('Adicione ao menos um procedimento com descrição.');
+      return;
+    }
+    const temSemPreco = itensValidos.some((i) => i.preco === 0);
+    if (temSemPreco) {
+      setOrcError('Atenção: alguns procedimentos estão sem valor. Defina o preço antes de continuar.');
       return;
     }
     setOrcError(null);
@@ -422,6 +497,10 @@ export function PacienteDetailClient({
     } else {
       setIsNovoOrcOpen(false);
       setNovoOrcItens([{ procedimentoId: '', descricao: '', quantidade: 1, preco: 0 }]);
+      toast.success('Orçamento criado como rascunho', {
+        description: 'Revise os itens e envie para o paciente quando estiver pronto.',
+        duration: 4000,
+      });
       router.refresh();
     }
     setOrcSaving(false);
@@ -511,9 +590,6 @@ export function PacienteDetailClient({
 
   return (
     <div className="p-8 max-w-7xl mx-auto w-full">
-      {/* Tour guiado — inicia automaticamente na primeira visita */}
-      <PatientDexTour autoStart />
-
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
@@ -586,7 +662,7 @@ export function PacienteDetailClient({
             </div>
           </div>
 
-          {/* Tabs — IDs usados pelo PatientDexTour */}
+          {/* Tabs — IDs usados pelo tour DEX */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="bg-muted/50 p-1 rounded-xl border border-border/40 mb-6 flex-wrap h-auto gap-1">
               {(
@@ -602,7 +678,7 @@ export function PacienteDetailClient({
                   key={val}
                   id={tourId}
                   value={val}
-                  className="rounded-lg px-4 py-2 text-xs font-bold data-[state=active]:bg-card data-[state=active]:shadow-sm text-muted-foreground data-[state=active]:text-foreground"
+                  className={`rounded-lg px-4 py-2 text-xs font-bold data-[state=active]:bg-card data-[state=active]:shadow-sm text-muted-foreground data-[state=active]:text-foreground transition-all duration-300${tourId && highlightedTab === tourId ? ' ring-2 ring-[#2f9c85]/60 shadow-[0_0_14px_rgba(47,156,133,0.45)]' : ''}`}
                 >
                   {label}
                 </TabsTrigger>
@@ -1561,19 +1637,63 @@ export function PacienteDetailClient({
       </Dialog>
 
       {/* Dialog: Novo Orçamento */}
-      <Dialog open={isNovoOrcOpen} onOpenChange={setIsNovoOrcOpen}>
+      <Dialog open={isNovoOrcOpen} onOpenChange={(open) => {
+        setIsNovoOrcOpen(open);
+        if (!open) { setEtapaNovoOrc('itens'); setFichasParaOrc([]); setOrcError(null); }
+      }}>
         <DialogContent className="max-w-lg rounded-2xl bg-card border-border max-h-[90vh] overflow-y-auto scrollbar-hide">
           <DialogHeader>
             <DialogTitle className="font-heading text-2xl text-foreground">
-              Novo Orçamento
+              {etapaNovoOrc === 'selecionar' ? 'Selecionar Ficha' : 'Novo Orçamento'}
             </DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              Selecione procedimentos e defina os valores.
+              {etapaNovoOrc === 'selecionar'
+                ? 'Escolha qual registro clínico vai gerar o orçamento.'
+                : 'Selecione procedimentos e defina os valores.'}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            {novoOrcItens.map((item, idx) => (
+            {/* ── Etapa 1: seleção de ficha ── */}
+            {etapaNovoOrc === 'selecionar' && (
+              <div className="space-y-3">
+                {fichasParaOrc.map((ficha) => {
+                  const denteCount = (ficha.dentes_afetados ?? []).length;
+                  const dataFormatada = format(parseISO(ficha.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
+                  return (
+                    <button
+                      key={ficha.id}
+                      onClick={() => selecionarFichaParaOrc(ficha.id)}
+                      className="w-full text-left p-4 rounded-xl border border-border bg-muted hover:border-teal/40 hover:bg-teal/5 transition-all group"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-semibold text-sm text-foreground group-hover:text-teal transition-colors truncate">
+                            {ficha.queixa_principal ?? 'Evolução clínica'}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-0.5">{dataFormatada}</div>
+                        </div>
+                        {denteCount > 0 && (
+                          <span className="shrink-0 text-[10px] font-bold font-mono bg-teal/10 text-teal px-2 py-1 rounded-lg">
+                            {denteCount} dente{denteCount !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={() => selecionarFichaParaOrc(null)}
+                  className="w-full py-3 border border-dashed border-border rounded-xl text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors flex items-center justify-center gap-2"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Criar orçamento em branco
+                </button>
+              </div>
+            )}
+
+            {/* ── Etapa 2: edição de itens ── */}
+            {etapaNovoOrc === 'itens' && novoOrcItens.map((item, idx) => (
               <div key={idx} className="bg-muted rounded-2xl border border-border p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
@@ -1689,34 +1809,48 @@ export function PacienteDetailClient({
               </div>
             ))}
 
-            <button
-              onClick={() =>
-                setNovoOrcItens((prev) => [
-                  ...prev,
-                  { procedimentoId: '', descricao: '', quantidade: 1, preco: 0 },
-                ])
-              }
-              className="w-full py-3 border border-dashed border-border rounded-xl text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors flex items-center justify-center gap-2"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Adicionar Procedimento
-            </button>
+            {etapaNovoOrc === 'itens' && (
+              <>
+                <button
+                  onClick={() =>
+                    setNovoOrcItens((prev) => [
+                      ...prev,
+                      { procedimentoId: '', descricao: '', quantidade: 1, preco: 0 },
+                    ])
+                  }
+                  className="w-full py-3 border border-dashed border-border rounded-xl text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors flex items-center justify-center gap-2"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Adicionar Procedimento
+                </button>
 
-            <div className="bg-teal/10 rounded-xl p-3 flex items-center justify-between border border-teal/20">
-              <span className="text-sm font-bold text-foreground">Total</span>
-              <span className="font-mono text-xl font-bold text-teal">
-                R$ {novoOrcTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </span>
-            </div>
+                <div className="bg-teal/10 rounded-xl p-3 flex items-center justify-between border border-teal/20">
+                  <span className="text-sm font-bold text-foreground">Total</span>
+                  <span className="font-mono text-xl font-bold text-teal">
+                    R$ {novoOrcTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
 
-            {orcError && (
-              <p className="text-xs text-red-500 bg-red-500/10 rounded-lg px-3 py-2">
-                {orcError}
-              </p>
+                {orcError && (
+                  <p className="text-xs text-red-500 bg-red-500/10 rounded-lg px-3 py-2">
+                    {orcError}
+                  </p>
+                )}
+              </>
             )}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="gap-2">
+            {etapaNovoOrc === 'itens' && fichasParaOrc.length > 1 && (
+              <Button
+                variant="outline"
+                onClick={() => setEtapaNovoOrc('selecionar')}
+                disabled={orcSaving}
+                className="rounded-xl border-border text-foreground hover:bg-muted mr-auto"
+              >
+                ← Voltar
+              </Button>
+            )}
             <Button
               variant="outline"
               onClick={() => setIsNovoOrcOpen(false)}
@@ -1724,13 +1858,15 @@ export function PacienteDetailClient({
             >
               Cancelar
             </Button>
-            <Button
-              onClick={() => void handleCriarOrcamento()}
-              disabled={orcSaving}
-              className="bg-teal text-white hover:bg-teal-lt rounded-xl disabled:opacity-50 font-bold"
-            >
-              {orcSaving ? 'Salvando...' : 'Criar Orçamento'}
-            </Button>
+            {etapaNovoOrc === 'itens' && (
+              <Button
+                onClick={() => void handleCriarOrcamento()}
+                disabled={orcSaving}
+                className="bg-teal text-white hover:bg-teal-lt rounded-xl disabled:opacity-50 font-bold"
+              >
+                {orcSaving ? 'Salvando...' : 'Criar Orçamento'}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

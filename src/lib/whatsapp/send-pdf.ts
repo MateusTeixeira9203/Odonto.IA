@@ -18,6 +18,7 @@ interface OrcamentoRow {
   status: string;
   condicoes_pagamento: string | null;
   total: number | null;
+  desconto: number | null;
   paciente: { nome: string; cpf: string | null; telefone: string | null } | null;
   clinica: { nome: string; endereco: string | null; telefone: string | null } | null;
   dentista: { nome: string; cro: string | null } | null;
@@ -83,7 +84,7 @@ function montarOrcamentoData(row: OrcamentoRow): OrcamentoData {
       quantidade: i.quantidade,
     })),
     subtotal,
-    desconto: 0,
+    desconto: row.desconto ?? 0,
     total:    row.total ?? subtotal,
     forma_pagamento: row.condicoes_pagamento ?? undefined,
   };
@@ -128,7 +129,7 @@ export async function sendOrcamentoWhatsApp(
   const { data: row, error } = await db
     .from('orcamentos')
     .select(`
-      id, created_at, validade_dias, status, condicoes_pagamento, total,
+      id, created_at, validade_dias, status, condicoes_pagamento, total, desconto,
       paciente:pacientes (nome, cpf, telefone),
       clinica:clinicas (nome, endereco, telefone),
       dentista:dentistas (nome, cro),

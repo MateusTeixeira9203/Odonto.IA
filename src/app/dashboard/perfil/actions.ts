@@ -42,6 +42,7 @@ export interface PerfilData {
   cro: string;
   especialidade: string;
   cpf: string;
+  chavePix: string;
 }
 
 export async function salvarPerfil(data: PerfilData): Promise<{ error?: string }> {
@@ -57,6 +58,7 @@ export async function salvarPerfil(data: PerfilData): Promise<{ error?: string }
       cro:           data.cro           || null,
       especialidade: data.especialidade || null,
       cpf:           data.cpf           || null,
+      chave_pix:     data.chavePix      || null,
     })
     .eq('user_id', user.id);
 

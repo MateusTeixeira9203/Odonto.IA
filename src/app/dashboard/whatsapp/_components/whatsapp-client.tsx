@@ -14,7 +14,9 @@ import {
   CheckCircle2,
   UserCheck,
   Phone,
+  Settings,
 } from 'lucide-react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -50,9 +52,14 @@ function etapaLabel(etapa: string): string {
     inicio:                 'Menu',
     coletando_nome:         'Coletando nome',
     coletando_motivo:       'Coletando motivo',
+    coletando_cpf:          'Coletando CPF',
+    coletando_data_nasc:    'Coletando data de nasc.',
     selecionando_dentista:  'Escolhendo dentista',
     oferecendo_horarios:    'Escolhendo horário',
     aguardando_confirmacao: 'Confirmando horário',
+    aguardando_dentista:    'Escolhendo dentista',
+    aguardando_data:        'Escolhendo data',
+    aguardando_hora:        'Escolhendo horário',
     confirmado:             'Agendado',
     humano:                 'Com atendente',
     enviando_pdf:           'Enviando PDF',
@@ -289,6 +296,14 @@ export function WhatsAppClient({ initialConversas, clinicaId }: Props) {
               <p className="text-xs text-[--color-gray-md] mt-0.5">{conversas.length} conversa(s)</p>
             </div>
           </div>
+          <div className="flex items-center gap-1">
+          <Link
+            href="/dashboard/bot"
+            className="p-1.5 rounded-lg hover:bg-[--color-surface-alt] text-[--color-gray-md] hover:text-[--color-teal] transition-colors"
+            title="Configurações do Bot"
+          >
+            <Settings className="w-4 h-4" />
+          </Link>
           <button
             onClick={() => void handleAtualizar()}
             className="p-1.5 rounded-lg hover:bg-[--color-surface-alt] text-[--color-gray-md] transition-colors"
@@ -296,6 +311,7 @@ export function WhatsAppClient({ initialConversas, clinicaId }: Props) {
           >
             <RefreshCw className={`w-4 h-4 ${atualizando ? 'animate-spin' : ''}`} />
           </button>
+          </div>
         </div>
 
         {/* Tabs */}

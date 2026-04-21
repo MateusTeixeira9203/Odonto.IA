@@ -14,7 +14,7 @@ export default async function PerfilPage() {
   // Busca campos profissionais que não estão no cache
   const { data: dados } = await supabase
     .from('dentistas')
-    .select('nome, cro, especialidade, telefone, cpf')
+    .select('nome, cro, especialidade, telefone, cpf, chave_pix')
     .eq('user_id', user!.id)
     .single();
 
@@ -30,6 +30,7 @@ export default async function PerfilPage() {
       especialidade={dados?.especialidade ?? null}
       telefone={dados?.telefone ?? null}
       cpf={(dados as { cpf?: string | null } | null)?.cpf ?? null}
+      chavePix={(dados as { chave_pix?: string | null } | null)?.chave_pix ?? null}
     />
     </PageTransition>
   );

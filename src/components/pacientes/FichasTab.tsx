@@ -3,6 +3,7 @@
 import * as React from "react";
 import {
   Plus,
+  X,
   Mic,
   MicOff,
   Trash2,
@@ -36,11 +37,12 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { HelpTooltip } from "@/components/ui/help-tooltip";
 import { criarOrcamento } from "@/app/dashboard/orcamentos/actions";
+import { toast } from 'sonner';
 import { temFeature, type PlanoId } from "@/lib/planos";
 
 interface ToothNote {
   tooth: number;
-  note: string;
+  notes: string[];
 }
 
 interface Evolution {
@@ -90,7 +92,11 @@ const mapFichaToEvolution = (f: FichaDB): Evolution => ({
     .replace(",", " às"),
   type: f.queixa_principal ?? "Evolução",
   observation: f.anotacoes ?? "",
-  teethNotes: (f.dentes_afetados ?? []).map((t) => ({ tooth: t, note: f.dentes_observacoes?.[String(t)] ?? "" })),
+  teethNotes: (f.dentes_afetados ?? []).map((t) => {
+    const raw = f.dentes_observacoes?.[String(t)] ?? "";
+    const parts = raw.split('\n').filter(Boolean);
+    return { tooth: t, notes: parts.length > 0 ? parts : [''] };
+  }),
   professional: f.dentista?.nome ?? "Profissional",
   files: [],
 });
@@ -125,7 +131,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
     type: "Evolução",
     observation: "",
     teethNotes: [] as ToothNote[],
-  });
+  } as { type: string; observation: string; teethNotes: ToothNote[] });
 
   // ── Orçamento sugerido pela IA ────────────────────────────────────────────
   type ItemSugerido = { descricao: string; quantidade: number; preco: number };
@@ -277,17 +283,41 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
       } else {
         setFormData((f) => ({
           ...f,
-          teethNotes: [...f.teethNotes, { tooth, note: "" }],
+          teethNotes: [...f.teethNotes, { tooth, notes: [''] }],
         }));
         return [...prev, tooth];
       }
     });
   };
 
-  const handleToothNoteChange = (tooth: number, note: string) => {
+  const handleToothNoteChange = (tooth: number, index: number, value: string) => {
     setFormData((f) => ({
       ...f,
-      teethNotes: f.teethNotes.map((tn) => (tn.tooth === tooth ? { ...tn, note } : tn)),
+      teethNotes: f.teethNotes.map((tn) =>
+        tn.tooth === tooth
+          ? { ...tn, notes: tn.notes.map((n, i) => (i === index ? value : n)) }
+          : tn
+      ),
+    }));
+  };
+
+  const addToothNote = (tooth: number) => {
+    setFormData((f) => ({
+      ...f,
+      teethNotes: f.teethNotes.map((tn) =>
+        tn.tooth === tooth ? { ...tn, notes: [...tn.notes, ''] } : tn
+      ),
+    }));
+  };
+
+  const removeToothNote = (tooth: number, index: number) => {
+    setFormData((f) => ({
+      ...f,
+      teethNotes: f.teethNotes.map((tn) =>
+        tn.tooth === tooth
+          ? { ...tn, notes: tn.notes.length > 1 ? tn.notes.filter((_, i) => i !== index) : [''] }
+          : tn
+      ),
     }));
   };
 
@@ -299,7 +329,9 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
       const supabase = createClient();
       const dentesAfetados = selectedTeeth;
       const dentesObservacoes = Object.fromEntries(
-        formData.teethNotes.filter(tn => tn.note).map(tn => [String(tn.tooth), tn.note])
+        formData.teethNotes
+          .map((tn) => [String(tn.tooth), tn.notes.filter((n) => n.trim()).join('\n')] as [string, string])
+          .filter(([, v]) => v.length > 0)
       );
 
       if (editingId) {
@@ -332,17 +364,35 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
       }
 
       await fetchFichas();
-      // Se o DEX já preparou sugestão durante a digitação, ela aparece automaticamente
-      // via orcamentoSugerido state. Limpa o debounce pendente ao fechar o painel.
       if (dexDebounceRef.current) clearTimeout(dexDebounceRef.current);
       setIsDexAnalyzing(false);
-      if (!isNovaFicha) {
-        // Edição: apenas fecha o painel, não sugere orçamento
-        closePanel();
-      } else {
-        closePanel();
-        // orcamentoSugerido já pode estar preenchido pelo listener de digitação
+
+      // Auto-gera orçamento se houver procedimentos sugeridos pelo DEX
+      const itensValidos = (orcamentoSugerido ?? []).filter((i) => i.descricao.trim() && i.preco > 0);
+      if (itensValidos.length > 0) {
+        try {
+          const result = await criarOrcamento({
+            pacienteId: patientId,
+            itens: itensValidos.map((i) => ({
+              procedimentoId: null,
+              descricao: i.descricao,
+              quantidade: i.quantidade,
+              precoUnitario: i.preco,
+            })),
+          });
+          if (!result.error) {
+            setOrcamentoSugerido(null);
+            toast.success('Orçamento gerado automaticamente', {
+              description: 'Revise e confirme na aba Orçamentos para enviar à secretaria.',
+              duration: 5000,
+            });
+          }
+        } catch (err) {
+          console.error('Erro ao gerar orçamento automático:', err);
+        }
       }
+
+      closePanel();
     } catch (err) {
       console.error("Erro ao salvar ficha:", err);
     } finally {
@@ -380,7 +430,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
     setIsPanelOpen(false);
     setEditingId(null);
     setSelectedTeeth([]);
-    setFormData({ type: "Evolução", observation: "", teethNotes: [] });
+    setFormData({ type: "Evolução", observation: "", teethNotes: [] } as { type: string; observation: string; teethNotes: ToothNote[] });
     setUploadedFiles([]);
   };
 
@@ -453,7 +503,10 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
     setFormData({
       type: evolution.type,
       observation: evolution.observation,
-      teethNotes: [...evolution.teethNotes],
+      teethNotes: evolution.teethNotes.map((tn) => ({
+        tooth: tn.tooth,
+        notes: tn.notes.length > 0 ? [...tn.notes, ''] : [''],
+      })),
     });
     setSelectedTeeth(evolution.teethNotes.map((tn) => tn.tooth));
     setIsPanelOpen(true);
@@ -604,29 +657,54 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                       <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-[0.15em]">
                         Observações por Dente
                       </label>
-                      <div className="space-y-3">
-                        {selectedTeeth.map((tooth) => (
-                          <motion.div
-                            key={tooth}
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -10 }}
-                            className="flex items-start gap-3"
-                          >
-                            <div className="w-10 h-10 shrink-0 rounded-lg bg-teal text-white flex items-center justify-center font-mono text-sm font-bold shadow-sm">
-                              {tooth}
-                            </div>
-                            <input
-                              type="text"
-                              value={
-                                formData.teethNotes.find((tn) => tn.tooth === tooth)?.note ?? ""
-                              }
-                              onChange={(e) => handleToothNoteChange(tooth, e.target.value)}
-                              placeholder={`Procedimento no dente ${tooth}...`}
-                              className="flex-1 bg-background border border-border rounded-xl px-4 py-2.5 text-sm font-medium text-foreground outline-none focus:border-teal transition-colors"
-                            />
-                          </motion.div>
-                        ))}
+                      <div className="space-y-4">
+                        {selectedTeeth.map((tooth) => {
+                          const tn = formData.teethNotes.find((t) => t.tooth === tooth);
+                          const notes = tn?.notes ?? [''];
+                          return (
+                            <motion.div
+                              key={tooth}
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              exit={{ opacity: 0, x: -10 }}
+                              className="flex items-start gap-3"
+                            >
+                              <div className="w-10 h-10 shrink-0 rounded-lg bg-teal text-white flex items-center justify-center font-mono text-sm font-bold shadow-sm mt-0.5">
+                                {tooth}
+                              </div>
+                              <div className="flex-1 space-y-2">
+                                {notes.map((note, idx) => (
+                                  <div key={idx} className="flex items-center gap-2">
+                                    <input
+                                      type="text"
+                                      value={note}
+                                      onChange={(e) => handleToothNoteChange(tooth, idx, e.target.value)}
+                                      placeholder={`Procedimento ${idx + 1} no dente ${tooth}...`}
+                                      className="flex-1 bg-background border border-border rounded-xl px-4 py-2.5 text-sm font-medium text-foreground outline-none focus:border-teal transition-colors"
+                                    />
+                                    {notes.length > 1 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => removeToothNote(tooth, idx)}
+                                        className="p-1.5 text-muted-foreground hover:text-red-500 transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20"
+                                      >
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+                                  </div>
+                                ))}
+                                <button
+                                  type="button"
+                                  onClick={() => addToothNote(tooth)}
+                                  className="flex items-center gap-1.5 text-xs font-semibold text-teal hover:text-teal-lt transition-colors px-1"
+                                >
+                                  <Plus className="w-3.5 h-3.5" />
+                                  Adicionar procedimento
+                                </button>
+                              </div>
+                            </motion.div>
+                          );
+                        })}
                       </div>
                     </motion.div>
                   )}
@@ -818,14 +896,16 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                   {evo.teethNotes.map((tn) => (
                     <div
                       key={tn.tooth}
-                      className="bg-muted px-3 py-1.5 rounded-lg border border-border/40 flex items-center gap-2"
+                      className="bg-muted px-3 py-1.5 rounded-lg border border-border/40 flex items-start gap-2"
                     >
-                      <span className="font-mono text-[10px] font-bold text-teal">
-                        Dente {tn.tooth}
+                      <span className="font-mono text-[10px] font-bold text-teal shrink-0 mt-0.5">
+                        D{tn.tooth}
                       </span>
-                      {tn.note && (
-                        <span className="text-[10px] text-foreground font-medium">{tn.note}</span>
-                      )}
+                      <div className="flex flex-col gap-0.5">
+                        {tn.notes.filter(Boolean).map((n, i) => (
+                          <span key={i} className="text-[10px] text-foreground font-medium">{n}</span>
+                        ))}
+                      </div>
                     </div>
                   ))}
                 </div>

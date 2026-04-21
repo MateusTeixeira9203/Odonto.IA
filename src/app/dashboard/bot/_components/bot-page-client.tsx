@@ -198,13 +198,15 @@ export function BotPageClient({
             Bot WhatsApp
           </h1>
           <p className="text-sm text-[--color-gray-md]">
-            Conexão, mensagens e testes do assistente virtual
+            {role === 'secretaria'
+              ? 'Gerencie a conexão do WhatsApp da clínica'
+              : 'Conexão, mensagens e testes do assistente virtual'}
           </p>
         </div>
       </div>
 
-      {/* ── Card: Status da Conexão ─────────────────────────────────────────── */}
-      <div className="bg-surface rounded-3xl border border-[--color-border] p-6 space-y-6">
+      {/* ── Card: Status da Conexão (secretária) ──────────────────────────────── */}
+      {(role === 'admin' || role === 'secretaria') && <div className="bg-surface rounded-3xl border border-[--color-border] p-6 space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <p className="text-xs uppercase tracking-widest text-[--color-gray-md] font-mono mb-3">
@@ -214,7 +216,7 @@ export function BotPageClient({
           </div>
 
           <div className="flex gap-2">
-            {role === 'admin' && (status === 'disconnected' || status === 'error') && (
+            {(status === 'disconnected' || status === 'error') && (
               <Button
                 onClick={handleConnect}
                 disabled={actionLoading}
@@ -227,7 +229,7 @@ export function BotPageClient({
                 Conectar WhatsApp
               </Button>
             )}
-            {role === 'admin' && status === 'connected' && (
+            {status === 'connected' && (
               <Button
                 onClick={handleDisconnect}
                 disabled={actionLoading}
@@ -301,9 +303,10 @@ export function BotPageClient({
             Instância: <span className="text-[--color-black] dark:text-white">{instanceName}</span>
           </p>
         )}
-      </div>
+      </div>}
 
-      {/* ── Card: Enviar Teste (só quando conectado) ─────────────────────────── */}
+      {/* ── Card: Enviar Teste (secretária, só quando conectado) ──────────────── */}
+      {(role === 'admin' || role === 'secretaria') &&
       <AnimatePresence>
         {status === 'connected' && (
           <motion.div
@@ -365,7 +368,7 @@ export function BotPageClient({
             </div>
           </motion.div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>}
 
       {/* ── Card: Personalizar Mensagens (sempre visível) ─────────────────────── */}
       <div className="bg-surface rounded-3xl border border-[--color-border] p-6 space-y-5">

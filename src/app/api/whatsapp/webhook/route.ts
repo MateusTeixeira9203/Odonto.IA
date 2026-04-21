@@ -113,7 +113,7 @@ async function identificarOuCriarPaciente(
 
   const { data: novo, error } = await db
     .from('pacientes')
-    .insert({ clinica_id: clinicaId, dentista_id: dentistaId, nome, telefone })
+    .insert({ clinica_id: clinicaId, dentista_id: dentistaId, nome, telefone, whatsapp: telefone })
     .select('id')
     .single();
 

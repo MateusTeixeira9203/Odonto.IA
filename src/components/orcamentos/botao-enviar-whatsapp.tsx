@@ -2,12 +2,15 @@
 
 import { MessageCircle } from "lucide-react";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+import { atualizarStatusOrcamento } from "@/app/dashboard/orcamentos/actions";
 
 interface BotaoEnviarWhatsAppProps {
   orcamentoId: string;
   pacienteTelefone: string | null | undefined;
   pacienteNome: string;
   valorTotal: number | null;
+  statusAtual?: string;
   /** "full" exibe botão largo com texto (usado nas ações rápidas da secretária) */
   variant?: 'icon' | 'full';
 }
@@ -27,9 +30,12 @@ export function BotaoEnviarWhatsApp({
   pacienteTelefone,
   pacienteNome,
   valorTotal,
+  statusAtual,
   variant = 'icon',
 }: BotaoEnviarWhatsAppProps) {
-  function handleEnviar() {
+  const router = useRouter();
+
+  async function handleEnviar() {
     if (!pacienteTelefone) {
       toast.error("Paciente não possui telefone cadastrado");
       return;
@@ -50,7 +56,19 @@ export function BotaoEnviarWhatsApp({
     );
 
     window.open(`https://wa.me/${telefoneFormatado}?text=${mensagem}`, "_blank");
-    toast.success("WhatsApp aberto! Envie a mensagem para o paciente.");
+
+    // Muda status para "enviado" se ainda estiver em rascunho
+    if (!statusAtual || statusAtual === 'rascunho') {
+      const result = await atualizarStatusOrcamento(orcamentoId, 'enviado');
+      if (!result.error) {
+        toast.success("WhatsApp aberto e orçamento marcado como enviado!");
+        router.refresh();
+      } else {
+        toast.success("WhatsApp aberto! Envie a mensagem para o paciente.");
+      }
+    } else {
+      toast.success("WhatsApp aberto! Envie a mensagem para o paciente.");
+    }
   }
 
   const semTelefone = !pacienteTelefone;
@@ -58,7 +76,7 @@ export function BotaoEnviarWhatsApp({
   if (variant === 'full') {
     return (
       <button
-        onClick={handleEnviar}
+        onClick={() => void handleEnviar()}
         disabled={semTelefone}
         className="flex items-center gap-3 px-4 py-3 bg-teal/10 hover:bg-teal/20 border border-teal/20 text-teal rounded-xl text-sm font-semibold transition-all disabled:opacity-50 w-full"
         title={semTelefone ? "Paciente sem telefone cadastrado" : "Enviar por WhatsApp"}
@@ -72,7 +90,7 @@ export function BotaoEnviarWhatsApp({
 
   return (
     <button
-      onClick={handleEnviar}
+      onClick={() => void handleEnviar()}
       disabled={semTelefone}
       className="p-2 rounded-xl hover:bg-teal/10 transition-colors text-muted-foreground hover:text-teal disabled:opacity-40"
       title={semTelefone ? "Paciente sem telefone cadastrado" : "Enviar por WhatsApp"}

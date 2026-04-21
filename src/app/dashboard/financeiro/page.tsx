@@ -2,9 +2,12 @@ import { redirect } from 'next/navigation';
 import { format } from 'date-fns';
 import { getDentistaCached } from '@/lib/get-dentista';
 import { createClient } from '@/lib/supabase/server';
-import { listarDespesas, calcularSaldoMes, listarUltimosMeses } from './actions';
+import { listarDespesas, listarReceitas, calcularSaldoMes, listarUltimosMeses, calcularHoraClinica } from './actions';
 import { FinanceiroClient } from './_components/financeiro-client';
 import { PageTransition } from '@/components/layout/page-transition';
+import { UpsellPage } from '@/components/upsell-page';
+import { temFeature } from '@/lib/planos';
+import { Wallet } from 'lucide-react';
 
 interface PageProps {
   searchParams: Promise<{ mes?: string }>;
@@ -18,6 +21,28 @@ export default async function FinanceiroPage({ searchParams }: PageProps) {
   const supabaseAuth = await createClient();
   const { data: { user } } = await supabaseAuth.auth.getUser();
   const isUserOverride = user?.email === 'clenio21@gmail.com';
+
+  const planoEfetivo = isUserOverride ? 'CLINICA' : dentista.plano;
+
+  if (!temFeature(planoEfetivo, 'financeiro')) {
+    return (
+      <PageTransition>
+        <UpsellPage
+          featureName="Módulo Financeiro"
+          featureDescription="Controle receitas, despesas e o fluxo de caixa da sua clínica com privacidade, entradas manuais e custo por hora clínica."
+          benefits={[
+            'Lançamento de saídas fixas e variáveis por categoria',
+            'Entradas manuais: PIX avulso, dinheiro físico, convênios',
+            'Receitas automáticas geradas pelos pagamentos de orçamentos',
+            'Custo por hora clínica calculado com base na agenda',
+            'Modo privacidade para proteger valores sensíveis',
+          ]}
+          requiredPlan="CLINICA"
+          icon={<Wallet className="w-8 h-8" style={{ color: '#2f9c85' }} />}
+        />
+      </PageTransition>
+    );
+  }
 
   const { mes } = await searchParams;
   const mesAtual = mes && /^\d{4}-\d{2}$/.test(mes) ? mes : format(new Date(), 'yyyy-MM');
@@ -36,10 +61,12 @@ export default async function FinanceiroPage({ searchParams }: PageProps) {
     dentistasClinica = data ?? [];
   }
 
-  const [despesas, saldo, chartData] = await Promise.all([
+  const [despesas, receitas, saldo, chartData, horaClinica] = await Promise.all([
     listarDespesas(mesAtual),
+    listarReceitas(mesAtual),
     calcularSaldoMes(mesAtual),
     listarUltimosMeses(6),
+    calcularHoraClinica(mesAtual),
   ]);
 
   return (
@@ -48,10 +75,12 @@ export default async function FinanceiroPage({ searchParams }: PageProps) {
         key={mesAtual}
         mesAtual={mesAtual}
         despesasIniciais={despesas}
+        receitasIniciais={receitas}
         saldoInicial={saldo}
         chartData={chartData}
+        horaClinica={horaClinica}
         role={dentista.role}
-        plano={isUserOverride ? 'BASICO' : dentista.plano}
+        plano={planoEfetivo}
         dentistaId={dentista.id}
         dentistasClinica={dentistasClinica}
       />

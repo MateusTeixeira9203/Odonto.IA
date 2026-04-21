@@ -21,6 +21,22 @@ interface Props {
   clinicaId: string;
 }
 
+function formatCpf(v: string): string {
+  const d = v.replace(/\D/g, '').slice(0, 11);
+  if (d.length <= 3) return d;
+  if (d.length <= 6) return `${d.slice(0, 3)}.${d.slice(3)}`;
+  if (d.length <= 9) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+}
+
+function formatPhone(v: string): string {
+  const d = v.replace(/\D/g, '').slice(0, 11);
+  if (d.length <= 2) return d.length ? `(${d}` : '';
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+}
+
 export default function NovoPacienteForm({ isSecretaria, dentistas, clinicaId }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -91,6 +107,22 @@ export default function NovoPacienteForm({ isSecretaria, dentistas, clinicaId }:
     if (isSecretaria && !dentistaId) {
       setError('Selecione o dentista responsável pelo paciente.');
       return;
+    }
+
+    if (form.cpf) {
+      const digits = form.cpf.replace(/\D/g, '');
+      if (digits.length !== 11) {
+        setError('CPF inválido. Digite os 11 dígitos.');
+        return;
+      }
+    }
+
+    if (form.telefone) {
+      const digits = form.telefone.replace(/\D/g, '');
+      if (digits.length < 10) {
+        setError('Telefone inválido. Digite DDD + número (mínimo 10 dígitos).');
+        return;
+      }
     }
 
     startTransition(async () => {
@@ -228,8 +260,9 @@ export default function NovoPacienteForm({ isSecretaria, dentistas, clinicaId }:
               <Input
                 id="cpf"
                 value={form.cpf}
-                onChange={set('cpf')}
+                onChange={(e) => setForm((p) => ({ ...p, cpf: formatCpf(e.target.value) }))}
                 placeholder="000.000.000-00"
+                inputMode="numeric"
                 className="rounded-xl bg-muted border-border text-foreground font-mono"
               />
             </div>
@@ -259,8 +292,9 @@ export default function NovoPacienteForm({ isSecretaria, dentistas, clinicaId }:
             <Input
               id="telefone"
               value={form.telefone}
-              onChange={set('telefone')}
-              placeholder="(11) 9 9999-9999"
+              onChange={(e) => setForm((p) => ({ ...p, telefone: formatPhone(e.target.value) }))}
+              placeholder="(11) 99999-9999"
+              inputMode="numeric"
               className="rounded-xl bg-muted border-border text-foreground"
             />
           </div>

@@ -118,7 +118,7 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
   // --- Aba Procedimentos ---
   const [procedimentos, setProcedimentos] = useState(procedimentosIniciais);
   const [editandoId, setEditandoId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ preco_padrao: 0, duracao_minutos: 0 });
+  const [editForm, setEditForm] = useState({ nome: '', preco_padrao: 0, duracao_minutos: 0 });
   const [showNovoProcedimento, setShowNovoProcedimento] = useState(false);
   const [novoProc, setNovoProc] = useState({
     nome: '',
@@ -131,6 +131,7 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
   const handleEditarProcedimento = (proc: Procedimento) => {
     setEditandoId(proc.id);
     setEditForm({
+      nome: proc.nome,
       preco_padrao: proc.preco_padrao ?? 0,
       duracao_minutos: proc.duracao_minutos ?? 30,
     });
@@ -139,6 +140,7 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
   const handleSalvarProcedimento = (id: string) => {
     startTransition(async () => {
       const result = await atualizarProcedimento(id, {
+        nome: editForm.nome.trim() || 'Procedimento',
         preco_padrao: editForm.preco_padrao,
         duracao_minutos: editForm.duracao_minutos,
       });
@@ -146,7 +148,7 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
         setProcedimentos((prev) =>
           prev.map((p) =>
             p.id === id
-              ? { ...p, preco_padrao: editForm.preco_padrao, duracao_minutos: editForm.duracao_minutos }
+              ? { ...p, nome: editForm.nome.trim() || p.nome, preco_padrao: editForm.preco_padrao, duracao_minutos: editForm.duracao_minutos }
               : p
           )
         );
@@ -564,56 +566,62 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
                           >
                             {editandoId === proc.id ? (
                               // Modo edição
-                              <div className="flex items-center gap-4 flex-wrap">
-                                <span className="font-medium text-sm text-foreground flex-1 min-w-[150px]">
-                                  {proc.nome}
-                                </span>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs text-muted-foreground">R$</span>
-                                  <input
-                                    type="number"
-                                    value={editForm.preco_padrao}
-                                    onChange={(e) =>
-                                      setEditForm((f) => ({
-                                        ...f,
-                                        preco_padrao: parseFloat(e.target.value) || 0,
-                                      }))
-                                    }
-                                    className="w-24 border border-border rounded-lg px-2 py-1 text-xs font-mono bg-background text-foreground outline-none focus:border-teal"
-                                  />
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <select
-                                    value={editForm.duracao_minutos}
-                                    onChange={(e) =>
-                                      setEditForm((f) => ({
-                                        ...f,
-                                        duracao_minutos: parseInt(e.target.value, 10),
-                                      }))
-                                    }
-                                    className="border border-border rounded-lg px-2 py-1 text-xs font-mono bg-background text-foreground outline-none focus:border-teal"
-                                  >
-                                    <option value={15}>15 min</option>
-                                    <option value={30}>30 min</option>
-                                    <option value={45}>45 min</option>
-                                    <option value={60}>60 min</option>
-                                    <option value={90}>90 min</option>
-                                  </select>
-                                </div>
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={() => handleSalvarProcedimento(proc.id)}
-                                    disabled={isPending}
-                                    className="p-1.5 bg-teal text-white rounded-lg hover:bg-teal-lt transition-colors"
-                                  >
-                                    <Check className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={() => setEditandoId(null)}
-                                    className="p-1.5 bg-muted text-muted-foreground rounded-lg hover:bg-accent transition-colors"
-                                  >
-                                    <X className="w-3.5 h-3.5" />
-                                  </button>
+                              <div className="flex flex-col gap-3">
+                                <input
+                                  type="text"
+                                  value={editForm.nome}
+                                  onChange={(e) => setEditForm((f) => ({ ...f, nome: e.target.value }))}
+                                  placeholder="Nome do procedimento"
+                                  className="w-full border border-teal/40 rounded-lg px-3 py-1.5 text-sm font-medium bg-background text-foreground outline-none focus:border-teal transition-colors"
+                                />
+                                <div className="flex items-center gap-4 flex-wrap">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs text-muted-foreground">R$</span>
+                                    <input
+                                      type="number"
+                                      value={editForm.preco_padrao}
+                                      onChange={(e) =>
+                                        setEditForm((f) => ({
+                                          ...f,
+                                          preco_padrao: parseFloat(e.target.value) || 0,
+                                        }))
+                                      }
+                                      className="w-24 border border-border rounded-lg px-2 py-1 text-xs font-mono bg-background text-foreground outline-none focus:border-teal"
+                                    />
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <select
+                                      value={editForm.duracao_minutos}
+                                      onChange={(e) =>
+                                        setEditForm((f) => ({
+                                          ...f,
+                                          duracao_minutos: parseInt(e.target.value, 10),
+                                        }))
+                                      }
+                                      className="border border-border rounded-lg px-2 py-1 text-xs font-mono bg-background text-foreground outline-none focus:border-teal"
+                                    >
+                                      <option value={15}>15 min</option>
+                                      <option value={30}>30 min</option>
+                                      <option value={45}>45 min</option>
+                                      <option value={60}>60 min</option>
+                                      <option value={90}>90 min</option>
+                                    </select>
+                                  </div>
+                                  <div className="flex gap-2 ml-auto">
+                                    <button
+                                      onClick={() => handleSalvarProcedimento(proc.id)}
+                                      disabled={isPending}
+                                      className="p-1.5 bg-teal text-white rounded-lg hover:bg-teal-lt transition-colors"
+                                    >
+                                      <Check className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => setEditandoId(null)}
+                                      className="p-1.5 bg-muted text-muted-foreground rounded-lg hover:bg-accent transition-colors"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
                             ) : (

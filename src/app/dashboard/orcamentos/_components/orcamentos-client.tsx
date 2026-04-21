@@ -19,6 +19,10 @@ import {
   Banknote,
   QrCode,
   User,
+  Languages,
+  Loader2,
+  Copy,
+  Check,
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import type { DentistaRole } from '@/types/database';
@@ -116,6 +120,7 @@ export function OrcamentosClient({
   const [novoOrcItens, setNovoOrcItens] = useState<NovoOrcItem[]>([
     { procedimentoId: '', descricao: '', quantidade: 1, preco: 0 },
   ]);
+  const [novoOrcDesconto, setNovoOrcDesconto] = useState(0);
   const [novoOrcPacienteSearch, setNovoOrcPacienteSearch] = useState('');
   const [novoOrcPacienteId, setNovoOrcPacienteId] = useState('');
   const [novoOrcPacienteNome, setNovoOrcPacienteNome] = useState('');
@@ -144,6 +149,12 @@ export function OrcamentosClient({
   // Exclusão de orçamento
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleteSaving, setDeleteSaving] = useState(false);
+
+  // Traduzir para paciente (DEX Simplificar)
+  const [traduzirOpen, setTraduzirOpen] = useState(false);
+  const [traduzirTexto, setTraduzirTexto] = useState('');
+  const [traduzirLoading, setTraduzirLoading] = useState(false);
+  const [traduzirCopied, setTraduzirCopied] = useState(false);
 
   // Secretaria: controles extras
   const [filterDentista, setFilterDentista] = useState<string>('todos');
@@ -180,7 +191,8 @@ export function OrcamentosClient({
     setPacienteSugestoes(data ?? []);
   }, []);
 
-  const novoOrcTotal = novoOrcItens.reduce((s, i) => s + i.quantidade * i.preco, 0);
+  const novoOrcSubtotal = novoOrcItens.reduce((s, i) => s + i.quantidade * i.preco, 0);
+  const novoOrcTotal = Math.max(0, novoOrcSubtotal - novoOrcDesconto);
 
   // Dentistas únicos para o dropdown da secretaria
   const dentistasUnicos = useMemo(() => {
@@ -248,6 +260,34 @@ export function OrcamentosClient({
     }
   }, [orcamentos, isSecretaria, viewedIds]);
 
+  // DEX Simplificar: traduz orçamento técnico para linguagem de paciente
+  const handleTraduzir = async () => {
+    if (!selected) return;
+    setTraduzirLoading(true);
+    setTraduzirTexto('');
+    setTraduzirOpen(true);
+    try {
+      const res = await fetch('/api/dex/simplificar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orcamentoId: selected.id }),
+      });
+      const data = (await res.json()) as { texto?: string; error?: string };
+      setTraduzirTexto(data.texto ?? 'Não foi possível simplificar o orçamento.');
+    } catch {
+      setTraduzirTexto('Erro ao conectar com o DEX. Tente novamente.');
+    } finally {
+      setTraduzirLoading(false);
+    }
+  };
+
+  const handleCopyTraduzir = () => {
+    void navigator.clipboard.writeText(traduzirTexto).then(() => {
+      setTraduzirCopied(true);
+      setTimeout(() => setTraduzirCopied(false), 2000);
+    });
+  };
+
   // Atualiza status via server action
   const handleStatusChange = async (id: string, status: StatusOrcamento) => {
     setIsSaving(true);
@@ -276,6 +316,7 @@ export function OrcamentosClient({
       valor,
       formaPagamento: pagForm.formaPagamento,
       data: pagForm.data,
+      dentistaId: selected.dentista?.id,
     });
 
     if (result.error) {
@@ -290,13 +331,19 @@ export function OrcamentosClient({
         data_pagamento: pagForm.data,
       };
       setOrcamentos((prev) =>
-        prev.map((o) =>
-          o.id === selected.id ? { ...o, pagamentos: [...o.pagamentos, novoPag] } : o
-        )
+        prev.map((o) => {
+          if (o.id !== selected.id) return o;
+          const atualizado = { ...o, pagamentos: [...o.pagamentos, novoPag] };
+          if (result.autoAprovado) atualizado.status = 'aprovado';
+          return atualizado;
+        })
       );
-      setSelected((prev) =>
-        prev ? { ...prev, pagamentos: [...prev.pagamentos, novoPag] } : prev
-      );
+      setSelected((prev) => {
+        if (!prev) return prev;
+        const atualizado = { ...prev, pagamentos: [...prev.pagamentos, novoPag] };
+        if (result.autoAprovado) atualizado.status = 'aprovado';
+        return atualizado;
+      });
       setPagForm({
         valor: '',
         formaPagamento: 'pix',
@@ -323,6 +370,7 @@ export function OrcamentosClient({
 
     const result = await criarOrcamento({
       pacienteId: novoOrcPacienteId,
+      desconto: novoOrcDesconto,
       itens: itensValidos.map((i) => ({
         procedimentoId: i.procedimentoId || null,
         descricao: i.descricao,
@@ -340,6 +388,7 @@ export function OrcamentosClient({
         created_at: new Date().toISOString(),
         status: 'rascunho',
         total: novoOrcTotal,
+        desconto: novoOrcDesconto,
         validade_dias: 30,
         condicoes_pagamento: null,
         paciente: { id: novoOrcPacienteId, nome: novoOrcPacienteNome, telefone: null },
@@ -359,6 +408,7 @@ export function OrcamentosClient({
       setOrcamentos((prev) => [novoOrc, ...prev]);
       setIsNovoOrcOpen(false);
       setNovoOrcItens([{ procedimentoId: '', descricao: '', quantidade: 1, preco: 0 }]);
+      setNovoOrcDesconto(0);
       setNovoOrcPacienteSearch('');
       setNovoOrcPacienteId('');
       setNovoOrcPacienteNome('');
@@ -427,6 +477,7 @@ export function OrcamentosClient({
       pacienteId: selected.paciente?.id ?? '',
       total: selected.total ?? 0,
       formaPagamento,
+      dentistaId: selected.dentista?.id,
     });
     if (!result.error) {
       const novoPag: PagamentoRow = {
@@ -750,12 +801,21 @@ export function OrcamentosClient({
                 <div className="flex items-center gap-1">
                   {!editMode && !isSecretaria && (
                     <>
+                      <button
+                        onClick={() => void handleTraduzir()}
+                        className="p-2 rounded-xl hover:bg-muted transition-colors text-muted-foreground hover:text-teal"
+                        title="DEX: Traduzir para o paciente"
+                        disabled={traduzirLoading}
+                      >
+                        <Languages className="w-4 h-4" />
+                      </button>
                       <BotaoDownloadPDF orcamentoId={selected.id} />
                       <BotaoEnviarWhatsApp
                         orcamentoId={selected.id}
                         pacienteTelefone={selected.paciente?.telefone}
                         pacienteNome={selected.paciente?.nome ?? ''}
                         valorTotal={selected.total}
+                        statusAtual={selected.status}
                       />
                       <button
                         onClick={handleOpenEdit}
@@ -810,9 +870,30 @@ export function OrcamentosClient({
                         pacienteTelefone={selected.paciente?.telefone}
                         pacienteNome={selected.paciente?.nome ?? ''}
                         valorTotal={selected.total}
+                        statusAtual={selected.status}
                         variant="full"
                       />
                     </div>
+                  </div>
+                )}
+
+                {/* Confirmar e enviar para secretaria — apenas para rascunhos (dentista/admin) */}
+                {!isSecretaria && selected.status === 'rascunho' && (
+                  <div className="bg-teal/5 border border-teal/20 rounded-2xl p-4 space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      O orçamento está em rascunho. Ao confirmar, a secretaria receberá uma notificação para acompanhar o retorno do paciente.
+                    </p>
+                    <Button
+                      onClick={() => void handleStatusChange(selected.id, 'enviado')}
+                      disabled={isSaving}
+                      className="w-full bg-teal hover:bg-teal-lt text-white rounded-xl font-semibold gap-2"
+                    >
+                      {isSaving
+                        ? <Loader2 className="w-4 h-4 animate-spin" />
+                        : <CheckCircle2 className="w-4 h-4" />
+                      }
+                      Confirmar e enviar para secretaria
+                    </Button>
                   </div>
                 )}
 
@@ -846,45 +927,75 @@ export function OrcamentosClient({
                   const valorPago = selected.pagamentos
                     .filter((p) => p.status === 'pago')
                     .reduce((s, p) => s + p.valor, 0);
-                  const valorRestante = Math.max(0, (selected.total ?? 0) - valorPago);
+                  const total = selected.total ?? 0;
+                  const valorRestante = Math.max(0, total - valorPago);
+                  const quitado = valorRestante === 0 && valorPago > 0;
+                  const percPago = total > 0 ? Math.min(100, Math.round((valorPago / total) * 100)) : 0;
+
                   return (
                     <div className="bg-teal/10 rounded-2xl p-5 border border-teal/20 space-y-3">
-                      <div>
-                        <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">
-                          Valor Total
-                        </div>
-                        <div className="font-mono text-3xl font-bold text-teal">
-                          {formatCurrency(selected.total)}
-                        </div>
-                        {selected.condicoes_pagamento && (
-                          <div className="text-xs text-muted-foreground mt-1">
-                            {selected.condicoes_pagamento}
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">
+                            Valor Total
                           </div>
+                          <div className="font-mono text-3xl font-bold text-teal">
+                            {formatCurrency(total)}
+                          </div>
+                          {selected.condicoes_pagamento && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {selected.condicoes_pagamento}
+                            </div>
+                          )}
+                        </div>
+                        {quitado && (
+                          <span className="shrink-0 text-[10px] font-bold uppercase px-2.5 py-1 rounded-full bg-teal text-white tracking-wider">
+                            Quitado
+                          </span>
                         )}
                       </div>
 
                       {valorPago > 0 && (
-                        <div className="border-t border-teal/20 pt-3 grid grid-cols-2 gap-3">
-                          <div>
-                            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-0.5">
-                              Pago
-                            </div>
-                            <div className="font-mono text-lg font-bold text-teal">
-                              {formatCurrency(valorPago)}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-0.5">
-                              Restante
-                            </div>
+                        <div className="space-y-2">
+                          {/* Barra de progresso */}
+                          <div className="w-full h-1.5 bg-teal/20 rounded-full overflow-hidden">
                             <div
-                              className={`font-mono text-lg font-bold ${
-                                valorRestante > 0 ? 'text-amber-500' : 'text-teal'
-                              }`}
-                            >
-                              {formatCurrency(valorRestante)}
+                              className="h-full bg-teal rounded-full transition-all duration-500"
+                              style={{ width: `${percPago}%` }}
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3 border-t border-teal/20 pt-2">
+                            <div>
+                              <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-0.5">
+                                Pago
+                              </div>
+                              <div className="font-mono text-lg font-bold text-teal">
+                                {formatCurrency(valorPago)}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-0.5">
+                                {quitado ? 'Saldo' : 'Falta Pagar'}
+                              </div>
+                              <div
+                                className={`font-mono text-lg font-bold ${
+                                  valorRestante > 0 ? 'text-amber-500' : 'text-teal'
+                                }`}
+                              >
+                                {formatCurrency(valorRestante)}
+                              </div>
                             </div>
                           </div>
+                        </div>
+                      )}
+
+                      {/* Alerta de pendência para secretária */}
+                      {isSecretaria && valorRestante > 0 && selected.status === 'aprovado' && (
+                        <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2 flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                          <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                            Pagamento pendente: {formatCurrency(valorRestante)}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -1065,19 +1176,33 @@ export function OrcamentosClient({
                   </div>
                 )}
 
-                {/* Registrar pagamento (dentista/admin) */}
-                {!isSecretaria && (
+                {/* Registrar pagamento */}
+                {(() => {
+                  const pago = selected.pagamentos.filter(p => p.status === 'pago').reduce((s, p) => s + p.valor, 0);
+                  const restante = Math.max(0, (selected.total ?? 0) - pago);
+                  return (
                 <div className="bg-muted/40 border border-border rounded-2xl p-5 space-y-4">
-                  <label className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-                    <CreditCard className="w-3 h-3" /> Registrar Pagamento
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                      <CreditCard className="w-3 h-3" /> Registrar Pagamento
+                    </label>
+                    {restante > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setPagForm(f => ({ ...f, valor: restante.toFixed(2) }))}
+                        className="text-[10px] font-bold text-teal hover:text-teal-lt transition-colors uppercase tracking-wider"
+                      >
+                        Preencher restante
+                      </button>
+                    )}
+                  </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <Label className="text-foreground text-xs">Valor (R$)</Label>
                       <Input
                         type="number"
-                        placeholder="0,00"
+                        placeholder={restante > 0 ? restante.toFixed(2) : '0,00'}
                         min="0"
                         step="0.01"
                         value={pagForm.valor}
@@ -1136,7 +1261,8 @@ export function OrcamentosClient({
                     {pagSaving ? 'Salvando...' : 'Confirmar Pagamento'}
                   </Button>
                 </div>
-                )}
+                  );
+                })()}
 
                 {/* Link para o paciente */}
                 {selected.paciente?.id && (
@@ -1185,6 +1311,48 @@ export function OrcamentosClient({
                 {pagRapidoSaving ? 'Registrando...' : 'Confirmar Pagamento PIX'}
               </Button>
             </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: DEX Simplificar — tradução para o paciente */}
+      <Dialog open={traduzirOpen} onOpenChange={(open) => { if (!open) { setTraduzirOpen(false); setTraduzirCopied(false); } }}>
+        <DialogContent className="max-w-lg rounded-2xl bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-xl text-foreground flex items-center gap-2">
+              <Languages className="w-5 h-5 text-teal" style={{ color: '#2f9c85' }} />
+              DEX: Texto para o Paciente
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              Versão simplificada gerada pelo DEX — pronto para enviar pelo WhatsApp.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="relative">
+            {traduzirLoading ? (
+              <div className="flex flex-col items-center justify-center py-10 gap-3">
+                <Loader2 className="w-6 h-6 animate-spin" style={{ color: '#2f9c85' }} />
+                <p className="text-sm text-muted-foreground">DEX gerando a versão simplificada...</p>
+              </div>
+            ) : (
+              <textarea
+                readOnly
+                value={traduzirTexto}
+                rows={10}
+                className="w-full rounded-xl border border-border bg-muted text-sm text-foreground p-3 resize-none focus:outline-none font-sans leading-relaxed"
+              />
+            )}
+          </div>
+          {!traduzirLoading && traduzirTexto && (
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={handleCopyTraduzir}
+                className="rounded-xl border-border text-foreground hover:bg-muted gap-2"
+              >
+                {traduzirCopied ? <Check className="w-4 h-4 text-teal" style={{ color: '#2f9c85' }} /> : <Copy className="w-4 h-4" />}
+                {traduzirCopied ? 'Copiado!' : 'Copiar texto'}
+              </Button>
+            </DialogFooter>
           )}
         </DialogContent>
       </Dialog>
@@ -1407,12 +1575,42 @@ export function OrcamentosClient({
               </button>
             </div>
 
-            {/* Total */}
-            <div className="bg-teal/10 rounded-xl p-3 flex items-center justify-between border border-teal/20">
-              <span className="text-sm font-bold text-foreground">Total</span>
-              <span className="font-mono text-xl font-bold text-teal">
-                {formatCurrency(novoOrcTotal)}
-              </span>
+            {/* Desconto */}
+            <div className="flex items-center gap-3 rounded-xl border border-border bg-muted px-3 py-2">
+              <Label className="text-sm font-medium text-foreground whitespace-nowrap shrink-0">
+                Desconto (R$)
+              </Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={novoOrcDesconto || ''}
+                onChange={(e) => setNovoOrcDesconto(Math.max(0, parseFloat(e.target.value) || 0))}
+                placeholder="0,00"
+                className="rounded-lg bg-transparent border-0 text-right font-mono text-sm p-0 h-auto focus-visible:ring-0 shadow-none"
+              />
+            </div>
+
+            {/* Subtotal + Desconto + Total */}
+            <div className="bg-teal/10 rounded-xl p-3 space-y-1 border border-teal/20">
+              {novoOrcDesconto > 0 && (
+                <>
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>Subtotal</span>
+                    <span className="font-mono">{formatCurrency(novoOrcSubtotal)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-red-500">
+                    <span>Desconto</span>
+                    <span className="font-mono">- {formatCurrency(novoOrcDesconto)}</span>
+                  </div>
+                </>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-foreground">Total</span>
+                <span className="font-mono text-xl font-bold text-teal">
+                  {formatCurrency(novoOrcTotal)}
+                </span>
+              </div>
             </div>
 
             {orcError && (

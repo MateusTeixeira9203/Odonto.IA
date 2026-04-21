@@ -111,12 +111,13 @@ export async function salvarHorarios(
 // --- Procedimentos da clínica ---
 
 export interface ProcedimentoUpdateData {
+  nome: string;
   preco_padrao: number;
   duracao_minutos: number;
 }
 
 /**
- * Atualiza preço e duração de um procedimento da clínica.
+ * Atualiza nome, preço e duração de um procedimento da clínica.
  * Filtra por clinica_id obtido do servidor — nunca do cliente.
  */
 export async function atualizarProcedimento(
@@ -131,6 +132,7 @@ export async function atualizarProcedimento(
   const { error } = await supabase
     .from("procedimentos")
     .update({
+      nome: data.nome,
       preco_padrao: data.preco_padrao,
       duracao_minutos: data.duracao_minutos,
     })

@@ -22,7 +22,6 @@ import {
 } from 'lucide-react';
 import type { PlanoId } from '@/lib/planos';
 import { temFeature } from '@/lib/planos';
-import { canViewWhatsApp } from '@/lib/access-control';
 import { motion, AnimatePresence } from 'motion/react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useTheme } from 'next-themes';
@@ -31,6 +30,7 @@ import { createClient } from '@/lib/supabase/client';
 import type { DentistaRole } from '@/types/database';
 import { DentIALogo } from '@/components/ui/dent-ia-logo';
 import { WhatsAppStatusDot } from '@/components/layout/whatsapp-status-dot';
+import { NotificationBell } from '@/components/layout/notification-bell';
 import Image from 'next/image';
 
 export interface SidebarProps {
@@ -49,11 +49,11 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role, 
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
-  const showClinical = role === 'admin' || role === 'dentista';
-  const showConfig   = role === 'admin' || role === 'dentista';
-  const showWhatsApp = canViewWhatsApp(role, plano);
+  const isDentista   = role === 'admin' || role === 'dentista';
+  const showClinical = isDentista;
+  const showConfig   = isDentista;
 
-  // Feature locks baseadas no plano
+  // Feature locks baseadas no plano (não escondem itens — mostram upsell)
   const financeiroLocked = !temFeature(plano ?? 'CLINICA', 'financeiro');
   const botLocked        = !temFeature(plano ?? 'CLINICA', 'botCustomizavel');
 
@@ -70,12 +70,12 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role, 
   }, []);
 
   const allNavItems = [
-    { href: '/dashboard',             icon: LayoutDashboard,  label: 'Início',       id: 'dashboard-link',     visible: true,        locked: false },
-    { href: '/dashboard/agendamentos',icon: Calendar,         label: 'Agendamentos', id: 'agendamentos-link',  visible: true,        locked: false },
-    { href: '/dashboard/pacientes',   icon: Users,            label: 'Pacientes',    id: 'pacientes-link',     visible: true,        locked: false },
-{ href: '/dashboard/orcamentos',  icon: CircleDollarSign, label: 'Orçamentos',   id: 'orcamentos-link',    visible: true,        locked: false },
-    { href: '/dashboard/financeiro',  icon: Wallet,           label: 'Financeiro',   id: 'financeiro-link',    visible: true,        locked: financeiroLocked },
-    { href: '/dashboard/whatsapp',    icon: MessageCircle,    label: 'WhatsApp',     id: 'whatsapp-link',      visible: showWhatsApp,locked: false },
+    { href: '/dashboard',              icon: LayoutDashboard,  label: 'Início',       id: 'dashboard-link',    visible: true,       locked: false },
+    { href: '/dashboard/agendamentos', icon: Calendar,         label: 'Agendamentos', id: 'agendamentos-link', visible: true,       locked: false },
+    { href: '/dashboard/pacientes',    icon: Users,            label: 'Pacientes',    id: 'pacientes-link',    visible: true,       locked: false },
+    { href: '/dashboard/orcamentos',   icon: CircleDollarSign, label: 'Orçamentos',   id: 'orcamentos-link',   visible: isDentista, locked: false },
+    { href: '/dashboard/financeiro',   icon: Wallet,           label: 'Financeiro',   id: 'financeiro-link',   visible: isDentista, locked: financeiroLocked },
+    { href: isDentista ? '/dashboard/bot' : '/dashboard/whatsapp', icon: MessageCircle, label: 'WhatsApp', id: 'whatsapp-link', visible: true, locked: false },
   ];
 
   const navItems = allNavItems.filter((item) => item.visible);
@@ -152,6 +152,8 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role, 
       </nav>
 
       <div className="p-4 border-t border-white/5">
+        <NotificationBell isExpanded={isExpanded} />
+
         <button
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
           className={`flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium text-sm transition-all group text-zinc-400 hover:bg-white/5 hover:text-white border-l-2 border-transparent w-full mb-1 ${!isExpanded && 'justify-center'}`}
@@ -177,8 +179,7 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role, 
           </AnimatePresence>
         </button>
 
-        {canViewWhatsApp(role, plano) && (
-          <Link
+        {!isDentista && <Link
             id="whatsapp-config-link"
             href="/dashboard/bot"
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium text-sm transition-all group ${
@@ -204,8 +205,7 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role, 
                 </motion.span>
               )}
             </AnimatePresence>
-          </Link>
-        )}
+          </Link>}
 
         {showConfig && (
           <Link

@@ -8,6 +8,10 @@ export const STATES = {
   AGUARDANDO_CONFIRMACAO: 'aguardando_confirmacao',
   ENVIANDO_PDF:           'enviando_pdf',
 
+  // Coleta de dados do novo paciente
+  COLETANDO_CPF:       'coletando_cpf',
+  COLETANDO_DATA_NASC: 'coletando_data_nasc',
+
   // Fluxo via List Messages (balões interativos)
   AGUARDANDO_DENTISTA: 'aguardando_dentista',
   AGUARDANDO_DATA:     'aguardando_data',

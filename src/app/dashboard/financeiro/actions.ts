@@ -54,6 +54,34 @@ export type DayPoint = {
   despesas: number;
 };
 
+export type ReceitaManual = {
+  id: string;
+  clinica_id: string;
+  dentista_id: string | null;
+  valor: number;
+  forma: 'pix' | 'dinheiro' | 'transferencia' | 'outro';
+  data: string;
+  descricao: string | null;
+  created_at: string;
+};
+
+export type NovaReceitaForm = {
+  valor: number;
+  forma: 'pix' | 'dinheiro' | 'transferencia' | 'outro';
+  data: string;
+  descricao?: string;
+  dentistaId?: string;
+};
+
+export type HoraClinicaResult = {
+  /** Soma das despesas fixas do mês */
+  despesasFixas: number;
+  /** Total de horas de trabalho no mês conforme agenda cadastrada (null = sem horários) */
+  horasNoMes: number | null;
+  /** despesasFixas / horasNoMes (null quando horasNoMes é null ou zero) */
+  custoPorHora: number | null;
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const MES_PT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -118,7 +146,7 @@ export async function calcularSaldoMes(mesISO: string): Promise<SaldoMes> {
     despesasQuery = despesasQuery.eq('dentista_id', dentista.id);
   }
 
-  const [{ data: pagamentos }, { data: despesasData }] = await Promise.all([
+  const [{ data: pagamentos }, { data: despesasData }, { data: receitasData }] = await Promise.all([
     supabase
       .from('pagamentos')
       .select('valor')
@@ -127,9 +155,17 @@ export async function calcularSaldoMes(mesISO: string): Promise<SaldoMes> {
       .gte('created_at', inicio)
       .lt('created_at', fim),
     despesasQuery,
+    supabase
+      .from('receitas_manuais')
+      .select('valor')
+      .eq('clinica_id', dentista.clinica_id)
+      .gte('data', inicioDate)
+      .lt('data', fimDate),
   ]);
 
-  const receita  = (pagamentos   ?? []).reduce((s, p) => s + Number(p.valor), 0);
+  const receitaPagamentos = (pagamentos  ?? []).reduce((s, p) => s + Number(p.valor), 0);
+  const receitaManuais    = (receitasData ?? []).reduce((s, r) => s + Number(r.valor), 0);
+  const receita  = receitaPagamentos + receitaManuais;
   const despesas = (despesasData ?? []).reduce((s, d) => s + Number(d.valor), 0);
   return { receita, despesas, saldo: receita - despesas };
 }
@@ -290,4 +326,139 @@ export async function excluirDespesa(
   revalidatePath('/dashboard');
   revalidatePath('/dashboard/financeiro');
   return { ok: true };
+}
+
+// ─── Receitas Manuais ─────────────────────────────────────────────────────────
+
+/** Lista entradas manuais de um mês (YYYY-MM). */
+export async function listarReceitas(mesISO: string): Promise<ReceitaManual[]> {
+  const dentista = await getDentistaCached();
+  if (!dentista) redirect('/login');
+
+  const { inicioDate, fimDate } = mesWindow(mesISO);
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from('receitas_manuais')
+    .select('*')
+    .eq('clinica_id', dentista.clinica_id)
+    .gte('data', inicioDate)
+    .lt('data', fimDate)
+    .order('data', { ascending: false });
+
+  return (data ?? []) as ReceitaManual[];
+}
+
+/** Cria uma nova entrada manual. */
+export async function criarReceita(
+  form: NovaReceitaForm,
+): Promise<{ ok: boolean; id?: string; erro?: string }> {
+  const dentista = await getDentistaCached();
+  if (!dentista) redirect('/login');
+
+  const dentistaAlvoId =
+    dentista.role === 'secretaria' ? form.dentistaId ?? null : dentista.id;
+
+  if (dentista.role === 'secretaria' && !dentistaAlvoId) {
+    return { ok: false, erro: 'Selecione o dentista responsável pela entrada' };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('receitas_manuais')
+    .insert({
+      clinica_id:  dentista.clinica_id,
+      dentista_id: dentistaAlvoId,
+      valor:       form.valor,
+      forma:       form.forma,
+      data:        form.data,
+      descricao:   form.descricao?.trim() || null,
+    })
+    .select('id')
+    .single();
+
+  if (error) return { ok: false, erro: error.message };
+
+  revalidatePath('/dashboard');
+  revalidatePath('/dashboard/financeiro');
+  return { ok: true, id: (data as { id: string }).id };
+}
+
+/** Remove uma entrada manual. */
+export async function excluirReceita(
+  id: string,
+): Promise<{ ok: boolean; erro?: string }> {
+  const dentista = await getDentistaCached();
+  if (!dentista) redirect('/login');
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('receitas_manuais')
+    .delete()
+    .eq('id', id)
+    .eq('clinica_id', dentista.clinica_id);
+
+  if (error) return { ok: false, erro: error.message };
+
+  revalidatePath('/dashboard');
+  revalidatePath('/dashboard/financeiro');
+  return { ok: true };
+}
+
+// ─── Hora Clínica ─────────────────────────────────────────────────────────────
+
+/** Calcula o custo por hora clínica: despesas fixas do mês ÷ horas agendadas.
+ *  Horas calculadas a partir de horarios_disponiveis da clínica para o mês. */
+export async function calcularHoraClinica(mesISO: string): Promise<HoraClinicaResult> {
+  const dentista = await getDentistaCached();
+  if (!dentista) redirect('/login');
+
+  const { inicioDate, fimDate } = mesWindow(mesISO);
+  const supabase = await createClient();
+
+  const [{ data: despesasFixas }, { data: horarios }] = await Promise.all([
+    // Soma apenas despesas fixas do mês
+    supabase
+      .from('despesas')
+      .select('valor')
+      .eq('clinica_id', dentista.clinica_id)
+      .eq('tipo', 'fixo')
+      .gte('data', inicioDate)
+      .lt('data', fimDate),
+    // Horários ativos da clínica
+    supabase
+      .from('horarios_disponiveis')
+      .select('dia_semana, hora_inicio, hora_fim')
+      .eq('clinica_id', dentista.clinica_id)
+      .eq('ativo', true),
+  ]);
+
+  const totalFixas = (despesasFixas ?? []).reduce((s, d) => s + Number(d.valor), 0);
+
+  if (!horarios || horarios.length === 0) {
+    return { despesasFixas: totalFixas, horasNoMes: null, custoPorHora: null };
+  }
+
+  // Conta quantas vezes cada dia_semana ocorre no mês
+  const [ano, mes] = mesISO.split('-').map(Number);
+  const diasNoMes = new Date(ano, mes, 0).getDate();
+  const contadorDia: Record<number, number> = {};
+  for (let d = 1; d <= diasNoMes; d++) {
+    const dow = new Date(ano, mes - 1, d).getDay();
+    contadorDia[dow] = (contadorDia[dow] ?? 0) + 1;
+  }
+
+  // Soma horas de trabalho: horas/dia × ocorrências do dia no mês
+  let horasNoMes = 0;
+  for (const h of horarios) {
+    const [sh, sm] = (h.hora_inicio as string).split(':').map(Number);
+    const [eh, em] = (h.hora_fim as string).split(':').map(Number);
+    const hPorDia = (eh + em / 60) - (sh + sm / 60);
+    if (hPorDia > 0) {
+      horasNoMes += hPorDia * (contadorDia[h.dia_semana as number] ?? 0);
+    }
+  }
+
+  const custoPorHora = horasNoMes > 0 ? totalFixas / horasNoMes : null;
+  return { despesasFixas: totalFixas, horasNoMes, custoPorHora };
 }

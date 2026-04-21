@@ -30,6 +30,21 @@ export async function createPaciente(
   const dentistaAlvo = data.dentistaId ?? dentista.id;
 
   const supabase = await createClient();
+
+  if (data.cpf) {
+    const cpfFormatted = data.cpf.trim();
+    const cpfRaw = cpfFormatted.replace(/\D/g, '');
+    const { data: existente } = await supabase
+      .from('pacientes')
+      .select('id, nome')
+      .eq('clinica_id', dentista.clinica_id)
+      .or(`cpf.eq.${cpfFormatted},cpf.eq.${cpfRaw}`)
+      .maybeSingle();
+    if (existente) {
+      return { success: false, error: `CPF já cadastrado para o paciente "${existente.nome}".` };
+    }
+  }
+
   const { error } = await supabase.from("pacientes").insert({
     clinica_id: dentista.clinica_id,
     dentista_id: dentistaAlvo,

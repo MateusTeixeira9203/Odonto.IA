@@ -22,6 +22,8 @@ export interface PlanoFeatures {
   multiDentistas: boolean;
   /** Silos de privacidade financeira entre dentistas (CLINICA) */
   silosPrivacidade: boolean;
+  /** Dex Co-Piloto: briefing, simplificação, inteligência comercial, notificações inter-role (CLINICA) */
+  copiloto: boolean;
 }
 
 export interface PlanoConfig {
@@ -52,6 +54,7 @@ export const PLANOS: Record<PlanoId, PlanoConfig> = {
       equipe: false,
       multiDentistas: false,
       silosPrivacidade: false,
+      copiloto: false,
     },
   },
   BASICO: {
@@ -66,10 +69,11 @@ export const PLANOS: Record<PlanoId, PlanoConfig> = {
       transcricaoVoz: true,
       orcamentoIA: true,
       planejamentoIA: true,
-      financeiro: true,
+      financeiro: false,
       equipe: true,
       multiDentistas: false,
       silosPrivacidade: false,
+      copiloto: false,
     },
   },
   CLINICA: {
@@ -88,6 +92,7 @@ export const PLANOS: Record<PlanoId, PlanoConfig> = {
       equipe: true,
       multiDentistas: true,
       silosPrivacidade: true,
+      copiloto: true,
     },
   },
 };
