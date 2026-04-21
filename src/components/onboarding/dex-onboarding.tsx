@@ -277,6 +277,18 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
           ],
           simulacao: 'orcamento' as const,
         },
+        {
+          id: 'FINANCEIRO',
+          path: '/dashboard/financeiro',
+          title: 'Controle de Despesas',
+          description: 'Registre as despesas da clínica — materiais, aluguel, contas — para que o dentista tenha uma visão real do lucro. Você lança, o sistema consolida tudo.',
+          targetId: 'financeiro-link',
+          bullets: [
+            'Lançamento de despesas fixas e variáveis',
+            'Categorias: materiais, aluguel, salários, outros',
+            'Dentista vê o resultado financeiro em tempo real',
+          ],
+        },
         { id: 'FINALE', path: '/dashboard', title: 'Tudo pronto!', description: 'Qualquer dúvida, é só me chamar aqui no canto. Bom trabalho e bom atendimento!' },
       ];
     }
