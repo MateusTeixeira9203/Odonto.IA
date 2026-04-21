@@ -6,7 +6,6 @@ import { Plus, ArrowRight, Users, TrendingUp, Clock, Sparkles, Calendar, CheckCi
 import Link from 'next/link';
 import { format, parseISO, isAfter, addDays, startOfWeek, endOfWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { GuidedTour } from './_components/guided-tour';
 import { PageTransition } from '@/components/layout/page-transition';
 import { DentistaDashboard, DashboardSkeleton } from './_components/dentista-dashboard';
 
@@ -305,8 +304,6 @@ export default async function DashboardPage() {
   return (
     <PageTransition>
       <div className="p-8 max-w-6xl mx-auto w-full">
-        <GuidedTour />
-
         {/* Header — renderizado imediatamente, sem dependência de dados */}
         <header className="flex items-center justify-between mb-10">
           <div>
