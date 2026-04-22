@@ -46,6 +46,7 @@ import { Label } from '@/components/ui/label';
 import { DocumentosTab } from '@/components/pacientes/DocumentosTab';
 import { PlanejamentoTab } from '@/components/pacientes/PlanejamentoTab';
 import { FichasTab } from '@/components/pacientes/FichasTab';
+import { PendenciasTab } from '@/components/pacientes/PendenciasTab';
 import { createClient } from '@/lib/supabase/client';
 import { atualizarPaciente, salvarAnotacoes } from '../actions';
 import type { DentistaRole } from '@/types/database';
@@ -669,6 +670,7 @@ export function PacienteDetailClient({
                 [
                   ['visao-geral',  'Visão Geral',      undefined],
                   ...(showClinicalTabs ? [['fichas',      'Fichas Clínicas', 'tab-fichas'      ] as const] : []),
+                  ...(showClinicalTabs ? [['pendencias',  'Pendências',       undefined          ] as const] : []),
                   ['documentos',   'Documentos',       'tab-documentos'  ],
                   ...(showClinicalTabs ? [['planejamento', 'Planejamento',    'tab-apresentacao'] as const] : []),
                   ['orcamentos',   'Orçamentos',       'tab-orcamento'   ],
@@ -847,6 +849,10 @@ export function PacienteDetailClient({
                     dentistaId={dentistaId}
                     plano={plano}
                   />
+                </TabsContent>
+
+                <TabsContent value="pendencias" className="mt-0">
+                  <PendenciasTab patientId={paciente.id} clinicaId={clinicaId} />
                 </TabsContent>
 
                 <TabsContent value="documentos" className="mt-0">

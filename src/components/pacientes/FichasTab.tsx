@@ -53,6 +53,7 @@ interface Evolution {
   teethNotes: ToothNote[];
   professional: string;
   files: string[];
+  procedimentosConcluidos: string[];
 }
 
 type FichaDB = {
@@ -64,6 +65,7 @@ type FichaDB = {
   dentes_observacoes: Record<string, string>;
   status: string;
   dentista?: { nome: string } | null;
+  procedimentos_concluidos: string[];
 };
 
 const TEETH_UPPER = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
@@ -99,6 +101,7 @@ const mapFichaToEvolution = (f: FichaDB): Evolution => ({
   }),
   professional: f.dentista?.nome ?? "Profissional",
   files: [],
+  procedimentosConcluidos: f.procedimentos_concluidos ?? [],
 });
 
 interface FichasTabProps {
@@ -198,7 +201,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
       const supabase = createClient();
       const { data, error } = await supabase
         .from("fichas")
-        .select("id, created_at, queixa_principal, anotacoes, dentes_afetados, dentes_observacoes, status, dentista:dentistas(nome)")
+        .select("id, created_at, queixa_principal, anotacoes, dentes_afetados, dentes_observacoes, status, procedimentos_concluidos, dentista:dentistas(nome)")
         .eq("paciente_id", patientId)
         .eq("clinica_id", clinicaId)
         .order("created_at", { ascending: false });
@@ -319,6 +322,27 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
           : tn
       ),
     }));
+  };
+
+  const handleToggleProcedimento = async (fichaId: string, key: string, current: string[]): Promise<void> => {
+    const supabase = createClient();
+    const newConcluidos = current.includes(key)
+      ? current.filter((k) => k !== key)
+      : [...current, key];
+
+    const { error } = await supabase
+      .from('fichas')
+      .update({ procedimentos_concluidos: newConcluidos })
+      .eq('id', fichaId)
+      .eq('clinica_id', clinicaId);
+
+    if (!error) {
+      setEvolutions((prev) =>
+        prev.map((e) =>
+          e.id === fichaId ? { ...e, procedimentosConcluidos: newConcluidos } : e
+        )
+      );
+    }
   };
 
   const handleSave = async () => {
@@ -839,7 +863,15 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
       )}
 
       <div className="relative space-y-8 before:absolute before:left-[19px] before:top-4 before:bottom-4 before:w-px before:bg-border/40">
-        {evolutions.map((evo, idx) => (
+        {evolutions.map((evo, idx) => {
+          const validKeys = evo.teethNotes.flatMap((tn) =>
+            tn.notes.filter(Boolean).map((_, i) => `${tn.tooth}_${i}`)
+          );
+          const totalProcs = validKeys.length;
+          const doneProcs = evo.procedimentosConcluidos.filter((k) => validKeys.includes(k)).length;
+          const allDone = totalProcs > 0 && doneProcs === totalProcs;
+
+          return (
           <motion.div
             key={evo.id}
             initial={{ opacity: 0, x: -20 }}
@@ -847,18 +879,29 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
             transition={{ delay: idx * 0.05 }}
             className="relative pl-12 group"
           >
-            <div className="absolute left-0 top-1 w-10 h-10 rounded-full bg-card border-2 border-teal flex items-center justify-center z-10 shadow-sm group-hover:scale-110 transition-transform">
-              <div className="w-2 h-2 rounded-full bg-teal" />
+            <div className={`absolute left-0 top-1 w-10 h-10 rounded-full bg-card border-2 flex items-center justify-center z-10 shadow-sm group-hover:scale-110 transition-transform ${allDone ? 'border-emerald-500' : 'border-teal'}`}>
+              {allDone
+                ? <Check className="w-4 h-4 text-emerald-500" />
+                : <div className="w-2 h-2 rounded-full bg-teal" />
+              }
             </div>
 
-            <div className="bg-card rounded-2xl border border-border/60 shadow-sm p-6 hover:shadow-md transition-all">
+            <div
+              className="bg-card rounded-2xl border border-border/60 shadow-sm p-6 hover:shadow-md transition-all"
+              style={allDone ? { boxShadow: '-3px 0 0 0 #10b981, 0 1px 3px rgba(0,0,0,0.06)' } : undefined}
+            >
               <div className="flex justify-between items-start mb-4">
                 <div className="space-y-1">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <span className="bg-teal/10 text-teal px-2.5 py-1 rounded-md text-[9px] font-bold uppercase tracking-widest">
                       {evo.type}
                     </span>
                     <h4 className="text-sm font-bold text-foreground">{evo.date}</h4>
+                    {totalProcs > 0 && (
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold border ${allDone ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/20'}`}>
+                        {allDone ? '✓ Concluído' : `${doneProcs}/${totalProcs} realizados`}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-medium">
                     <User className="w-3 h-3" /> {evo.professional}
@@ -892,19 +935,34 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
               )}
 
               {evo.teethNotes.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-4">
+                <div className="flex flex-col gap-2 mb-4">
                   {evo.teethNotes.map((tn) => (
                     <div
                       key={tn.tooth}
-                      className="bg-muted px-3 py-1.5 rounded-lg border border-border/40 flex items-start gap-2"
+                      className="bg-muted rounded-lg border border-border/40 px-3 py-2"
                     >
-                      <span className="font-mono text-[10px] font-bold text-teal shrink-0 mt-0.5">
+                      <span className="font-mono text-[10px] font-bold text-teal block mb-1.5">
                         D{tn.tooth}
                       </span>
-                      <div className="flex flex-col gap-0.5">
-                        {tn.notes.filter(Boolean).map((n, i) => (
-                          <span key={i} className="text-[10px] text-foreground font-medium">{n}</span>
-                        ))}
+                      <div className="flex flex-col gap-1.5">
+                        {tn.notes.filter(Boolean).map((n, i) => {
+                          const procKey = `${tn.tooth}_${i}`;
+                          const done = evo.procedimentosConcluidos.includes(procKey);
+                          return (
+                            <button
+                              key={i}
+                              onClick={() => void handleToggleProcedimento(evo.id, procKey, evo.procedimentosConcluidos)}
+                              className="flex items-center gap-2 text-left group/proc w-full"
+                            >
+                              <div className={`w-4 h-4 rounded border shrink-0 flex items-center justify-center transition-all ${done ? 'bg-emerald-500 border-emerald-500' : 'border-border group-hover/proc:border-teal'}`}>
+                                {done && <Check className="w-2.5 h-2.5 text-white" />}
+                              </div>
+                              <span className={`text-[11px] font-medium transition-all ${done ? 'line-through text-muted-foreground' : 'text-foreground group-hover/proc:text-teal'}`}>
+                                {n}
+                              </span>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   ))}
@@ -925,7 +983,8 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
               )}
             </div>
           </motion.div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Modal: Orçamento sugerido pela IA */}
