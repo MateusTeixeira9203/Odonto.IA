@@ -88,7 +88,7 @@ interface NovoOrcItem {
   procedimentoId: string;
   descricao: string;
   quantidade: number;
-  preco: number;
+  preco: string;
 }
 
 export function OrcamentosClient({
@@ -118,7 +118,7 @@ export function OrcamentosClient({
   const [isNovoOrcOpen, setIsNovoOrcOpen] = useState(false);
   const [procedimentosClinica, setProcedimentosClinica] = useState<ProcedimentoClinica[]>([]);
   const [novoOrcItens, setNovoOrcItens] = useState<NovoOrcItem[]>([
-    { procedimentoId: '', descricao: '', quantidade: 1, preco: 0 },
+    { procedimentoId: '', descricao: '', quantidade: 1, preco: '' },
   ]);
   const [novoOrcDesconto, setNovoOrcDesconto] = useState(0);
   const [novoOrcPacienteSearch, setNovoOrcPacienteSearch] = useState('');
@@ -141,7 +141,7 @@ export function OrcamentosClient({
   // Edição de orçamento
   const [editMode, setEditMode] = useState(false);
   const [editItens, setEditItens] = useState<
-    Array<{ id?: string; descricao: string; quantidade: number; preco_unitario: number }>
+    Array<{ id?: string; descricao: string; quantidade: number; preco_unitario: string }>
   >([]);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
@@ -191,7 +191,7 @@ export function OrcamentosClient({
     setPacienteSugestoes(data ?? []);
   }, []);
 
-  const novoOrcSubtotal = novoOrcItens.reduce((s, i) => s + i.quantidade * i.preco, 0);
+  const novoOrcSubtotal = novoOrcItens.reduce((s, i) => s + i.quantidade * (parseFloat(i.preco) || 0), 0);
   const novoOrcTotal = Math.max(0, novoOrcSubtotal - novoOrcDesconto);
 
   // Dentistas únicos para o dropdown da secretaria
@@ -360,7 +360,7 @@ export function OrcamentosClient({
       setOrcError('Selecione um paciente.');
       return;
     }
-    const itensValidos = novoOrcItens.filter((i) => i.descricao.trim() && i.preco > 0);
+    const itensValidos = novoOrcItens.filter((i) => i.descricao.trim() && (parseFloat(i.preco) || 0) > 0);
     if (itensValidos.length === 0) {
       setOrcError('Adicione ao menos um procedimento com descrição e valor.');
       return;
@@ -375,7 +375,7 @@ export function OrcamentosClient({
         procedimentoId: i.procedimentoId || null,
         descricao: i.descricao,
         quantidade: i.quantidade,
-        precoUnitario: i.preco,
+        precoUnitario: parseFloat(i.preco) || 0,
       })),
     });
 
@@ -399,15 +399,15 @@ export function OrcamentosClient({
             orcamento_id: result.id ?? '',
             descricao: i.descricao,
             quantidade: i.quantidade,
-            preco_unitario: i.preco,
-            preco_total: i.quantidade * i.preco,
+            preco_unitario: parseFloat(i.preco) || 0,
+            preco_total: i.quantidade * (parseFloat(i.preco) || 0),
           })
         ),
         pagamentos: [],
       };
       setOrcamentos((prev) => [novoOrc, ...prev]);
       setIsNovoOrcOpen(false);
-      setNovoOrcItens([{ procedimentoId: '', descricao: '', quantidade: 1, preco: 0 }]);
+      setNovoOrcItens([{ procedimentoId: '', descricao: '', quantidade: 1, preco: '' }]);
       setNovoOrcDesconto(0);
       setNovoOrcPacienteSearch('');
       setNovoOrcPacienteId('');
@@ -424,10 +424,11 @@ export function OrcamentosClient({
         id: item.id,
         descricao: item.descricao ?? '',
         quantidade: item.quantidade,
-        preco_unitario:
+        preco_unitario: String(
           item.quantidade > 0
             ? (item.preco_total ?? 0) / item.quantidade
-            : (item.preco_total ?? 0),
+            : (item.preco_total ?? 0)
+        ),
       }))
     );
     setEditError(null);
@@ -436,24 +437,24 @@ export function OrcamentosClient({
 
   const handleSalvarEdicao = async () => {
     if (!selected) return;
-    const itensValidos = editItens.filter((i) => i.descricao.trim() && i.preco_unitario > 0);
+    const itensValidos = editItens.filter((i) => i.descricao.trim() && (parseFloat(i.preco_unitario) || 0) > 0);
     if (itensValidos.length === 0) {
       setEditError('Adicione ao menos um procedimento com descrição e valor.');
       return;
     }
     setEditSaving(true);
-    const result = await editarOrcamento(selected.id, itensValidos);
+    const result = await editarOrcamento(selected.id, itensValidos.map(i => ({ ...i, preco_unitario: parseFloat(i.preco_unitario) || 0 })));
     if (result.error) {
       setEditError(result.error);
     } else {
-      const novoTotal = itensValidos.reduce((sum, i) => sum + i.quantidade * i.preco_unitario, 0);
+      const novoTotal = itensValidos.reduce((sum, i) => sum + i.quantidade * (parseFloat(i.preco_unitario) || 0), 0);
       const novosItens: OrcamentoItemRow[] = itensValidos.map((i) => ({
         id: i.id ?? crypto.randomUUID(),
         orcamento_id: selected.id,
         descricao: i.descricao,
         quantidade: i.quantidade,
-        preco_unitario: i.preco_unitario,
-        preco_total: i.quantidade * i.preco_unitario,
+        preco_unitario: parseFloat(i.preco_unitario) || 0,
+        preco_total: i.quantidade * (parseFloat(i.preco_unitario) || 0),
       }));
       setOrcamentos((prev) =>
         prev.map((o) =>
@@ -532,7 +533,7 @@ export function OrcamentosClient({
           <button
             onClick={() => {
               setOrcError(null);
-              setNovoOrcItens([{ procedimentoId: '', descricao: '', quantidade: 1, preco: 0 }]);
+              setNovoOrcItens([{ procedimentoId: '', descricao: '', quantidade: 1, preco: '' }]);
               setNovoOrcPacienteSearch('');
               setNovoOrcPacienteId('');
               setNovoOrcPacienteNome('');
@@ -1057,19 +1058,14 @@ export function OrcamentosClient({
                                 Preço unit. (R$)
                               </label>
                               <Input
-                                type="number"
-                                min="0"
-                                step="0.01"
+                                type="text"
+                                inputMode="decimal"
+                                placeholder="0.00"
                                 value={item.preco_unitario}
                                 onChange={(e) =>
                                   setEditItens((prev) =>
                                     prev.map((it, i) =>
-                                      i === idx
-                                        ? {
-                                            ...it,
-                                            preco_unitario: parseFloat(e.target.value) || 0,
-                                          }
-                                        : it
+                                      i === idx ? { ...it, preco_unitario: e.target.value } : it
                                     )
                                   )
                                 }
@@ -1083,7 +1079,7 @@ export function OrcamentosClient({
                         onClick={() =>
                           setEditItens((prev) => [
                             ...prev,
-                            { descricao: '', quantidade: 1, preco_unitario: 0 },
+                            { descricao: '', quantidade: 1, preco_unitario: '' },
                           ])
                         }
                         className="w-full py-3 border border-dashed border-border rounded-xl text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors flex items-center justify-center gap-2"
@@ -1093,7 +1089,7 @@ export function OrcamentosClient({
                       <div className="bg-teal/10 rounded-xl p-3 border border-teal/20 flex items-center justify-between">
                         <span className="text-sm font-bold text-foreground">Total</span>
                         <span className="font-mono text-lg font-bold text-teal">
-                          {formatCurrency(editItens.reduce((sum, i) => sum + i.quantidade * i.preco_unitario, 0))}
+                          {formatCurrency(editItens.reduce((sum, i) => sum + i.quantidade * (parseFloat(i.preco_unitario) || 0), 0))}
                         </span>
                       </div>
                       {editError && (
@@ -1481,7 +1477,7 @@ export function OrcamentosClient({
                                 ...it,
                                 procedimentoId: v,
                                 descricao: proc?.nome ?? it.descricao,
-                                preco: proc?.preco_padrao ?? it.preco,
+                                preco: proc?.preco_padrao != null ? String(proc.preco_padrao) : it.preco,
                               }
                             : it
                         )
@@ -1541,16 +1537,14 @@ export function OrcamentosClient({
                     <div className="space-y-1">
                       <Label className="text-xs text-foreground">Valor unitário (R$)</Label>
                       <Input
-                        type="number"
-                        min="0"
-                        step="0.01"
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="0.00"
                         value={item.preco}
                         onChange={(e) =>
                           setNovoOrcItens((prev) =>
                             prev.map((it, i) =>
-                              i === idx
-                                ? { ...it, preco: parseFloat(e.target.value) || 0 }
-                                : it
+                              i === idx ? { ...it, preco: e.target.value } : it
                             )
                           )
                         }
@@ -1565,7 +1559,7 @@ export function OrcamentosClient({
                 onClick={() =>
                   setNovoOrcItens((prev) => [
                     ...prev,
-                    { procedimentoId: '', descricao: '', quantidade: 1, preco: 0 },
+                    { procedimentoId: '', descricao: '', quantidade: 1, preco: '' },
                   ])
                 }
                 className="w-full py-3 border border-dashed border-border rounded-xl text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors flex items-center justify-center gap-2"
