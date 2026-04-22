@@ -78,6 +78,13 @@ const STATUS_MAP: Record<
 const formatCurrency = (value: number | null) =>
   (value ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+// Helpers para input de valor estilo calculadora (dígitos → centavos)
+// "32555" → 325.55 → exibe "325,55"
+const centsToFloat  = (digits: string): number => parseInt(digits || '0', 10) / 100;
+const floatToCents  = (value: number): string  => String(Math.round(value * 100));
+const formatCents   = (digits: string): string  =>
+  centsToFloat(digits).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 interface ProcedimentoClinica {
   id: string;
   nome: string;
@@ -191,7 +198,7 @@ export function OrcamentosClient({
     setPacienteSugestoes(data ?? []);
   }, []);
 
-  const novoOrcSubtotal = novoOrcItens.reduce((s, i) => s + i.quantidade * (parseFloat(i.preco) || 0), 0);
+  const novoOrcSubtotal = novoOrcItens.reduce((s, i) => s + i.quantidade * centsToFloat(i.preco), 0);
   const novoOrcTotal = Math.max(0, novoOrcSubtotal - novoOrcDesconto);
 
   // Dentistas únicos para o dropdown da secretaria
@@ -360,7 +367,7 @@ export function OrcamentosClient({
       setOrcError('Selecione um paciente.');
       return;
     }
-    const itensValidos = novoOrcItens.filter((i) => i.descricao.trim() && (parseFloat(i.preco) || 0) > 0);
+    const itensValidos = novoOrcItens.filter((i) => i.descricao.trim() && centsToFloat(i.preco) > 0);
     if (itensValidos.length === 0) {
       setOrcError('Adicione ao menos um procedimento com descrição e valor.');
       return;
@@ -375,7 +382,7 @@ export function OrcamentosClient({
         procedimentoId: i.procedimentoId || null,
         descricao: i.descricao,
         quantidade: i.quantidade,
-        precoUnitario: parseFloat(i.preco) || 0,
+        precoUnitario: centsToFloat(i.preco),
       })),
     });
 
@@ -399,8 +406,8 @@ export function OrcamentosClient({
             orcamento_id: result.id ?? '',
             descricao: i.descricao,
             quantidade: i.quantidade,
-            preco_unitario: parseFloat(i.preco) || 0,
-            preco_total: i.quantidade * (parseFloat(i.preco) || 0),
+            preco_unitario: centsToFloat(i.preco),
+            preco_total: i.quantidade * centsToFloat(i.preco),
           })
         ),
         pagamentos: [],
@@ -424,7 +431,7 @@ export function OrcamentosClient({
         id: item.id,
         descricao: item.descricao ?? '',
         quantidade: item.quantidade,
-        preco_unitario: String(
+        preco_unitario: floatToCents(
           item.quantidade > 0
             ? (item.preco_total ?? 0) / item.quantidade
             : (item.preco_total ?? 0)
@@ -437,24 +444,24 @@ export function OrcamentosClient({
 
   const handleSalvarEdicao = async () => {
     if (!selected) return;
-    const itensValidos = editItens.filter((i) => i.descricao.trim() && (parseFloat(i.preco_unitario) || 0) > 0);
+    const itensValidos = editItens.filter((i) => i.descricao.trim() && centsToFloat(i.preco_unitario) > 0);
     if (itensValidos.length === 0) {
       setEditError('Adicione ao menos um procedimento com descrição e valor.');
       return;
     }
     setEditSaving(true);
-    const result = await editarOrcamento(selected.id, itensValidos.map(i => ({ ...i, preco_unitario: parseFloat(i.preco_unitario) || 0 })));
+    const result = await editarOrcamento(selected.id, itensValidos.map(i => ({ ...i, preco_unitario: centsToFloat(i.preco_unitario) })));
     if (result.error) {
       setEditError(result.error);
     } else {
-      const novoTotal = itensValidos.reduce((sum, i) => sum + i.quantidade * (parseFloat(i.preco_unitario) || 0), 0);
+      const novoTotal = itensValidos.reduce((sum, i) => sum + i.quantidade * centsToFloat(i.preco_unitario), 0);
       const novosItens: OrcamentoItemRow[] = itensValidos.map((i) => ({
         id: i.id ?? crypto.randomUUID(),
         orcamento_id: selected.id,
         descricao: i.descricao,
         quantidade: i.quantidade,
-        preco_unitario: parseFloat(i.preco_unitario) || 0,
-        preco_total: i.quantidade * (parseFloat(i.preco_unitario) || 0),
+        preco_unitario: centsToFloat(i.preco_unitario),
+        preco_total: i.quantidade * centsToFloat(i.preco_unitario),
       }));
       setOrcamentos((prev) =>
         prev.map((o) =>
@@ -1059,13 +1066,13 @@ export function OrcamentosClient({
                               </label>
                               <Input
                                 type="text"
-                                inputMode="decimal"
-                                placeholder="0.00"
-                                value={item.preco_unitario}
+                                inputMode="numeric"
+                                placeholder="0,00"
+                                value={formatCents(item.preco_unitario)}
                                 onChange={(e) =>
                                   setEditItens((prev) =>
                                     prev.map((it, i) =>
-                                      i === idx ? { ...it, preco_unitario: e.target.value } : it
+                                      i === idx ? { ...it, preco_unitario: e.target.value.replace(/\D/g, '') } : it
                                     )
                                   )
                                 }
@@ -1089,7 +1096,7 @@ export function OrcamentosClient({
                       <div className="bg-teal/10 rounded-xl p-3 border border-teal/20 flex items-center justify-between">
                         <span className="text-sm font-bold text-foreground">Total</span>
                         <span className="font-mono text-lg font-bold text-teal">
-                          {formatCurrency(editItens.reduce((sum, i) => sum + i.quantidade * (parseFloat(i.preco_unitario) || 0), 0))}
+                          {formatCurrency(editItens.reduce((sum, i) => sum + i.quantidade * centsToFloat(i.preco_unitario), 0))}
                         </span>
                       </div>
                       {editError && (
@@ -1477,7 +1484,7 @@ export function OrcamentosClient({
                                 ...it,
                                 procedimentoId: v,
                                 descricao: proc?.nome ?? it.descricao,
-                                preco: proc?.preco_padrao != null ? String(proc.preco_padrao) : it.preco,
+                                preco: proc?.preco_padrao != null ? floatToCents(proc.preco_padrao) : it.preco,
                               }
                             : it
                         )
@@ -1538,13 +1545,13 @@ export function OrcamentosClient({
                       <Label className="text-xs text-foreground">Valor unitário (R$)</Label>
                       <Input
                         type="text"
-                        inputMode="decimal"
-                        placeholder="0.00"
-                        value={item.preco}
+                        inputMode="numeric"
+                        placeholder="0,00"
+                        value={formatCents(item.preco)}
                         onChange={(e) =>
                           setNovoOrcItens((prev) =>
                             prev.map((it, i) =>
-                              i === idx ? { ...it, preco: e.target.value } : it
+                              i === idx ? { ...it, preco: e.target.value.replace(/\D/g, '') } : it
                             )
                           )
                         }
