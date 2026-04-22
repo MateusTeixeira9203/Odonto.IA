@@ -91,7 +91,7 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role, 
       {/* Toggle Button */}
       <button
         onClick={onToggle}
-        className="absolute -right-3 top-10 w-6 h-6 bg-teal rounded-full flex items-center justify-center text-white border-2 border-brand-charcoal hover:bg-teal-lt transition-colors z-30"
+        className="absolute -right-3.5 top-10 w-7 h-7 bg-teal rounded-full flex items-center justify-center text-white border-2 border-brand-charcoal hover:bg-teal-lt active:scale-95 transition-all z-30"
       >
         {isExpanded ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
       </button>
@@ -123,7 +123,7 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role, 
               key={item.href}
               id={item.id}
               href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium text-sm transition-all group ${
+              className={`flex items-center gap-3 px-3 py-3 rounded-lg font-medium text-sm transition-all group ${
                 isActive
                   ? 'bg-teal/10 text-teal-lt shadow-inner border-l-2 border-teal-lt'
                   : item.locked
@@ -182,7 +182,7 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role, 
         {!isDentista && <Link
             id="whatsapp-config-link"
             href="/dashboard/bot"
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium text-sm transition-all group ${
+            className={`flex items-center gap-3 px-3 py-3 rounded-lg font-medium text-sm transition-all group ${
               pathname === '/dashboard/bot'
                 ? 'bg-teal/10 text-teal-lt border-l-2 border-teal-lt'
                 : botLocked
@@ -211,7 +211,7 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role, 
           <Link
             id="configuracoes-link"
             href="/dashboard/configuracoes"
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium text-sm transition-all group ${
+            className={`flex items-center gap-3 px-3 py-3 rounded-lg font-medium text-sm transition-all group ${
               pathname === '/dashboard/configuracoes'
                 ? 'bg-teal/10 text-teal-lt border-l-2 border-teal-lt'
                 : 'text-zinc-400 hover:bg-white/5 hover:text-white border-l-2 border-transparent'

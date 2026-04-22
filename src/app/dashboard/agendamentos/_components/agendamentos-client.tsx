@@ -458,7 +458,7 @@ export function AgendamentosClient({
   };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto w-full">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
       {/* Cabeçalho */}
       <motion.header
         initial={{ opacity: 0, y: -20 }}
@@ -466,7 +466,7 @@ export function AgendamentosClient({
         className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8"
       >
         <div>
-          <h1 className="font-heading text-4xl text-foreground mb-2 flex items-center">
+          <h1 className="font-heading text-3xl md:text-4xl text-foreground mb-2 flex items-center">
             Agendamentos
             <HelpTooltip content="Gerencie sua agenda com visualização mensal/semanal." />
           </h1>
@@ -541,7 +541,7 @@ export function AgendamentosClient({
         </div>
       </motion.header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 lg:gap-8">
         {/* Calendário */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
@@ -735,7 +735,7 @@ export function AgendamentosClient({
                             <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                               <button
                                 onClick={() => router.push(`/dashboard/pacientes/${apt.paciente?.id}`)}
-                                className="px-4 py-2 text-sm font-semibold text-foreground border border-border rounded-lg hover:bg-accent transition-colors"
+                                className="px-4 py-2.5 min-h-[44px] text-sm font-semibold text-foreground border border-border rounded-lg hover:bg-accent active:bg-accent transition-colors"
                               >
                                 Ver Ficha
                               </button>

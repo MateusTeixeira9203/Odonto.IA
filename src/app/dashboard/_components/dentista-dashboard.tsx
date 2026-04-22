@@ -96,7 +96,7 @@ export async function DentistaDashboard({ dentista }: { dentista: DentistaCache 
   return (
     <>
       {/* ── Row 1: Métricas ──────────────────────────────────────────────────── */}
-      <div id="dex-tour-metrics" className={`grid grid-cols-1 gap-4 mb-10 ${canEdit ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
+      <div id="dex-tour-metrics" className={`grid grid-cols-2 gap-3 md:gap-4 mb-8 md:mb-10 ${canEdit ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
 
         {/* Pacientes */}
         <div className="bg-surface p-6 rounded-3xl border border-border shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all relative overflow-hidden group">
@@ -106,7 +106,7 @@ export async function DentistaDashboard({ dentista }: { dentista: DentistaCache 
           <div className="text-[10px] font-bold text-text-secondary uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
             <div className="w-1.5 h-1.5 rounded-full bg-teal" /> Pacientes
           </div>
-          <div className="font-mono text-5xl font-medium text-text-primary tracking-tight">
+          <div className="font-mono text-4xl md:text-5xl font-medium text-text-primary tracking-tight">
             {totalPacientes ?? 0}
           </div>
           <div className="text-[10px] text-teal mt-4 font-bold uppercase tracking-wider flex items-center gap-1 bg-teal-pale w-fit px-2 py-1 rounded-md">
@@ -122,7 +122,7 @@ export async function DentistaDashboard({ dentista }: { dentista: DentistaCache 
           <div className="text-[10px] font-bold text-text-secondary uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
             <div className="w-1.5 h-1.5 rounded-full bg-teal" /> Agendamentos
           </div>
-          <div className="font-mono text-5xl font-medium text-text-primary tracking-tight">
+          <div className="font-mono text-4xl md:text-5xl font-medium text-text-primary tracking-tight">
             {agendamentosConfirmados ?? 0}
           </div>
           <div className="text-[10px] text-text-secondary mt-4 font-bold uppercase tracking-wider flex items-center gap-1 bg-surface-alt w-fit px-2 py-1 rounded-md">
@@ -138,7 +138,7 @@ export async function DentistaDashboard({ dentista }: { dentista: DentistaCache 
           <div className="text-[10px] font-bold text-text-secondary uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
             <div className="w-1.5 h-1.5 rounded-full bg-teal" /> Orçamentos Pendentes
           </div>
-          <div className="font-mono text-5xl font-medium text-text-primary tracking-tight">
+          <div className="font-mono text-4xl md:text-5xl font-medium text-text-primary tracking-tight">
             {orcamentosPendentes ?? 0}
           </div>
           <div className={`text-[10px] mt-4 font-bold uppercase tracking-wider w-fit px-2 py-1 rounded-md ${(orcamentosPendentes ?? 0) > 0 ? 'bg-teal-pale text-teal' : 'bg-surface-alt text-text-secondary'}`}>
@@ -175,7 +175,7 @@ export async function DentistaDashboard({ dentista }: { dentista: DentistaCache 
       </div>
 
       {/* ── Row 2: Atendimentos de Hoje (70%) + Insights IA (30%) ──────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-8 md:mb-10">
         <div className="lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -328,7 +328,7 @@ export function DashboardSkeleton({ canEdit }: { canEdit: boolean }) {
       </div>
 
       {/* Linha 2: atendimentos + insights */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-8 md:mb-10">
         <div className="lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
             <div className="space-y-2">

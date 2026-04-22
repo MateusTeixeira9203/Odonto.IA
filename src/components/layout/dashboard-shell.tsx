@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { DexWidget } from "@/components/layout/dex-widget";
 import { DexOnboarding } from "@/components/onboarding/dex-onboarding";
@@ -19,7 +19,10 @@ interface DashboardShellProps {
 }
 
 export function DashboardShell({ children, nome, clinicaNome, role, avatarUrl, plano, dentistaId }: DashboardShellProps) {
-  const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+  useEffect(() => {
+    setIsSidebarExpanded(window.innerWidth >= 1024);
+  }, []);
 
   return (
     <div className="relative flex min-h-screen bg-bg overflow-hidden">

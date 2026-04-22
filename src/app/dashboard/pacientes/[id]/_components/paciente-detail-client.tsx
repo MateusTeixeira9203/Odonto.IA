@@ -590,7 +590,7 @@ export function PacienteDetailClient({
   };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto w-full">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
@@ -603,7 +603,7 @@ export function PacienteDetailClient({
           <ArrowLeft className="w-5 h-5 text-muted-foreground" />
         </button>
         <div>
-          <h1 className="font-heading text-4xl text-foreground">{paciente.nome}</h1>
+          <h1 className="font-heading text-3xl md:text-4xl text-foreground">{paciente.nome}</h1>
           <p className="text-muted-foreground text-sm font-medium mt-1">
             Paciente desde {membroDesde}
             {dataNascimento && ` • Nascimento: ${dataNascimento}`}
@@ -611,12 +611,12 @@ export function PacienteDetailClient({
         </div>
       </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="lg:col-span-3 space-y-6"
+          className="md:col-span-3 space-y-6"
         >
           {/* Header Card */}
           <div className="bg-card rounded-2xl border border-border/60 shadow-sm p-6 flex flex-wrap items-center justify-between gap-6">

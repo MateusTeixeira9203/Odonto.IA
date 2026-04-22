@@ -88,10 +88,10 @@ async function SecretaryDashboard({
 
   return (
     <PageTransition>
-    <div className="p-8 max-w-6xl mx-auto w-full">
-      <header className="flex items-center justify-between mb-10">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto w-full">
+      <header className="flex items-center justify-between mb-8 md:mb-10">
         <div>
-          <h1 className="font-heading text-4xl text-text-primary mb-1">
+          <h1 className="font-heading text-3xl md:text-4xl text-text-primary mb-1">
             {saudacao}, {nome.split(' ')[0]}!
           </h1>
           <p className="text-text-secondary text-sm font-medium">
@@ -108,7 +108,7 @@ async function SecretaryDashboard({
       </header>
 
       {/* ── Row 1: Métricas + Ação Rápida (secretária sempre vê o botão) ─── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-8 md:mb-10">
         {/* Total Pacientes */}
         <div className="bg-surface p-6 rounded-3xl border border-border shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-4 opacity-[0.04] group-hover:opacity-[0.07] transition-opacity pointer-events-none">
@@ -117,7 +117,7 @@ async function SecretaryDashboard({
           <div className="text-[10px] font-bold text-text-secondary uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
             <div className="w-1.5 h-1.5 rounded-full bg-teal" /> Pacientes
           </div>
-          <div className="font-mono text-5xl font-medium text-text-primary tracking-tight">
+          <div className="font-mono text-4xl md:text-5xl font-medium text-text-primary tracking-tight">
             {totalPacientes ?? 0}
           </div>
           <div className="text-[10px] text-teal mt-4 font-bold uppercase tracking-wider flex items-center gap-1 bg-teal-pale w-fit px-2 py-1 rounded-md">
@@ -133,7 +133,7 @@ async function SecretaryDashboard({
           <div className="text-[10px] font-bold text-text-secondary uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
             <div className="w-1.5 h-1.5 rounded-full bg-teal" /> Agendamentos
           </div>
-          <div className="font-mono text-5xl font-medium text-text-primary tracking-tight">
+          <div className="font-mono text-4xl md:text-5xl font-medium text-text-primary tracking-tight">
             {agendamentosSemanais ?? 0}
           </div>
           <div className="text-[10px] text-text-secondary mt-4 font-bold uppercase tracking-wider flex items-center gap-1 bg-surface-alt w-fit px-2 py-1 rounded-md">
@@ -149,7 +149,7 @@ async function SecretaryDashboard({
           <div className="text-[10px] font-bold text-text-secondary uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
             <div className="w-1.5 h-1.5 rounded-full bg-teal" /> Orçamentos Pendentes
           </div>
-          <div className="font-mono text-5xl font-medium text-text-primary tracking-tight">
+          <div className="font-mono text-4xl md:text-5xl font-medium text-text-primary tracking-tight">
             {orcamentosPendentes ?? 0}
           </div>
           <div className={`text-[10px] mt-4 font-bold uppercase tracking-wider w-fit px-2 py-1 rounded-md ${(orcamentosPendentes ?? 0) > 0 ? 'bg-teal-pale text-teal' : 'bg-surface-alt text-text-secondary'}`}>
@@ -182,7 +182,7 @@ async function SecretaryDashboard({
       </div>
 
       {/* ── Row 2: Próximos agendamentos + Últimos Pacientes ─── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
         {/* Próximos Agendamentos */}
         <div>
           <div className="flex items-center justify-between mb-4">
@@ -303,11 +303,11 @@ export default async function DashboardPage() {
 
   return (
     <PageTransition>
-      <div className="p-8 max-w-6xl mx-auto w-full">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto w-full">
         {/* Header — renderizado imediatamente, sem dependência de dados */}
-        <header className="flex items-center justify-between mb-10">
+        <header className="flex items-center justify-between mb-8 md:mb-10">
           <div>
-            <h1 className="font-heading text-4xl text-text-primary mb-1">Visão Geral</h1>
+            <h1 className="font-heading text-3xl md:text-4xl text-text-primary mb-1">Visão Geral</h1>
             <p className="text-text-secondary text-sm font-medium">
               Monitoramento em tempo real da sua clínica.
             </p>

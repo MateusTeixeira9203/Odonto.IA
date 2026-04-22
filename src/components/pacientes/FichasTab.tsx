@@ -586,7 +586,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
             exit={{ opacity: 0, height: 0, marginTop: 0 }}
             className="overflow-hidden"
           >
-            <div className="bg-muted/30 border border-border/60 rounded-2xl p-6 flex flex-col lg:flex-row gap-8">
+            <div className="bg-muted/30 border border-border/60 rounded-2xl p-4 md:p-6 flex flex-col lg:flex-row gap-6 lg:gap-8">
               {/* Coluna Esquerda */}
               <div className="flex-[3] flex flex-col gap-6">
                 <div className="flex-1">
@@ -805,7 +805,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
               </div>
 
               {/* Odontograma */}
-              <div className="flex-[2] bg-background rounded-xl border border-border/60 p-6 flex flex-col">
+              <div className="flex-[2] bg-background rounded-xl border border-border/60 p-4 md:p-6 flex flex-col">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="font-heading text-lg text-foreground flex items-center">
                     Odontograma
@@ -819,7 +819,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                 </div>
 
                 <div className="flex-1 flex flex-col justify-center gap-8">
-                  <div className="flex justify-center gap-1 flex-wrap">
+                  <div className="flex justify-center gap-1 md:gap-1.5 flex-wrap">
                     {TEETH_UPPER.map((tooth) => (
                       <ToothButton
                         key={tooth}
@@ -830,7 +830,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                       />
                     ))}
                   </div>
-                  <div className="flex justify-center gap-1 flex-wrap">
+                  <div className="flex justify-center gap-1 md:gap-1.5 flex-wrap">
                     {TEETH_LOWER.map((tooth) => (
                       <ToothButton
                         key={tooth}
@@ -1165,7 +1165,7 @@ function ToothButton({
   return (
     <button
       onClick={onClick}
-      className={`relative w-8 h-10 border-2 flex items-center justify-center font-mono text-xs font-bold transition-all ${
+      className={`relative w-9 h-11 md:w-10 md:h-12 border-2 flex items-center justify-center font-mono text-[10px] md:text-xs font-bold transition-all active:scale-95 ${
         isUpper ? "rounded-t-md rounded-b-sm" : "rounded-b-md rounded-t-sm"
       } ${
         isSelected
