@@ -456,19 +456,21 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">Explicação para o Paciente</label>
-                    <button
-                      onClick={() => void generateSectionWithAI(section.id)}
-                      disabled={isGeneratingAI === section.id || !section.title}
-                      className="text-teal text-[10px] font-bold flex items-center gap-1 hover:text-teal-dark transition-colors disabled:opacity-50"
-                    >
-                      {isGeneratingAI === section.id ? (
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                      ) : (
-                        <Sparkles className="w-3 h-3" />
-                      )}
-                      Gerar com a IA
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => void generateSectionWithAI(section.id)}
+                        disabled={isGeneratingAI === section.id || !section.title}
+                        className="text-teal text-[10px] font-bold flex items-center gap-1 hover:text-teal-dark transition-colors disabled:opacity-50"
+                      >
+                        {isGeneratingAI === section.id ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Sparkles className="w-3 h-3" />
+                        )}
+                        Gerar com a IA
+                      </button>
                       <HelpTooltip content="Descreva os procedimentos e a IA gera um orçamento profissional." className="ml-0.5" />
-                    </button>
+                    </div>
                   </div>
                   <textarea
                     value={section.content}

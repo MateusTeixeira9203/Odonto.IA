@@ -12,8 +12,6 @@ import {
   Plus,
   Edit2,
   ChevronRight,
-  Activity,
-  Save,
   Calendar,
   CheckCircle2,
   XCircle,
@@ -22,6 +20,8 @@ import {
   Trash2,
   Loader2,
   Lock,
+  Check,
+  ClipboardList,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -48,7 +48,7 @@ import { PlanejamentoTab } from '@/components/pacientes/PlanejamentoTab';
 import { FichasTab } from '@/components/pacientes/FichasTab';
 import { PendenciasTab } from '@/components/pacientes/PendenciasTab';
 import { createClient } from '@/lib/supabase/client';
-import { atualizarPaciente, salvarAnotacoes } from '../actions';
+import { atualizarPaciente } from '../actions';
 import type { DentistaRole } from '@/types/database';
 import type { PlanoId } from '@/lib/planos';
 import { temFeature } from '@/lib/planos';
@@ -74,6 +74,23 @@ type FichaRecente = {
   anotacoes: string | null;
   dentista: { nome: string } | null;
 };
+
+type FichaParaPendencia = {
+  id: string;
+  dentes_afetados: number[];
+  dentes_observacoes: Record<string, string>;
+  procedimentos_concluidos: string[];
+};
+
+type PendenciaItem = {
+  fichaId: string;
+  tooth: number;
+  descricao: string;
+  key: string;
+  globalKey: string;
+};
+
+const ARCH_LABEL_SHORT: Record<number, string> = { 97: 'Sup.', 98: 'Inf.', 99: 'Boca' };
 
 type FichaParaOrc = {
   id: string;
@@ -163,9 +180,6 @@ export function PacienteDetailClient({
 
   const [activeTab, setActiveTab] = useState('visao-geral');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [notes, setNotes] = useState(paciente.observacoes ?? '');
-  const [saveNotesDone, setSaveNotesDone] = useState(false);
-  const [saveNotesError, setSaveNotesError] = useState<string | null>(null);
 
   const [editNome, setEditNome] = useState(paciente.nome);
   const [editTelefone, setEditTelefone] = useState(paciente.telefone ?? '');
@@ -223,6 +237,11 @@ export function PacienteDetailClient({
 
   // Atividades recentes (visão geral)
   const [fichasRecentes, setFichasRecentes] = useState<FichaRecente[]>([]);
+
+  // Pendências — widget persistente acima das abas
+  const [pendencias, setPendencias] = useState<PendenciaItem[]>([]);
+  const [pendenciasConcluidas, setPendenciasConcluidas] = useState<Set<string>>(new Set());
+  const [togglingPendencia, setTogglingPendencia] = useState<string | null>(null);
 
   // Tab highlight + switch — acionados pelo tour DEX via CustomEvent
   const [highlightedTab, setHighlightedTab] = useState<string | null>(null);
@@ -285,20 +304,6 @@ export function PacienteDetailClient({
 
   const totalOrcado = orcamentosState.reduce((sum, o) => sum + (o.total ?? 0), 0);
 
-  const handleSaveNotes = () => {
-    setSaveNotesError(null);
-    setSaveNotesDone(false);
-    startTransition(async () => {
-      const result = await salvarAnotacoes(paciente.id, notes);
-      if (result.error) {
-        setSaveNotesError(result.error);
-      } else {
-        setSaveNotesDone(true);
-        router.refresh();
-      }
-    });
-  };
-
   const handleSaveEdit = () => {
     setEditError(null);
     startTransition(async () => {
@@ -317,7 +322,7 @@ export function PacienteDetailClient({
     });
   };
 
-  // Busca procedimentos da clínica e fichas recentes ao montar
+  // Busca procedimentos da clínica, fichas recentes e pendências ao montar
   useEffect(() => {
     const supabase = createClient();
     void supabase
@@ -336,7 +341,66 @@ export function PacienteDetailClient({
       .order('created_at', { ascending: false })
       .limit(5)
       .then(({ data }) => setFichasRecentes((data as unknown as FichaRecente[]) ?? []));
+
+    void supabase
+      .from('fichas')
+      .select('id, dentes_afetados, dentes_observacoes, procedimentos_concluidos')
+      .eq('paciente_id', paciente.id)
+      .eq('clinica_id', clinicaId)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        const fichas = (data as unknown as FichaParaPendencia[]) ?? [];
+        const items: PendenciaItem[] = [];
+        const concluidos = new Set<string>();
+        for (const ficha of fichas) {
+          (ficha.procedimentos_concluidos ?? []).forEach((k) =>
+            concluidos.add(`${ficha.id}::${k}`)
+          );
+          for (const tooth of ficha.dentes_afetados ?? []) {
+            const raw = ficha.dentes_observacoes?.[String(tooth)] ?? '';
+            raw.split('\n').filter(Boolean).forEach((note, i) => {
+              items.push({
+                fichaId: ficha.id,
+                tooth,
+                descricao: note,
+                key: `${tooth}_${i}`,
+                globalKey: `${ficha.id}::${tooth}_${i}`,
+              });
+            });
+          }
+        }
+        setPendencias(items);
+        setPendenciasConcluidas(concluidos);
+      });
   }, [clinicaId, paciente.id]);
+
+  const togglePendencia = async (item: PendenciaItem) => {
+    if (togglingPendencia === item.globalKey) return;
+    setTogglingPendencia(item.globalKey);
+    try {
+      const supabase = createClient();
+      const { data: fichaData } = await supabase
+        .from('fichas')
+        .select('procedimentos_concluidos')
+        .eq('id', item.fichaId)
+        .single();
+      const current: string[] = (fichaData as { procedimentos_concluidos: string[] } | null)?.procedimentos_concluidos ?? [];
+      const isDone = pendenciasConcluidas.has(item.globalKey);
+      const next = isDone ? current.filter((k) => k !== item.key) : [...current, item.key];
+      await supabase
+        .from('fichas')
+        .update({ procedimentos_concluidos: next })
+        .eq('id', item.fichaId)
+        .eq('clinica_id', clinicaId);
+      setPendenciasConcluidas((prev) => {
+        const s = new Set(prev);
+        isDone ? s.delete(item.globalKey) : s.add(item.globalKey);
+        return s;
+      });
+    } finally {
+      setTogglingPendencia(null);
+    }
+  };
 
   const handleStatusChange = useCallback(async (orcId: string, status: StatusOrcamento) => {
     const result = await atualizarStatusOrcamento(orcId, status);
@@ -398,29 +462,36 @@ export function PacienteDetailClient({
     const obs = ficha.dentes_observacoes ?? {};
     if (dentes.length === 0) return [{ procedimentoId: '', descricao: '', quantidade: 1, preco: 0 }];
 
-    const itens: NovoOrcItem[] = [];
+    // Agrupa dentes por procedimento: mesmo texto em vários dentes → um item com quantidade N
+    const procToTeeth = new Map<string, number[]>();
     for (const tooth of dentes) {
-      const rawObs = obs[String(tooth)] ?? '';
-      const procs = rawObs.split('\n').filter(Boolean);
-      if (procs.length === 0) {
-        itens.push({ procedimentoId: '', descricao: `Dente ${tooth}`, quantidade: 1, preco: 0 });
-      } else {
-        for (const proc of procs) {
-          const match = procedimentosClinica.find(
-            (p) =>
-              p.nome.toLowerCase().includes(proc.toLowerCase()) ||
-              proc.toLowerCase().includes(p.nome.toLowerCase()),
-          );
-          itens.push({
-            procedimentoId: match?.id ?? '',
-            descricao: match?.nome ?? `Dente ${tooth} — ${proc}`,
-            quantidade: 1,
-            preco: match?.preco_padrao ?? 0,
-          });
-        }
+      const procs = (obs[String(tooth)] ?? '').split('\n').filter(Boolean);
+      for (const proc of procs) {
+        procToTeeth.set(proc, [...(procToTeeth.get(proc) ?? []), tooth]);
       }
     }
-    return itens;
+
+    if (procToTeeth.size === 0) {
+      return dentes.map((t) => ({ procedimentoId: '', descricao: `Dente ${t}`, quantidade: 1, preco: 0 }));
+    }
+
+    return Array.from(procToTeeth.entries()).map(([proc, teeth]) => {
+      const match = procedimentosClinica.find(
+        (p) =>
+          p.nome.toLowerCase().includes(proc.toLowerCase()) ||
+          proc.toLowerCase().includes(p.nome.toLowerCase()),
+      );
+      const descricao =
+        teeth.length > 1
+          ? `${match?.nome ?? proc} (D${teeth.join(', D')})`
+          : match?.nome ?? `D${teeth[0]} — ${proc}`;
+      return {
+        procedimentoId: match?.id ?? '',
+        descricao,
+        quantidade: teeth.length,
+        preco: match?.preco_padrao ?? 0,
+      };
+    });
   };
 
   const abrirNovoOrcamento = async () => {
@@ -611,12 +682,12 @@ export function PacienteDetailClient({
         </div>
       </motion.div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
+      <div className="space-y-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="md:col-span-3 space-y-6"
+          className="space-y-6"
         >
           {/* Header Card */}
           <div className="bg-card rounded-2xl border border-border/60 shadow-sm p-6 flex flex-wrap items-center justify-between gap-6">
@@ -665,7 +736,7 @@ export function PacienteDetailClient({
 
           {/* Tabs — IDs usados pelo tour DEX */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="bg-muted/50 p-1 rounded-xl border border-border/40 mb-6 flex-wrap h-auto gap-1">
+            <TabsList className="bg-card p-1.5 rounded-2xl border border-border/60 shadow-sm mb-6 flex-wrap h-auto gap-1">
               {(
                 [
                   ['visao-geral',  'Visão Geral',      undefined],
@@ -680,13 +751,16 @@ export function PacienteDetailClient({
                   key={val}
                   id={tourId}
                   value={val}
-                  className={`rounded-lg px-4 py-2 text-xs font-bold data-[state=active]:bg-card data-[state=active]:shadow-sm text-muted-foreground data-[state=active]:text-foreground transition-all duration-300${tourId && highlightedTab === tourId ? ' ring-2 ring-[#2f9c85]/60 shadow-[0_0_14px_rgba(47,156,133,0.45)]' : ''}`}
+                  className={`rounded-xl px-5 py-2.5 text-sm font-bold text-muted-foreground transition-all duration-300 data-[state=active]:bg-teal/10 data-[state=active]:text-teal data-[state=active]:border data-[state=active]:border-teal/20 data-[state=active]:shadow-none hover:text-foreground${tourId && highlightedTab === tourId ? ' ring-2 ring-[#2f9c85]/60 shadow-[0_0_14px_rgba(47,156,133,0.45)]' : ''}`}
                 >
                   {label}
                 </TabsTrigger>
               ))}
             </TabsList>
 
+            <div className="flex gap-6 items-start">
+              {/* Conteúdo da aba */}
+              <div className="flex-1 min-w-0">
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeTab}
@@ -1020,67 +1094,98 @@ export function PacienteDetailClient({
                 </TabsContent>
               </motion.div>
             </AnimatePresence>
+              </div>{/* fim flex-1 */}
+
+              {/* Sidebar: Procedimentos Pendentes */}
+              <AnimatePresence>
+                {showClinicalTabs && activeTab === 'visao-geral' && (() => {
+                  const pending = pendencias.filter((p) => !pendenciasConcluidas.has(p.globalKey));
+                  const total = pendencias.length;
+                  const doneCount = total - pending.length;
+                  return (
+                    <motion.div
+                      key="pendencias-sidebar"
+                      initial={{ opacity: 0, x: 16 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 16 }}
+                      transition={{ duration: 0.2 }}
+                      className="w-72 shrink-0 sticky top-6"
+                    >
+                      <div className="bg-card rounded-2xl border border-border/60 shadow-sm p-5">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-2">
+                            <ClipboardList className="w-4 h-4 text-teal" />
+                            <h3 className="font-heading text-base text-foreground">Pendências</h3>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            {doneCount > 0 && (
+                              <span className="text-[9px] font-bold font-mono bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 px-1.5 py-0.5 rounded-full">
+                                {doneCount} ok
+                              </span>
+                            )}
+                            {pending.length > 0 && (
+                              <span className="text-[9px] font-bold font-mono bg-amber-500/10 text-amber-600 border border-amber-500/20 px-1.5 py-0.5 rounded-full">
+                                {pending.length} pendente{pending.length !== 1 ? 's' : ''}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {pending.length === 0 ? (
+                          <div className="flex items-center gap-2.5 py-2">
+                            <div className="w-7 h-7 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0">
+                              <Check className="w-3.5 h-3.5 text-emerald-500" />
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {total === 0 ? 'Nenhum procedimento.' : 'Tudo concluído!'}
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {pending.slice(0, 8).map((item) => (
+                              <button
+                                key={item.globalKey}
+                                onClick={() => void togglePendencia(item)}
+                                disabled={togglingPendencia === item.globalKey}
+                                className="flex items-center gap-2 w-full p-2 rounded-xl bg-muted hover:bg-accent border border-border/40 hover:border-teal/30 transition-all text-left group disabled:opacity-50"
+                              >
+                                <div className="w-3.5 h-3.5 rounded border-2 border-border group-hover:border-teal shrink-0 transition-colors flex items-center justify-center">
+                                  {togglingPendencia === item.globalKey && (
+                                    <Loader2 className="w-2 h-2 animate-spin text-teal" />
+                                  )}
+                                </div>
+                                <span className="text-[11px] text-foreground truncate flex-1">{item.descricao}</span>
+                                <span className="text-[9px] font-mono font-bold text-teal shrink-0 bg-teal/10 px-1 py-0.5 rounded">
+                                  {ARCH_LABEL_SHORT[item.tooth] ?? `D${item.tooth}`}
+                                </span>
+                              </button>
+                            ))}
+                            {pending.length > 8 && (
+                              <button
+                                onClick={() => setActiveTab('pendencias')}
+                                className="w-full text-center text-[11px] text-muted-foreground hover:text-teal transition-colors py-1"
+                              >
+                                +{pending.length - 8} mais
+                              </button>
+                            )}
+                          </div>
+                        )}
+
+                        {total > 0 && (
+                          <button
+                            onClick={() => setActiveTab('pendencias')}
+                            className="mt-3 w-full text-[11px] font-bold text-teal hover:text-teal-lt transition-colors flex items-center justify-center gap-1 border-t border-border/40 pt-3"
+                          >
+                            Ver histórico completo <ChevronRight className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    </motion.div>
+                  );
+                })()}
+              </AnimatePresence>
+            </div>{/* fim flex gap-6 */}
           </Tabs>
-        </motion.div>
-
-        {/* Sidebar */}
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.2 }}
-          className="space-y-6"
-        >
-          <div className="bg-teal/10 rounded-2xl border border-teal/20 shadow-lg p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Activity className="w-4 h-4 text-teal" />
-              <span className="font-mono text-[10px] uppercase tracking-widest text-teal font-bold">
-                Resumo Rápido
-              </span>
-            </div>
-            <div className="space-y-3 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Orçamentos</span>
-                <span className="font-bold text-foreground">{orcamentosState.length}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Aprovados</span>
-                <span className="font-bold text-teal">
-                  {orcamentosState.filter((o) => o.status === 'aprovado').length}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Total pago</span>
-                <span className="font-mono text-xs font-bold text-foreground">
-                  R${' '}
-                  {totalPago.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Anotações */}
-          <div className="bg-card rounded-2xl border border-border shadow-sm p-6">
-            <h3 className="font-heading text-lg text-foreground mb-4">Anotações</h3>
-            <textarea
-              className="w-full bg-muted border-none rounded-xl p-4 text-xs font-medium text-foreground placeholder:text-muted-foreground/50 min-h-[120px] focus:ring-2 focus:ring-teal/20 transition-all resize-none"
-              placeholder="Observações sobre o paciente..."
-              value={notes}
-              onChange={(e) => {
-                setNotes(e.target.value);
-                setSaveNotesDone(false);
-              }}
-            />
-            {saveNotesError && <p className="text-xs text-red-500 mt-2">{saveNotesError}</p>}
-            {saveNotesDone && <p className="text-xs text-teal mt-2">Salvo com sucesso.</p>}
-            <button
-              onClick={handleSaveNotes}
-              disabled={isPending}
-              className="w-full mt-4 py-2.5 bg-teal/10 hover:bg-teal/20 text-teal rounded-xl text-[10px] font-bold uppercase tracking-widest transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              <Save className="w-3.5 h-3.5" />
-              {isPending ? 'Salvando...' : 'Salvar Anotações'}
-            </button>
-          </div>
         </motion.div>
       </div>
 

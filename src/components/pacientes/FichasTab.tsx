@@ -45,6 +45,18 @@ interface ToothNote {
   notes: string[];
 }
 
+type SelectionMode = 'single' | 'multiple' | 'arch';
+
+const ARCH_SUPERIOR = 97;
+const ARCH_INFERIOR = 98;
+const ARCH_COMPLETA = 99;
+
+const ARCH_LABELS: Record<number, string> = {
+  [ARCH_SUPERIOR]: 'Arcada Superior',
+  [ARCH_INFERIOR]: 'Arcada Inferior',
+  [ARCH_COMPLETA]: 'Boca Toda',
+};
+
 interface Evolution {
   id: string;
   date: string;
@@ -121,6 +133,9 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
   const [isRecording, setIsRecording] = React.useState(false);
   const [isTranscribing, setIsTranscribing] = React.useState(false);
   const [selectedTeeth, setSelectedTeeth] = React.useState<number[]>([]);
+  const [sharedTeeth, setSharedTeeth] = React.useState<number[]>([]);
+  const [selectionMode, setSelectionMode] = React.useState<SelectionMode>('single');
+  const [sharedNotes, setSharedNotes] = React.useState<string[]>(['']);
   const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
   const audioChunksRef = React.useRef<Blob[]>([]);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -275,22 +290,52 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
   };
 
   const toggleTooth = (tooth: number) => {
+    if (selectionMode === 'multiple') {
+      // Modo múltiplos: adiciona/remove do grupo compartilhado
+      setSharedTeeth((prev) =>
+        prev.includes(tooth) ? prev.filter((t) => t !== tooth) : [...prev, tooth]
+      );
+      return;
+    }
+    // Modo individual e arcada: cada dente tem seus próprios procedimentos
     setSelectedTeeth((prev) => {
       const isSelected = prev.includes(tooth);
       if (isSelected) {
-        setFormData((f) => ({
-          ...f,
-          teethNotes: f.teethNotes.filter((tn) => tn.tooth !== tooth),
-        }));
+        setFormData((f) => ({ ...f, teethNotes: f.teethNotes.filter((tn) => tn.tooth !== tooth) }));
         return prev.filter((t) => t !== tooth);
       } else {
-        setFormData((f) => ({
-          ...f,
-          teethNotes: [...f.teethNotes, { tooth, notes: [''] }],
-        }));
+        setFormData((f) => ({ ...f, teethNotes: [...f.teethNotes, { tooth, notes: [''] }] }));
         return [...prev, tooth];
       }
     });
+  };
+
+  const toggleArch = (archNum: number) => {
+    setSelectedTeeth((prev) => {
+      const isSelected = prev.includes(archNum);
+      if (isSelected) {
+        setFormData((f) => ({ ...f, teethNotes: f.teethNotes.filter((tn) => tn.tooth !== archNum) }));
+        return prev.filter((t) => t !== archNum);
+      } else {
+        setFormData((f) => ({ ...f, teethNotes: [...f.teethNotes, { tooth: archNum, notes: [''] }] }));
+        return [...prev, archNum];
+      }
+    });
+  };
+
+  const handleModeChange = (mode: SelectionMode) => {
+    setSelectionMode(mode);
+    // Não limpa seleções ao trocar de modo — permite transicionar mantendo o que já foi selecionado
+  };
+
+  const handleSharedNoteChange = (index: number, value: string) => {
+    setSharedNotes((prev) => prev.map((n, i) => (i === index ? value : n)));
+  };
+
+  const addSharedNote = () => setSharedNotes((prev) => [...prev, '']);
+
+  const removeSharedNote = (index: number) => {
+    setSharedNotes((prev) => prev.length > 1 ? prev.filter((_, i) => i !== index) : ['']);
   };
 
   const handleToothNoteChange = (tooth: number, index: number, value: string) => {
@@ -351,12 +396,21 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
 
     try {
       const supabase = createClient();
-      const dentesAfetados = selectedTeeth;
-      const dentesObservacoes = Object.fromEntries(
-        formData.teethNotes
-          .map((tn) => [String(tn.tooth), tn.notes.filter((n) => n.trim()).join('\n')] as [string, string])
-          .filter(([, v]) => v.length > 0)
-      );
+      const dentesAfetados = [...selectedTeeth, ...sharedTeeth];
+      const validSharedNotes = sharedNotes.filter((n) => n.trim()).join('\n');
+
+      const dentesObservacoes: Record<string, string> = {
+        // Dentes individuais — cada um com seus próprios procedimentos
+        ...Object.fromEntries(
+          formData.teethNotes
+            .map((tn) => [String(tn.tooth), tn.notes.filter((n) => n.trim()).join('\n')] as [string, string])
+            .filter(([, v]) => v.length > 0)
+        ),
+        // Grupo de dentes — todos compartilham as mesmas notas
+        ...(validSharedNotes
+          ? Object.fromEntries(sharedTeeth.map((t) => [String(t), validSharedNotes]))
+          : {}),
+      };
 
       if (editingId) {
         const { error } = await supabase
@@ -454,6 +508,9 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
     setIsPanelOpen(false);
     setEditingId(null);
     setSelectedTeeth([]);
+    setSharedTeeth([]);
+    setSelectionMode('single');
+    setSharedNotes(['']);
     setFormData({ type: "Evolução", observation: "", teethNotes: [] } as { type: string; observation: string; teethNotes: ToothNote[] });
     setUploadedFiles([]);
   };
@@ -523,16 +580,43 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
   };
 
   const handleEdit = (evolution: Evolution) => {
+    // Detecta grupo compartilhado: dentes com exatamente as mesmas notas (≥2 dentes)
+    const realTeeth = evolution.teethNotes.filter((tn) => !(tn.tooth in ARCH_LABELS));
+    const byNotes = new Map<string, number[]>();
+    for (const tn of realTeeth) {
+      const key = tn.notes.filter(Boolean).join('\n');
+      if (key) byNotes.set(key, [...(byNotes.get(key) ?? []), tn.tooth]);
+    }
+    // Grupo com mais dentes (mín. 2) é o grupo compartilhado
+    let detectedSharedGroup: { notes: string; teeth: number[] } | null = null;
+    for (const [notes, teeth] of byNotes) {
+      if (teeth.length > 1 && (!detectedSharedGroup || teeth.length > detectedSharedGroup.teeth.length)) {
+        detectedSharedGroup = { notes, teeth };
+      }
+    }
+
+    const sharedTeethSet = new Set(detectedSharedGroup?.teeth ?? []);
+    const individualNotes = evolution.teethNotes.filter((tn) => !sharedTeethSet.has(tn.tooth));
+    const hasArch = individualNotes.some((tn) => tn.tooth in ARCH_LABELS);
+    const startMode: SelectionMode =
+      detectedSharedGroup && individualNotes.length === 0 ? 'multiple' :
+      hasArch ? 'arch' : 'single';
+
+    setSelectionMode(startMode);
+    setSharedTeeth(detectedSharedGroup?.teeth ?? []);
+    setSharedNotes(
+      detectedSharedGroup ? detectedSharedGroup.notes.split('\n').filter(Boolean) : ['']
+    );
     setEditingId(evolution.id);
     setFormData({
       type: evolution.type,
       observation: evolution.observation,
-      teethNotes: evolution.teethNotes.map((tn) => ({
+      teethNotes: individualNotes.map((tn) => ({
         tooth: tn.tooth,
-        notes: tn.notes.length > 0 ? [...tn.notes, ''] : [''],
+        notes: tn.notes.length > 0 ? [...tn.notes] : [''],
       })),
     });
-    setSelectedTeeth(evolution.teethNotes.map((tn) => tn.tooth));
+    setSelectedTeeth(individualNotes.map((tn) => tn.tooth));
     setIsPanelOpen(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -671,68 +755,128 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                   </AnimatePresence>
                 </div>
 
-                <AnimatePresence>
-                  {selectedTeeth.length > 0 && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="space-y-4"
-                    >
-                      <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-[0.15em]">
-                        Observações por Dente
-                      </label>
-                      <div className="space-y-4">
-                        {selectedTeeth.map((tooth) => {
-                          const tn = formData.teethNotes.find((t) => t.tooth === tooth);
-                          const notes = tn?.notes ?? [''];
-                          return (
-                            <motion.div
-                              key={tooth}
-                              initial={{ opacity: 0, x: -10 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              exit={{ opacity: 0, x: -10 }}
-                              className="flex items-start gap-3"
-                            >
-                              <div className="w-10 h-10 shrink-0 rounded-lg bg-teal text-white flex items-center justify-center font-mono text-sm font-bold shadow-sm mt-0.5">
-                                {tooth}
-                              </div>
-                              <div className="flex-1 space-y-2">
-                                {notes.map((note, idx) => (
-                                  <div key={idx} className="flex items-center gap-2">
-                                    <input
-                                      type="text"
-                                      value={note}
-                                      onChange={(e) => handleToothNoteChange(tooth, idx, e.target.value)}
-                                      placeholder={`Procedimento ${idx + 1} no dente ${tooth}...`}
-                                      className="flex-1 bg-background border border-border rounded-xl px-4 py-2.5 text-sm font-medium text-foreground outline-none focus:border-teal transition-colors"
-                                    />
-                                    {notes.length > 1 && (
-                                      <button
-                                        type="button"
-                                        onClick={() => removeToothNote(tooth, idx)}
-                                        className="p-1.5 text-muted-foreground hover:text-red-500 transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20"
-                                      >
-                                        <X className="w-3.5 h-3.5" />
-                                      </button>
-                                    )}
+                {/* Seção de procedimentos — sempre visível, sem layout shift */}
+                <div className="space-y-3">
+                  <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-[0.15em]">
+                    Procedimentos
+                  </label>
+
+                  {selectedTeeth.length === 0 && sharedTeeth.length === 0 ? (
+                    <div className="min-h-[88px] flex items-center justify-center text-xs text-muted-foreground bg-background rounded-xl border border-dashed border-border/60">
+                      {selectionMode === 'arch'
+                        ? 'Selecione uma arcada ao lado'
+                        : 'Selecione dentes no odontograma ao lado'}
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* Dentes individuais (modo single / arcada) */}
+                      {selectedTeeth.length > 0 && (
+                        <div className="space-y-3">
+                          {sharedTeeth.length > 0 && (
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Individuais</span>
+                          )}
+                          {selectedTeeth.map((tooth) => {
+                            const tn = formData.teethNotes.find((t) => t.tooth === tooth);
+                            const notes = tn?.notes ?? [''];
+                            return (
+                              <motion.div
+                                key={tooth}
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                className="flex items-start gap-3"
+                              >
+                                {tooth in ARCH_LABELS ? (
+                                  <div className="shrink-0 rounded-lg bg-teal text-white flex items-center justify-center font-mono text-[10px] font-bold shadow-sm mt-0.5 px-2 py-2 whitespace-nowrap">
+                                    {ARCH_LABELS[tooth]}
                                   </div>
-                                ))}
-                                <button
-                                  type="button"
-                                  onClick={() => addToothNote(tooth)}
-                                  className="flex items-center gap-1.5 text-xs font-semibold text-teal hover:text-teal-lt transition-colors px-1"
-                                >
-                                  <Plus className="w-3.5 h-3.5" />
-                                  Adicionar procedimento
-                                </button>
-                              </div>
-                            </motion.div>
-                          );
-                        })}
-                      </div>
-                    </motion.div>
+                                ) : (
+                                  <div className="w-10 h-10 shrink-0 rounded-lg bg-teal text-white flex items-center justify-center font-mono text-sm font-bold shadow-sm mt-0.5">
+                                    {tooth}
+                                  </div>
+                                )}
+                                <div className="flex-1 space-y-2">
+                                  {notes.map((note, idx) => (
+                                    <div key={idx} className="flex items-center gap-2">
+                                      <input
+                                        type="text"
+                                        value={note}
+                                        onChange={(e) => handleToothNoteChange(tooth, idx, e.target.value)}
+                                        placeholder={`Procedimento ${idx + 1}...`}
+                                        className="flex-1 bg-background border border-border rounded-xl px-4 py-2.5 text-sm font-medium text-foreground outline-none focus:border-teal transition-colors"
+                                      />
+                                      {notes.length > 1 && (
+                                        <button type="button" onClick={() => removeToothNote(tooth, idx)} className="p-1.5 text-muted-foreground hover:text-red-500 transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20">
+                                          <X className="w-3.5 h-3.5" />
+                                        </button>
+                                      )}
+                                    </div>
+                                  ))}
+                                  <button type="button" onClick={() => addToothNote(tooth)} className="flex items-center gap-1.5 text-xs font-semibold text-teal hover:text-teal-lt transition-colors px-1">
+                                    <Plus className="w-3.5 h-3.5" />
+                                    Adicionar procedimento
+                                  </button>
+                                </div>
+                              </motion.div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Grupo de dentes (modo múltiplos) */}
+                      {(sharedTeeth.length > 0 || selectionMode === 'multiple') && (
+                        <div className="space-y-3">
+                          {selectedTeeth.length > 0 && (
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-px bg-border/60" />
+                              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest shrink-0">Grupo</span>
+                              <div className="flex-1 h-px bg-border/60" />
+                            </div>
+                          )}
+                          {sharedTeeth.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5">
+                              {sharedTeeth.map((tooth) => (
+                                <div key={tooth} className="flex items-center gap-1 bg-teal/15 border border-teal/40 text-teal px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold">
+                                  D{tooth}
+                                  <button type="button" onClick={() => toggleTooth(tooth)} className="ml-0.5 hover:opacity-60 transition-opacity">
+                                    <X className="w-2.5 h-2.5" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {sharedTeeth.length === 0 ? (
+                            <div className="min-h-[60px] flex items-center justify-center text-xs text-muted-foreground bg-background rounded-xl border border-dashed border-border/60">
+                              Selecione os dentes no odontograma
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              {sharedNotes.map((note, idx) => (
+                                <div key={idx} className="flex items-center gap-2">
+                                  <input
+                                    type="text"
+                                    value={note}
+                                    onChange={(e) => handleSharedNoteChange(idx, e.target.value)}
+                                    placeholder={`Procedimento ${idx + 1} para todos os dentes...`}
+                                    className="flex-1 bg-background border border-teal/30 rounded-xl px-4 py-2.5 text-sm font-medium text-foreground outline-none focus:border-teal transition-colors"
+                                  />
+                                  {sharedNotes.length > 1 && (
+                                    <button type="button" onClick={() => removeSharedNote(idx)} className="p-1.5 text-muted-foreground hover:text-red-500 transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20">
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
+                              <button type="button" onClick={addSharedNote} className="flex items-center gap-1.5 text-xs font-semibold text-teal hover:text-teal-lt transition-colors px-1">
+                                <Plus className="w-3.5 h-3.5" />
+                                Adicionar procedimento
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   )}
-                </AnimatePresence>
+                </div>
 
                 <div>
                   <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-[0.15em] mb-2">
@@ -806,45 +950,100 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
 
               {/* Odontograma */}
               <div className="flex-[2] bg-background rounded-xl border border-border/60 p-4 md:p-6 flex flex-col">
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center justify-between mb-4">
                   <h3 className="font-heading text-lg text-foreground flex items-center">
                     Odontograma
-                    <HelpTooltip content="Clique nos dentes para marcar procedimentos." />
+                    <HelpTooltip content="Escolha o tipo de seleção e marque os dentes ou arcadas afetados." />
                   </h3>
-                  <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    <div className="flex items-center gap-1.5">
+                  {selectionMode !== 'arch' && (
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                       <div className="w-2.5 h-2.5 rounded-sm bg-teal" /> Selecionado
                     </div>
-                  </div>
+                  )}
                 </div>
 
-                <div className="flex-1 flex flex-col justify-center gap-8">
-                  <div className="flex justify-center gap-1 md:gap-1.5 flex-wrap">
-                    {TEETH_UPPER.map((tooth) => (
-                      <ToothButton
-                        key={tooth}
-                        num={tooth}
-                        isSelected={selectedTeeth.includes(tooth)}
-                        isUpper={true}
-                        onClick={() => toggleTooth(tooth)}
-                      />
-                    ))}
-                  </div>
-                  <div className="flex justify-center gap-1 md:gap-1.5 flex-wrap">
-                    {TEETH_LOWER.map((tooth) => (
-                      <ToothButton
-                        key={tooth}
-                        num={tooth}
-                        isSelected={selectedTeeth.includes(tooth)}
-                        isUpper={false}
-                        onClick={() => toggleTooth(tooth)}
-                      />
-                    ))}
-                  </div>
+                {/* Seletor de modo */}
+                <div className="flex gap-1 p-1 bg-muted rounded-xl mb-6">
+                  {([
+                    { id: 'single', label: 'Dente único' },
+                    { id: 'multiple', label: 'Múltiplos' },
+                    { id: 'arch', label: 'Arcada / Geral' },
+                  ] as const).map(({ id, label }) => (
+                    <button
+                      key={id}
+                      onClick={() => handleModeChange(id)}
+                      className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-bold transition-all ${
+                        selectionMode === id
+                          ? 'bg-background shadow-sm text-foreground'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
 
-                <div className="mt-8 text-center text-xs text-muted-foreground font-medium">
-                  Clique nos dentes para adicionar observações específicas.
+                {selectionMode !== 'arch' ? (
+                  <div className="flex-1 flex flex-col justify-center gap-8">
+                    <div className="flex justify-center gap-1 md:gap-1.5 flex-wrap">
+                      {TEETH_UPPER.map((tooth) => (
+                        <ToothButton
+                          key={tooth}
+                          num={tooth}
+                          isSelected={selectedTeeth.includes(tooth) || sharedTeeth.includes(tooth)}
+                          isShared={sharedTeeth.includes(tooth)}
+                          isUpper={true}
+                          showCheckbox={selectionMode === 'multiple'}
+                          onClick={() => toggleTooth(tooth)}
+                        />
+                      ))}
+                    </div>
+                    <div className="flex justify-center gap-1 md:gap-1.5 flex-wrap">
+                      {TEETH_LOWER.map((tooth) => (
+                        <ToothButton
+                          key={tooth}
+                          num={tooth}
+                          isSelected={selectedTeeth.includes(tooth) || sharedTeeth.includes(tooth)}
+                          isShared={sharedTeeth.includes(tooth)}
+                          isUpper={false}
+                          showCheckbox={selectionMode === 'multiple'}
+                          onClick={() => toggleTooth(tooth)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex-1 flex flex-col justify-center gap-3">
+                    <p className="text-xs text-muted-foreground text-center mb-1">
+                      Selecione a área afetada pelo procedimento
+                    </p>
+                    {[
+                      { id: ARCH_SUPERIOR, label: 'Arcada Superior', sub: 'Dentes 11 a 28' },
+                      { id: ARCH_INFERIOR, label: 'Arcada Inferior', sub: 'Dentes 31 a 48' },
+                      { id: ARCH_COMPLETA, label: 'Boca Toda', sub: 'Todas as arcadas' },
+                    ].map(({ id, label, sub }) => (
+                      <button
+                        key={id}
+                        onClick={() => toggleArch(id)}
+                        className={`w-full px-4 py-3 rounded-xl text-sm font-semibold border-2 transition-all flex items-center justify-between ${
+                          selectedTeeth.includes(id)
+                            ? 'bg-teal border-teal text-white'
+                            : 'bg-muted border-border text-foreground hover:border-teal hover:text-teal'
+                        }`}
+                      >
+                        <span>{label}</span>
+                        <span className={`text-[10px] font-normal ${selectedTeeth.includes(id) ? 'text-white/70' : 'text-muted-foreground'}`}>
+                          {sub}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <div className="mt-6 text-center text-xs text-muted-foreground font-medium">
+                  {selectionMode === 'single' && 'Clique em um dente para adicionar observações.'}
+                  {selectionMode === 'multiple' && 'Clique em vários dentes para marcar juntos.'}
+                  {selectionMode === 'arch' && 'Procedimentos em toda a arcada ou boca.'}
                 </div>
               </div>
             </div>
@@ -942,7 +1141,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                       className="bg-muted rounded-lg border border-border/40 px-3 py-2"
                     >
                       <span className="font-mono text-[10px] font-bold text-teal block mb-1.5">
-                        D{tn.tooth}
+                        {tn.tooth in ARCH_LABELS ? ARCH_LABELS[tn.tooth] : `D${tn.tooth}`}
                       </span>
                       <div className="flex flex-col gap-1.5">
                         {tn.notes.filter(Boolean).map((n, i) => {
@@ -1154,12 +1353,16 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
 function ToothButton({
   num,
   isSelected,
+  isShared,
   isUpper,
+  showCheckbox,
   onClick,
 }: {
   num: number;
   isSelected: boolean;
+  isShared: boolean;
   isUpper: boolean;
+  showCheckbox: boolean;
   onClick: () => void;
 }) {
   return (
@@ -1168,12 +1371,21 @@ function ToothButton({
       className={`relative w-9 h-11 md:w-10 md:h-12 border-2 flex items-center justify-center font-mono text-[10px] md:text-xs font-bold transition-all active:scale-95 ${
         isUpper ? "rounded-t-md rounded-b-sm" : "rounded-b-md rounded-t-sm"
       } ${
-        isSelected
+        isShared
+          ? "bg-teal/20 border-teal text-teal shadow-md scale-110 z-10"
+          : isSelected
           ? "bg-teal border-teal text-white shadow-md scale-110 z-10"
           : "bg-muted border-border text-muted-foreground hover:border-teal hover:text-teal"
       }`}
     >
       {num}
+      {showCheckbox && (
+        <div
+          className={`absolute top-0.5 right-0.5 w-2 h-2 rounded-sm border transition-all ${
+            isShared ? 'bg-teal border-teal' : isSelected ? 'bg-white border-white' : 'border-muted-foreground/50'
+          }`}
+        />
+      )}
     </button>
   );
 }
