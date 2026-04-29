@@ -1,7 +1,7 @@
 # Backlog — DentIA
 
 Documento vivo de organização do que precisa ser feito, refinado ou corrigido.
-Atualizado em: 2026-04-29
+Atualizado em: 2026-04-29 (pendentes de commit adicionados)
 
 ---
 
@@ -15,10 +15,24 @@ Atualizado em: 2026-04-29
 - [ ] **Contexto do paciente** — rota `/api/dex/patient-context` com mudanças pendentes (unstaged). Revisar e commitar.
 
 ### Fluxo da Secretária
-- [ ] **Criar agendamento em nome do dentista** — lógica de `dentistaId` na action existe, mas o formulário de criação na visão da secretária precisa de revisão de UX (seleção do dentista não está clara).
+
+#### Bugs / Inconsistências
+- [ ] **Paciente órfão ao criar** — formulário de novo paciente (`pacientes/novo`) não tem seletor de dentista. Paciente fica sem `dentista_id`, invisível nas fichas do dentista. Adicionar dropdown igual ao de agendamentos.
+- [ ] **Dois links de WhatsApp na sidebar** — sidebar mostra `/dashboard/whatsapp` e `/dashboard/bot` ao mesmo tempo para secretária. Remover o redundante.
+- [ ] **Secretária não consegue criar orçamentos** — `canEdit = dentista.plano === 'SOLO'` bloqueia secretária mesmo no plano CLINICA. Corrigir para `canEdit = plano === 'SOLO' || role === 'secretaria'`.
+- [ ] **Seletor de dentista em orçamentos não existe** — secretária vê orçamentos de todos mas não tem filtro por dentista. Props `dentistas` já chegam no componente mas não são usadas.
+
+#### Funcionalidades incompletas
+- [ ] **Criar agendamento em nome do dentista** — lógica de `dentistaId` na action existe, mas o formulário precisa de revisão de UX (seleção do dentista não está clara visualmente).
 - [ ] **Visão da agenda por dentista** — secretária vê todos os agendamentos da clínica mas não tem filtro visual por dentista no calendário.
 - [ ] **Confirmação de agendamentos** — agendamentos criados pela secretária ficam com status `agendado`. Falta fluxo de confirmação pelo dentista ou pelo paciente.
-- [ ] **Permissões de edição** — secretária consegue editar fichas? Revisar o que ela pode e não pode fazer em cada tela.
+- [ ] **Auditoria de ações** — campo `created_by` existe em `agendamentos` mas não é exibido em nenhuma tela. Mostrar "criado por [secretária]" nos cards de agendamento e nos registros financeiros.
+- [ ] **Notificação ao dentista em lançamentos financeiros** — quando secretária lança despesa/receita associada a um dentista, o dentista não é notificado. Apenas o admin recebe notificação de pagamento.
+- [ ] **Filtro de dentista em orçamentos** — adicionar dropdown similar ao de agendamentos para secretária filtrar orçamentos por dentista.
+
+#### Permissões a revisar
+- [ ] **Secretária pode editar fichas clínicas?** — não está claro no código se tem acesso ao perfil do paciente e às fichas. Definir e implementar guardrail.
+- [ ] **Seletor de dentista no financeiro não persiste** — ao trocar de aba/mês, o seletor de dentista volta ao padrão. Manter seleção enquanto navega.
 
 ### Pagamentos
 - [ ] **Geração automática ao criar orçamento** — `pagamentos` não é inserido ao criar orçamento. A tela exibe e atualiza registros existentes, mas não os cria.
@@ -30,6 +44,7 @@ Atualizado em: 2026-04-29
 
 ### Fichas Clínicas
 - [ ] **Assinatura do paciente** — implementada na `FichasTab`. Validar UX no tablet (touch), garantir que o canvas renderiza corretamente em diferentes tamanhos de tela.
+- [ ] **Export do prontuário completo** — botão sutil no cabeçalho do perfil do paciente para baixar histórico completo como HTML estilizado (abre no browser, Ctrl+P para PDF). Sem dependência extra. Fichas, procedimentos, orçamentos e agendamentos em um arquivo só.
 - [ ] **Extração de imagem com IA** — rota `/api/extrair-imagem` existe mas não tem botão na interface. Adicionar ação nas fotos de raio-x.
 - [ ] **PDF da ficha** — gerar PDF da evolução clínica para impressão ou envio. Coluna `pdf_url` existe no schema, sem implementação.
 
@@ -82,6 +97,19 @@ Atualizado em: 2026-04-29
 | `update_updated_at` search_path | migration | Função com `search_path` mutável. Fix simples com `SET search_path = public`. |
 | Funções SECURITY DEFINER expostas para `anon` | banco | `get_my_clinica_id`, `get_my_role`, `get_my_dentista_id` acessíveis sem login via REST. Revogar EXECUTE para anon. |
 | RLS `WITH CHECK (true)` em clinicas | banco | INSERT na tabela `clinicas` sem restrição para usuários autenticados. |
+
+---
+
+## 🕐 Mudanças pendentes de commit
+
+Arquivos com alterações não commitadas — revisar e commitar quando contexto da sessão estiver disponível:
+
+| Arquivo | O que tem |
+|---|---|
+| `src/app/api/dex/patient-context/route.ts` | Mudanças no contexto enviado ao DEX durante consulta |
+| `src/lib/whatsapp/states.ts` | Novos estados do bot WhatsApp (possivelmente AGUARDANDO_CONFIRMACAO_24H) |
+| `src/components/layout/dex-widget.tsx` | Mudanças no widget do DEX (incompletas) |
+| `src/app/dashboard/pacientes/[id]/_components/paciente-detail-client.tsx` | Mudanças no detalhe do paciente (não revisadas) |
 
 ---
 

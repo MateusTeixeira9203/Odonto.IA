@@ -259,7 +259,10 @@ export function DexWidget({ plano, nome, dentistaId }: DexWidgetProps) {
               role: 'dex',
               type: 'alert',
               content: `Próximo paciente: ${ctx.proximoPaciente}${ctx.proximoHorario ? ` às ${ctx.proximoHorario}` : ''}. Deseja o briefing pré-consulta?`,
-              actions: [{ label: '📋 Gerar briefing', href: '__briefing__' }],
+              actions: [
+                { label: '📋 Gerar briefing', href: '__briefing__' },
+                { label: '🩺 Iniciar consulta', href: `/consulta/${ctx.proximoAgendamentoId}` },
+              ],
             });
           }
           if (patCtx && !('error' in patCtx)) {
@@ -275,7 +278,6 @@ export function DexWidget({ plano, nome, dentistaId }: DexWidgetProps) {
               type: 'text',
               content: [
                 `👤 ${patCtx.nome} · ${patCtx.idade}`,
-                patCtx.alergias ? `⚠️ Alergias: ${patCtx.alergias}` : null,
                 `📝 Fichas:\n${fichasText}`,
                 orcText ? `💰 Orçamentos: ${orcText}` : null,
               ].filter(Boolean).join('\n'),
@@ -284,7 +286,7 @@ export function DexWidget({ plano, nome, dentistaId }: DexWidgetProps) {
               {
                 role: 'model',
                 parts: [{
-                  text: `Paciente em tela: ${patCtx.nome} (${patCtx.idade}). Alergias: ${patCtx.alergias ?? 'nenhuma'}. Fichas recentes: ${fichasText}. ${orcText ? `Orçamentos: ${orcText}.` : ''}`,
+                  text: `Paciente em tela: ${patCtx.nome} (${patCtx.idade}). Fichas recentes: ${fichasText}. ${orcText ? `Orçamentos: ${orcText}.` : ''}`,
                 }],
               },
             ];
@@ -376,7 +378,6 @@ export function DexWidget({ plano, nome, dentistaId }: DexWidgetProps) {
         if ('error' in ctx) return;
         setPatientCtxPreload(ctx);
         setPatientHasAlert(!!(
-          ctx.alergias ||
           ctx.fichasRecentes.length > 0 ||
           ctx.orcamentosAbertos.length > 0
         ));

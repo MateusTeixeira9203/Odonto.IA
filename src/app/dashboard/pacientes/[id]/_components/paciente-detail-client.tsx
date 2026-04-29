@@ -22,6 +22,7 @@ import {
   Lock,
   Check,
   ClipboardList,
+  Stethoscope,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -46,7 +47,6 @@ import { Label } from '@/components/ui/label';
 import { DocumentosTab } from '@/components/pacientes/DocumentosTab';
 import { PlanejamentoTab } from '@/components/pacientes/PlanejamentoTab';
 import { FichasTab } from '@/components/pacientes/FichasTab';
-import { PendenciasTab } from '@/components/pacientes/PendenciasTab';
 import { createClient } from '@/lib/supabase/client';
 import { atualizarPaciente } from '../actions';
 import type { DentistaRole } from '@/types/database';
@@ -740,11 +740,10 @@ export function PacienteDetailClient({
               {(
                 [
                   ['visao-geral',  'Visão Geral',      undefined],
-                  ...(showClinicalTabs ? [['fichas',      'Fichas Clínicas', 'tab-fichas'      ] as const] : []),
-                  ...(showClinicalTabs ? [['pendencias',  'Pendências',       undefined          ] as const] : []),
-                  ['documentos',   'Documentos',       'tab-documentos'  ],
+                  ...(showClinicalTabs ? [['fichas',       'Fichas Clínicas', 'tab-fichas'      ] as const] : []),
                   ...(showClinicalTabs ? [['planejamento', 'Planejamento',    'tab-apresentacao'] as const] : []),
                   ['orcamentos',   'Orçamentos',       'tab-orcamento'   ],
+                  ['documentos',   'Documentos',       'tab-documentos'  ],
                 ] as [string, string, string | undefined][]
               ).map(([val, label, tourId]) => (
                 <TabsTrigger
@@ -779,30 +778,41 @@ export function PacienteDetailClient({
                         <Clock className="w-5 h-5 text-teal" />
                       </div>
                       {agendamentoProximo ? (
-                        <div className="flex items-center gap-4 p-4 bg-muted rounded-2xl border border-border/20">
-                          <div className="w-12 h-12 bg-card rounded-xl flex flex-col items-center justify-center shadow-sm shrink-0">
-                            <span className="text-[10px] font-bold text-teal uppercase">
-                              {format(parseISO(agendamentoProximo.data_hora), 'MMM', { locale: ptBR })}
-                            </span>
-                            <span className="text-lg font-bold text-foreground leading-none">
-                              {format(parseISO(agendamentoProximo.data_hora), 'dd')}
-                            </span>
-                          </div>
-                          <div>
-                            <div className="font-bold text-sm text-foreground">
-                              {agendamentoProximo.observacoes ?? 'Consulta agendada'}
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-4 p-4 bg-muted rounded-2xl border border-border/20">
+                            <div className="w-12 h-12 bg-card rounded-xl flex flex-col items-center justify-center shadow-sm shrink-0">
+                              <span className="text-[10px] font-bold text-teal uppercase">
+                                {format(parseISO(agendamentoProximo.data_hora), 'MMM', { locale: ptBR })}
+                              </span>
+                              <span className="text-lg font-bold text-foreground leading-none">
+                                {format(parseISO(agendamentoProximo.data_hora), 'dd')}
+                              </span>
                             </div>
-                            <div className="text-xs text-muted-foreground mt-0.5">
-                              {format(parseISO(agendamentoProximo.data_hora), "EEEE, 'às' HH:mm", {
-                                locale: ptBR,
-                              })}
-                            </div>
-                            {agendamentoProximo.dentista && (
-                              <div className="text-xs text-teal mt-0.5 font-medium">
-                                {agendamentoProximo.dentista.nome}
+                            <div className="flex-1 min-w-0">
+                              <div className="font-bold text-sm text-foreground">
+                                {agendamentoProximo.observacoes ?? 'Consulta agendada'}
                               </div>
-                            )}
+                              <div className="text-xs text-muted-foreground mt-0.5">
+                                {format(parseISO(agendamentoProximo.data_hora), "EEEE, 'às' HH:mm", {
+                                  locale: ptBR,
+                                })}
+                              </div>
+                              {agendamentoProximo.dentista && (
+                                <div className="text-xs text-teal mt-0.5 font-medium">
+                                  {agendamentoProximo.dentista.nome}
+                                </div>
+                              )}
+                            </div>
                           </div>
+                          {!['cancelado', 'faltou', 'realizado'].includes(agendamentoProximo.status) && (
+                            <button
+                              onClick={() => router.push(`/consulta/${agendamentoProximo.id}`)}
+                              className="w-full py-2.5 rounded-xl bg-teal text-white text-sm font-bold flex items-center justify-center gap-2 hover:bg-teal-lt transition-colors shadow-[0_0_15px_rgba(47,156,133,0.3)]"
+                            >
+                              <Stethoscope className="w-4 h-4" />
+                              Iniciar consulta
+                            </button>
+                          )}
                         </div>
                       ) : (
                         <div className="p-4 bg-muted rounded-2xl border border-border/20 text-center">
@@ -923,14 +933,6 @@ export function PacienteDetailClient({
                     dentistaId={dentistaId}
                     plano={plano}
                   />
-                </TabsContent>
-
-                <TabsContent value="pendencias" className="mt-0">
-                  <PendenciasTab patientId={paciente.id} clinicaId={clinicaId} />
-                </TabsContent>
-
-                <TabsContent value="documentos" className="mt-0">
-                  <DocumentosTab patientId={paciente.id} clinicaId={clinicaId} />
                 </TabsContent>
 
                 <TabsContent value="planejamento" className="mt-0">
@@ -1092,6 +1094,11 @@ export function PacienteDetailClient({
                     })
                   )}
                 </TabsContent>
+
+                {/* Documentos */}
+                <TabsContent value="documentos" className="mt-0">
+                  <DocumentosTab patientId={paciente.id} clinicaId={clinicaId} />
+                </TabsContent>
               </motion.div>
             </AnimatePresence>
               </div>{/* fim flex-1 */}
@@ -1162,7 +1169,7 @@ export function PacienteDetailClient({
                             ))}
                             {pending.length > 8 && (
                               <button
-                                onClick={() => setActiveTab('pendencias')}
+                                onClick={() => setActiveTab('fichas')}
                                 className="w-full text-center text-[11px] text-muted-foreground hover:text-teal transition-colors py-1"
                               >
                                 +{pending.length - 8} mais
@@ -1173,10 +1180,10 @@ export function PacienteDetailClient({
 
                         {total > 0 && (
                           <button
-                            onClick={() => setActiveTab('pendencias')}
+                            onClick={() => setActiveTab('fichas')}
                             className="mt-3 w-full text-[11px] font-bold text-teal hover:text-teal-lt transition-colors flex items-center justify-center gap-1 border-t border-border/40 pt-3"
                           >
-                            Ver histórico completo <ChevronRight className="w-3 h-3" />
+                            Ver fichas clínicas <ChevronRight className="w-3 h-3" />
                           </button>
                         )}
                       </div>

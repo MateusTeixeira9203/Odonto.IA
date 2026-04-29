@@ -5,7 +5,6 @@ import { createClient } from '@/lib/supabase/server';
 export interface DexPatientContext {
   nome: string;
   idade: string;
-  alergias: string | null;
   observacoes: string | null;
   fichasRecentes: { data: string; queixa: string; anotacoes: string }[];
   orcamentosAbertos: { descricao: string; total: number; status: string }[];
@@ -27,7 +26,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const [pacienteRes, fichasRes, orcRes] = await Promise.all([
     supabase
       .from('pacientes')
-      .select('nome, data_nascimento, alergias, observacoes')
+      .select('nome, data_nascimento, observacoes')
       .eq('id', patientId)
       .eq('clinica_id', dentista.clinica_id)
       .maybeSingle(),
@@ -55,7 +54,6 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const p = pacienteRes.data as {
     nome: string;
     data_nascimento: string | null;
-    alergias: string | null;
     observacoes: string | null;
   };
 
@@ -81,7 +79,6 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   return NextResponse.json({
     nome: p.nome,
     idade,
-    alergias: p.alergias,
     observacoes: p.observacoes,
     fichasRecentes,
     orcamentosAbertos,
