@@ -229,6 +229,9 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
     }
   };
 
+  const escapeHtml = (str: string): string =>
+    str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
   const handleGerarPDF = () => {
     const printWindow = window.open('', '_blank', 'width=900,height=700');
     if (!printWindow) return;
@@ -237,23 +240,28 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
       ? `<table>
           <thead><tr><th>Procedimento</th><th>Valor</th></tr></thead>
           <tbody>
-            ${budgetProcedures.map(p => `<tr><td>${p.name}</td><td>R$ ${p.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td></tr>`).join('')}
+            ${budgetProcedures.map(p => `<tr><td>${escapeHtml(p.name)}</td><td>R$ ${p.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td></tr>`).join('')}
           </tbody>
           <tfoot><tr><td><strong>Total</strong></td><td><strong>R$ ${totalBudget.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></td></tr></tfoot>
         </table>`
       : '<p style="color:#8a8a8a">Nenhum procedimento vinculado.</p>';
 
-    const sectionsHTML = sectionsRef.current.map((s, i) => `
+    const sectionsHTML = sectionsRef.current.map((s, i) => {
+      const contentFormatted = s.content
+        ? escapeHtml(s.content).replace(/\n/g, '<br>')
+        : '<em style="color:#8a8a8a">Sem conteúdo.</em>';
+      return `
       <div class="section">
-        <h2>${String(i + 1).padStart(2, '0')}. ${s.title || 'Seção sem título'}</h2>
-        <p>${s.content || '<em style="color:#8a8a8a">Sem conteúdo.</em>'}</p>
-      </div>`).join('');
+        <h2>${String(i + 1).padStart(2, '0')}. ${escapeHtml(s.title || 'Seção sem título')}</h2>
+        <p>${contentFormatted}</p>
+      </div>`;
+    }).join('');
 
     const html = `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>${planningTitle} — ${patientName}</title>
+  <title>${escapeHtml(planningTitle)} — ${escapeHtml(patientName)}</title>
   <style>
     body { font-family: Georgia, serif; max-width: 780px; margin: 40px auto; color: #0d0d0d; line-height: 1.6; }
     header { border-bottom: 2px solid #2f9c85; padding-bottom: 16px; margin-bottom: 32px; }
@@ -275,8 +283,8 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
 <body>
   <header>
     <small>Apresentação ao Paciente</small>
-    <h1>${planningTitle}</h1>
-    <p>Paciente: <strong>${patientName}</strong></p>
+    <h1>${escapeHtml(planningTitle)}</h1>
+    <p>Paciente: <strong>${escapeHtml(patientName)}</strong></p>
   </header>
   ${sectionsHTML}
   <div class="budget">
