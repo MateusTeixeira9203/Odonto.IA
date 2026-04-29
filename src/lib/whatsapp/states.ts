@@ -17,6 +17,9 @@ export const STATES = {
   AGUARDANDO_DATA:     'aguardando_data',
   AGUARDANDO_HORA:     'aguardando_hora',
 
+  // Lembretes de confirmação (24h antes)
+  AGUARDANDO_CONFIRMACAO_24H: 'aguardando_confirmacao_24h',
+
   // Estados comuns
   CONFIRMADO: 'confirmado',
   HUMANO:     'humano',
