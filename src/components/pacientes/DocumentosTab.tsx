@@ -82,6 +82,7 @@ export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
   const [selecionados, setSelecionados] = useState<string[]>([]);
   const [modoSelecao, setModoSelecao] = useState(false);
 
@@ -138,66 +139,85 @@ export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
   }, [patientId, fetchDocuments]);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
     e.target.value = '';
 
-    if (!ALLOWED_MIME[file.type]) {
-      alert('Tipo não permitido. Use imagens, PDF, DOC, DOCX, XLS, XLSX, PPT ou PPTX.');
+    const invalidos = files.filter(f => !ALLOWED_MIME[f.type]);
+    const grandes = files.filter(f => f.size > MAX_UPLOAD_SIZE);
+
+    if (invalidos.length > 0) {
+      alert(`Tipo não permitido: ${invalidos.map(f => f.name).join(', ')}\nUse imagens, PDF, DOC, DOCX, XLS, XLSX, PPT ou PPTX.`);
       return;
     }
-    if (file.size > MAX_UPLOAD_SIZE) {
-      alert('Arquivo muito grande. Máximo 20 MB.');
+    if (grandes.length > 0) {
+      alert(`Arquivos muito grandes (máx 20 MB): ${grandes.map(f => f.name).join(', ')}`);
       return;
     }
 
     setIsUploading(true);
-    try {
-      const supabase = createClient();
-      const storagePath = `${clinicaId}/${patientId}/docs/${Date.now()}_${file.name}`;
+    setUploadProgress({ current: 0, total: files.length });
 
-      const { error: storageErr } = await supabase.storage
-        .from('fichas')
-        .upload(storagePath, file, { upsert: false });
-      if (storageErr) throw storageErr;
+    const supabase = createClient();
+    const novos: Document[] = [];
+    const erros: string[] = [];
 
-      const { data: urlData } = supabase.storage.from('fichas').getPublicUrl(storagePath);
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      setUploadProgress({ current: i + 1, total: files.length });
 
-      const { data: docData, error: dbErr } = await supabase
-        .from('paciente_documentos')
-        .insert({
-          paciente_id: patientId,
-          clinica_id: clinicaId,
-          nome: file.name,
+      try {
+        const storagePath = `${clinicaId}/${patientId}/docs/${Date.now()}_${file.name}`;
+
+        const { error: storageErr } = await supabase.storage
+          .from('fichas')
+          .upload(storagePath, file, { upsert: false });
+        if (storageErr) throw storageErr;
+
+        const { data: urlData } = supabase.storage.from('fichas').getPublicUrl(storagePath);
+
+        const { data: docData, error: dbErr } = await supabase
+          .from('paciente_documentos')
+          .insert({
+            paciente_id: patientId,
+            clinica_id: clinicaId,
+            nome: file.name,
+            url: urlData.publicUrl,
+            categoria: getCategoryFromFile(file),
+          })
+          .select('id, created_at')
+          .single();
+        if (dbErr) throw dbErr;
+
+        const row = docData as Record<string, unknown>;
+        novos.push({
+          id: row.id as string,
+          name: file.name,
+          tipo: file.type || inferMimeFromName(file.name),
+          category: getCategoryFromFile(file),
+          date: new Date(row.created_at as string).toLocaleDateString('pt-BR', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+          }),
+          source: 'Upload Direto',
           url: urlData.publicUrl,
-          categoria: getCategoryFromFile(file),
-        })
-        .select('id, created_at')
-        .single();
-      if (dbErr) throw dbErr;
-
-      const row = docData as Record<string, unknown>;
-      const newDoc: Document = {
-        id: row.id as string,
-        name: file.name,
-        tipo: file.type || inferMimeFromName(file.name),
-        category: getCategoryFromFile(file),
-        date: new Date(row.created_at as string).toLocaleDateString('pt-BR', {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-        }),
-        source: 'Upload Direto',
-        url: urlData.publicUrl,
-      };
-
-      setDocuments(prev => [newDoc, ...prev]);
-    } catch (err) {
-      console.error('Erro no upload:', err);
-      alert('Erro ao fazer upload. Tente novamente.');
-    } finally {
-      setIsUploading(false);
+        });
+      } catch (err) {
+        console.error(`Erro no upload de ${file.name}:`, err);
+        erros.push(file.name);
+      }
     }
+
+    if (novos.length > 0) {
+      setDocuments(prev => [...novos.reverse(), ...prev]);
+    }
+    if (erros.length > 0) {
+      alert(`Erro ao enviar: ${erros.join(', ')}`);
+    }
+
+    setIsUploading(false);
+    setUploadProgress(null);
   };
 
   const handleDeleteDoc = async (docId: string, e: React.MouseEvent): Promise<void> => {
@@ -241,6 +261,7 @@ export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
         ref={fileInputRef}
         type="file"
         accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+        multiple
         className="hidden"
         onChange={handleFileSelect}
       />
@@ -310,7 +331,9 @@ export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
             disabled={isUploading}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-teal text-white rounded-lg text-xs font-bold hover:bg-teal-lt transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isUploading ? (
+            {isUploading && uploadProgress ? (
+              <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {uploadProgress.current}/{uploadProgress.total}</>
+            ) : isUploading ? (
               <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Enviando...</>
             ) : (
               <><Plus className="w-3.5 h-3.5" /> Adicionar</>

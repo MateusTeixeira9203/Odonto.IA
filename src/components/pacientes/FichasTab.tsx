@@ -16,6 +16,7 @@ import {
   Loader2,
   Sparkles,
   Lock,
+  PenLine,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useRouter } from "next/navigation";
@@ -39,6 +40,8 @@ import { HelpTooltip } from "@/components/ui/help-tooltip";
 import { criarOrcamento } from "@/app/dashboard/orcamentos/actions";
 import { toast } from 'sonner';
 import { temFeature, type PlanoId } from "@/lib/planos";
+import { SignaturePad } from "@/components/fichas/SignaturePad";
+import type SignaturePadLib from 'signature_pad';
 
 interface ToothNote {
   tooth: number;
@@ -66,6 +69,8 @@ interface Evolution {
   professional: string;
   files: string[];
   procedimentosConcluidos: string[];
+  assinaturaUrl: string | null;
+  assinadoEm: string | null;
 }
 
 type FichaDB = {
@@ -78,6 +83,8 @@ type FichaDB = {
   status: string;
   dentista?: { nome: string } | null;
   procedimentos_concluidos: string[];
+  assinatura_url: string | null;
+  assinado_em: string | null;
 };
 
 const TEETH_UPPER = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
@@ -114,6 +121,8 @@ const mapFichaToEvolution = (f: FichaDB): Evolution => ({
   professional: f.dentista?.nome ?? "Profissional",
   files: [],
   procedimentosConcluidos: f.procedimentos_concluidos ?? [],
+  assinaturaUrl: f.assinatura_url ?? null,
+  assinadoEm: f.assinado_em ?? null,
 });
 
 interface FichasTabProps {
@@ -140,6 +149,9 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
   const audioChunksRef = React.useRef<Blob[]>([]);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = React.useState<string | null>(null);
+  const [signingFichaId, setSigningFichaId] = React.useState<string | null>(null);
+  const [isSavingSignature, setIsSavingSignature] = React.useState(false);
+  const signaturePadRef = React.useRef<SignaturePadLib | null>(null);
   const [uploadedFiles, setUploadedFiles] = React.useState<
     Array<{ name: string; url: string; docId: string; storagePath: string }>
   >([]);
@@ -216,7 +228,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
       const supabase = createClient();
       const { data, error } = await supabase
         .from("fichas")
-        .select("id, created_at, queixa_principal, anotacoes, dentes_afetados, dentes_observacoes, status, procedimentos_concluidos, dentista:dentistas(nome)")
+        .select("id, created_at, queixa_principal, anotacoes, dentes_afetados, dentes_observacoes, status, procedimentos_concluidos, assinatura_url, assinado_em, dentista:dentistas(nome)")
         .eq("paciente_id", patientId)
         .eq("clinica_id", clinicaId)
         .order("created_at", { ascending: false });
@@ -501,6 +513,55 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
       console.error('Erro ao criar orçamento:', err);
     } finally {
       setCriandoOrcamento(false);
+    }
+  };
+
+  const handleSaveSignature = async () => {
+    if (!signingFichaId || !signaturePadRef.current) return;
+    if (signaturePadRef.current.isEmpty()) {
+      toast.error('Nenhuma assinatura detectada. Por favor assine antes de confirmar.');
+      return;
+    }
+
+    setIsSavingSignature(true);
+    try {
+      const dataUrl = signaturePadRef.current.toDataURL('image/png');
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+
+      const supabase = createClient();
+      const storagePath = `${clinicaId}/${patientId}/assinatura_${signingFichaId}.png`;
+
+      const { error: storageErr } = await supabase.storage
+        .from('fichas')
+        .upload(storagePath, blob, { upsert: true, contentType: 'image/png' });
+      if (storageErr) throw storageErr;
+
+      const { data: urlData } = supabase.storage.from('fichas').getPublicUrl(storagePath);
+      const assinadoEm = new Date().toISOString();
+
+      const { error: dbErr } = await supabase
+        .from('fichas')
+        .update({ assinatura_url: urlData.publicUrl, assinado_em: assinadoEm })
+        .eq('id', signingFichaId)
+        .eq('clinica_id', clinicaId);
+      if (dbErr) throw dbErr;
+
+      setEvolutions((prev) =>
+        prev.map((e) =>
+          e.id === signingFichaId
+            ? { ...e, assinaturaUrl: urlData.publicUrl, assinadoEm: assinadoEm }
+            : e
+        )
+      );
+
+      setSigningFichaId(null);
+      toast.success('Assinatura salva com sucesso.');
+    } catch (err) {
+      console.error('[assinatura] Erro ao salvar:', err);
+      toast.error('Erro ao salvar assinatura. Tente novamente.');
+    } finally {
+      setIsSavingSignature(false);
     }
   };
 
@@ -1107,24 +1168,41 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                   </div>
                 </div>
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground">
-                      <MoreVertical className="w-4 h-4" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleEdit(evo)}>
-                      <Edit2 className="w-3 h-3" /> Editar
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => setShowDeleteConfirm(evo.id)}
-                      className="text-red-500 focus:text-red-500"
+                <div className="flex items-center gap-2">
+                  {evo.assinadoEm ? (
+                    <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[9px] font-bold">
+                      <Check className="w-3 h-3" />
+                      Assinado em {new Date(evo.assinadoEm).toLocaleDateString('pt-BR')}
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => setSigningFichaId(evo.id)}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold border border-border text-muted-foreground hover:border-teal hover:text-teal transition-colors"
                     >
-                      <Trash2 className="w-3 h-3" /> Excluir
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                      <PenLine className="w-3 h-3" />
+                      Assinar
+                    </button>
+                  )}
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground">
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleEdit(evo)}>
+                        <Edit2 className="w-3 h-3" /> Editar
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => setShowDeleteConfirm(evo.id)}
+                        className="text-red-500 focus:text-red-500"
+                      >
+                        <Trash2 className="w-3 h-3" /> Excluir
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
 
               {evo.observation && (
@@ -1297,6 +1375,45 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                 <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Criando...</>
               ) : (
                 'Criar Orçamento'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Assinatura do Paciente */}
+      <Dialog open={!!signingFichaId} onOpenChange={(open) => { if (!open) setSigningFichaId(null); }}>
+        <DialogContent className="max-w-md rounded-2xl bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-xl text-foreground flex items-center gap-2">
+              <PenLine className="w-5 h-5 text-teal" />
+              Assinatura do Paciente
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              Vire a tela para o paciente e peça que assine com o dedo ou mouse.
+            </DialogDescription>
+          </DialogHeader>
+
+          <SignaturePad padRef={signaturePadRef} />
+
+          <DialogFooter className="gap-2 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => setSigningFichaId(null)}
+              disabled={isSavingSignature}
+              className="rounded-xl border-border text-foreground hover:bg-muted"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => void handleSaveSignature()}
+              disabled={isSavingSignature}
+              className="bg-teal text-white hover:bg-teal-lt rounded-xl"
+            >
+              {isSavingSignature ? (
+                <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Salvando...</>
+              ) : (
+                <><Check className="w-4 h-4 mr-2" /> Confirmar assinatura</>
               )}
             </Button>
           </DialogFooter>

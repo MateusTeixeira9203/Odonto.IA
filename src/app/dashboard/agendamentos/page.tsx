@@ -47,7 +47,7 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
   const query = supabase
     .from('agendamentos')
     .select(
-      'id, clinica_id, paciente_id, dentista_id, data_hora, duracao_minutos, status, origem, observacoes, created_at, paciente:pacientes(id, nome), dentista:dentistas(id, nome)'
+      'id, clinica_id, paciente_id, dentista_id, data_hora, duracao_minutos, status, origem, observacoes, created_at, paciente:pacientes(id, nome), dentista:dentistas!agendamentos_dentista_id_fkey(id, nome)'
     )
     .eq('clinica_id', dentista.clinica_id)
     .gte('data_hora', inicioMes)
@@ -91,8 +91,9 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
     );
   }
 
-  // Solo/Clinica: dentista cria. Secretária: cria em nome do dentista. BASICO dentista: leitura.
-  const canEdit = dentista.plano === 'SOLO' || dentista.plano === 'CLINICA' || dentista.role === 'secretaria';
+  // Todos os dentistas podem gerenciar a própria agenda independente do plano.
+  // Secretária cria em nome do dentista (status 'agendado', pendente de confirmação).
+  const canEdit = true;
 
   return (
     <PageTransition>

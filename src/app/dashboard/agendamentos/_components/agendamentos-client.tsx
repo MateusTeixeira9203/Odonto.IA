@@ -371,10 +371,10 @@ export function AgendamentosClient({
         id: result.id ?? crypto.randomUUID(),
         clinica_id: _clinicaId,
         paciente_id: novoForm.pacienteId,
-        dentista_id: novoForm.dentistaId,
+        dentista_id: isSecretaria ? novoForm.dentistaId : dentistaAtualId,
         data_hora: dataHora,
         duracao_minutos: parseInt(novoForm.duracao, 10) || 30,
-        status: 'agendado',
+        status: isSecretaria ? 'agendado' : 'confirmado',
         origem: 'manual',
         observacoes: observacoesCombinadas,
         created_at: new Date().toISOString(),
@@ -384,6 +384,8 @@ export function AgendamentosClient({
       setAgendamentos((prev) => [...prev, novoAgt]);
       setIsNewModalOpen(false);
       resetForm();
+      // Navega o calendário para o dia do agendamento criado
+      setSelectedDate(new Date(ano, mes - 1, dia));
     }
     setIsSaving(false);
   };
@@ -1068,7 +1070,7 @@ export function AgendamentosClient({
                     </Button>
                     <Button
                       onClick={enterEditMode}
-                      className="bg-teal text-white hover:bg-teal-lt rounded-xl flex items-center gap-1.5"
+                      className="bg-teal/10 text-teal hover:bg-teal/20 border border-teal/30 rounded-xl flex items-center gap-1.5"
                     >
                       <Pencil className="w-4 h-4" />
                       Editar

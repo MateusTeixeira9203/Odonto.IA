@@ -23,7 +23,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   // Busca o agendamento com dados do paciente
   const { data: ag } = await supabase
     .from('agendamentos')
-    .select('data_hora, duracao_minutos, observacoes, procedimento, paciente:pacientes(id, nome, data_nascimento, telefone, alergias, observacoes)')
+    .select('data_hora, duracao_minutos, observacoes, paciente:pacientes(id, nome, data_nascimento, telefone, observacoes)')
     .eq('id', agendamentoId)
     .eq('clinica_id', dentista.clinica_id)
     .maybeSingle();
@@ -35,7 +35,6 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     nome: string;
     data_nascimento: string | null;
     telefone: string | null;
-    alergias: string | null;
     observacoes: string | null;
   } | null;
 
@@ -86,9 +85,7 @@ DADOS DO PACIENTE:
 Nome: ${paciente.nome}
 Idade: ${idadeStr}
 Horário: ${hora}
-Procedimento previsto: ${(ag.procedimento as string | null) ?? 'não especificado'}
 Observações do agendamento: ${(ag.observacoes as string | null) ?? 'nenhuma'}
-Alergias: ${paciente.alergias ?? 'não informadas'}
 Observações gerais: ${paciente.observacoes ?? 'nenhuma'}
 
 HISTÓRICO DE FICHAS:
@@ -99,7 +96,7 @@ ${orcTexto}`;
   const ai = new GoogleGenAI({ apiKey });
   try {
     const result = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash',
       contents: prompt,
     });
     const briefing = (result.text ?? '').trim();

@@ -63,6 +63,10 @@ interface BotContexto {
   /** Slots disponíveis para a data selecionada — ISO UTC strings */
   horarios_slots?: string[];
   duracao_minutos?: number;
+  /** ID do agendamento — usado no estado AGUARDANDO_CONFIRMACAO_24H */
+  agendamento_id?: string;
+  /** ISO UTC da consulta — usado no estado AGUARDANDO_CONFIRMACAO_24H */
+  data_hora?: string;
 }
 
 // ─── Fuso horário BRT ──────────────────────────────────────────────────────────
@@ -348,11 +352,11 @@ export async function processMessage(
           nome:       ctx.paciente_nome ?? '',
         });
 
-        // Notifica o dentista e a secretária sobre o novo agendamento
+        // Notifica a secretária sobre o novo agendamento via bot
         const db2 = createServiceClient();
         await inserirNotificacao(db2, {
           clinicaId:    conversa.clinica_id,
-          paraRole:     'all',
+          paraRole:     'secretaria',
           deDentistaId: dentistaId,
           tipo:         'briefing',
           titulo:       `Novo agendamento — ${ctx.paciente_nome ?? 'Paciente'}`,
@@ -370,6 +374,56 @@ export async function processMessage(
         await atualizarConversa(conversa.id, etapa, ctx as Record<string, unknown>);
         return { texto: erro, novoEstado: etapa };
       }
+    }
+
+    // ── AGUARDANDO_CONFIRMACAO_24H ────────────────────────────────────────────
+    case STATES.AGUARDANDO_CONFIRMACAO_24H: {
+      const agendamentoId = ctx.agendamento_id as string | undefined;
+      const confirmou = /^(sim|s|confirmo|confirmar|yes|ok|1)$/i.test(input);
+      const negou     = /^(n[aã]o|n|cancelar|cancel|no|2)$/i.test(input);
+
+      if (confirmou && agendamentoId) {
+        const db = createServiceClient();
+        await db
+          .from('agendamentos')
+          .update({ status: 'confirmado' })
+          .eq('id', agendamentoId);
+
+        const dataHora = ctx.data_hora as string | undefined;
+        const dentistaNome = ctx.dentista_nome as string | undefined;
+        const resumo = dataHora ? formatarSlotParaConfirmacao(dataHora) : 'o horário agendado';
+        const msg = `✅ Presença confirmada para ${resumo}${dentistaNome ? ` com ${dentistaNome}` : ''}! Te esperamos lá. 😊`;
+        await sendWhatsAppText(instancia, conversa.telefone, msg);
+        await salvarMensagem(conversa, 'saida', msg);
+        await atualizarConversa(conversa.id, STATES.CONFIRMADO, {});
+        return { texto: '', novoEstado: STATES.CONFIRMADO };
+      }
+
+      if (negou) {
+        const db = createServiceClient();
+        // Notifica secretária sobre a recusa
+        await inserirNotificacao(db, {
+          clinicaId: conversa.clinica_id,
+          paraRole:  'secretaria',
+          tipo:      'follow_up',
+          titulo:    `Paciente recusou consulta — ${ctx.paciente_nome ?? 'Paciente'}`,
+          mensagem:  `${ctx.paciente_nome ?? 'Paciente'} respondeu NÃO ao lembrete de confirmação. Reagendar.`,
+          href:      '/dashboard/agendamentos',
+        });
+
+        const msg = `Entendido! Nossa equipe vai entrar em contato para reagendar. 📞`;
+        await sendWhatsAppText(instancia, conversa.telefone, msg);
+        await salvarMensagem(conversa, 'saida', msg);
+        await atualizarConversa(conversa.id, STATES.HUMANO, {});
+        return { texto: '', novoEstado: STATES.HUMANO };
+      }
+
+      // Resposta não reconhecida — pede de novo
+      const nudge = `Não entendi. 🤔 Responda *CONFIRMO* para confirmar sua presença ou *NÃO* para cancelar.`;
+      await sendWhatsAppText(instancia, conversa.telefone, nudge);
+      await salvarMensagem(conversa, 'saida', nudge);
+      await atualizarConversa(conversa.id, STATES.AGUARDANDO_CONFIRMACAO_24H, ctx as Record<string, unknown>);
+      return { texto: '', novoEstado: STATES.AGUARDANDO_CONFIRMACAO_24H };
     }
 
     // ── CONFIRMADO ────────────────────────────────────────────────────────────

@@ -196,7 +196,7 @@ export async function atualizarAgendamento(
     const { data: agendamento } = await supabase
       .from("agendamentos")
       .select(
-        "google_event_id, dentista_id, data_hora, duracao_minutos, observacoes, paciente:pacientes(nome), dentista:dentistas(nome)"
+        "google_event_id, dentista_id, data_hora, duracao_minutos, observacoes, paciente:pacientes(nome), dentista:dentistas!agendamentos_dentista_id_fkey(nome)"
       )
       .eq("id", id)
       .maybeSingle<{
