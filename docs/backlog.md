@@ -7,7 +7,6 @@ Atualizado em: 2026-05-04
 
 ## 📅 Tarefas do Dia — 2026-05-04
 
-- [ ] **Commit das alterações** — commitar tudo que está pendente das sessões anteriores (PlanejamentoTab B+C, modal agendamentos, migrations 048–049, backlog atualizado)
 - [ ] **Reativar o DEX** — desbloquear widget e onboarding em `dashboard-shell.tsx`; reconectar modo consulta ao fluxo principal; revisar e commitar mudanças pendentes em `patient-context/route.ts`
 
 ---
@@ -63,7 +62,6 @@ Atualizado em: 2026-05-04
 - [ ] **Loading states** — algumas telas não têm skeleton enquanto carregam dados. Padronizar com o `Skeleton` do shadcn.
 
 ### Configurações
-- [ ] **Convite de dentistas** — tabela `convites` e fluxo de `status_convite` existem. Revisar se o e-mail de convite está sendo disparado corretamente.
 - [ ] **Planos e limites** — `temFeature()` e `limite_dentistas` estão implementados mas não testados com múltiplos usuários em produção.
 - [ ] **Chave PIX** — campo `chave_pix` adicionado em dentistas (migration 042). Não está sendo exibida em nenhuma tela relevante de pagamento.
 - [ ] **Dentista pode migrar de clínica** — dentista autenticado consegue sair de uma clínica e aceitar convite de outra sem criar nova conta. Dados clínicos (pacientes, fichas, orçamentos) seguem o dentista. Uma clínica ativa por vez; opção de operar solo permitida. Requer: fluxo de convite revisado, tela de "Minhas Clínicas" no perfil, e migração controlada de `clinica_id` nas tabelas relevantes.
@@ -95,6 +93,13 @@ Atualizado em: 2026-05-04
 ---
 
 ## ✅ Feito recentemente (referência)
+
+### Fluxo de Convites (2026-05-04)
+- **Auditoria completa** — mapeados todos os problemas do fluxo: metadados ausentes no JWT, redirect sem distinção de role, convite deletado em vez de marcado, contador de vagas não descontava convites pendentes.
+- **`inviteUserByEmail` com metadados** — `role`, `clinica_id` e `convidado_por` agora passados no `data` do convite como fallback caso a tabela `convites` falhe.
+- **Redirect unificado** — qualquer convidado (secretaria ou dentista) vai para `/dashboard?welcome=true`; perfil é editado em `/dashboard/perfil` que já adapta os campos por role.
+- **Histórico de convites** — callback faz `UPDATE { status: 'aceito' }` em vez de deletar o registro; migration 050 adicionou colunas `status` e `convidado_por` na tabela `convites`.
+- **Contador de vagas correto** — `convitesRestantes` desconta convites de dentistas pendentes mas ignora convites de secretaria (sem limite).
 
 ### PlanejamentoTab + Agendamentos (2026-05-03)
 - **PlanejamentoTab B+C** — barra de progresso com contagem de procedimentos e total do orçamento; seção colapsável sincroniza procedimentos das fichas (`dentes_observacoes`) para `planejamento_procedimentos` (migration 048); cada procedimento tem badge de status clicável (pendente → agendado → concluído); cabeçalho de seção ganhou select de status e input de data estimada (migration 049); image picker renomeado para "Buscar da aba Documentos".
