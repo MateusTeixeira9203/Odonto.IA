@@ -16,7 +16,12 @@ import {
   Presentation,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  Circle,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
 import { HelpTooltip } from '@/components/ui/help-tooltip';
@@ -38,6 +43,17 @@ interface Section {
   title: string;
   content: string;
   imageIds: string[];
+  status: 'pendente' | 'em_andamento' | 'concluido';
+  dataEstimada: string | null;
+}
+
+interface PlanProc {
+  id: string;
+  descricao: string;
+  dente: number | null;
+  status: 'pendente' | 'agendado' | 'concluido';
+  fichaRef: string | null;
+  ordem: number;
 }
 
 interface BudgetProcedure {
@@ -66,6 +82,13 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
   const [currentSlide, setCurrentSlide] = useState(0);
   const [slideDirection, setSlideDirection] = useState(1);
 
+  const router = useRouter();
+
+  // Procedimentos da ficha sincronizados
+  const [planProcs, setPlanProcs]           = useState<PlanProc[]>([]);
+  const [procsExpanded, setProcsExpanded]   = useState(true);
+  const [updatingProcId, setUpdatingProcId] = useState<string | null>(null);
+
   // Ref para acesso sempre atualizado nas funções de debounce
   const sectionsRef = useRef<Section[]>([]);
   const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -79,25 +102,41 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
     try {
       const supabase = createClient();
 
-      const [docsResult, budgetResult, secoesResult] = await Promise.all([
-        supabase
-          .from('paciente_documentos')
-          .select('*')
-          .eq('paciente_id', patientId)
-          .in('categoria', ['Radiografias', 'Fotografias']),
-        supabase
-          .from('orcamentos')
-          .select('*, orcamento_itens(*)')
-          .eq('paciente_id', patientId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-        supabase
-          .from('planejamento_secoes')
-          .select('*')
-          .eq('paciente_id', patientId)
-          .order('ordem', { ascending: true }),
-      ]);
+      type FichaRow = {
+        id: string;
+        dentes_observacoes: Record<string, string> | null;
+      };
+
+      const [docsResult, budgetResult, secoesResult, fichasResult, existingProcsResult] =
+        await Promise.all([
+          supabase
+            .from('paciente_documentos')
+            .select('*')
+            .eq('paciente_id', patientId)
+            .in('categoria', ['Radiografias', 'Fotografias']),
+          supabase
+            .from('orcamentos')
+            .select('*, orcamento_itens(*)')
+            .eq('paciente_id', patientId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          supabase
+            .from('planejamento_secoes')
+            .select('*')
+            .eq('paciente_id', patientId)
+            .order('ordem', { ascending: true }),
+          supabase
+            .from('fichas')
+            .select('id, dentes_observacoes')
+            .eq('paciente_id', patientId)
+            .not('dentes_observacoes', 'is', null),
+          supabase
+            .from('planejamento_procedimentos')
+            .select('*')
+            .eq('paciente_id', patientId)
+            .order('ordem', { ascending: true }),
+        ]);
 
       if (docsResult.error) throw docsResult.error;
       setDocuments(
@@ -133,7 +172,63 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
             title: row.titulo as string,
             content: (row.conteudo as string) ?? '',
             imageIds: (row.imagem_ids as string[]) ?? [],
+            status: ((row.status as string) ?? 'pendente') as Section['status'],
+            dataEstimada: (row.data_estimada as string | null) ?? null,
           }))
+        );
+      }
+
+      // ── Sincroniza procedimentos das fichas ──────────────────────────────
+      const rawProcs: { fichaRef: string; descricao: string; dente: number }[] = [];
+      for (const ficha of (fichasResult.data ?? []) as FichaRow[]) {
+        const obs = ficha.dentes_observacoes ?? {};
+        for (const [dente, desc] of Object.entries(obs)) {
+          if (typeof desc === 'string' && desc.trim()) {
+            rawProcs.push({
+              fichaRef: `${ficha.id}::${dente}`,
+              descricao: desc.trim(),
+              dente: parseInt(dente, 10),
+            });
+          }
+        }
+      }
+
+      const existingRefs = new Set(
+        (existingProcsResult.data ?? []).map((p: Record<string, unknown>) => p.ficha_ref as string)
+      );
+      const toInsert = rawProcs.filter(p => !existingRefs.has(p.fichaRef));
+
+      const mapPlanProc = (row: Record<string, unknown>): PlanProc => ({
+        id: row.id as string,
+        descricao: row.descricao as string,
+        dente: row.dente as number | null,
+        status: (row.status as PlanProc['status']) ?? 'pendente',
+        fichaRef: row.ficha_ref as string | null,
+        ordem: row.ordem as number,
+      });
+
+      if (toInsert.length > 0) {
+        const startOrdem = (existingProcsResult.data ?? []).length;
+        await supabase.from('planejamento_procedimentos').insert(
+          toInsert.map((p, i) => ({
+            clinica_id: clinicaId,
+            paciente_id: patientId,
+            descricao: p.descricao,
+            dente: p.dente,
+            status: 'pendente',
+            ficha_ref: p.fichaRef,
+            ordem: startOrdem + i,
+          }))
+        );
+        const { data: refreshed } = await supabase
+          .from('planejamento_procedimentos')
+          .select('*')
+          .eq('paciente_id', patientId)
+          .order('ordem', { ascending: true });
+        setPlanProcs((refreshed ?? []).map(r => mapPlanProc(r as Record<string, unknown>)));
+      } else {
+        setPlanProcs(
+          (existingProcsResult.data ?? []).map(r => mapPlanProc(r as Record<string, unknown>))
         );
       }
     } catch (error) {
@@ -141,7 +236,7 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
     } finally {
       setLoadingData(false);
     }
-  }, [patientId]);
+  }, [patientId, clinicaId]);
 
   useEffect(() => {
     if (patientId) {
@@ -169,6 +264,8 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
           conteudo: section.content,
           imagem_ids: section.imageIds,
           ordem: idx,
+          status: section.status,
+          data_estimada: section.dataEstimada || null,
           updated_at: new Date().toISOString(),
         });
       } else {
@@ -182,6 +279,8 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
             conteudo: section.content,
             imagem_ids: section.imageIds,
             ordem: idx,
+            status: section.status,
+            data_estimada: section.dataEstimada || null,
           })
           .select('id')
           .single();
@@ -303,6 +402,35 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
   const totalBudget = budgetProcedures.reduce((acc, curr) => acc + curr.value, 0);
   const totalSlides = sections.length + 1; // +1 para o slide de orçamento
 
+  const concluidosCount  = planProcs.filter(p => p.status === 'concluido').length;
+  const progressPercent  = planProcs.length > 0
+    ? Math.round((concluidosCount / planProcs.length) * 100)
+    : 0;
+
+  const getProcStatusLabel = (status: PlanProc['status']): string => {
+    if (status === 'agendado')  return 'Agendado';
+    if (status === 'concluido') return 'Concluído';
+    return 'Pendente';
+  };
+
+  const getProcStatusNext = (status: PlanProc['status']): PlanProc['status'] => {
+    if (status === 'pendente')  return 'agendado';
+    if (status === 'agendado')  return 'concluido';
+    return 'pendente';
+  };
+
+  const getProcStatusColor = (status: PlanProc['status']): string => {
+    if (status === 'concluido') return 'bg-teal/10 text-teal border-teal/20';
+    if (status === 'agendado')  return 'bg-teal/5 text-teal-lt border-teal/10';
+    return 'bg-surface-alt text-text-secondary border-border/60';
+  };
+
+  const getSectionStatusColor = (status: Section['status']): string => {
+    if (status === 'concluido')    return 'bg-teal/10 text-teal border-teal/20';
+    if (status === 'em_andamento') return 'bg-teal/5 text-teal-lt border-teal/10';
+    return 'bg-surface-alt text-text-secondary border-border/60';
+  };
+
   const addSection = async (): Promise<void> => {
     const supabase = createClient();
     const newOrder = sectionsRef.current.length;
@@ -315,6 +443,8 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
         conteudo: '',
         imagem_ids: [],
         ordem: newOrder,
+        status: 'pendente',
+        data_estimada: null,
       })
       .select('id')
       .single();
@@ -329,6 +459,8 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
       title: '',
       content: '',
       imageIds: [],
+      status: 'pendente',
+      dataEstimada: null,
     };
     setSections(prev => [...prev, newSection]);
   };
@@ -367,6 +499,17 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
     updateSection(sectionId, 'imageIds', newImageIds);
   };
 
+  const updateProcStatus = async (procId: string, newStatus: PlanProc['status']): Promise<void> => {
+    setUpdatingProcId(procId);
+    setPlanProcs(prev => prev.map(p => p.id === procId ? { ...p, status: newStatus } : p));
+    const supabase = createClient();
+    await supabase
+      .from('planejamento_procedimentos')
+      .update({ status: newStatus })
+      .eq('id', procId);
+    setUpdatingProcId(null);
+  };
+
   if (loadingData) {
     return (
       <div className="flex items-center justify-center p-20">
@@ -377,11 +520,13 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
 
   return (
     <div className="space-y-8 pb-20">
-      {/* Cabeçalho da Apresentação */}
+      {/* Cabeçalho — Progresso + Ações */}
       <div className="bg-surface rounded-3xl border border-border/60 shadow-sm p-8">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
           <div className="flex-1">
-            <div className="text-[10px] font-bold text-teal uppercase tracking-[0.2em] mb-2">Apresentação ao Paciente</div>
+            <div className="text-[10px] font-bold text-teal uppercase tracking-[0.2em] mb-2">
+              Apresentação ao Paciente
+            </div>
             <input
               type="text"
               value={planningTitle}
@@ -389,12 +534,51 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
               className="font-heading text-3xl text-text-primary bg-transparent border-none outline-none w-full focus:ring-0 p-0"
               placeholder="Título do Planejamento"
             />
-            <div className="flex items-center gap-2 mt-2 text-text-secondary text-sm font-medium">
-              <Calendar className="w-4 h-4" />
-              Criado em 19 de Março, 2026
-            </div>
+
+            {/* Barra de progresso */}
+            {planProcs.length > 0 && (
+              <div className="mt-5">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold text-text-secondary">
+                    Progresso do tratamento
+                  </span>
+                  <span className="font-mono text-xs font-bold text-teal">
+                    {progressPercent}%
+                  </span>
+                </div>
+                <div className="w-full bg-surface-alt rounded-full h-2">
+                  <div
+                    className="bg-teal h-2 rounded-full transition-all duration-500"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+                <div className="flex items-center gap-6 mt-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono text-lg font-bold text-text-primary">
+                      {planProcs.length}
+                    </span>
+                    <span className="text-xs text-text-secondary">procedimentos</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono text-lg font-bold text-teal">
+                      {concluidosCount}
+                    </span>
+                    <span className="text-xs text-text-secondary">concluídos</span>
+                  </div>
+                  {budgetExists && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono text-lg font-bold text-text-primary">
+                        R$ {totalBudget.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                      <span className="text-xs text-text-secondary">orçamento</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
-          <div className="flex items-center gap-3">
+
+          <div className="flex items-center gap-3 flex-shrink-0">
             <button
               onClick={() => { setCurrentSlide(0); setIsPresentationOpen(true); }}
               disabled={sections.length === 0}
@@ -407,11 +591,98 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
               onClick={handleGerarPDF}
               className="bg-text-primary text-bg px-6 py-3 rounded-2xl font-bold text-sm flex items-center gap-2 hover:opacity-80 transition-all shadow-md"
             >
-              <Download className="w-4 h-4" /> Gerar PDF da Apresentação
+              <Download className="w-4 h-4" /> Gerar PDF
             </button>
           </div>
         </div>
       </div>
+
+      {/* Seção de Procedimentos da Ficha */}
+      {planProcs.length > 0 && (
+        <div className="bg-surface rounded-3xl border border-border/60 shadow-sm overflow-hidden">
+          <button
+            onClick={() => setProcsExpanded(prev => !prev)}
+            className="w-full p-6 flex items-center justify-between hover:bg-surface-alt/30 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="text-[10px] font-bold text-text-secondary uppercase tracking-[0.2em]">
+                Procedimentos da Ficha
+              </div>
+              <span className="px-2 py-0.5 rounded-full bg-teal/10 text-teal text-[10px] font-bold">
+                {planProcs.length}
+              </span>
+            </div>
+            {procsExpanded
+              ? <ChevronUp className="w-4 h-4 text-text-secondary" />
+              : <ChevronDown className="w-4 h-4 text-text-secondary" />
+            }
+          </button>
+
+          <AnimatePresence initial={false}>
+            {procsExpanded && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="px-6 pb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {planProcs.map(proc => (
+                    <div
+                      key={proc.id}
+                      className="bg-surface-alt/50 border border-border/60 rounded-2xl p-4 flex flex-col gap-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          {proc.dente && (
+                            <div className="text-[10px] font-bold text-teal uppercase tracking-wider mb-0.5">
+                              Dente {proc.dente}
+                            </div>
+                          )}
+                          <p className="text-sm font-medium text-text-primary leading-snug">
+                            {proc.descricao}
+                          </p>
+                        </div>
+                        {updatingProcId === proc.id && (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-teal shrink-0 mt-0.5" />
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 mt-auto">
+                        <button
+                          onClick={() => void updateProcStatus(proc.id, getProcStatusNext(proc.status))}
+                          disabled={updatingProcId === proc.id}
+                          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] font-bold uppercase tracking-wider transition-all disabled:opacity-50 ${getProcStatusColor(proc.status)}`}
+                        >
+                          {proc.status === 'concluido' ? (
+                            <CheckCircle2 className="w-3 h-3" />
+                          ) : proc.status === 'agendado' ? (
+                            <Clock className="w-3 h-3" />
+                          ) : (
+                            <Circle className="w-3 h-3" />
+                          )}
+                          {getProcStatusLabel(proc.status)}
+                        </button>
+
+                        {proc.status !== 'concluido' && (
+                          <button
+                            onClick={() => router.push('/dashboard/agendamentos')}
+                            className="ml-auto p-1.5 rounded-lg text-text-secondary hover:text-teal hover:bg-teal/10 transition-colors border border-transparent hover:border-teal/20"
+                            title="Ir para agendamentos"
+                          >
+                            <Calendar className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
 
       {/* Seções */}
       <div className="space-y-6">
@@ -425,19 +696,40 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
               className="bg-surface rounded-3xl border border-border/60 shadow-sm overflow-hidden group"
             >
               <div className="p-6 border-b border-border/40 flex items-center justify-between bg-surface-alt/30">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-text-primary text-bg flex items-center justify-center font-mono text-xs font-bold">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="w-8 h-8 rounded-full bg-text-primary text-bg flex items-center justify-center font-mono text-xs font-bold shrink-0">
                     {String(index + 1).padStart(2, '0')}
                   </div>
-                  <input
-                    type="text"
-                    value={section.title}
-                    onChange={(e) => updateSection(section.id, 'title', e.target.value)}
-                    placeholder="Título da Seção (ex: Situação Atual)"
-                    className="font-heading text-xl text-text-primary bg-transparent border-none outline-none focus:ring-0 p-0 min-w-[300px]"
-                  />
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    <input
+                      type="text"
+                      value={section.title}
+                      onChange={(e) => updateSection(section.id, 'title', e.target.value)}
+                      placeholder="Título da Seção (ex: Situação Atual)"
+                      className="font-heading text-xl text-text-primary bg-transparent border-none outline-none focus:ring-0 p-0 w-full"
+                    />
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <select
+                        value={section.status}
+                        onChange={(e) => updateSection(section.id, 'status', e.target.value as Section['status'])}
+                        className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg border cursor-pointer outline-none transition-all ${getSectionStatusColor(section.status)}`}
+                        style={{ appearance: 'none' }}
+                      >
+                        <option value="pendente">Pendente</option>
+                        <option value="em_andamento">Em Andamento</option>
+                        <option value="concluido">Concluído</option>
+                      </select>
+                      <input
+                        type="date"
+                        value={section.dataEstimada ?? ''}
+                        onChange={(e) => updateSection(section.id, 'dataEstimada', e.target.value || '')}
+                        className="text-[11px] text-text-secondary bg-transparent border border-border/60 rounded-lg px-2 py-1 focus:ring-0 focus:border-teal transition-colors outline-none"
+                        title="Data estimada para esta etapa"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 shrink-0 ml-2">
                   {savingIds.has(section.id) ? (
                     <div className="p-2 text-text-secondary">
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -495,7 +787,10 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
                       onClick={() => setIsImagePickerOpen(section.id)}
                       className="text-teal text-xs font-bold flex items-center gap-1 hover:text-teal-dark transition-colors"
                     >
-                      <Plus className="w-3 h-3" /> Selecionar do Histórico
+                      <Plus className="w-3 h-3" /> Buscar da aba Documentos
+                      {documents.length > 0 && (
+                        <span className="ml-0.5 text-text-secondary font-normal">({documents.length})</span>
+                      )}
                     </button>
                   </div>
 
@@ -676,7 +971,12 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
               className="relative w-full max-w-2xl bg-surface rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[80vh] border border-border/40"
             >
               <div className="p-6 border-b border-border/60 flex items-center justify-between">
-                <h3 className="font-heading text-xl text-text-primary">Selecionar Imagens do Histórico</h3>
+                <h3 className="font-heading text-xl text-text-primary">
+                  Documentos do Paciente
+                  {documents.length === 0 && (
+                    <span className="text-sm font-normal text-text-secondary ml-2">— nenhum documento encontrado</span>
+                  )}
+                </h3>
                 <button
                   onClick={() => setIsImagePickerOpen(null)}
                   className="p-2 rounded-xl hover:bg-surface-alt/50 transition-colors text-text-secondary hover:text-text-primary"
@@ -686,6 +986,15 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
               </div>
 
               <div className="flex-1 overflow-y-auto p-6">
+                {documents.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <ImageIcon className="w-10 h-10 text-text-secondary/40 mb-3" />
+                    <p className="text-sm font-medium text-text-secondary">Nenhum documento encontrado</p>
+                    <p className="text-xs text-text-secondary/60 mt-1 max-w-xs">
+                      Adicione fotos ou radiografias na aba Documentos do paciente.
+                    </p>
+                  </div>
+                )}
                 <div className="grid grid-cols-3 gap-4">
                   {documents.map(doc => {
                     const isSelected = sections.find(s => s.id === isImagePickerOpen)?.imageIds.includes(doc.id);

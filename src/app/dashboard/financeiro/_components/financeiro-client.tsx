@@ -76,16 +76,18 @@ function fmt(v: number) {
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface Props {
-  mesAtual:         string;
-  despesasIniciais: Despesa[];
-  receitasIniciais: ReceitaManual[];
-  saldoInicial:     SaldoMes;
-  chartData:        ChartPoint[];
-  horaClinica:      HoraClinicaResult;
-  role:             DentistaRole;
-  plano:            PlanoId;
-  dentistaId:       string;
-  dentistasClinica: { id: string; nome: string }[];
+  mesAtual:             string;
+  despesasIniciais:     Despesa[];
+  receitasIniciais:     ReceitaManual[];
+  saldoInicial:         SaldoMes;
+  chartData:            ChartPoint[];
+  horaClinica:          HoraClinicaResult;
+  role:                 DentistaRole;
+  plano:                PlanoId;
+  dentistaId:           string;
+  dentistasClinica:     { id: string; nome: string }[];
+  /** Dentista pré-selecionado vindo da URL (?dentista=id) — persiste ao trocar de mês */
+  initialDentistaFiltro?: string;
 }
 
 type SheetMode = 'saida' | 'entrada' | null;
@@ -95,6 +97,7 @@ type SheetMode = 'saida' | 'entrada' | null;
 export function FinanceiroClient({
   mesAtual, despesasIniciais, receitasIniciais, saldoInicial,
   chartData, horaClinica, role, plano, dentistaId, dentistasClinica,
+  initialDentistaFiltro = '',
 }: Props) {
   const router = useRouter();
   const [despesas, setDespesas] = useState<Despesa[]>(despesasIniciais);
@@ -103,11 +106,16 @@ export function FinanceiroClient({
   const [isPrivacy, setIsPrivacy] = useState(false);
   const [sheetMode, setSheetMode] = useState<SheetMode>(null);
 
+  // ID do dentista persistido entre trocas de mês (via URL) — apenas secretária
+  const [selectedDentistaId, setSelectedDentistaId] = useState<string>(
+    () => initialDentistaFiltro || dentistasClinica[0]?.id || ''
+  );
+
   // ── Estados: formulário saída ─────────────────────────────────────────────
   const [form, setForm] = useState<NovaDespesaForm>({
     valor: 0, categoria: 'Outro', tipo: 'variavel',
     data: format(new Date(), 'yyyy-MM-dd'), descricao: '',
-    dentistaId: role === 'secretaria' ? '' : dentistaId,
+    dentistaId: role === 'secretaria' ? (initialDentistaFiltro || dentistasClinica[0]?.id || '') : dentistaId,
   });
   const [salvando,  setSalvando]  = useState(false);
   const [removendo, setRemovendo] = useState<string | null>(null);
@@ -116,7 +124,7 @@ export function FinanceiroClient({
   const [formReceita, setFormReceita] = useState<NovaReceitaForm>({
     valor: 0, forma: 'pix',
     data: format(new Date(), 'yyyy-MM-dd'), descricao: '',
-    dentistaId: role === 'secretaria' ? '' : dentistaId,
+    dentistaId: role === 'secretaria' ? (initialDentistaFiltro || dentistasClinica[0]?.id || '') : dentistaId,
   });
   const [salvandoReceita,  setSalvandoReceita]  = useState(false);
   const [removendoReceita, setRemovendoReceita] = useState<string | null>(null);
@@ -138,7 +146,11 @@ export function FinanceiroClient({
 
   function navMes(delta: number) {
     const prox = delta > 0 ? addMonths(mesDate, 1) : subMonths(mesDate, 1);
-    router.push(`/dashboard/financeiro?mes=${format(prox, 'yyyy-MM')}`);
+    const base = `/dashboard/financeiro?mes=${format(prox, 'yyyy-MM')}`;
+    router.push(role === 'secretaria' && selectedDentistaId
+      ? `${base}&dentista=${selectedDentistaId}`
+      : base
+    );
   }
 
   // ── Handlers: saída ───────────────────────────────────────────────────────
@@ -164,7 +176,7 @@ export function FinanceiroClient({
         setSaldo(prev => ({ ...prev, despesas: prev.despesas + form.valor, saldo: prev.saldo - form.valor }));
       }
       toast.success('Saída registrada!');
-      setForm(f => ({ ...f, valor: 0, descricao: '', dentistaId: role === 'secretaria' ? '' : dentistaId }));
+      setForm(f => ({ ...f, valor: 0, descricao: '', dentistaId: role === 'secretaria' ? selectedDentistaId : dentistaId }));
       setSheetMode(null);
     } finally { setSalvando(false); }
   }
@@ -205,7 +217,7 @@ export function FinanceiroClient({
         setSaldo(prev => ({ ...prev, receita: prev.receita + formReceita.valor, saldo: prev.saldo + formReceita.valor }));
       }
       toast.success('Entrada registrada!');
-      setFormReceita(f => ({ ...f, valor: 0, descricao: '', dentistaId: role === 'secretaria' ? '' : dentistaId }));
+      setFormReceita(f => ({ ...f, valor: 0, descricao: '', dentistaId: role === 'secretaria' ? selectedDentistaId : dentistaId }));
       setSheetMode(null);
     } finally { setSalvandoReceita(false); }
   }
@@ -542,7 +554,11 @@ export function FinanceiroClient({
                 {role === 'secretaria' && (
                   <DentistaSelector
                     value={form.dentistaId ?? ''}
-                    onChange={v => setForm(f => ({ ...f, dentistaId: v || undefined }))}
+                    onChange={v => {
+                      setSelectedDentistaId(v);
+                      setForm(f => ({ ...f, dentistaId: v || undefined }));
+                      setFormReceita(f => ({ ...f, dentistaId: v || undefined }));
+                    }}
                     dentistas={dentistasClinica}
                   />
                 )}
@@ -607,7 +623,11 @@ export function FinanceiroClient({
                 {role === 'secretaria' && (
                   <DentistaSelector
                     value={formReceita.dentistaId ?? ''}
-                    onChange={v => setFormReceita(f => ({ ...f, dentistaId: v || undefined }))}
+                    onChange={v => {
+                      setSelectedDentistaId(v);
+                      setForm(f => ({ ...f, dentistaId: v || undefined }));
+                      setFormReceita(f => ({ ...f, dentistaId: v || undefined }));
+                    }}
                     dentistas={dentistasClinica}
                   />
                 )}

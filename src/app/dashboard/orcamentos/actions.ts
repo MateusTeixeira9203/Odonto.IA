@@ -44,7 +44,7 @@ export async function atualizarStatusOrcamento(
   if (status === 'enviado' || status === 'aprovado') {
     const { data: orc } = await supabase
       .from('orcamentos')
-      .select('paciente:pacientes(nome)')
+      .select('paciente_id, dentista_id, total, paciente:pacientes(nome)')
       .eq('id', orcamentoId)
       .maybeSingle();
     const pacNome = (orc?.paciente as unknown as { nome: string } | null)?.nome ?? 'paciente';
@@ -61,6 +61,28 @@ export async function atualizarStatusOrcamento(
         : `Orçamento de ${pacNome} foi aprovado pelo dentista.`,
       href:         '/dashboard/orcamentos',
     });
+
+    // Ao aprovar, cria um pagamento pendente automaticamente se ainda não houver nenhum
+    if (status === 'aprovado' && orc && orc.total && orc.total > 0) {
+      const { count } = await supabase
+        .from('pagamentos')
+        .select('id', { count: 'exact', head: true })
+        .eq('orcamento_id', orcamentoId);
+
+      if ((count ?? 0) === 0) {
+        await supabase.from('pagamentos').insert({
+          orcamento_id:   orcamentoId,
+          paciente_id:    orc.paciente_id as string,
+          dentista_id:    orc.dentista_id as string,
+          clinica_id:     clinicaId,
+          valor:          orc.total as number,
+          status:         'pendente',
+          forma_pagamento: null,
+          data_pagamento:  null,
+          data_vencimento: null,
+        });
+      }
+    }
   }
 
   return {};
@@ -88,6 +110,7 @@ export async function marcarPagamentoPago(
       status: "pago",
       forma_pagamento: formaPagamento,
       data_pagamento: hoje,
+      marcado_por_id: dentista.id,
     })
     .eq("id", pagamentoId)
     .eq("clinica_id", clinicaId);
@@ -112,9 +135,13 @@ export async function criarOrcamento(dados: {
     quantidade: number;
     precoUnitario: number;
   }>;
+  /** Preenchido pela secretária para atribuir o orçamento a um dentista específico */
+  dentistaId?: string;
 }): Promise<{ error?: string; id?: string }> {
   const dentista = await getDentistaCached();
   if (!dentista) redirect("/login");
+
+  const dentistaAlvoId = dados.dentistaId ?? dentista.id;
 
   const supabase = await createClient();
 
@@ -129,7 +156,7 @@ export async function criarOrcamento(dados: {
     .from("orcamentos")
     .insert({
       clinica_id: dentista.clinica_id,
-      dentista_id: dentista.id,
+      dentista_id: dentistaAlvoId,
       paciente_id: dados.pacienteId,
       status: "rascunho",
       total,
@@ -176,6 +203,8 @@ export async function registrarPagamento(dados: {
   valor: number;
   formaPagamento: FormaPagamento;
   data: string;
+  /** Data combinada (vencimento) — se no futuro, cria parcela pendente em vez de pago */
+  dataVencimento?: string;
   /** dentista_id do orçamento — necessário quando quem registra é a secretária */
   dentistaId?: string;
 }): Promise<{ error?: string; id?: string; autoAprovado?: boolean }> {
@@ -185,6 +214,8 @@ export async function registrarPagamento(dados: {
   const supabase = await createClient();
 
   const dentistaId = dados.dentistaId ?? sessao.id;
+  const hoje = new Date().toISOString().split('T')[0];
+  const isAgendado = dados.dataVencimento && dados.dataVencimento > hoje;
 
   const { data, error } = await supabase
     .from("pagamentos")
@@ -194,9 +225,10 @@ export async function registrarPagamento(dados: {
       dentista_id: dentistaId,
       clinica_id: sessao.clinica_id,
       valor: dados.valor,
-      status: "pago",
-      forma_pagamento: dados.formaPagamento,
-      data_pagamento: dados.data,
+      status: isAgendado ? 'pendente' : 'pago',
+      forma_pagamento: isAgendado ? null : dados.formaPagamento,
+      data_pagamento: isAgendado ? null : dados.data,
+      data_vencimento: dados.dataVencimento ?? null,
     })
     .select("id")
     .single();
@@ -214,7 +246,7 @@ export async function registrarPagamento(dados: {
     .eq("clinica_id", sessao.clinica_id)
     .single();
 
-  if (orcRow && orcRow.status !== "aprovado") {
+  if (orcRow && orcRow.status === "enviado") {
     const { data: pagamentos } = await supabase
       .from("pagamentos")
       .select("valor")
@@ -232,20 +264,21 @@ export async function registrarPagamento(dados: {
     }
   }
 
-  // Secretária registrando pagamento → notifica o dentista do orçamento
+  // Secretária registrando pagamento → notifica o dentista dono do orçamento
   if (sessao.role === 'secretaria' && dados.dentistaId) {
     const { data: pac } = await supabase
       .from('pacientes').select('nome').eq('id', dados.pacienteId).maybeSingle();
     const pacNome = (pac as { nome: string } | null)?.nome ?? 'paciente';
     const valorFmt = dados.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     await inserirNotificacao(supabase, {
-      clinicaId:    sessao.clinica_id,
-      paraRole:     'admin',
-      deDentistaId: dados.dentistaId,
-      tipo:         'briefing',
-      titulo:       `Pagamento recebido — ${pacNome}`,
-      mensagem:     `Secretária registrou ${valorFmt} (${dados.formaPagamento.replace(/_/g, ' ')}) do paciente ${pacNome}.`,
-      href:         '/dashboard/orcamentos',
+      clinicaId:      sessao.clinica_id,
+      paraRole:       'dentista',
+      paraDentistaId: dados.dentistaId,
+      deDentistaId:   sessao.id,
+      tipo:           'briefing',
+      titulo:         `Pagamento recebido — ${pacNome}`,
+      mensagem:       `Secretária registrou ${valorFmt} (${dados.formaPagamento.replace(/_/g, ' ')}) do paciente ${pacNome}.`,
+      href:           '/dashboard/orcamentos',
     });
   }
 
@@ -352,20 +385,21 @@ export async function registrarPagamentoRapido(dados: {
     .eq("id", dados.orcamentoId)
     .eq("clinica_id", sessao.clinica_id);
 
-  // Secretária registrando → notifica o dentista
+  // Secretária registrando → notifica o dentista dono do orçamento
   if (sessao.role === 'secretaria' && dados.dentistaId) {
     const { data: pac } = await supabase
       .from('pacientes').select('nome').eq('id', dados.pacienteId).maybeSingle();
     const pacNome = (pac as { nome: string } | null)?.nome ?? 'paciente';
     const valorFmt = dados.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     await inserirNotificacao(supabase, {
-      clinicaId:    sessao.clinica_id,
-      paraRole:     'admin',
-      deDentistaId: dados.dentistaId,
-      tipo:         'briefing',
-      titulo:       `Pagamento recebido — ${pacNome}`,
-      mensagem:     `Secretária registrou ${valorFmt} (${dados.formaPagamento.replace(/_/g, ' ')}) de ${pacNome}. Orçamento aprovado.`,
-      href:         '/dashboard/orcamentos',
+      clinicaId:      sessao.clinica_id,
+      paraRole:       'dentista',
+      paraDentistaId: dados.dentistaId,
+      deDentistaId:   sessao.id,
+      tipo:           'briefing',
+      titulo:         `Pagamento recebido — ${pacNome}`,
+      mensagem:       `Secretária registrou ${valorFmt} (${dados.formaPagamento.replace(/_/g, ' ')}) de ${pacNome}. Orçamento aprovado.`,
+      href:           '/dashboard/orcamentos',
     });
   }
 

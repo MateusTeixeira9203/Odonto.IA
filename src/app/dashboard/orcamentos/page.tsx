@@ -20,6 +20,8 @@ export type PagamentoRow = {
   status: string;
   forma_pagamento: string | null;
   data_pagamento: string | null;
+  data_vencimento: string | null;
+  marcado_por: { nome: string } | null;
 };
 
 export type OrcamentoRow = {
@@ -43,7 +45,7 @@ export default async function OrcamentosPage() {
   // Override para usuário específico ter acesso a features de plano superior
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  const isUserOverride = user?.email === 'clenio21@gmail.com';
+  const isUserOverride = !!process.env.PLAN_OVERRIDE_EMAIL && user?.email === process.env.PLAN_OVERRIDE_EMAIL;
 
   // Verifica se há secretária na clínica
   const { count: secretariaCount } = await supabase
@@ -83,7 +85,7 @@ export default async function OrcamentosPage() {
       .eq('clinica_id', dentista.clinica_id),
     supabase
       .from('pagamentos')
-      .select('id, orcamento_id, valor, status, forma_pagamento, data_pagamento')
+      .select('id, orcamento_id, valor, status, forma_pagamento, data_pagamento, data_vencimento, marcado_por:dentistas!pagamentos_marcado_por_id_fkey(nome)')
       .eq('clinica_id', dentista.clinica_id),
   ]);
 
@@ -98,7 +100,8 @@ export default async function OrcamentosPage() {
   }));
 
   // Solo: dentista cria orçamentos manualmente. BASICO/CLINICA: cria via perfil do paciente.
-  const canEdit = !isUserOverride && dentista.plano === 'SOLO';
+  // Secretária sempre pode criar orçamentos independente do plano.
+  const canEdit = !isUserOverride && (dentista.plano === 'SOLO' || dentista.role === 'secretaria');
 
   return (
     <PageTransition>

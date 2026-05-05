@@ -345,8 +345,20 @@ export function BotPageClient({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="max-w-5xl mx-auto p-8 space-y-6"
+      className="relative max-w-5xl mx-auto p-8 space-y-6"
     >
+      {/* ── Em Breve overlay ──────────────────────────────────────────────────── */}
+      <div className="absolute inset-0 z-50 rounded-3xl backdrop-blur-sm bg-bg/60 flex flex-col items-center justify-center gap-4 pointer-events-auto">
+        <div className="w-14 h-14 rounded-2xl bg-teal/10 flex items-center justify-center">
+          <BotMessageSquare className="w-7 h-7 text-teal" />
+        </div>
+        <div className="text-center">
+          <p className="font-heading text-3xl text-text-primary mb-2">Em Breve</p>
+          <p className="text-sm text-text-secondary max-w-xs">
+            O bot de atendimento automático estará disponível com a integração oficial do WhatsApp.
+          </p>
+        </div>
+      </div>
       {/* ── Cabeçalho ─────────────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">

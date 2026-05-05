@@ -16,7 +16,9 @@ export type StatusAgendamento =
   | "confirmado"
   | "cancelado"
   | "realizado"
-  | "faltou";
+  | "faltou"
+  | "na_recepcao"
+  | "em_atendimento";
 
 export async function criarAgendamento(dados: {
   pacienteId: string;
@@ -33,6 +35,24 @@ export async function criarAgendamento(dados: {
   const dentistaAlvo = dados.dentistaId ?? dentista.id;
 
   const supabase = await createClient();
+
+  // Verificar que o dentista alvo pertence à clínica (proteção quando secretária especifica dentistaId)
+  if (dados.dentistaId && dados.dentistaId !== dentista.id) {
+    const { count: dentCount } = await supabase
+      .from('dentistas')
+      .select('id', { count: 'exact', head: true })
+      .eq('id', dados.dentistaId)
+      .eq('clinica_id', dentista.clinica_id);
+    if ((dentCount ?? 0) === 0) return { error: 'Dentista não encontrado.' };
+  }
+
+  // Verificar que o paciente pertence à clínica antes de inserir
+  const { count: pacCount } = await supabase
+    .from('pacientes')
+    .select('id', { count: 'exact', head: true })
+    .eq('id', dados.pacienteId)
+    .eq('clinica_id', dentista.clinica_id);
+  if ((pacCount ?? 0) === 0) return { error: 'Paciente não encontrado.' };
 
   // Verificar conflito de horário para o dentista alvo
   const novoInicioMs = new Date(dados.dataHora).getTime();

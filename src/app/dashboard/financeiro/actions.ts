@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { getDentistaCached } from '@/lib/get-dentista';
 import { createClient } from '@/lib/supabase/server';
+import { inserirNotificacao } from '@/lib/notificacoes';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -155,12 +156,16 @@ export async function calcularSaldoMes(mesISO: string): Promise<SaldoMes> {
       .gte('created_at', inicio)
       .lt('created_at', fim),
     despesasQuery,
-    supabase
-      .from('receitas_manuais')
-      .select('valor')
-      .eq('clinica_id', dentista.clinica_id)
-      .gte('data', inicioDate)
-      .lt('data', fimDate),
+    (() => {
+      let q = supabase
+        .from('receitas_manuais')
+        .select('valor')
+        .eq('clinica_id', dentista.clinica_id)
+        .gte('data', inicioDate)
+        .lt('data', fimDate);
+      if (dentista.role === 'dentista') q = q.eq('dentista_id', dentista.id);
+      return q;
+    })(),
   ]);
 
   const receitaPagamentos = (pagamentos  ?? []).reduce((s, p) => s + Number(p.valor), 0);
@@ -302,6 +307,21 @@ export async function criarDespesa(
 
   if (error) return { ok: false, erro: error.message };
 
+  // Notifica o dentista alvo quando quem lança é a secretária
+  if (dentista.role === 'secretaria' && dentistaAlvoId) {
+    const valor = form.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    await inserirNotificacao(supabase, {
+      clinicaId:       dentista.clinica_id,
+      paraRole:        'dentista',
+      paraDentistaId:  dentistaAlvoId,
+      deDentistaId:    dentista.id,
+      tipo:            'sistema',
+      titulo:          `Nova despesa lançada — ${form.categoria}`,
+      mensagem:        `A secretária registrou uma saída de ${valor}${form.descricao ? ` (${form.descricao})` : ''} em seu nome.`,
+      href:            '/dashboard/financeiro',
+    });
+  }
+
   revalidatePath('/dashboard');
   revalidatePath('/dashboard/financeiro');
   return { ok: true, id: (data as { id: string }).id };
@@ -330,7 +350,8 @@ export async function excluirDespesa(
 
 // ─── Receitas Manuais ─────────────────────────────────────────────────────────
 
-/** Lista entradas manuais de um mês (YYYY-MM). */
+/** Lista entradas manuais de um mês (YYYY-MM).
+ *  Dentistas têm silo: vêem apenas as próprias receitas. */
 export async function listarReceitas(mesISO: string): Promise<ReceitaManual[]> {
   const dentista = await getDentistaCached();
   if (!dentista) redirect('/login');
@@ -338,7 +359,7 @@ export async function listarReceitas(mesISO: string): Promise<ReceitaManual[]> {
   const { inicioDate, fimDate } = mesWindow(mesISO);
   const supabase = await createClient();
 
-  const { data } = await supabase
+  let query = supabase
     .from('receitas_manuais')
     .select('*')
     .eq('clinica_id', dentista.clinica_id)
@@ -346,6 +367,11 @@ export async function listarReceitas(mesISO: string): Promise<ReceitaManual[]> {
     .lt('data', fimDate)
     .order('data', { ascending: false });
 
+  if (dentista.role === 'dentista') {
+    query = query.eq('dentista_id', dentista.id);
+  }
+
+  const { data } = await query;
   return (data ?? []) as ReceitaManual[];
 }
 
@@ -378,6 +404,22 @@ export async function criarReceita(
     .single();
 
   if (error) return { ok: false, erro: error.message };
+
+  // Notifica o dentista alvo quando quem lança é a secretária
+  if (dentista.role === 'secretaria' && dentistaAlvoId) {
+    const valor = form.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const forma = { pix: 'PIX', dinheiro: 'Dinheiro', transferencia: 'Transferência', outro: 'Outro' }[form.forma] ?? form.forma;
+    await inserirNotificacao(supabase, {
+      clinicaId:       dentista.clinica_id,
+      paraRole:        'dentista',
+      paraDentistaId:  dentistaAlvoId,
+      deDentistaId:    dentista.id,
+      tipo:            'sistema',
+      titulo:          `Nova entrada lançada — ${forma}`,
+      mensagem:        `A secretária registrou uma entrada de ${valor}${form.descricao ? ` (${form.descricao})` : ''} em seu nome.`,
+      href:            '/dashboard/financeiro',
+    });
+  }
 
   revalidatePath('/dashboard');
   revalidatePath('/dashboard/financeiro');

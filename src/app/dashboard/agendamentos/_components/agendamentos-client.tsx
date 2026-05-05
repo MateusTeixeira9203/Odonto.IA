@@ -15,7 +15,9 @@ import {
   CalendarDays,
   Loader2,
   CheckCircle2,
+  PenLine,
 } from 'lucide-react';
+import { AssinaturaRecepcaoModal } from '@/components/fichas/AssinaturaRecepcaoModal';
 import { useState, useMemo, useCallback, useTransition, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -63,7 +65,6 @@ import {
 } from '../actions';
 import { createClient } from '@/lib/supabase/client';
 import { HelpTooltip } from '@/components/ui/help-tooltip';
-import { GoogleCalendarSyncButton } from '@/components/calendar/sync-button';
 import type { DentistaRole } from '@/types/database';
 import { toast } from 'sonner';
 
@@ -111,7 +112,6 @@ interface Props {
   dentistaAtualId: string;
   /** Lista de dentistas para filtro/form (apenas preenchida para secretária) */
   dentistas: { id: string; nome: string }[];
-  calendarConnected: boolean;
   /** Mapa dentistaId → GCal conectado (secretária) */
   calendarConnectedPerDentista: Record<string, boolean>;
   /** Clínica tem pelo menos uma secretária ativa */
@@ -128,7 +128,6 @@ export function AgendamentosClient({
   role,
   dentistaAtualId,
   dentistas,
-  calendarConnected,
   calendarConnectedPerDentista,
   temSecretaria,
   mesAtual,
@@ -165,6 +164,14 @@ export function AgendamentosClient({
   const [detailMode, setDetailMode] = useState<'view' | 'edit' | 'confirm-delete'>('view');
   const [editForm, setEditForm] = useState({ data: '', hora: '', duracao: '30', observacoes: '' });
 
+  // Assinatura do paciente na recepção
+  const [assinadosLocal, setAssinadosLocal] = useState<Set<string>>(new Set());
+  const [assinaturaModal, setAssinaturaModal] = useState<{
+    pacienteId: string;
+    pacienteNome: string;
+    aptId: string;
+  } | null>(null);
+
   // Filtro por dentista (somente secretária)
   const [filtroDentistaId, setFiltroDentistaId] = useState<string>('todos');
 
@@ -192,7 +199,6 @@ export function AgendamentosClient({
     data: format(new Date(), 'yyyy-MM-dd'),
     hora: '09:00',
     duracao: '30',
-    tipo: '',
     observacoes: '',
     dentistaId: dentistas[0]?.id ?? '',
   });
@@ -266,7 +272,6 @@ export function AgendamentosClient({
       data: format(new Date(), 'yyyy-MM-dd'),
       hora: '09:00',
       duracao: '30',
-      tipo: '',
       observacoes: '',
       dentistaId: dentistas[0]?.id ?? '',
     });
@@ -349,8 +354,7 @@ export function AgendamentosClient({
     const [ano, mes, dia] = novoForm.data.split('-').map(Number);
     const [hora, minuto] = novoForm.hora.split(':').map(Number);
     const dataHora = new Date(ano, mes - 1, dia, hora, minuto).toISOString();
-    const observacoesCombinadas =
-      [novoForm.tipo, novoForm.observacoes].filter(Boolean).join(' — ') || null;
+    const observacoesCombinadas = novoForm.observacoes.trim() || null;
 
     const result = await criarAgendamento({
       pacienteId: novoForm.pacienteId,
@@ -480,26 +484,32 @@ export function AgendamentosClient({
         </div>
 
         <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
-          {/* Filtro por dentista — apenas secretária */}
+          {/* Filtro por dentista — tabs para secretária */}
           {isSecretaria && dentistas.length > 0 && (
-            <div className="flex items-center gap-2">
-              <UserCog className="w-4 h-4 text-muted-foreground shrink-0" />
-              <Select
-                value={filtroDentistaId}
-                onValueChange={(v) => v && setFiltroDentistaId(v)}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                onClick={() => setFiltroDentistaId('todos')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  filtroDentistaId === 'todos'
+                    ? 'bg-teal text-white shadow-sm'
+                    : 'bg-card border border-border text-muted-foreground hover:text-foreground'
+                }`}
               >
-                <SelectTrigger className="h-10 w-48 rounded-xl bg-card border-border text-foreground text-sm">
-                  <SelectValue placeholder="Todos os dentistas" />
-                </SelectTrigger>
-                <SelectContent className="bg-card border-border">
-                  <SelectItem value="todos">Todos os dentistas</SelectItem>
-                  {dentistas.map((d) => (
-                    <SelectItem key={d.id} value={d.id}>
-                      {d.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                Todos
+              </button>
+              {dentistas.map((d) => (
+                <button
+                  key={d.id}
+                  onClick={() => setFiltroDentistaId(d.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    filtroDentistaId === d.id
+                      ? 'bg-teal text-white shadow-sm'
+                      : 'bg-card border border-border text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {d.nome.split(' ')[0]}
+                </button>
+              ))}
             </div>
           )}
 
@@ -514,21 +524,6 @@ export function AgendamentosClient({
                 onClick={() => void handleImportCalendar()}
               />
             )}
-
-          {/* Google Calendar — apenas plano SOLO (dentista autônomo) */}
-          {canEdit && !isSecretaria && (
-            <>
-              <GoogleCalendarSyncButton connected={calendarConnected} />
-              {calendarConnected && (
-                <ImportCalendarButton
-                  isImporting={isImporting}
-                  progress={importProgress}
-                  done={importDone}
-                  onClick={() => void handleImportCalendar()}
-                />
-              )}
-            </>
-          )}
 
           {/* Novo Agendamento — plano SOLO ou secretária */}
           {canEdit && (
@@ -734,7 +729,34 @@ export function AgendamentosClient({
                               )}
                             </div>
 
-                            <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex gap-2 flex-wrap justify-end" onClick={(e) => e.stopPropagation()}>
+                              {/* Botão check-in rápido — apenas secretária */}
+                              {isSecretaria && (apt.status === 'agendado' || apt.status === 'confirmado') && (
+                                <button
+                                  onClick={() => void handleStatusChange(apt.id, 'na_recepcao')}
+                                  className="px-4 py-2.5 min-h-[44px] text-sm font-semibold text-white bg-teal hover:bg-teal-lt rounded-lg transition-colors flex items-center gap-1.5"
+                                  style={{ boxShadow: '0 4px 12px -4px rgba(47,156,133,0.4)' }}
+                                >
+                                  <CheckCircle2 className="w-4 h-4" />
+                                  Chegou!
+                                </button>
+                              )}
+                              {/* Solicitar assinatura — secretária, paciente presente ou atendimento concluído */}
+                              {isSecretaria && (apt.status === 'na_recepcao' || apt.status === 'em_atendimento' || apt.status === 'realizado') && apt.paciente && (
+                                assinadosLocal.has(apt.id) ? (
+                                  <span className="px-4 py-2.5 min-h-[44px] text-sm font-semibold text-teal bg-teal/10 border border-teal/20 rounded-lg flex items-center gap-1.5">
+                                    <CheckCircle2 className="w-4 h-4" /> Assinado
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={() => setAssinaturaModal({ pacienteId: apt.paciente!.id, pacienteNome: apt.paciente!.nome, aptId: apt.id })}
+                                    className="px-4 py-2.5 min-h-[44px] text-sm font-semibold text-text-secondary border border-border rounded-lg hover:bg-teal/5 hover:text-teal hover:border-teal/30 transition-colors flex items-center gap-1.5"
+                                  >
+                                    <PenLine className="w-4 h-4" />
+                                    Assinar
+                                  </button>
+                                )
+                              )}
                               <button
                                 onClick={() => router.push(`/dashboard/pacientes/${apt.paciente?.id}`)}
                                 className="px-4 py-2.5 min-h-[44px] text-sm font-semibold text-foreground border border-border rounded-lg hover:bg-accent active:bg-accent transition-colors"
@@ -782,183 +804,218 @@ export function AgendamentosClient({
 
       {/* Modal: Novo Agendamento */}
       <Dialog open={isNewModalOpen} onOpenChange={(open) => { if (!open) resetForm(); setIsNewModalOpen(open); }}>
-        <DialogContent className="max-w-md rounded-2xl bg-card border-border">
-          <DialogHeader>
-            <DialogTitle className="font-heading text-2xl text-foreground">
-              Novo Agendamento
-            </DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              Preencha os dados para marcar uma nova consulta.
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="max-w-2xl rounded-2xl bg-card border-border p-0 gap-0 overflow-hidden max-h-[90vh]">
+          <DialogDescription className="sr-only">Preencha os dados para marcar uma nova consulta.</DialogDescription>
+          <div className="flex h-full">
 
-          <div className="space-y-4 py-4">
-            {/* Dentista — apenas secretária */}
-            {isSecretaria && dentistas.length > 0 && (
-              <div className="space-y-2">
-                <Label className="text-foreground">
-                  Dentista <span className="text-red-500">*</span>
-                </Label>
-                <Select
-                  value={novoForm.dentistaId}
-                  onValueChange={(v) => v && setNovoForm((f) => ({ ...f, dentistaId: v }))}
-                >
-                  <SelectTrigger className="rounded-xl bg-muted border-border text-foreground">
-                    <SelectValue>
-                      {(v: string | null) =>
-                        v
-                          ? (dentistas.find((d) => d.id === v)?.nome ?? v)
-                          : 'Selecione o dentista...'
-                      }
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent className="bg-card border-border">
-                    {dentistas.map((d) => (
-                      <SelectItem key={d.id} value={d.id}>
-                        {d.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            {/* Coluna esquerda — paciente + dentista + observações */}
+            <div className="flex-1 min-w-0 overflow-y-auto p-6 space-y-5">
+              <DialogHeader>
+                <DialogTitle className="font-heading text-2xl text-foreground">
+                  Novo Agendamento
+                </DialogTitle>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Preencha os dados para marcar uma nova consulta.
+                </p>
+              </DialogHeader>
 
-            {/* Busca de paciente com autocomplete */}
-            <div className="space-y-2 relative">
-              <Label htmlFor="patient" className="text-foreground">
-                Paciente <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="patient"
-                placeholder="Digite o nome do paciente..."
-                value={novoForm.pacienteSearch}
-                autoComplete="off"
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setNovoForm((f) => ({ ...f, pacienteSearch: v, pacienteId: '', pacienteNome: '' }));
-                  setShowSugestoes(true);
-                  void buscarPacientes(v);
-                }}
-                className="rounded-xl bg-muted border-border text-foreground"
-              />
-              {showSugestoes && pacienteSugestoes.length > 0 && (
-                <div className="absolute z-50 w-full bg-card border border-border rounded-xl shadow-lg mt-1 overflow-hidden">
-                  {pacienteSugestoes.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => {
-                        setNovoForm((f) => ({
-                          ...f,
-                          pacienteSearch: p.nome,
-                          pacienteId: p.id,
-                          pacienteNome: p.nome,
-                        }));
-                        setShowSugestoes(false);
-                        setPacienteSugestoes([]);
-                      }}
-                      className="w-full px-4 py-2.5 text-sm text-left hover:bg-muted transition-colors text-foreground"
-                    >
-                      {p.nome}
-                    </button>
-                  ))}
+              {/* Dentista — apenas secretária */}
+              {isSecretaria && dentistas.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-foreground text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Dentista <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={novoForm.dentistaId}
+                    onValueChange={(v) => v && setNovoForm((f) => ({ ...f, dentistaId: v }))}
+                  >
+                    <SelectTrigger className="rounded-xl bg-muted border-border text-foreground">
+                      <SelectValue>
+                        {(v: string | null) =>
+                          v
+                            ? (dentistas.find((d) => d.id === v)?.nome ?? v)
+                            : 'Selecione o dentista...'
+                        }
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-border">
+                      {dentistas.map((d) => (
+                        <SelectItem key={d.id} value={d.id}>
+                          {d.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
-            </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="apt-date" className="text-foreground">
-                  Data
+              {/* Busca de paciente com autocomplete */}
+              <div className="space-y-2 relative">
+                <Label htmlFor="patient" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Paciente <span className="text-red-500">*</span>
                 </Label>
                 <Input
-                  id="apt-date"
-                  type="date"
-                  value={novoForm.data}
-                  onChange={(e) => setNovoForm((f) => ({ ...f, data: e.target.value }))}
+                  id="patient"
+                  placeholder="Digite o nome do paciente..."
+                  value={novoForm.pacienteSearch}
+                  autoComplete="off"
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setNovoForm((f) => ({ ...f, pacienteSearch: v, pacienteId: '', pacienteNome: '' }));
+                    setShowSugestoes(true);
+                    void buscarPacientes(v);
+                  }}
                   className="rounded-xl bg-muted border-border text-foreground"
                 />
+                {showSugestoes && pacienteSugestoes.length > 0 && (
+                  <div className="absolute z-50 w-full bg-card border border-border rounded-xl shadow-lg mt-1 overflow-hidden">
+                    {pacienteSugestoes.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => {
+                          setNovoForm((f) => ({
+                            ...f,
+                            pacienteSearch: p.nome,
+                            pacienteId: p.id,
+                            pacienteNome: p.nome,
+                          }));
+                          setShowSugestoes(false);
+                          setPacienteSugestoes([]);
+                        }}
+                        className="w-full px-4 py-2.5 text-sm text-left hover:bg-muted transition-colors text-foreground"
+                      >
+                        {p.nome}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {novoForm.pacienteId && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-teal/5 border border-teal/20 rounded-lg text-sm text-teal font-medium">
+                    <User className="w-4 h-4 shrink-0" />
+                    {novoForm.pacienteNome}
+                  </div>
+                )}
               </div>
+
+              {/* Observações */}
               <div className="space-y-2">
-                <Label htmlFor="apt-time" className="text-foreground">
-                  Hora
+                <Label htmlFor="apt-notes" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Observações
                 </Label>
-                <Input
-                  id="apt-time"
-                  type="time"
-                  value={novoForm.hora}
-                  onChange={(e) => setNovoForm((f) => ({ ...f, hora: e.target.value }))}
-                  className="rounded-xl bg-muted border-border text-foreground"
+                <textarea
+                  id="apt-notes"
+                  value={novoForm.observacoes}
+                  onChange={(e) => setNovoForm((f) => ({ ...f, observacoes: e.target.value }))}
+                  className="w-full bg-muted border border-border rounded-xl p-3 text-sm min-h-[100px] focus:ring-2 focus:ring-teal/20 transition-all resize-none text-foreground placeholder:text-muted-foreground/50"
+                  placeholder="Notas adicionais sobre a consulta..."
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-foreground">Duração (min)</Label>
-                <Select
-                  value={novoForm.duracao}
-                  onValueChange={(v) => v && setNovoForm((f) => ({ ...f, duracao: v }))}
+            {/* Coluna direita — data, hora, duração + ações */}
+            <div className="w-60 shrink-0 border-l border-border flex flex-col bg-muted/20">
+              <div className="p-6 space-y-5 flex-1">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Quando
+                </p>
+
+                <div className="space-y-2">
+                  <Label htmlFor="apt-date" className="text-sm font-medium text-foreground">
+                    Data
+                  </Label>
+                  <Input
+                    id="apt-date"
+                    type="date"
+                    value={novoForm.data}
+                    onChange={(e) => setNovoForm((f) => ({ ...f, data: e.target.value }))}
+                    className="rounded-xl bg-muted border-border text-foreground"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="apt-time" className="text-sm font-medium text-foreground">
+                    Hora
+                  </Label>
+                  <Input
+                    id="apt-time"
+                    type="time"
+                    value={novoForm.hora}
+                    onChange={(e) => setNovoForm((f) => ({ ...f, hora: e.target.value }))}
+                    className="rounded-xl bg-muted border-border text-foreground"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-foreground">Duração</Label>
+                  <Select
+                    value={novoForm.duracao}
+                    onValueChange={(v) => v && setNovoForm((f) => ({ ...f, duracao: v }))}
+                  >
+                    <SelectTrigger className="rounded-xl bg-muted border-border text-foreground">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-border">
+                      <SelectItem value="15">15 min</SelectItem>
+                      <SelectItem value="30">30 min</SelectItem>
+                      <SelectItem value="45">45 min</SelectItem>
+                      <SelectItem value="60">1 hora</SelectItem>
+                      <SelectItem value="90">1h 30min</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Resumo visual */}
+                {novoForm.pacienteId && novoForm.data && novoForm.hora && (
+                  <div className="rounded-xl border border-teal/20 bg-teal/5 p-3 space-y-1 text-sm">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-teal mb-2">Resumo</div>
+                    <div className="text-foreground font-medium truncate">{novoForm.pacienteNome}</div>
+                    <div className="text-muted-foreground font-mono text-xs">
+                      {novoForm.data.split('-').reverse().join('/')} às {novoForm.hora}
+                    </div>
+                    <div className="text-muted-foreground text-xs">{novoForm.duracao} min</div>
+                  </div>
+                )}
+              </div>
+
+              {/* Rodapé com erro + botões */}
+              <div className="p-4 border-t border-border space-y-2">
+                {saveError && (
+                  <p className="text-xs text-red-500 bg-red-500/10 rounded-lg p-2">{saveError}</p>
+                )}
+                <Button
+                  onClick={() => void handleCriarAgendamento()}
+                  disabled={isSaving}
+                  className="w-full bg-teal text-white hover:bg-teal-lt rounded-xl disabled:opacity-50"
                 >
-                  <SelectTrigger className="rounded-xl bg-muted border-border text-foreground">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-card border-border">
-                    <SelectItem value="15">15 min</SelectItem>
-                    <SelectItem value="30">30 min</SelectItem>
-                    <SelectItem value="45">45 min</SelectItem>
-                    <SelectItem value="60">60 min</SelectItem>
-                    <SelectItem value="90">90 min</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-foreground">Procedimento</Label>
-                <Input
-                  placeholder="Ex: Limpeza, Avaliação..."
-                  value={novoForm.tipo}
-                  onChange={(e) => setNovoForm((f) => ({ ...f, tipo: e.target.value }))}
-                  className="rounded-xl bg-muted border-border text-foreground"
-                />
+                  {isSaving ? 'Salvando...' : 'Salvar Agendamento'}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => { setIsNewModalOpen(false); resetForm(); }}
+                  className="w-full rounded-xl border-border text-foreground hover:bg-muted"
+                >
+                  Cancelar
+                </Button>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="apt-notes" className="text-foreground">
-                Observações
-              </Label>
-              <textarea
-                id="apt-notes"
-                value={novoForm.observacoes}
-                onChange={(e) => setNovoForm((f) => ({ ...f, observacoes: e.target.value }))}
-                className="w-full bg-muted border border-border rounded-xl p-3 text-sm min-h-[80px] focus:ring-2 focus:ring-teal/20 transition-all resize-none text-foreground placeholder:text-muted-foreground/50"
-                placeholder="Notas adicionais..."
-              />
-            </div>
-
-            {saveError && (
-              <p className="text-sm text-red-500 bg-red-500/10 rounded-lg p-3">{saveError}</p>
-            )}
           </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => { setIsNewModalOpen(false); resetForm(); }}
-              className="rounded-xl border-border text-foreground hover:bg-muted"
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={() => void handleCriarAgendamento()}
-              disabled={isSaving}
-              className="bg-teal text-white hover:bg-teal-lt rounded-xl disabled:opacity-50"
-            >
-              {isSaving ? 'Salvando...' : 'Salvar Agendamento'}
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Modal: Assinatura do paciente */}
+      {assinaturaModal && (
+        <AssinaturaRecepcaoModal
+          open={!!assinaturaModal}
+          onOpenChange={(open) => { if (!open) setAssinaturaModal(null); }}
+          pacienteId={assinaturaModal.pacienteId}
+          pacienteNome={assinaturaModal.pacienteNome}
+          onSigned={() => {
+            setAssinadosLocal(prev => new Set([...prev, assinaturaModal.aptId]));
+          }}
+        />
+      )}
 
       {/* Modal: Detalhe do agendamento */}
       <Dialog
@@ -1051,6 +1108,23 @@ export function AgendamentosClient({
                         </SelectContent>
                       </Select>
                     </div>
+
+                    {/* Assinatura do paciente — secretária */}
+                    {isSecretaria && (selectedApt.status === 'na_recepcao' || selectedApt.status === 'em_atendimento' || selectedApt.status === 'realizado') && selectedApt.paciente && (
+                      assinadosLocal.has(selectedApt.id) ? (
+                        <div className="flex items-center gap-2 text-sm font-semibold text-teal bg-teal/10 rounded-xl px-4 py-3 border border-teal/20">
+                          <CheckCircle2 className="w-4 h-4" /> Assinatura registrada
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setAssinaturaModal({ pacienteId: selectedApt.paciente!.id, pacienteNome: selectedApt.paciente!.nome, aptId: selectedApt.id })}
+                          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-border text-sm font-semibold text-text-secondary hover:bg-teal/5 hover:text-teal hover:border-teal/30 transition-all"
+                        >
+                          <PenLine className="w-4 h-4" />
+                          Solicitar Assinatura do Paciente
+                        </button>
+                      )
+                    )}
                   </div>
 
                   <DialogFooter className="flex-col sm:flex-row gap-2">

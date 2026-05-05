@@ -91,11 +91,22 @@ interface ProcedimentoClinica {
   preco_padrao: number | null;
 }
 
+interface FichaProc {
+  fichaId: string;
+  fichaDate: string;
+  tooth: number;
+  descricao: string;
+  /** `${fichaId}::${tooth}_${noteIndex}` — chave global única */
+  globalKey: string;
+}
+
 interface NovoOrcItem {
   procedimentoId: string;
   descricao: string;
   quantidade: number;
   preco: string;
+  /** Preenchido quando o item veio da seleção na ficha do paciente */
+  fichaKey?: string;
 }
 
 export function OrcamentosClient({
@@ -131,16 +142,26 @@ export function OrcamentosClient({
   const [novoOrcPacienteSearch, setNovoOrcPacienteSearch] = useState('');
   const [novoOrcPacienteId, setNovoOrcPacienteId] = useState('');
   const [novoOrcPacienteNome, setNovoOrcPacienteNome] = useState('');
+  const [novoOrcDentistaId, setNovoOrcDentistaId] = useState<string>(() => dentistas[0]?.id ?? '');
   const [pacienteSugestoes, setPacienteSugestoes] = useState<{ id: string; nome: string }[]>([]);
   const [showSugestoes, setShowSugestoes] = useState(false);
   const [orcSaving, setOrcSaving] = useState(false);
   const [orcError, setOrcError] = useState<string | null>(null);
+
+  // Procedimentos da ficha (carregados ao selecionar paciente)
+  const [fichaProcs, setFichaProcs] = useState<FichaProc[]>([]);
+  const [fichaProcsLoading, setFichaProcsLoading] = useState(false);
+  const [selectedFichaKeys, setSelectedFichaKeys] = useState<Set<string>>(new Set());
+
+  // Desconto por percentual (null = sem percentual ativo, controle manual)
+  const [descontoPercent, setDescontoPercent] = useState<5 | 10 | 15 | null>(null);
 
   // Registrar pagamento (painel lateral)
   const [pagForm, setPagForm] = useState({
     valor: '',
     formaPagamento: 'pix' as FormaPagamento,
     data: new Date().toISOString().split('T')[0],
+    dataVencimento: '',
   });
   const [pagSaving, setPagSaving] = useState(false);
   const [pagError, setPagError] = useState<string | null>(null);
@@ -198,8 +219,81 @@ export function OrcamentosClient({
     setPacienteSugestoes(data ?? []);
   }, []);
 
+  const buscarProcedimentosFicha = useCallback(async (pacienteId: string) => {
+    if (!pacienteId) { setFichaProcs([]); return; }
+    setFichaProcsLoading(true);
+    const supabase = createClient();
+    const { data } = await supabase
+      .from('fichas')
+      .select('id, created_at, dentes_afetados, dentes_observacoes, procedimentos_concluidos')
+      .eq('paciente_id', pacienteId)
+      .eq('clinica_id', clinicaId)
+      .order('created_at', { ascending: false });
+
+    const procs: FichaProc[] = [];
+    for (const ficha of (data ?? []) as {
+      id: string;
+      created_at: string;
+      dentes_afetados: number[];
+      dentes_observacoes: Record<string, string>;
+      procedimentos_concluidos: string[];
+    }[]) {
+      const done = new Set(ficha.procedimentos_concluidos ?? []);
+      for (const tooth of (ficha.dentes_afetados ?? [])) {
+        const raw = ficha.dentes_observacoes?.[String(tooth)] ?? '';
+        raw.split('\n').filter(Boolean).forEach((note, i) => {
+          const key = `${tooth}_${i}`;
+          if (!done.has(key)) {
+            procs.push({
+              fichaId: ficha.id,
+              fichaDate: ficha.created_at,
+              tooth,
+              descricao: note,
+              globalKey: `${ficha.id}::${key}`,
+            });
+          }
+        });
+      }
+    }
+    setFichaProcs(procs);
+    setFichaProcsLoading(false);
+  }, [clinicaId]);
+
+  const handleToggleFichaProc = useCallback((proc: FichaProc) => {
+    const isSelected = selectedFichaKeys.has(proc.globalKey);
+
+    if (isSelected) {
+      setNovoOrcItens(prev => prev.filter(i => i.fichaKey !== proc.globalKey));
+      setSelectedFichaKeys(prev => {
+        const next = new Set(prev);
+        next.delete(proc.globalKey);
+        return next;
+      });
+    } else {
+      const newItem: NovoOrcItem = {
+        procedimentoId: '',
+        descricao: `Dente ${proc.tooth} – ${proc.descricao}`,
+        quantidade: 1,
+        preco: '',
+        fichaKey: proc.globalKey,
+      };
+      setNovoOrcItens(prev => {
+        const cleaned = prev.filter(i => i.descricao !== '' || i.preco !== '');
+        return [...cleaned, newItem];
+      });
+      setSelectedFichaKeys(prev => new Set([...prev, proc.globalKey]));
+    }
+  }, [selectedFichaKeys]);
+
   const novoOrcSubtotal = novoOrcItens.reduce((s, i) => s + i.quantidade * centsToFloat(i.preco), 0);
   const novoOrcTotal = Math.max(0, novoOrcSubtotal - novoOrcDesconto);
+
+  // Recalcula desconto em R$ quando percentual ou subtotal mudam
+  useEffect(() => {
+    if (descontoPercent !== null) {
+      setNovoOrcDesconto(Math.round(novoOrcSubtotal * descontoPercent) / 100);
+    }
+  }, [descontoPercent, novoOrcSubtotal]);
 
   // Dentistas únicos para o dropdown da secretaria
   const dentistasUnicos = useMemo(() => {
@@ -317,12 +411,16 @@ export function OrcamentosClient({
     setPagError(null);
     setPagSaving(true);
 
+    const hoje = new Date().toISOString().split('T')[0];
+    const isAgendado = pagForm.dataVencimento && pagForm.dataVencimento > hoje;
+
     const result = await registrarPagamento({
       orcamentoId: selected.id,
       pacienteId: selected.paciente?.id ?? '',
       valor,
       formaPagamento: pagForm.formaPagamento,
       data: pagForm.data,
+      dataVencimento: pagForm.dataVencimento || undefined,
       dentistaId: selected.dentista?.id,
     });
 
@@ -333,9 +431,11 @@ export function OrcamentosClient({
         id: result.id ?? crypto.randomUUID(),
         orcamento_id: selected.id,
         valor,
-        status: 'pago',
-        forma_pagamento: pagForm.formaPagamento,
-        data_pagamento: pagForm.data,
+        status: isAgendado ? 'pendente' : 'pago',
+        forma_pagamento: isAgendado ? null : pagForm.formaPagamento,
+        data_pagamento: isAgendado ? null : pagForm.data,
+        data_vencimento: pagForm.dataVencimento || null,
+        marcado_por: null,
       };
       setOrcamentos((prev) =>
         prev.map((o) => {
@@ -355,6 +455,7 @@ export function OrcamentosClient({
         valor: '',
         formaPagamento: 'pix',
         data: new Date().toISOString().split('T')[0],
+        dataVencimento: '',
       });
       router.refresh();
     }
@@ -378,6 +479,7 @@ export function OrcamentosClient({
     const result = await criarOrcamento({
       pacienteId: novoOrcPacienteId,
       desconto: novoOrcDesconto,
+      dentistaId: isSecretaria ? novoOrcDentistaId : undefined,
       itens: itensValidos.map((i) => ({
         procedimentoId: i.procedimentoId || null,
         descricao: i.descricao,
@@ -399,7 +501,9 @@ export function OrcamentosClient({
         validade_dias: 30,
         condicoes_pagamento: null,
         paciente: { id: novoOrcPacienteId, nome: novoOrcPacienteNome, telefone: null },
-        dentista: null,
+        dentista: isSecretaria
+          ? (dentistas.find((d) => d.id === novoOrcDentistaId) ?? null)
+          : null,
         itens: itensValidos.map(
           (i): OrcamentoItemRow => ({
             id: crypto.randomUUID(),
@@ -419,6 +523,11 @@ export function OrcamentosClient({
       setNovoOrcPacienteSearch('');
       setNovoOrcPacienteId('');
       setNovoOrcPacienteNome('');
+      setNovoOrcDentistaId(dentistas[0]?.id ?? '');
+      setFichaProcs([]);
+      setSelectedFichaKeys(new Set());
+      setDescontoPercent(null);
+      setFichaProcsLoading(false);
       router.refresh();
     }
     setOrcSaving(false);
@@ -495,6 +604,8 @@ export function OrcamentosClient({
         status: 'pago',
         forma_pagamento: formaPagamento,
         data_pagamento: hoje,
+        data_vencimento: null,
+        marcado_por: null,
       };
       setOrcamentos((prev) =>
         prev.map((o) =>
@@ -710,6 +821,7 @@ export function OrcamentosClient({
                         valor: '',
                         formaPagamento: 'pix',
                         data: new Date().toISOString().split('T')[0],
+                        dataVencimento: '',
                       });
                       // Marca como visto ao abrir
                       setViewedIds((prev) => new Set([...prev, o.id]));
@@ -1146,35 +1258,57 @@ export function OrcamentosClient({
                 {selected.pagamentos.length > 0 && (
                   <div>
                     <label className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest mb-3 flex items-center gap-2">
-                      <CreditCard className="w-3 h-3" /> Pagamentos
+                      <CreditCard className="w-3 h-3" /> Parcelas
                     </label>
                     <div className="space-y-2">
-                      {selected.pagamentos.map((pag) => (
-                        <div
-                          key={pag.id}
-                          className="flex items-center justify-between p-3 bg-card rounded-xl border border-border"
-                        >
-                          <div>
-                            <div className="font-mono text-sm font-semibold text-foreground">
-                              {formatCurrency(pag.valor)}
-                            </div>
-                            {pag.forma_pagamento && (
-                              <div className="text-[10px] text-muted-foreground uppercase mt-0.5">
-                                {pag.forma_pagamento.replace(/_/g, ' ')}
-                              </div>
-                            )}
-                          </div>
-                          <span
-                            className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md ${
-                              pag.status === 'pago'
-                                ? 'bg-teal/10 text-teal'
-                                : 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'
+                      {selected.pagamentos.map((pag) => {
+                        const isVencido = pag.status === 'pendente' && pag.data_vencimento && pag.data_vencimento < hoje;
+                        return (
+                          <div
+                            key={pag.id}
+                            className={`flex items-center justify-between p-3 rounded-xl border ${
+                              isVencido
+                                ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800/40'
+                                : 'bg-card border-border'
                             }`}
                           >
-                            {pag.status}
-                          </span>
-                        </div>
-                      ))}
+                            <div className="min-w-0">
+                              <div className="font-mono text-sm font-semibold text-foreground">
+                                {formatCurrency(pag.valor)}
+                              </div>
+                              <div className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-2 flex-wrap">
+                                {pag.forma_pagamento && (
+                                  <span className="uppercase">{pag.forma_pagamento.replace(/_/g, ' ')}</span>
+                                )}
+                                {pag.data_vencimento && (
+                                  <span className={isVencido ? 'text-red-500 font-semibold' : ''}>
+                                    vence {format(parseISO(pag.data_vencimento), "dd/MM/yyyy", { locale: ptBR })}
+                                  </span>
+                                )}
+                                {pag.data_pagamento && pag.status === 'pago' && (
+                                  <span>
+                                    pago em {format(parseISO(pag.data_pagamento), "dd/MM/yyyy", { locale: ptBR })}
+                                    {pag.marcado_por?.nome && (
+                                      <> · por {pag.marcado_por.nome}</>
+                                    )}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <span
+                              className={`shrink-0 text-[10px] font-bold uppercase px-2 py-0.5 rounded-md ${
+                                pag.status === 'pago'
+                                  ? 'bg-teal/10 text-teal'
+                                  : isVencido
+                                    ? 'bg-red-500/10 text-red-500'
+                                    : 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'
+                              }`}
+                            >
+                              {pag.status === 'pago' ? 'Pago' : isVencido ? 'Vencido' : 'Pendente'}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -1200,69 +1334,100 @@ export function OrcamentosClient({
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <Label className="text-foreground text-xs">Valor (R$)</Label>
-                      <Input
-                        type="number"
-                        placeholder={restante > 0 ? restante.toFixed(2) : '0,00'}
-                        min="0"
-                        step="0.01"
-                        value={pagForm.valor}
-                        onChange={(e) =>
-                          setPagForm((f) => ({ ...f, valor: e.target.value }))
-                        }
-                        className="rounded-xl bg-muted border-border text-foreground"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-foreground text-xs">Data</Label>
-                      <Input
-                        type="date"
-                        value={pagForm.data}
-                        onChange={(e) =>
-                          setPagForm((f) => ({ ...f, data: e.target.value }))
-                        }
-                        className="rounded-xl bg-muted border-border text-foreground"
-                      />
-                    </div>
-                  </div>
+                  {(() => {
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    const isAgendado = pagForm.dataVencimento && pagForm.dataVencimento > todayStr;
+                    return (
+                      <>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <Label className="text-foreground text-xs">Valor (R$)</Label>
+                            <Input
+                              type="number"
+                              placeholder={restante > 0 ? restante.toFixed(2) : '0,00'}
+                              min="0"
+                              step="0.01"
+                              value={pagForm.valor}
+                              onChange={(e) => setPagForm((f) => ({ ...f, valor: e.target.value }))}
+                              className="rounded-xl bg-muted border-border text-foreground"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-foreground text-xs">
+                              Vencimento <span className="text-muted-foreground font-normal">(parcela futura)</span>
+                            </Label>
+                            <Input
+                              type="date"
+                              value={pagForm.dataVencimento}
+                              min={todayStr}
+                              onChange={(e) => setPagForm((f) => ({ ...f, dataVencimento: e.target.value }))}
+                              className="rounded-xl bg-muted border-border text-foreground"
+                            />
+                          </div>
+                        </div>
 
-                  <div className="space-y-1.5">
-                    <Label className="text-foreground text-xs">Forma de Pagamento</Label>
-                    <Select
-                      value={pagForm.formaPagamento}
-                      onValueChange={(v) =>
-                        v && setPagForm((f) => ({ ...f, formaPagamento: v as FormaPagamento }))
-                      }
-                    >
-                      <SelectTrigger className="rounded-xl bg-muted border-border text-foreground">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-card border-border">
-                        <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                        <SelectItem value="pix">PIX</SelectItem>
-                        <SelectItem value="cartao_credito">Cartão de Crédito</SelectItem>
-                        <SelectItem value="cartao_debito">Cartão de Débito</SelectItem>
-                        <SelectItem value="boleto">Boleto</SelectItem>
-                        <SelectItem value="outro">Outro</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                        {!isAgendado && (
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                              <Label className="text-foreground text-xs">Data do Pagamento</Label>
+                              <Input
+                                type="date"
+                                value={pagForm.data}
+                                onChange={(e) => setPagForm((f) => ({ ...f, data: e.target.value }))}
+                                className="rounded-xl bg-muted border-border text-foreground"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-foreground text-xs">Forma de Pagamento</Label>
+                              <Select
+                                value={pagForm.formaPagamento}
+                                onValueChange={(v) => v && setPagForm((f) => ({ ...f, formaPagamento: v as FormaPagamento }))}
+                              >
+                                <SelectTrigger className="rounded-xl bg-muted border-border text-foreground">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="bg-card border-border">
+                                  <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                                  <SelectItem value="pix">PIX</SelectItem>
+                                  <SelectItem value="cartao_credito">Cartão de Crédito</SelectItem>
+                                  <SelectItem value="cartao_debito">Cartão de Débito</SelectItem>
+                                  <SelectItem value="boleto">Boleto</SelectItem>
+                                  <SelectItem value="outro">Outro</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        )}
 
-                  {pagError && (
-                    <p className="text-xs text-red-500 bg-red-500/10 rounded-lg px-3 py-2">
-                      {pagError}
-                    </p>
-                  )}
+                        {isAgendado && (
+                          <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-xl px-3 py-2.5">
+                            <Calendar className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                            <p className="text-xs text-amber-700 dark:text-amber-400">
+                              Parcela futura — será registrada como <strong>pendente</strong>
+                            </p>
+                          </div>
+                        )}
 
-                  <Button
-                    onClick={() => void handleRegistrarPagamento()}
-                    disabled={pagSaving || !pagForm.valor}
-                    className="w-full bg-teal text-white hover:bg-teal-lt rounded-xl disabled:opacity-50"
-                  >
-                    {pagSaving ? 'Salvando...' : 'Confirmar Pagamento'}
-                  </Button>
+                        {pagError && (
+                          <p className="text-xs text-red-500 bg-red-500/10 rounded-lg px-3 py-2">
+                            {pagError}
+                          </p>
+                        )}
+
+                        <Button
+                          onClick={() => void handleRegistrarPagamento()}
+                          disabled={pagSaving || !pagForm.valor}
+                          className="w-full bg-teal text-white hover:bg-teal-lt rounded-xl disabled:opacity-50"
+                        >
+                          {pagSaving
+                            ? 'Salvando...'
+                            : isAgendado
+                              ? 'Agendar Parcela'
+                              : 'Confirmar Pagamento'}
+                        </Button>
+                      </>
+                    );
+                  })()}
                 </div>
                   );
                 })()}
@@ -1395,246 +1560,385 @@ export function OrcamentosClient({
       </Dialog>
 
       {/* Dialog: Novo Orçamento */}
-      <Dialog open={isNovoOrcOpen} onOpenChange={setIsNovoOrcOpen}>
-        <DialogContent className="max-w-lg rounded-2xl bg-card border-border max-h-[90vh] overflow-y-auto scrollbar-hide">
-          <DialogHeader>
-            <DialogTitle className="font-heading text-2xl text-foreground">
-              Novo Orçamento
-            </DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              Selecione o paciente e os procedimentos.
-            </DialogDescription>
-          </DialogHeader>
+      <Dialog
+        open={isNovoOrcOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsNovoOrcOpen(false);
+            setNovoOrcItens([{ procedimentoId: '', descricao: '', quantidade: 1, preco: '' }]);
+            setNovoOrcDesconto(0);
+            setNovoOrcPacienteSearch('');
+            setNovoOrcPacienteId('');
+            setNovoOrcPacienteNome('');
+            setOrcError(null);
+            setFichaProcs([]);
+            setSelectedFichaKeys(new Set());
+            setDescontoPercent(null);
+            setFichaProcsLoading(false);
+          } else {
+            setIsNovoOrcOpen(true);
+          }
+        }}
+      >
+        <DialogContent className="max-w-3xl rounded-2xl bg-card border-border p-0 overflow-hidden gap-0 max-h-[90vh]">
+          <div className="flex" style={{ maxHeight: '90vh' }}>
 
-          <div className="space-y-5 py-4">
-            {/* Busca de paciente */}
-            <div className="space-y-2 relative">
-              <Label className="text-foreground text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                Paciente <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                placeholder="Digite o nome do paciente..."
-                value={novoOrcPacienteSearch}
-                autoComplete="off"
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setNovoOrcPacienteSearch(v);
-                  setNovoOrcPacienteId('');
-                  setNovoOrcPacienteNome('');
-                  setShowSugestoes(true);
-                  void buscarPacientes(v);
-                }}
-                className="rounded-xl bg-muted border-border text-foreground"
-              />
-              {showSugestoes && pacienteSugestoes.length > 0 && (
-                <div className="absolute z-50 w-full bg-card border border-border rounded-xl shadow-lg mt-1 overflow-hidden">
-                  {pacienteSugestoes.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => {
-                        setNovoOrcPacienteSearch(p.nome);
-                        setNovoOrcPacienteId(p.id);
-                        setNovoOrcPacienteNome(p.nome);
-                        setShowSugestoes(false);
-                        setPacienteSugestoes([]);
-                      }}
-                      className="w-full px-4 py-2.5 text-sm text-left hover:bg-muted transition-colors text-foreground"
-                    >
-                      {p.nome}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            {/* ── Coluna esquerda: scrollável ── */}
+            <div className="flex-1 min-w-0 overflow-y-auto p-6 space-y-5">
+              <DialogHeader>
+                <DialogTitle className="font-heading text-2xl text-foreground">
+                  Novo Orçamento
+                </DialogTitle>
+                <DialogDescription className="text-muted-foreground">
+                  Selecione o paciente e os procedimentos a cobrar.
+                </DialogDescription>
+              </DialogHeader>
 
-            {/* Itens / Procedimentos */}
-            <div className="space-y-3">
-              <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
-                Procedimentos
-              </Label>
-
-              {novoOrcItens.map((item, idx) => (
-                <div key={idx} className="bg-muted rounded-2xl border border-border p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
-                      Procedimento {idx + 1}
-                    </span>
-                    {novoOrcItens.length > 1 && (
-                      <button
-                        onClick={() =>
-                          setNovoOrcItens((prev) => prev.filter((_, i) => i !== idx))
-                        }
-                        className="p-1 text-red-400 hover:text-red-500 transition-colors"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-
-                  <Select
-                    value={item.procedimentoId}
-                    onValueChange={(v) => {
-                      if (!v) return;
-                      const proc = procedimentosClinica.find((p) => p.id === v);
-                      setNovoOrcItens((prev) =>
-                        prev.map((it, i) =>
-                          i === idx
-                            ? {
-                                ...it,
-                                procedimentoId: v,
-                                descricao: proc?.nome ?? it.descricao,
-                                preco: proc?.preco_padrao != null ? floatToCents(proc.preco_padrao) : it.preco,
-                              }
-                            : it
-                        )
-                      );
-                    }}
+              {/* Seletor de dentista — apenas para secretária */}
+              {isSecretaria && dentistas.length > 1 && (
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                    Dentista <span className="text-red-500">*</span>
+                  </Label>
+                  <select
+                    value={novoOrcDentistaId}
+                    onChange={(e) => setNovoOrcDentistaId(e.target.value)}
+                    className="w-full rounded-xl bg-muted border border-border text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal/50"
                   >
-                    <SelectTrigger className="rounded-xl bg-card border-border text-foreground">
-                      <SelectValue>
-                        {(v: string | null) =>
-                          v
-                            ? (procedimentosClinica.find((p) => p.id === v)?.nome ?? v)
-                            : 'Selecionar da clínica (opcional)...'
-                        }
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border-border">
-                      {procedimentosClinica.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <Input
-                    placeholder="Descrição do procedimento *"
-                    value={item.descricao}
-                    onChange={(e) =>
-                      setNovoOrcItens((prev) =>
-                        prev.map((it, i) =>
-                          i === idx ? { ...it, descricao: e.target.value } : it
-                        )
-                      )
-                    }
-                    className="rounded-xl bg-card border-border text-foreground"
-                  />
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <Label className="text-xs text-foreground">Qtd</Label>
-                      <Input
-                        type="number"
-                        min="1"
-                        value={item.quantidade}
-                        onChange={(e) =>
-                          setNovoOrcItens((prev) =>
-                            prev.map((it, i) =>
-                              i === idx
-                                ? { ...it, quantidade: parseInt(e.target.value) || 1 }
-                                : it
-                            )
-                          )
-                        }
-                        className="rounded-xl bg-card border-border text-foreground font-mono"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs text-foreground">Valor unitário (R$)</Label>
-                      <Input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="0,00"
-                        value={formatCents(item.preco)}
-                        onChange={(e) =>
-                          setNovoOrcItens((prev) =>
-                            prev.map((it, i) =>
-                              i === idx ? { ...it, preco: e.target.value.replace(/\D/g, '') } : it
-                            )
-                          )
-                        }
-                        className="rounded-xl bg-card border-border text-foreground font-mono"
-                      />
-                    </div>
-                  </div>
+                    {dentistas.map((d) => (
+                      <option key={d.id} value={d.id}>{d.nome}</option>
+                    ))}
+                  </select>
                 </div>
-              ))}
-
-              <button
-                onClick={() =>
-                  setNovoOrcItens((prev) => [
-                    ...prev,
-                    { procedimentoId: '', descricao: '', quantidade: 1, preco: '' },
-                  ])
-                }
-                className="w-full py-3 border border-dashed border-border rounded-xl text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors flex items-center justify-center gap-2"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Adicionar Procedimento
-              </button>
-            </div>
-
-            {/* Desconto */}
-            <div className="flex items-center gap-3 rounded-xl border border-border bg-muted px-3 py-2">
-              <Label className="text-sm font-medium text-foreground whitespace-nowrap shrink-0">
-                Desconto (R$)
-              </Label>
-              <Input
-                type="number"
-                min="0"
-                step="0.01"
-                value={novoOrcDesconto || ''}
-                onChange={(e) => setNovoOrcDesconto(Math.max(0, parseFloat(e.target.value) || 0))}
-                placeholder="0,00"
-                className="rounded-lg bg-transparent border-0 text-right font-mono text-sm p-0 h-auto focus-visible:ring-0 shadow-none"
-              />
-            </div>
-
-            {/* Subtotal + Desconto + Total */}
-            <div className="bg-teal/10 rounded-xl p-3 space-y-1 border border-teal/20">
-              {novoOrcDesconto > 0 && (
-                <>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>Subtotal</span>
-                    <span className="font-mono">{formatCurrency(novoOrcSubtotal)}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs text-red-500">
-                    <span>Desconto</span>
-                    <span className="font-mono">- {formatCurrency(novoOrcDesconto)}</span>
-                  </div>
-                </>
               )}
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-foreground">Total</span>
-                <span className="font-mono text-xl font-bold text-teal">
-                  {formatCurrency(novoOrcTotal)}
-                </span>
+
+              {/* Busca de paciente */}
+              <div className="space-y-2 relative">
+                <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                  Paciente <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  placeholder="Digite o nome do paciente..."
+                  value={novoOrcPacienteSearch}
+                  autoComplete="off"
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setNovoOrcPacienteSearch(v);
+                    setNovoOrcPacienteId('');
+                    setNovoOrcPacienteNome('');
+                    setShowSugestoes(true);
+                    void buscarPacientes(v);
+                  }}
+                  className="rounded-xl bg-muted border-border text-foreground"
+                />
+                {showSugestoes && pacienteSugestoes.length > 0 && (
+                  <div className="absolute z-50 w-full bg-card border border-border rounded-xl shadow-lg mt-1 overflow-hidden">
+                    {pacienteSugestoes.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => {
+                          setNovoOrcPacienteSearch(p.nome);
+                          setNovoOrcPacienteId(p.id);
+                          setNovoOrcPacienteNome(p.nome);
+                          setShowSugestoes(false);
+                          setPacienteSugestoes([]);
+                          setSelectedFichaKeys(new Set());
+                          setNovoOrcItens([{ procedimentoId: '', descricao: '', quantidade: 1, preco: '' }]);
+                          void buscarProcedimentosFicha(p.id);
+                        }}
+                        className="w-full px-4 py-2.5 text-sm text-left hover:bg-muted transition-colors text-foreground"
+                      >
+                        {p.nome}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* ── Checklist de procedimentos da ficha ── */}
+              {novoOrcPacienteId && (
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
+                    Procedimentos Pendentes na Ficha
+                  </Label>
+                  {fichaProcsLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground py-3">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Carregando fichas...
+                    </div>
+                  ) : fichaProcs.length === 0 ? (
+                    <p className="text-xs text-muted-foreground bg-muted rounded-xl px-4 py-3 border border-border">
+                      Nenhum procedimento pendente registrado nas fichas deste paciente.
+                    </p>
+                  ) : (
+                    <div className="rounded-xl border border-border overflow-hidden">
+                      {fichaProcs.map((proc) => {
+                        const isSelected = selectedFichaKeys.has(proc.globalKey);
+                        const date = new Date(proc.fichaDate).toLocaleDateString('pt-BR', {
+                          day: '2-digit', month: '2-digit', year: '2-digit',
+                        });
+                        return (
+                          <button
+                            key={proc.globalKey}
+                            type="button"
+                            onClick={() => handleToggleFichaProc(proc)}
+                            className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors border-b border-border last:border-b-0 ${
+                              isSelected ? 'bg-teal/5 hover:bg-teal/10' : 'hover:bg-muted'
+                            }`}
+                          >
+                            <div className={`w-4 h-4 rounded border-2 shrink-0 flex items-center justify-center transition-colors ${
+                              isSelected ? 'bg-teal border-teal' : 'border-border bg-transparent'
+                            }`}>
+                              {isSelected && <Check className="w-2.5 h-2.5 text-white" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-foreground truncate">
+                                {proc.descricao}
+                              </p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="font-mono text-[10px] font-bold text-teal">D{proc.tooth}</span>
+                                <span className="text-[10px] text-muted-foreground">{date}</span>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Itens do orçamento ── */}
+              <div className="space-y-3">
+                <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
+                  Itens do Orçamento
+                </Label>
+
+                {novoOrcItens.map((item, idx) => (
+                  <div key={idx} className="bg-muted rounded-2xl border border-border p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
+                        {item.fichaKey ? 'Da ficha' : `Item ${idx + 1}`}
+                      </span>
+                      {novoOrcItens.length > 1 && (
+                        <button
+                          onClick={() => {
+                            if (item.fichaKey) {
+                              setSelectedFichaKeys(prev => {
+                                const next = new Set(prev);
+                                next.delete(item.fichaKey!);
+                                return next;
+                              });
+                            }
+                            setNovoOrcItens(prev => prev.filter((_, i) => i !== idx));
+                          }}
+                          className="p-1 text-red-400 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    <Select
+                      value={item.procedimentoId}
+                      onValueChange={(v) => {
+                        if (!v) return;
+                        const proc = procedimentosClinica.find((p) => p.id === v);
+                        setNovoOrcItens(prev =>
+                          prev.map((it, i) =>
+                            i === idx
+                              ? {
+                                  ...it,
+                                  procedimentoId: v,
+                                  descricao: proc?.nome ?? it.descricao,
+                                  preco: proc?.preco_padrao != null ? floatToCents(proc.preco_padrao) : it.preco,
+                                }
+                              : it
+                          )
+                        );
+                      }}
+                    >
+                      <SelectTrigger className="rounded-xl bg-card border-border text-foreground">
+                        <SelectValue>
+                          {(v: string | null) =>
+                            v
+                              ? (procedimentosClinica.find((p) => p.id === v)?.nome ?? v)
+                              : 'Vincular ao catálogo (preenche preço)...'
+                          }
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent className="bg-card border-border">
+                        {procedimentosClinica.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Input
+                      placeholder="Descrição do procedimento *"
+                      value={item.descricao}
+                      onChange={(e) =>
+                        setNovoOrcItens(prev =>
+                          prev.map((it, i) =>
+                            i === idx ? { ...it, descricao: e.target.value } : it
+                          )
+                        )
+                      }
+                      className="rounded-xl bg-card border-border text-foreground"
+                    />
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Qtd</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={item.quantidade}
+                          onChange={(e) =>
+                            setNovoOrcItens(prev =>
+                              prev.map((it, i) =>
+                                i === idx ? { ...it, quantidade: parseInt(e.target.value) || 1 } : it
+                              )
+                            )
+                          }
+                          className="rounded-xl bg-card border-border text-foreground font-mono"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Valor unitário (R$)</Label>
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="0,00"
+                          value={formatCents(item.preco)}
+                          onChange={(e) =>
+                            setNovoOrcItens(prev =>
+                              prev.map((it, i) =>
+                                i === idx ? { ...it, preco: e.target.value.replace(/\D/g, '') } : it
+                              )
+                            )
+                          }
+                          className="rounded-xl bg-card border-border text-foreground font-mono"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <button
+                  onClick={() =>
+                    setNovoOrcItens(prev => [
+                      ...prev,
+                      { procedimentoId: '', descricao: '', quantidade: 1, preco: '' },
+                    ])
+                  }
+                  className="w-full py-3 border border-dashed border-border rounded-xl text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors flex items-center justify-center gap-2"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Adicionar item manual
+                </button>
               </div>
             </div>
 
-            {orcError && (
-              <p className="text-xs text-red-500 bg-red-500/10 rounded-lg px-3 py-2">{orcError}</p>
-            )}
-          </div>
+            {/* ── Coluna direita: sticky ── */}
+            <div className="w-72 shrink-0 border-l border-border flex flex-col bg-muted/20">
+              <div className="flex-1 p-6 space-y-5 overflow-y-auto">
 
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsNovoOrcOpen(false)}
-              className="rounded-xl border-border text-foreground hover:bg-muted"
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={() => void handleCriarOrcamento()}
-              disabled={orcSaving}
-              className="bg-teal text-white hover:bg-teal-lt rounded-xl disabled:opacity-50 font-bold"
-            >
-              {orcSaving ? 'Salvando...' : 'Criar Orçamento'}
-            </Button>
-          </DialogFooter>
+                {/* Desconto */}
+                <div className="space-y-3">
+                  <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
+                    Desconto
+                  </Label>
+
+                  {/* Botões rápidos de % */}
+                  <div className="flex gap-2">
+                    {([5, 10, 15] as const).map((pct) => (
+                      <button
+                        key={pct}
+                        type="button"
+                        onClick={() => setDescontoPercent(prev => (prev === pct ? null : pct))}
+                        className={`flex-1 py-2 rounded-xl text-sm font-bold border transition-all ${
+                          descontoPercent === pct
+                            ? 'bg-teal text-white border-teal shadow-[0_0_12px_rgba(47,156,133,0.3)]'
+                            : 'bg-card border-border text-muted-foreground hover:border-teal/50 hover:text-foreground'
+                        }`}
+                      >
+                        {pct}%
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Input manual em R$ */}
+                  <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2">
+                    <span className="text-xs text-muted-foreground shrink-0">R$</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={novoOrcDesconto || ''}
+                      onChange={(e) => {
+                        setDescontoPercent(null);
+                        setNovoOrcDesconto(Math.max(0, parseFloat(e.target.value) || 0));
+                      }}
+                      placeholder="0,00"
+                      className="rounded-lg bg-transparent border-0 text-right font-mono text-sm p-0 h-auto focus-visible:ring-0 shadow-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Resumo financeiro */}
+                <div className="bg-teal/5 rounded-2xl p-4 space-y-2 border border-teal/15">
+                  {novoOrcDesconto > 0 && (
+                    <>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>Subtotal</span>
+                        <span className="font-mono">{formatCurrency(novoOrcSubtotal)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-red-500">
+                        <span>Desconto{descontoPercent ? ` (${descontoPercent}%)` : ''}</span>
+                        <span className="font-mono">– {formatCurrency(novoOrcDesconto)}</span>
+                      </div>
+                      <div className="border-t border-teal/15 pt-2" />
+                    </>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-foreground">Total</span>
+                    <span className="font-mono text-2xl font-bold text-teal">
+                      {formatCurrency(novoOrcTotal)}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground text-right font-mono">
+                    {novoOrcItens.filter(i => i.descricao || i.preco).length} item(s)
+                  </p>
+                </div>
+              </div>
+
+              {/* Botões de ação — fixos no rodapé da coluna direita */}
+              <div className="p-6 border-t border-border space-y-2">
+                {orcError && (
+                  <p className="text-xs text-red-500 bg-red-500/10 rounded-lg px-3 py-2">{orcError}</p>
+                )}
+                <Button
+                  onClick={() => void handleCriarOrcamento()}
+                  disabled={orcSaving}
+                  className="w-full bg-teal text-white hover:bg-teal-lt rounded-xl disabled:opacity-50 font-bold"
+                >
+                  {orcSaving ? 'Salvando...' : 'Criar Orçamento'}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsNovoOrcOpen(false)}
+                  className="w-full rounded-xl border-border text-foreground hover:bg-muted"
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+
+          </div>
         </DialogContent>
       </Dialog>
     </div>

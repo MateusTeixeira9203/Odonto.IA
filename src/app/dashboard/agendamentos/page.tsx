@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { startOfMonth, endOfMonth, format, parseISO } from 'date-fns';
 import { getDentistaCached } from '@/lib/get-dentista';
 import { createClient } from '@/lib/supabase/server';
-import { isGoogleCalendarConnected, getCalendarConnectedMap } from '@/lib/calendar/google-provider';
+import { getCalendarConnectedMap } from '@/lib/calendar/google-provider';
 import { AgendamentosClient } from './_components/agendamentos-client';
 import { PageTransition } from '@/components/layout/page-transition';
 
@@ -58,11 +58,10 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
     query.eq('dentista_id', dentista.id);
   }
 
-  // Dados em paralelo: agendamentos + GCal status + contagem de secretárias
-  const [{ data: agendamentosRaw }, calendarConnected, { count: secretariaCount }] =
+  // Dados em paralelo: agendamentos + contagem de secretárias
+  const [{ data: agendamentosRaw }, { count: secretariaCount }] =
     await Promise.all([
       query,
-      isSecretaria ? Promise.resolve(false) : isGoogleCalendarConnected(dentista.id),
       supabase
         .from('dentistas')
         .select('id', { count: 'exact', head: true })
@@ -104,7 +103,6 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
         role={dentista.role}
         dentistaAtualId={dentista.id}
         dentistas={dentistasClinica}
-        calendarConnected={calendarConnected}
         calendarConnectedPerDentista={calendarConnectedPerDentista}
         temSecretaria={temSecretaria}
         mesAtual={mesAtual}

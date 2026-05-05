@@ -16,7 +16,6 @@ import {
   Sun,
   Moon,
   MessageCircle,
-  BotMessageSquare,
   Wallet,
   Lock,
 } from 'lucide-react';
@@ -30,6 +29,7 @@ import { createClient } from '@/lib/supabase/client';
 import type { DentistaRole } from '@/types/database';
 import { DentIALogo } from '@/components/ui/dent-ia-logo';
 import { WhatsAppStatusDot } from '@/components/layout/whatsapp-status-dot';
+import { WhatsAppConnectSheet } from '@/components/layout/whatsapp-connect-sheet';
 import { NotificationBell } from '@/components/layout/notification-bell';
 import Image from 'next/image';
 
@@ -48,6 +48,9 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role, 
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+
+  const [waSheetOpen, setWaSheetOpen] = useState(false);
+  const [waStatus, setWaStatus] = useState<'connected' | 'connecting' | 'disconnected' | 'error'>('disconnected');
 
   const isDentista   = role === 'admin' || role === 'dentista';
   const showClinical = isDentista;
@@ -73,9 +76,9 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role, 
     { href: '/dashboard',              icon: LayoutDashboard,  label: 'Início',       id: 'dashboard-link',    visible: true,       locked: false },
     { href: '/dashboard/agendamentos', icon: Calendar,         label: 'Agendamentos', id: 'agendamentos-link', visible: true,       locked: false },
     { href: '/dashboard/pacientes',    icon: Users,            label: 'Pacientes',    id: 'pacientes-link',    visible: true,       locked: false },
-    { href: '/dashboard/orcamentos',   icon: CircleDollarSign, label: 'Orçamentos',   id: 'orcamentos-link',   visible: isDentista, locked: false },
-    { href: '/dashboard/financeiro',   icon: Wallet,           label: 'Financeiro',   id: 'financeiro-link',   visible: isDentista, locked: financeiroLocked },
-    { href: isDentista ? '/dashboard/bot' : '/dashboard/whatsapp', icon: MessageCircle, label: 'WhatsApp', id: 'whatsapp-link', visible: true, locked: false },
+    { href: '/dashboard/orcamentos',   icon: CircleDollarSign, label: 'Orçamentos',   id: 'orcamentos-link',   visible: true,       locked: false },
+    { href: '/dashboard/financeiro',   icon: Wallet,           label: 'Financeiro',   id: 'financeiro-link',   visible: isDentista,         locked: financeiroLocked },
+    { href: '/dashboard/bot',          icon: MessageCircle,    label: 'WhatsApp',     id: 'whatsapp-link',     visible: role === 'admin',   locked: botLocked },
   ];
 
   const navItems = allNavItems.filter((item) => item.visible);
@@ -179,33 +182,51 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, role, 
           </AnimatePresence>
         </button>
 
-        {!isDentista && <Link
-            id="whatsapp-config-link"
-            href="/dashboard/bot"
-            className={`flex items-center gap-3 px-3 py-3 rounded-lg font-medium text-sm transition-all group ${
-              pathname === '/dashboard/bot'
-                ? 'bg-teal/10 text-teal-lt border-l-2 border-teal-lt'
-                : botLocked
-                  ? 'text-zinc-600 hover:bg-white/5 hover:text-zinc-400 border-l-2 border-transparent'
-                  : 'text-zinc-400 hover:bg-white/5 hover:text-white border-l-2 border-transparent'
-            } ${!isExpanded && 'justify-center'}`}
-          >
-            <BotMessageSquare className={`w-4 h-4 shrink-0 ${pathname === '/dashboard/bot' ? 'text-teal-lt' : botLocked ? 'text-zinc-600' : 'text-zinc-400 group-hover:text-white'}`} />
-            <AnimatePresence mode="wait">
-              {isExpanded && (
-                <motion.span
-                  initial={{ opacity: 0, width: 0 }}
-                  animate={{ opacity: 1, width: 'auto' }}
-                  exit={{ opacity: 0, width: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="whitespace-nowrap overflow-hidden flex items-center gap-2 flex-1"
-                >
-                  Bot WhatsApp
-                  {botLocked ? <Lock className="w-3 h-3 text-teal/60 ml-auto shrink-0" /> : <WhatsAppStatusDot />}
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </Link>}
+        {/* WhatsApp da secretária — abre Sheet de conexão */}
+        {!isDentista && (
+          <>
+            <button
+              id="whatsapp-config-link"
+              onClick={() => setWaSheetOpen(true)}
+              className={`flex items-center gap-3 px-3 py-3 rounded-lg font-medium text-sm transition-all group w-full border-l-2 border-transparent text-zinc-400 hover:bg-white/5 hover:text-white ${!isExpanded && 'justify-center'}`}
+            >
+              <div className="relative shrink-0">
+                <MessageCircle className="w-4 h-4 text-zinc-400 group-hover:text-white" />
+                {waStatus === 'connected' && (
+                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-teal border border-brand-charcoal" />
+                )}
+                {waStatus === 'disconnected' && (
+                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-zinc-500 border border-brand-charcoal" />
+                )}
+                {waStatus === 'connecting' && (
+                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-teal/50 border border-brand-charcoal animate-pulse" />
+                )}
+              </div>
+              <AnimatePresence mode="wait">
+                {isExpanded && (
+                  <motion.span
+                    initial={{ opacity: 0, width: 0 }}
+                    animate={{ opacity: 1, width: 'auto' }}
+                    exit={{ opacity: 0, width: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="whitespace-nowrap overflow-hidden flex items-center gap-2 flex-1 text-left"
+                  >
+                    WhatsApp
+                    <span className={`ml-auto text-[10px] font-mono ${waStatus === 'connected' ? 'text-teal' : 'text-zinc-600'}`}>
+                      {waStatus === 'connected' ? 'online' : waStatus === 'connecting' ? 'conectando' : 'desconectado'}
+                    </span>
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </button>
+
+            <WhatsAppConnectSheet
+              open={waSheetOpen}
+              onOpenChange={setWaSheetOpen}
+              onStatusChange={setWaStatus}
+            />
+          </>
+        )}
 
         {showConfig && (
           <Link

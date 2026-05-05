@@ -10,7 +10,7 @@ import { temFeature } from '@/lib/planos';
 import { Wallet } from 'lucide-react';
 
 interface PageProps {
-  searchParams: Promise<{ mes?: string }>;
+  searchParams: Promise<{ mes?: string; dentista?: string }>;
 }
 
 export default async function FinanceiroPage({ searchParams }: PageProps) {
@@ -20,7 +20,7 @@ export default async function FinanceiroPage({ searchParams }: PageProps) {
   // Override para usuário específico ter acesso a features de plano superior
   const supabaseAuth = await createClient();
   const { data: { user } } = await supabaseAuth.auth.getUser();
-  const isUserOverride = user?.email === 'clenio21@gmail.com';
+  const isUserOverride = !!process.env.PLAN_OVERRIDE_EMAIL && user?.email === process.env.PLAN_OVERRIDE_EMAIL;
 
   const planoEfetivo = isUserOverride ? 'CLINICA' : dentista.plano;
 
@@ -44,7 +44,7 @@ export default async function FinanceiroPage({ searchParams }: PageProps) {
     );
   }
 
-  const { mes } = await searchParams;
+  const { mes, dentista: dentistaParam } = await searchParams;
   const mesAtual = mes && /^\d{4}-\d{2}$/.test(mes) ? mes : format(new Date(), 'yyyy-MM');
 
   // Busca dentistas da clínica para o seletor da secretária
@@ -83,6 +83,7 @@ export default async function FinanceiroPage({ searchParams }: PageProps) {
         plano={planoEfetivo}
         dentistaId={dentista.id}
         dentistasClinica={dentistasClinica}
+        initialDentistaFiltro={dentistaParam ?? ''}
       />
     </PageTransition>
   );

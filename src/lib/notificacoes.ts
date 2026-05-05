@@ -11,6 +11,8 @@ export interface NotificacaoPayload {
   clinicaId: string;
   /** Role que deve receber: 'secretaria' | 'dentista' | 'admin' | 'all' */
   paraRole: string;
+  /** Quando preenchido, a notificação é direcionada a um dentista específico */
+  paraDentistaId?: string;
   deDentistaId?: string;
   tipo: TipoNotificacao;
   titulo: string;
@@ -28,13 +30,14 @@ export async function inserirNotificacao(
 ): Promise<void> {
   try {
     const { error } = await supabase.from('notificacoes').insert({
-      clinica_id:      payload.clinicaId,
-      para_role:       payload.paraRole,
-      de_dentista_id:  payload.deDentistaId ?? null,
-      tipo:            payload.tipo,
-      titulo:          payload.titulo,
-      mensagem:        payload.mensagem,
-      href:            payload.href ?? null,
+      clinica_id:       payload.clinicaId,
+      para_role:        payload.paraRole,
+      para_dentista_id: payload.paraDentistaId ?? null,
+      de_dentista_id:   payload.deDentistaId ?? null,
+      tipo:             payload.tipo,
+      titulo:           payload.titulo,
+      mensagem:         payload.mensagem,
+      href:             payload.href ?? null,
     });
     if (error) console.error('[notificacoes] Erro ao inserir:', error.message);
   } catch (err) {

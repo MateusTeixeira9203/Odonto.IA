@@ -62,12 +62,13 @@ export async function GET(): Promise<NextResponse> {
         .order('updated_at', { ascending: true })
         .limit(5),
 
-      // Notificações não lidas do BD para o role atual
+      // Notificações não lidas: role correto E (sem dentista alvo OU para este dentista)
       supabase
         .from('notificacoes')
         .select('id, tipo, titulo, mensagem, href')
         .eq('clinica_id', dentista.clinica_id)
         .or(`para_role.eq.${dentista.role},para_role.eq.all`)
+        .or(`para_dentista_id.is.null,para_dentista_id.eq.${dentista.id}`)
         .eq('lida', false)
         .order('created_at', { ascending: false })
         .limit(10),

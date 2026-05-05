@@ -333,6 +333,8 @@ export function PacienteDetailClient({
       .order('nome')
       .then(({ data }) => setProcedimentosClinica(data ?? []));
 
+    if (!showClinicalTabs) return;
+
     void supabase
       .from('fichas')
       .select('id, created_at, queixa_principal, anotacoes, dentista:dentistas(nome)')
@@ -804,7 +806,7 @@ export function PacienteDetailClient({
                               )}
                             </div>
                           </div>
-                          {!['cancelado', 'faltou', 'realizado'].includes(agendamentoProximo.status) && (
+                          {showClinicalTabs && !['cancelado', 'faltou', 'realizado'].includes(agendamentoProximo.status) && (
                             <button
                               onClick={() => router.push(`/consulta/${agendamentoProximo.id}`)}
                               className="w-full py-2.5 rounded-xl bg-teal text-white text-sm font-bold flex items-center justify-center gap-2 hover:bg-teal-lt transition-colors shadow-[0_0_15px_rgba(47,156,133,0.3)]"
@@ -878,64 +880,69 @@ export function PacienteDetailClient({
                     </div>
                   </div>
 
-                  {/* Atividade Recente */}
-                  <div className="bg-card rounded-2xl border border-border/60 shadow-sm p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-heading text-xl text-foreground">Atividade Recente</h3>
-                      <FileText className="w-5 h-5 text-teal" />
-                    </div>
-                    {fichasRecentes.length === 0 ? (
-                      <div className="text-center py-6">
-                        <FileText className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
-                        <p className="text-sm text-muted-foreground">Nenhum registro clínico ainda.</p>
+                  {/* Atividade Recente — apenas para dentista/admin */}
+                  {showClinicalTabs && (
+                    <div className="bg-card rounded-2xl border border-border/60 shadow-sm p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-heading text-xl text-foreground">Atividade Recente</h3>
+                        <FileText className="w-5 h-5 text-teal" />
                       </div>
-                    ) : (
-                      <div className="space-y-1">
-                        {fichasRecentes.map((ficha) => (
-                          <div
-                            key={ficha.id}
-                            className="flex items-start gap-3 py-3 border-b border-border/40 last:border-0"
-                          >
-                            <div className="w-8 h-8 rounded-full bg-teal/10 flex items-center justify-center shrink-0 mt-0.5">
-                              <FileText className="w-4 h-4 text-teal" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium text-foreground truncate">
-                                {ficha.queixa_principal ?? 'Evolução clínica'}
+                      {fichasRecentes.length === 0 ? (
+                        <div className="text-center py-6">
+                          <FileText className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
+                          <p className="text-sm text-muted-foreground">Nenhum registro clínico ainda.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          {fichasRecentes.map((ficha) => (
+                            <div
+                              key={ficha.id}
+                              className="flex items-start gap-3 py-3 border-b border-border/40 last:border-0"
+                            >
+                              <div className="w-8 h-8 rounded-full bg-teal/10 flex items-center justify-center shrink-0 mt-0.5">
+                                <FileText className="w-4 h-4 text-teal" />
                               </div>
-                              {ficha.anotacoes && (
-                                <div className="text-xs text-muted-foreground truncate mt-0.5">
-                                  {ficha.anotacoes}
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-medium text-foreground truncate">
+                                  {ficha.queixa_principal ?? 'Evolução clínica'}
                                 </div>
-                              )}
-                              <div className="flex items-center gap-3 mt-1">
-                                <span className="text-[10px] text-muted-foreground">
-                                  {format(parseISO(ficha.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                                </span>
-                                {ficha.dentista && (
-                                  <span className="text-[10px] text-teal font-medium">
-                                    {ficha.dentista.nome}
-                                  </span>
+                                {ficha.anotacoes && (
+                                  <div className="text-xs text-muted-foreground truncate mt-0.5">
+                                    {ficha.anotacoes}
+                                  </div>
                                 )}
+                                <div className="flex items-center gap-3 mt-1">
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {format(parseISO(ficha.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                                  </span>
+                                  {ficha.dentista && (
+                                    <span className="text-[10px] text-teal font-medium">
+                                      {ficha.dentista.nome}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </TabsContent>
 
-                <TabsContent value="fichas" className="mt-0">
-                  <FichasTab
-                    patientId={paciente.id}
-                    clinicaId={clinicaId}
-                    dentistaId={dentistaId}
-                    plano={plano}
-                  />
-                </TabsContent>
+                {showClinicalTabs && (
+                  <TabsContent value="fichas" className="mt-0">
+                    <FichasTab
+                      patientId={paciente.id}
+                      clinicaId={clinicaId}
+                      dentistaId={dentistaId}
+                      plano={plano}
+                    />
+                  </TabsContent>
+                )}
 
-                <TabsContent value="planejamento" className="mt-0">
+                {showClinicalTabs && (
+                  <TabsContent value="planejamento" className="mt-0">
                   {temFeature(plano, 'planejamentoIA') ? (
                     <PlanejamentoTab patientId={paciente.id} clinicaId={clinicaId} patientName={paciente.nome} />
                   ) : (
@@ -949,7 +956,8 @@ export function PacienteDetailClient({
                       </div>
                     </div>
                   )}
-                </TabsContent>
+                  </TabsContent>
+                )}
 
                 {/* Orçamentos */}
                 <TabsContent value="orcamentos" className="mt-0 space-y-4">
