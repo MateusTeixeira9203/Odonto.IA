@@ -50,8 +50,11 @@ export default async function UsuariosPage() {
   const dentistasAtivos = (usuarios ?? []).filter(
     (u) => (u as UsuarioRow).role !== 'secretaria' && (u as UsuarioRow).ativo
   ).length;
+  const convitesDentistasPendentes = (convites ?? []).filter(
+    (c) => (c as ConvitePendente).role !== 'secretaria'
+  ).length;
   const limiteDentistas = (clinica as { limite_dentistas: number } | null)?.limite_dentistas ?? 5;
-  const convitesRestantes = Math.max(0, limiteDentistas - dentistasAtivos);
+  const convitesRestantes = Math.max(0, limiteDentistas - dentistasAtivos - convitesDentistasPendentes);
 
   return (
     <UsuariosClient

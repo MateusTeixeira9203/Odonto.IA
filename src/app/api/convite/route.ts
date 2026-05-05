@@ -79,8 +79,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const origin = new URL(request.url).origin;
   const service = createServiceClient();
 
-  // Envia convite — redireciona para /auth/callback que cria o dentista automaticamente
+  // Envia convite — metadados no JWT servem de fallback caso a tabela convites falhe
   const { data: inviteData, error: inviteError } = await service.auth.admin.inviteUserByEmail(email, {
+    data: {
+      role,
+      clinica_id: dentista.clinica_id,
+      convidado_por: dentista.id,
+    },
     redirectTo: `${origin}/auth/callback`,
   });
 
@@ -105,6 +110,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     email,
     role,
     token: crypto.randomUUID(),
+    convidado_por: dentista.id,
   });
 
   return NextResponse.json({ success: true });

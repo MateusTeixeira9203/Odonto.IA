@@ -13,8 +13,9 @@ import type { CookieOptions } from "@supabase/ssr";
  *  2. Identificar se o usuário tem convite pendente na tabela `convites`
  *  3. Criar/vincular dentista à clínica correta — status_convite sempre 'aceito'
  *  4. Redirecionar:
- *       - Tem clinica_id  → /dashboard?welcome=true
- *       - Sem clinica_id  → /onboarding
+ *       - Qualquer convidado    → /dashboard?welcome=true (perfil via /dashboard/perfil)
+ *       - Sem convite, tem clinica_id → /dashboard
+ *       - Sem convite, sem clinica_id → /onboarding
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const { searchParams, origin } = new URL(request.url);
@@ -72,21 +73,22 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   // ── 3. IDENTIFICAÇÃO DE CONVITE ────────────────────────────────────────────
   // Busca na tabela convites pelo email — fonte de verdade independente do JWT.
+  // Metadados do JWT servem de fallback caso o registro em convites não exista.
   if (user.email) {
     const { data: convite } = await service
       .from("convites")
-      .select("role, clinica_id")
+      .select("id, role, clinica_id")
       .eq("email", user.email)
       .gt("expires_at", new Date().toISOString())
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    if (convite) {
-      const role       = convite.role as string;
-      const clinica_id = convite.clinica_id as string;
+    const role       = (convite?.role ?? user.user_metadata?.role) as string | undefined;
+    const clinica_id = (convite?.clinica_id ?? user.user_metadata?.clinica_id) as string | undefined;
 
-      // Todo convidado entra diretamente com status aceito — boas-vindas no dashboard
+    if (role && clinica_id) {
+      // Todo convidado entra diretamente com status aceito
       const status_convite = "aceito";
 
       // Cria o dentista apenas se ainda não existe (proteção contra dupla execução)
@@ -114,19 +116,16 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         }
       }
 
-      // Remove convite após uso
-      await service
-        .from("convites")
-        .delete()
-        .eq("email", user.email)
-        .eq("clinica_id", clinica_id);
+      // Marca convite como aceito (mantém histórico em vez de deletar)
+      if (convite?.id) {
+        await service
+          .from("convites")
+          .update({ status: "aceito" })
+          .eq("id", convite.id);
+      }
 
-      // Tem clinica_id → dashboard com modal de boas-vindas
-      const redirectTo = existing?.clinica_id ?? clinica_id
-        ? `${origin}/dashboard?welcome=true`
-        : `${origin}/onboarding`;
-
-      const response = NextResponse.redirect(redirectTo);
+      // Todo convidado vai direto ao dashboard — perfil é editado em /dashboard/perfil
+      const response = NextResponse.redirect(`${origin}/dashboard?welcome=true`);
       pendingCookies.forEach(({ name, value, options }) =>
         response.cookies.set(name, value, options)
       );
