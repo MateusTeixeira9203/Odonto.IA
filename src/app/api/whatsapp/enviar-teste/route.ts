@@ -9,19 +9,34 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getInstanceForClinica, sendMessage } from '@/services/whatsapp.service';
 
+// Resolução canônica: users.active_clinica_id → clinica_usuarios (não dentistas)
 async function getAuthorizedClinica(): Promise<{ clinicaId: string } | null> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data } = await supabase
-    .from('dentistas')
-    .select('clinica_id, role')
-    .eq('user_id', user.id)
+  const { data: userRecord } = await supabase
+    .from('users')
+    .select('active_clinica_id')
+    .eq('id', user.id)
     .maybeSingle();
 
-  if (!data || (data.role !== 'admin' && data.role !== 'secretaria')) return null;
-  return { clinicaId: data.clinica_id as string };
+  if (!userRecord?.active_clinica_id) return null;
+  const clinicId = userRecord.active_clinica_id as string;
+
+  const { data: membership } = await supabase
+    .from('clinica_usuarios')
+    .select('role')
+    .eq('usuario_id', user.id)
+    .eq('clinica_id', clinicId)
+    .eq('status', 'ativo')
+    .maybeSingle();
+
+  if (!membership || (membership.role !== 'admin' && membership.role !== 'secretaria')) {
+    return null;
+  }
+
+  return { clinicaId: clinicId };
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {

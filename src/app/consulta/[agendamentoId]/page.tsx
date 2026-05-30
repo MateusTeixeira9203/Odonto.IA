@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getDentistaCached } from '@/lib/get-dentista';
-import { createClient } from '@/lib/supabase/server';
+import { requireClinicContext } from '@/server/auth/clinic';
 import { ConsultaClient } from './_components/consulta-client';
 
 interface Props {
@@ -9,17 +8,13 @@ interface Props {
 
 export default async function ConsultaPage({ params }: Props) {
   const { agendamentoId } = await params;
-
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect('/login');
-
-  const supabase = await createClient();
+  const { supabase, clinicId } = await requireClinicContext();
 
   const { data: ag } = await supabase
     .from('agendamentos')
     .select('id, data_hora, observacoes, status, paciente:pacientes(id, nome, data_nascimento, telefone, observacoes)')
     .eq('id', agendamentoId)
-    .eq('clinica_id', dentista.clinica_id)
+    .eq('clinica_id', clinicId)
     .maybeSingle();
 
   if (!ag) redirect('/dashboard/agendamentos');
@@ -34,36 +29,54 @@ export default async function ConsultaPage({ params }: Props) {
 
   if (!paciente) redirect('/dashboard/agendamentos');
 
-  const { data: fichas } = await supabase
-    .from('fichas')
-    .select('created_at, queixa_principal, anotacoes, dentes_afetados')
-    .eq('paciente_id', paciente.id)
-    .eq('clinica_id', dentista.clinica_id)
-    .order('created_at', { ascending: false })
-    .limit(5);
-
-  const { data: orcamentos } = await supabase
-    .from('orcamentos')
-    .select('total, status, orcamento_itens(descricao)')
-    .eq('paciente_id', paciente.id)
-    .eq('clinica_id', dentista.clinica_id)
-    .in('status', ['aprovado', 'enviado'])
-    .order('created_at', { ascending: false })
-    .limit(3);
+  const [{ data: fichas }, { data: orcamentos }, { data: planejamentoRaw }] = await Promise.all([
+    supabase
+      .from('fichas')
+      .select('created_at, queixa_principal, anotacoes, dentes_afetados, alergias, historico_medico, medicamentos_em_uso, historico_dental')
+      .eq('paciente_id', paciente.id)
+      .eq('clinica_id', clinicId)
+      .order('created_at', { ascending: false })
+      .limit(5),
+    supabase
+      .from('orcamentos')
+      .select('total, status, orcamento_itens(descricao)')
+      .eq('paciente_id', paciente.id)
+      .eq('clinica_id', clinicId)
+      .in('status', ['aprovado', 'enviado'])
+      .order('created_at', { ascending: false })
+      .limit(3),
+    supabase
+      .from('planejamentos')
+      .select('id, titulo, status, planejamento_etapas(id, titulo, dente, descricao_simples, status, ordem)')
+      .eq('paciente_id', paciente.id)
+      .eq('clinica_id', clinicId)
+      .in('status', ['rascunho', 'apresentado', 'aprovado'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
   const hora = new Date(ag.data_hora as string).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  const idadeStr = paciente.data_nascimento
-    ? `${new Date().getFullYear() - new Date(paciente.data_nascimento).getFullYear()} anos`
-    : null;
+  let idadeStr: string | null = null;
+  if (paciente.data_nascimento) {
+    const hoje = new Date();
+    const nasc = new Date(paciente.data_nascimento);
+    let idade = hoje.getFullYear() - nasc.getFullYear();
+    const m = hoje.getMonth() - nasc.getMonth();
+    if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) idade--;
+    idadeStr = `${idade} anos`;
+  }
 
   const ultimaFicha = fichas?.[0] ?? null;
+  const alertasClinicos: string[] = [];
+  if (ultimaFicha?.alergias) alertasClinicos.push(`Alergias: ${ultimaFicha.alergias as string}`);
+  if (ultimaFicha?.medicamentos_em_uso) alertasClinicos.push(`Medicamentos: ${ultimaFicha.medicamentos_em_uso as string}`);
 
   return (
     <ConsultaClient
       agendamentoId={agendamentoId}
       paciente={{ ...paciente, idadeStr }}
       hora={hora}
-      procedimento={null}
       observacoesAgendamento={(ag.observacoes as string | null) ?? null}
       ultimaQueixa={(ultimaFicha?.queixa_principal as string | null) ?? null}
       ultimasAnotacoes={(ultimaFicha?.anotacoes as string | null) ?? null}
@@ -78,8 +91,18 @@ export default async function ConsultaPage({ params }: Props) {
         status: o.status as string,
         itens: ((o.orcamento_itens as { descricao: string }[] | null) ?? []).map(i => i.descricao).filter(Boolean),
       }))}
-      dentistaId={dentista.id}
-      clinicaId={dentista.clinica_id}
+      agendamentoStatus={(ag.status as string)}
+      alertasClinicos={alertasClinicos}
+      planejamento={planejamentoRaw ? {
+        id: (planejamentoRaw as {id: string}).id,
+        titulo: (planejamentoRaw as {titulo: string}).titulo,
+        etapas: ((planejamentoRaw as {planejamento_etapas: unknown[]}).planejamento_etapas ?? [])
+          .map((e: unknown) => {
+            const etapa = e as { id: string; titulo: string; dente: string | null; descricao_simples: string | null; status: string; ordem: number };
+            return etapa;
+          })
+          .sort((a: { ordem: number }, b: { ordem: number }) => a.ordem - b.ordem),
+      } : null}
     />
   );
 }

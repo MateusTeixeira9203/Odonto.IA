@@ -1,10 +1,8 @@
-import { redirect } from 'next/navigation';
-import { getDentistaCached } from '@/lib/get-dentista';
+import { requireRole } from '@/server/auth/roles';
 import { createServiceClient } from '@/lib/supabase/service';
 import WhatsAppConfigClient from './_components/whatsapp-config-client';
 import type { BotConfigForm } from './actions';
 
-/** Normaliza os valores da API para os 3 estados usados na UI. */
 function normalizeStatus(raw: string): 'disconnected' | 'connecting' | 'connected' {
   if (raw === 'connected' || raw === 'open') return 'connected';
   if (raw === 'connecting') return 'connecting';
@@ -12,9 +10,7 @@ function normalizeStatus(raw: string): 'disconnected' | 'connecting' | 'connecte
 }
 
 export default async function WhatsAppConfigPage() {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect('/login');
-  if (dentista.role !== 'secretaria') redirect('/dashboard');
+  const { clinicId } = await requireRole(['admin', 'dentista']);
 
   const db = createServiceClient();
 
@@ -22,12 +18,12 @@ export default async function WhatsAppConfigPage() {
     db
       .from('bot_config')
       .select('*')
-      .eq('clinica_id', dentista.clinica_id)
+      .eq('clinica_id', clinicId)
       .maybeSingle(),
     db
       .from('instancias_whatsapp')
       .select('instance_name, status, qrcode')
-      .eq('clinica_id', dentista.clinica_id)
+      .eq('clinica_id', clinicId)
       .maybeSingle(),
   ]);
 

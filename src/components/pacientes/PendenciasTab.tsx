@@ -4,6 +4,7 @@ import * as React from 'react';
 import { CheckSquare, Square, Clock, Loader2, Clipboard, Check } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { motion, AnimatePresence } from 'motion/react';
+import { DexLoader } from '@/components/ui/dex-loader';
 
 type ProcedimentoItem = {
   fichaId: string;
@@ -127,20 +128,18 @@ export function PendenciasTab({ patientId, clinicaId }: PendenciasTabProps) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-6 h-6 animate-spin text-teal" />
-      </div>
+      <DexLoader className="py-20" />
     );
   }
 
   if (items.length === 0) {
     return (
-      <div className="bg-card rounded-2xl border border-border p-12 text-center">
-        <Clipboard className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
-        <p className="text-muted-foreground text-sm">
+      <div className="bg-surface rounded-2xl border border-border p-12 text-center">
+        <Clipboard className="w-10 h-10 text-text-secondary/30 mx-auto mb-3" />
+        <p className="text-text-secondary text-sm">
           Nenhum procedimento registrado nas fichas ainda.
         </p>
-        <p className="text-muted-foreground text-xs mt-1">
+        <p className="text-text-secondary text-xs mt-1">
           Adicione dentes e procedimentos nas fichas clínicas para acompanhar aqui.
         </p>
       </div>
@@ -163,20 +162,20 @@ export function PendenciasTab({ patientId, clinicaId }: PendenciasTabProps) {
           <p className="text-[10px] font-bold text-emerald-600/70 uppercase tracking-wider">Realizado{realizados.length !== 1 ? 's' : ''}</p>
         </div>
         {items.length > 0 && (
-          <div className="ml-auto bg-muted rounded-xl px-4 py-3 text-center border border-border/40">
-            <p className="text-sm font-bold text-foreground font-mono">
+          <div className="ml-auto bg-surface-alt rounded-xl px-4 py-3 text-center border border-border/40">
+            <p className="text-sm font-bold text-text-primary font-mono">
               {Math.round((realizados.length / items.length) * 100)}%
             </p>
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Progresso</p>
+            <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider">Progresso</p>
           </div>
         )}
       </div>
 
       {/* Pendentes */}
       {pendentes.length > 0 && (
-        <div className="bg-card rounded-2xl border border-border/60 shadow-sm overflow-hidden">
+        <div className="bg-surface rounded-2xl border border-border/60 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-border/40 flex items-center justify-between">
-            <h3 className="font-bold text-sm text-foreground">Pendentes</h3>
+            <h3 className="font-bold text-sm text-text-primary">Pendentes</h3>
             <span className="text-[10px] font-bold text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
               {pendentes.length}
             </span>
@@ -197,9 +196,9 @@ export function PendenciasTab({ patientId, clinicaId }: PendenciasTabProps) {
 
       {/* Realizados */}
       {realizados.length > 0 && (
-        <div className="bg-card rounded-2xl border border-border/60 shadow-sm overflow-hidden">
+        <div className="bg-surface rounded-2xl border border-border/60 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-border/40 flex items-center justify-between">
-            <h3 className="font-bold text-sm text-muted-foreground">Realizados</h3>
+            <h3 className="font-bold text-sm text-text-secondary">Realizados</h3>
             <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
               {realizados.length}
             </span>
@@ -244,7 +243,7 @@ function ProcedimentoRow({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="flex items-center gap-4 px-6 py-3.5 hover:bg-muted/50 transition-colors border-b border-border/20 last:border-b-0"
+      className="flex items-center gap-4 px-6 py-3.5 hover:bg-surface-alt/50 transition-colors border-b border-border/20 last:border-b-0"
     >
       <button
         onClick={onToggle}
@@ -256,18 +255,18 @@ function ProcedimentoRow({
         ) : done ? (
           <CheckSquare className="w-4 h-4 text-emerald-500" />
         ) : (
-          <Square className="w-4 h-4 text-muted-foreground hover:text-teal transition-colors" />
+          <Square className="w-4 h-4 text-text-secondary hover:text-teal transition-colors" />
         )}
       </button>
 
       <div className="flex-1 min-w-0">
-        <p className={`text-sm font-medium leading-snug ${done ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+        <p className={`text-sm font-medium leading-snug ${done ? 'line-through text-text-secondary' : 'text-text-primary'}`}>
           {item.descricao}
         </p>
         <div className="flex items-center gap-3 mt-1 flex-wrap">
           <span className="font-mono text-[10px] font-bold text-teal">D{item.tooth}</span>
-          <span className="text-[10px] text-muted-foreground truncate max-w-[180px]">{item.queixa}</span>
-          <span className="flex items-center gap-1 text-[10px] text-muted-foreground shrink-0">
+          <span className="text-[10px] text-text-secondary truncate max-w-[180px]">{item.queixa}</span>
+          <span className="flex items-center gap-1 text-[10px] text-text-secondary shrink-0">
             <Clock className="w-2.5 h-2.5" />
             {date}
           </span>

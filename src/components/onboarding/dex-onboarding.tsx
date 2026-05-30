@@ -8,6 +8,7 @@ import { SimAgendamento }     from './sim-agendamento';
 import { SimOrcamento }       from './sim-orcamento';
 import { SimPerfilPaciente }  from './sim-perfil-paciente';
 import { SimBot }             from './sim-bot';
+import { SimFinanceiro }      from './sim-financeiro';
 import type { PlanoId }   from '@/lib/planos';
 
 // Chaves escopadas por dentista
@@ -30,7 +31,7 @@ interface TourStep {
   title: string;
   description: string;
   targetId?: string;
-  simulacao?: 'agendamento' | 'perfilPaciente' | 'orcamento' | 'bot';
+  simulacao?: 'agendamento' | 'perfilPaciente' | 'orcamento' | 'bot' | 'financeiro';
   details?: string;
   bullets?: string[];
 }
@@ -209,13 +210,14 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
   const STEPS = useMemo<TourStep[]>(() => {
     const perfilPacienteStep: TourStep = {
       id: 'PERFIL_PACIENTE',
-      path: '/dashboard/pacientes/demo',
-      title: 'Prontuário Digital Completo',
-      description: 'Ficha clínica, documentos e orçamentos do paciente em um só lugar. O DEX preenche evolução clínica por voz e identifica os dentes automaticamente.',
+      path: '/dashboard/pacientes',
+      title: 'Prontuário em 4 abas',
+      description: 'Tudo que você precisa saber sobre o paciente em um único lugar — da ficha clínica ao orçamento aprovado.',
       bullets: [
-        'Evolução clínica: grave por voz, a IA transcreve e identifica dentes',
-        'Documentos: fotos, raio-x e PDFs organizados por data',
-        'Orçamentos: gerado a partir do planejamento e enviado pelo WhatsApp',
+        'Fichas: grave a evolução por voz, a IA transcreve e marca os dentes no odontograma',
+        'Documentos: fotos, raio-x e PDFs organizados por tipo e data',
+        'Planejamento: a IA gera as seções (exames, diagnóstico, tratamento) e cria o orçamento automaticamente',
+        'Orçamentos: status, itens detalhados e botão de envio pelo WhatsApp',
       ],
       simulacao: 'perfilPaciente',
     };
@@ -224,11 +226,11 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
       id: 'ORCAMENTOS',
       path: '/dashboard/orcamentos',
       title: 'Orçamentos e Pagamentos',
-      description: 'Todos os orçamentos da clínica em um painel. Acompanhe status, aprove, envie pelo WhatsApp e registre pagamentos — tudo sem sair da tela.',
+      description: 'Painel completo de todos os orçamentos. Acompanhe cada um do rascunho até o pagamento — sem uma planilha.',
       bullets: [
-        'Status em tempo real: rascunho → enviado → aprovado',
-        'DEX simplifica o orçamento em linguagem acessível para o paciente',
-        'Secretária registra pagamentos direto na recepção',
+        'Ciclo completo: rascunho → enviado pelo WhatsApp → aprovado pelo paciente',
+        'Secretária registra o pagamento na recepção (dinheiro, PIX ou cartão)',
+        'O financeiro é atualizado automaticamente quando o pagamento entra',
       ],
       simulacao: 'orcamento',
     };
@@ -237,12 +239,12 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
       id: 'FINANCEIRO',
       path: '/dashboard/financeiro',
       title: 'Financeiro sem Planilhas',
-      description: 'Veja receitas, despesas e lucro real da clínica em tempo real. As receitas entram automaticamente quando pagamentos são registrados — você só lança as despesas.',
-      targetId: 'financeiro-link',
+      description: 'Receitas, despesas e lucro real da clínica — atualizados automaticamente quando pagamentos são registrados.',
+      simulacao: 'financeiro' as const,
       bullets: [
-        'Despesas fixas e variáveis registradas em segundos',
-        'Receitas geradas automaticamente pelos pagamentos',
-        'Gráfico de lucro líquido mês a mês',
+        'Receitas entram sozinhas quando pagamentos são confirmados',
+        'Você só lança as despesas: aluguel, materiais, salários',
+        'Gráfico de lucro líquido dos últimos 6 meses',
       ],
     };
 
@@ -252,17 +254,17 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
           id: 'INTRO',
           path: '/dashboard',
           title: '',
-          description: `Olá, ${firstName}! Eu sou o DEX — a IA do DentIA. Você é a central de operações da clínica e eu vou te mostrar tudo que precisa saber em menos de 2 minutos. Vamos?`,
+          description: `Olá, ${firstName}! Eu sou o DEX — a IA do Odonto.IA. Você é a central de operações da clínica e eu vou te mostrar tudo que você precisa dominar em menos de 2 minutos. Vamos?`,
         },
         {
           id: 'AGENDA',
           path: '/dashboard/agendamentos',
           title: 'Central de Agendamentos',
-          description: 'Aqui chegam todos os pedidos de consulta — inclusive os do bot do WhatsApp. Confirme, reagende ou cancele sem precisar ligar para ninguém.',
+          description: 'Aqui chegam todos os pedidos de consulta — inclusive os que o bot do WhatsApp já agendou automaticamente durante a madrugada.',
           bullets: [
-            'Pedidos do bot do WhatsApp caem direto aqui',
-            'Veja a agenda de todos os dentistas ao mesmo tempo',
-            'Confirme, edite ou cancele com um clique',
+            'Agendamentos do WhatsApp chegam prontos, sem ligação',
+            'Veja a agenda de todos os dentistas na mesma tela',
+            'Confirme, reagende ou cancele com um clique',
           ],
           simulacao: 'agendamento' as const,
         },
@@ -270,11 +272,11 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
           id: 'ORCAMENTOS',
           path: '/dashboard/orcamentos',
           title: 'Orçamentos e Pagamentos',
-          description: 'Acompanhe todos os orçamentos gerados pelos dentistas. Quando o paciente pagar, registre aqui na recepção — o sistema atualiza o status automaticamente.',
+          description: 'Quando o paciente pagar, você registra aqui na recepção. O sistema atualiza o financeiro automaticamente — sem planilha, sem retrabalho.',
           bullets: [
-            'Veja o valor aprovado e o que ainda está pendente',
-            'Registre pagamentos em 2 cliques (dinheiro, PIX, cartão)',
-            'Histórico de pagamentos automático por paciente',
+            'Veja o valor de cada orçamento aprovado e o que está pendente',
+            'Registre pagamentos em 2 cliques: dinheiro, PIX ou cartão',
+            'Histórico completo de pagamentos por paciente',
           ],
           simulacao: 'orcamento' as const,
         },
@@ -282,15 +284,14 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
           id: 'FINANCEIRO',
           path: '/dashboard/financeiro',
           title: 'Controle de Despesas',
-          description: 'Registre as despesas da clínica — materiais, aluguel, contas — para que o dentista tenha uma visão real do lucro. Você lança, o sistema consolida tudo.',
-          targetId: 'financeiro-link',
+          description: 'Lance as despesas da clínica para que o dentista tenha a visão real do lucro. Quanto mais completo, melhor a gestão.',
+          simulacao: 'financeiro' as const,
           bullets: [
-            'Lançamento de despesas fixas e variáveis',
-            'Categorias: materiais, aluguel, salários, outros',
-            'Dentista vê o resultado financeiro em tempo real',
+            'Registre aluguel, materiais, salários e outros gastos',
+            'As receitas entram automaticamente pelos pagamentos',
+            'Dentista vê receita, despesas e lucro em tempo real',
           ],
         },
-        { id: 'FINALE', path: '/dashboard', title: 'Tudo pronto!', description: 'Qualquer dúvida, é só me chamar aqui no canto. Bom trabalho e bom atendimento!' },
       ];
     }
 
@@ -306,11 +307,11 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
           id: 'AGENDA',
           path: '/dashboard/agendamentos',
           title: 'Agenda no Piloto Automático',
-          description: 'A secretária e o bot do WhatsApp organizam tudo aqui. Você chega na clínica e a agenda já está montada — sem ligações, sem conflitos de horário.',
+          description: 'A secretária e o bot organizam tudo. Você chega na clínica com a agenda montada — sem ligações, sem conflitos de horário.',
           bullets: [
-            'Agendamentos pelo WhatsApp chegam automaticamente',
-            'Conflitos de horário bloqueados na hora',
-            'Você só foca no atendimento',
+            'Pacientes agendam pelo WhatsApp a qualquer hora',
+            'Conflitos de horário bloqueados automaticamente',
+            'Um clique para abrir a consulta e preencher a ficha',
           ],
           simulacao: 'agendamento' as const,
         },
@@ -329,17 +330,17 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
         id: 'INTRO',
         path: '/dashboard',
         title: '',
-        description: `Olá, Doutor(a) ${firstName}! Eu sou o DEX, a IA do DentIA. Em 2 minutos você vai ver como sua clínica vai rodar no piloto automático — agenda, fichas, orçamentos, financeiro e bot WhatsApp. Vamos?`,
+        description: `Olá, Doutor(a) ${firstName}! Eu sou o DEX, a IA do Odonto.IA. Em 2 minutos você vai ver como sua clínica vai rodar no piloto automático — agenda, fichas, orçamentos, financeiro e bot WhatsApp. Vamos?`,
       },
       {
         id: 'AGENDA',
         path: '/dashboard/agendamentos',
         title: 'Agenda que se Organiza Sozinha',
-        description: 'Pacientes agendam pelo WhatsApp a qualquer hora, 24h por dia. O bot verifica disponibilidade, evita conflitos e registra tudo aqui — sem uma ligação.',
+        description: 'Pacientes agendam pelo WhatsApp a qualquer hora — o bot verifica disponibilidade, evita conflitos e registra tudo aqui. Sem uma ligação.',
         bullets: [
-          'Agendamentos 24h pelo bot do WhatsApp',
-          'Conflitos de horário bloqueados automaticamente',
-          'Secretária confirma ou reagenda com um clique',
+          'Bot atende 24h e cria o agendamento automaticamente',
+          'Conflitos de horário bloqueados antes de confirmar',
+          'Secretária vê e gerencia tudo em um único painel',
         ],
         simulacao: 'agendamento' as const,
       },
@@ -349,13 +350,13 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
       {
         id: 'WHATSAPP',
         path: '/dashboard',
-        title: 'Bot WhatsApp 24h — DEX',
-        description: 'O DEX atende seus pacientes a qualquer hora: identifica quem é, coleta dados, mostra os dentistas disponíveis e confirma o horário — tudo automático no WhatsApp.',
+        title: 'Bot WhatsApp 24h',
+        description: 'O DEX atende seus pacientes a qualquer hora: identifica quem é, coleta o motivo da consulta, mostra os horários disponíveis e confirma o agendamento — tudo no WhatsApp.',
         simulacao: 'bot' as const,
         bullets: [
-          'Funciona 24h sem precisar de ninguém na recepção',
-          'Paciente novo é cadastrado automaticamente',
-          'Personalize as mensagens e o nome do assistente',
+          'Funciona 24h sem ninguém na recepção',
+          'Paciente novo é cadastrado automaticamente no sistema',
+          'Personalize o nome do assistente e as mensagens',
         ],
       },
       ...(temEquipe ? [{
@@ -480,7 +481,7 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
   const isLast    = stepIndex === STEPS.length - 1;
   const centerLeft = dims.w / 2 - DEX_SIZE / 2;
   const centerTop  = dims.h / 2 - DEX_SIZE / 2 - 90;
-  const fabLeft    = dims.w - 24 - DEX_FAB_SIZE;
+  const fabLeft    = dims.w / 2 - DEX_FAB_SIZE / 2;
   const fabTop     = dims.h - 24 - DEX_FAB_SIZE;
 
   const SkipBtn = (
@@ -592,7 +593,7 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
 
                 <div className="flex items-center gap-2 mb-4 justify-center">
                   <Sparkles className="w-3.5 h-3.5" style={{ color: '#2f9c85' }} />
-                  <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#2f9c85' }}>DEX — IA do DentIA</span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#2f9c85' }}>DEX — Odonto.IA</span>
                 </div>
 
                 <p className="text-white/90 text-sm leading-relaxed mb-6 text-center">{step.description}</p>
@@ -656,10 +657,12 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
 
           {/* Bubble to the left of FAB */}
           <motion.div
-            initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1.6 }}
+            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.6 }}
             className="fixed rounded-2xl px-5 py-4"
             style={{
-              right: 24 + DEX_FAB_SIZE + 14, bottom: 16, width: 240,
+              bottom: 24 + DEX_FAB_SIZE + 18,
+              left: Math.max(8, dims.w / 2 - 130),
+              width: 260,
               background: 'rgba(9,9,11,0.97)',
               border: '1.5px solid rgba(47,156,133,0.5)',
               boxShadow: '0 16px 40px rgba(0,0,0,0.6)',
@@ -667,8 +670,9 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
           >
             <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#2f9c85' }}>Eu moro aqui!</p>
             <p className="text-white/80 text-sm leading-relaxed">{step.description}</p>
-            <div className="absolute right-[-9px] top-1/2 -translate-y-1/2 w-4 h-4 rotate-45"
-              style={{ background: 'rgba(9,9,11,0.97)', borderTop: '1.5px solid rgba(47,156,133,0.5)', borderRight: '1.5px solid rgba(47,156,133,0.5)' }} />
+            {/* Seta apontando pra baixo, em direção à barra */}
+            <div className="absolute bottom-[-9px] left-1/2 -translate-x-1/2 w-4 h-4 rotate-45"
+              style={{ background: 'rgba(9,9,11,0.97)', borderBottom: '1.5px solid rgba(47,156,133,0.5)', borderRight: '1.5px solid rgba(47,156,133,0.5)' }} />
           </motion.div>
 
           {/* CTA */}
@@ -810,6 +814,7 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
             {step.simulacao === 'perfilPaciente' && <SimPerfilPaciente key="sim-perfil" />}
             {step.simulacao === 'orcamento'      && <SimOrcamento      key="sim-or" />}
             {step.simulacao === 'bot'            && <SimBot            key="sim-bot" />}
+            {step.simulacao === 'financeiro'     && <SimFinanceiro     key="sim-fin" />}
           </AnimatePresence>
         </div>
       </motion.div>

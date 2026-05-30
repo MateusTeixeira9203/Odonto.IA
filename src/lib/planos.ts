@@ -1,4 +1,4 @@
-// Definições canônicas dos planos DentIA.
+// Definições canônicas dos planos Odonto.IA.
 // Usadas tanto na UI (PlanGuard, Sidebar) quanto no backend (onboarding, validações).
 
 export type PlanoId = 'SOLO' | 'BASICO' | 'CLINICA';

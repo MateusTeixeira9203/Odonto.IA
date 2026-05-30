@@ -4,12 +4,19 @@ import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Mic, MicOff, Upload, Save, Loader2, FileText, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { toast } from 'sonner';
 
 const TEETH_UPPER = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
 const TEETH_LOWER = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
 
-// Dentes com observações anteriores (mock)
-const PREVIOUS_TEETH = [46, 21];
+// Tooth-type width: molars wider, incisors narrower
+const TOOTH_WIDTH: Record<number, string> = {
+  1: 'w-7', 2: 'w-7', // central/lateral incisors
+  3: 'w-7',            // canine
+  4: 'w-8', 5: 'w-8', // premolars
+  6: 'w-9', 7: 'w-9', 8: 'w-9', // molars
+};
+const toothWidth = (t: number) => TOOTH_WIDTH[t % 10] ?? 'w-8';
 
 const ALLOWED_MIME: Record<string, boolean> = {
   'image/jpeg': true,
@@ -75,7 +82,7 @@ export function NovaEvolucaoPanel({ onCancel, onSave, clinicaId, patientId }: No
       setIsRecording(true);
     } catch (err) {
       console.error('Erro ao acessar microfone:', err);
-      alert('Não foi possível acessar o microfone.');
+      toast.error('Não foi possível acessar o microfone.');
     }
   };
 
@@ -105,7 +112,7 @@ export function NovaEvolucaoPanel({ onCancel, onSave, clinicaId, patientId }: No
       }
     } catch (error) {
       console.error('Erro na transcrição:', error);
-      alert('Erro ao transcrever áudio.');
+      toast.error('Erro ao transcrever áudio.');
     } finally {
       setIsTranscribing(false);
     }
@@ -117,11 +124,11 @@ export function NovaEvolucaoPanel({ onCancel, onSave, clinicaId, patientId }: No
     e.target.value = '';
 
     if (!ALLOWED_MIME[file.type]) {
-      alert('Tipo não permitido. Use JPG, PNG, WEBP, PDF ou DOCX.');
+      toast.error('Tipo não permitido. Use JPG, PNG, WEBP, PDF ou DOCX.');
       return;
     }
     if (file.size > MAX_UPLOAD_SIZE) {
-      alert('Arquivo muito grande. Máximo 10 MB.');
+      toast.error('Arquivo muito grande. Máximo 10 MB.');
       return;
     }
 
@@ -135,7 +142,10 @@ export function NovaEvolucaoPanel({ onCancel, onSave, clinicaId, patientId }: No
         .upload(storagePath, file, { upsert: false });
       if (storageErr) throw storageErr;
 
-      const { data: urlData } = supabase.storage.from('fichas').getPublicUrl(storagePath);
+      const { data: signedData } = await supabase.storage
+        .from('fichas')
+        .createSignedUrl(storagePath, 3600);
+      const displayUrl = signedData?.signedUrl ?? '';
 
       const { data: doc, error: dbErr } = await supabase
         .from('paciente_documentos')
@@ -143,7 +153,7 @@ export function NovaEvolucaoPanel({ onCancel, onSave, clinicaId, patientId }: No
           paciente_id: patientId,
           clinica_id: clinicaId,
           nome: file.name,
-          url: urlData.publicUrl,
+          url: storagePath,
           categoria: getCategoria(file.type),
         })
         .select('id')
@@ -152,11 +162,11 @@ export function NovaEvolucaoPanel({ onCancel, onSave, clinicaId, patientId }: No
 
       setUploadedFiles((prev) => [
         ...prev,
-        { name: file.name, url: urlData.publicUrl, docId: doc.id as string, storagePath },
+        { name: file.name, url: displayUrl, docId: doc.id as string, storagePath },
       ]);
     } catch (err) {
       console.error('Erro no upload:', err);
-      alert('Erro ao fazer upload. Tente novamente.');
+      toast.error('Erro ao fazer upload. Tente novamente.');
     } finally {
       setIsUploading(false);
     }
@@ -330,72 +340,100 @@ export function NovaEvolucaoPanel({ onCancel, onSave, clinicaId, patientId }: No
         </div>
 
         {/* Coluna Direita (40%) - Odontograma */}
-        <div className="flex-[2] bg-surface rounded-xl border border-border p-6 flex flex-col">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="font-heading text-lg text-text-primary">Odontograma</h3>
-            <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
-              <div className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-sm bg-teal" /> Selecionado
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-sm bg-teal-pale border border-teal/30" /> C/ Histórico
-              </div>
+        <div className="flex-[2] bg-surface rounded-xl border border-border p-5 flex flex-col">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-heading text-base text-text-primary">Odontograma</h3>
+            <div className="flex items-center gap-2.5 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
+              <span className="flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded-sm bg-teal inline-block" /> Selecionado
+              </span>
             </div>
           </div>
 
-          <div className="flex-1 flex flex-col justify-center gap-8">
-            {/* Dentes Superiores */}
-            <div className="flex justify-center gap-1 flex-wrap">
-              {TEETH_UPPER.map(tooth => {
-                const isSelected = selectedTeeth.includes(tooth);
-                const hasHistory = PREVIOUS_TEETH.includes(tooth);
+          {/* Quadrant headers */}
+          <div className="flex justify-center mb-1">
+            <div className="flex w-full max-w-xs sm:max-w-sm justify-between text-[9px] font-bold uppercase tracking-widest text-text-secondary px-1">
+              <span>Dir.</span>
+              <span>Esq.</span>
+            </div>
+          </div>
 
+          <div className="flex-1 flex flex-col justify-center gap-1">
+            {/* Upper teeth */}
+            <div className="flex justify-center items-end gap-0.5">
+              {TEETH_UPPER.map((tooth, idx) => {
+                const isSelected = selectedTeeth.includes(tooth);
+                const isCenterLeft = idx === 7; // tooth 11 — right of center
                 return (
-                  <button
-                    key={tooth}
-                    onClick={() => toggleTooth(tooth)}
-                    className={`relative w-8 h-10 rounded-t-md rounded-b-sm border-2 flex items-center justify-center font-mono text-xs font-bold transition-all ${
-                      isSelected
-                        ? 'bg-teal border-teal text-white shadow-md -translate-y-1'
-                        : hasHistory
-                          ? 'bg-teal-pale border-teal/30 text-teal-dark hover:bg-teal/10'
-                          : 'bg-surface-alt border-border text-text-secondary hover:border-teal hover:text-teal'
-                    }`}
-                  >
-                    {tooth}
-                  </button>
+                  <div key={tooth} className="flex items-end">
+                    {isCenterLeft && (
+                      <div className="w-px h-8 bg-border mx-1 self-stretch" />
+                    )}
+                    <button
+                      onClick={() => toggleTooth(tooth)}
+                      title={`Dente ${tooth}`}
+                      className={`${toothWidth(tooth)} h-10 rounded-t-lg rounded-b-[3px] border flex items-center justify-center font-mono text-[10px] font-bold transition-all hover:scale-105 active:scale-95 ${
+                        isSelected
+                          ? 'bg-teal border-teal text-white -translate-y-1.5 shadow-[0_4px_12px_rgba(47,156,133,0.4)]'
+                          : 'bg-surface-alt border-border text-text-secondary hover:border-teal/60 hover:text-teal hover:bg-teal/5'
+                      }`}
+                    >
+                      {tooth}
+                    </button>
+                  </div>
                 );
               })}
             </div>
 
-            {/* Dentes Inferiores */}
-            <div className="flex justify-center gap-1 flex-wrap">
-              {TEETH_LOWER.map(tooth => {
-                const isSelected = selectedTeeth.includes(tooth);
-                const hasHistory = PREVIOUS_TEETH.includes(tooth);
+            {/* Arch separator */}
+            <div className="flex justify-center">
+              <div className="w-full max-w-xs sm:max-w-sm h-px bg-border my-1" />
+            </div>
 
+            {/* Lower teeth */}
+            <div className="flex justify-center items-start gap-0.5">
+              {TEETH_LOWER.map((tooth, idx) => {
+                const isSelected = selectedTeeth.includes(tooth);
+                const isCenterLeft = idx === 7; // tooth 41 — right of center
                 return (
-                  <button
-                    key={tooth}
-                    onClick={() => toggleTooth(tooth)}
-                    className={`relative w-8 h-10 rounded-b-md rounded-t-sm border-2 flex items-center justify-center font-mono text-xs font-bold transition-all ${
-                      isSelected
-                        ? 'bg-teal border-teal text-white shadow-md translate-y-1'
-                        : hasHistory
-                          ? 'bg-teal-pale border-teal/30 text-teal-dark hover:bg-teal/10'
-                          : 'bg-surface-alt border-border text-text-secondary hover:border-teal hover:text-teal'
-                    }`}
-                  >
-                    {tooth}
-                  </button>
+                  <div key={tooth} className="flex items-start">
+                    {isCenterLeft && (
+                      <div className="w-px h-8 bg-border mx-1 self-stretch" />
+                    )}
+                    <button
+                      onClick={() => toggleTooth(tooth)}
+                      title={`Dente ${tooth}`}
+                      className={`${toothWidth(tooth)} h-10 rounded-b-lg rounded-t-[3px] border flex items-center justify-center font-mono text-[10px] font-bold transition-all hover:scale-105 active:scale-95 ${
+                        isSelected
+                          ? 'bg-teal border-teal text-white translate-y-1.5 shadow-[0_-4px_12px_rgba(47,156,133,0.4)]'
+                          : 'bg-surface-alt border-border text-text-secondary hover:border-teal/60 hover:text-teal hover:bg-teal/5'
+                      }`}
+                    >
+                      {tooth}
+                    </button>
+                  </div>
                 );
               })}
             </div>
           </div>
 
-          <div className="mt-8 text-center text-xs text-text-secondary font-medium">
-            Clique nos dentes para adicionar observações específicas.
+          {/* Bottom quadrant labels */}
+          <div className="flex justify-center mt-1 mb-3">
+            <div className="flex w-full max-w-xs sm:max-w-sm justify-between text-[9px] font-bold uppercase tracking-widest text-text-secondary px-1">
+              <span>Dir.</span>
+              <span>Esq.</span>
+            </div>
           </div>
+
+          {selectedTeeth.length > 0 ? (
+            <p className="text-center text-xs text-teal font-semibold">
+              {selectedTeeth.length} dente{selectedTeeth.length !== 1 ? 's' : ''} selecionado{selectedTeeth.length !== 1 ? 's' : ''}
+            </p>
+          ) : (
+            <p className="text-center text-[11px] text-text-secondary">
+              Clique nos dentes para adicionar observações.
+            </p>
+          )}
         </div>
 
       </div>

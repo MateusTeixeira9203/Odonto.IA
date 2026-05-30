@@ -1,28 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenAI } from '@google/genai';
 import { getDentistaCached } from '@/lib/get-dentista';
 import { createClient } from '@/lib/supabase/server';
+import { withRateLimit } from '@/lib/rate-limit';
+import { generateText } from '@/lib/ai/provider';
+import { logAICall } from '@/lib/ai/logger';
 
-/**
- * POST /api/dex/simplificar
- * Traduz um orçamento técnico para linguagem acessível ao paciente.
- * Body: { orcamentoId: string }
- */
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  const limited = await withRateLimit(req, 'dex:simplificar', 20, 60_000);
+  if (limited) return limited;
+
   const dentista = await getDentistaCached();
   if (!dentista) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
 
-  const apiKey = process.env.GEMINI_API_KEY ?? process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-  if (!apiKey) return NextResponse.json({ error: 'GEMINI_API_KEY não configurada' }, { status: 500 });
+  if (!process.env.GEMINI_API_KEY) {
+    return NextResponse.json({ error: 'GEMINI_API_KEY não configurada' }, { status: 500 });
+  }
 
   let body: { orcamentoId?: string };
-  try { body = (await req.json()) as typeof body; } catch {
+  try {
+    body = (await req.json()) as typeof body;
+  } catch {
     return NextResponse.json({ error: 'Body inválido' }, { status: 400 });
   }
   if (!body.orcamentoId) return NextResponse.json({ error: 'orcamentoId obrigatório' }, { status: 400 });
 
   const supabase = await createClient();
-
   const { data: orc } = await supabase
     .from('orcamentos')
     .select('total, desconto, paciente:pacientes(nome), orcamento_itens(descricao, quantidade, preco_unitario, preco_total)')
@@ -56,16 +58,33 @@ ${itensTexto}
 ${desconto > 0 ? `Desconto: R$ ${desconto.toFixed(2)}` : ''}
 Total: R$ ${total.toFixed(2)}`;
 
-  const ai = new GoogleGenAI({ apiKey });
+  const callStart = Date.now();
   try {
-    const result = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
-      contents: prompt,
+    const result = await generateText({ prompt, feature: 'simplificar' });
+
+    logAICall({
+      feature:    'simplificar',
+      provider:   result.provider,
+      model:      result.model,
+      latencyMs:  result.latencyMs,
+      success:    true,
+      dentistaId: dentista.id,
+      clinicaId:  dentista.clinica_id,
     });
-    const texto = (result.text ?? '').trim();
-    return NextResponse.json({ texto, pacienteNome });
+
+    return NextResponse.json({ texto: result.data, pacienteNome });
   } catch (err) {
-    console.error('[dex/simplificar] Erro Gemini:', err);
+    console.error('[dex/simplificar] Erro:', err);
+    logAICall({
+      feature:    'simplificar',
+      provider:   'gemini',
+      model:      'gemini-2.5-flash',
+      latencyMs:  Date.now() - callStart,
+      success:    false,
+      dentistaId: dentista.id,
+      clinicaId:  dentista.clinica_id,
+      error:      err instanceof Error ? err.message : 'Erro interno',
+    });
     return NextResponse.json({ error: 'Erro ao simplificar' }, { status: 500 });
   }
 }

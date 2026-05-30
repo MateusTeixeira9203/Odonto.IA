@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { motion } from "motion/react";
 import { CheckCircle2, ArrowRight } from "lucide-react";
-import { DentIALogo } from "@/components/ui/dent-ia-logo";
+import { OdontoIALogo } from "@/components/ui/dent-ia-logo";
 
 export default function EmailConfirmadoPage(): React.JSX.Element {
   return (
@@ -15,7 +15,7 @@ export default function EmailConfirmadoPage(): React.JSX.Element {
       >
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-teal text-white mb-4 shadow-lg">
-            <DentIALogo className="w-7 h-7" />
+            <OdontoIALogo className="w-7 h-7" />
           </div>
         </div>
 
@@ -39,7 +39,7 @@ export default function EmailConfirmadoPage(): React.JSX.Element {
               Email confirmado!
             </h1>
             <p className="text-text-secondary text-sm font-medium mb-8 leading-relaxed">
-              Sua conta foi ativada com sucesso. Agora você pode acessar o Dent IA e começar a
+              Sua conta foi ativada com sucesso. Agora você pode acessar o Odonto.IA e começar a
               configurar sua clínica.
             </p>
 

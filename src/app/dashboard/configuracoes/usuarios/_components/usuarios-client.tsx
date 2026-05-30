@@ -186,7 +186,7 @@ export function UsuariosClient({ usuarios, convitesPendentes, meuId, meuRole, li
         className="flex items-start justify-between gap-4"
       >
         <div>
-          <h1 className="font-serif text-3xl text-text-primary dark:text-white">Equipe</h1>
+          <h1 className="font-heading font-bold text-3xl text-text-primary">Equipe</h1>
           <p className="text-text-secondary dark:text-zinc-400 text-sm mt-1">
             Gerencie dentistas e secretárias da clínica
           </p>
@@ -336,7 +336,7 @@ export function UsuariosClient({ usuarios, convitesPendentes, meuId, meuRole, li
       <AlertDialog open={!!confirmDelete} onOpenChange={(open) => { if (!open) setConfirmDelete(null); }}>
         <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle className="font-serif text-xl">Excluir usuário?</AlertDialogTitle>
+            <AlertDialogTitle className="font-heading font-semibold text-xl">Excluir usuário?</AlertDialogTitle>
             <AlertDialogDescription className="text-sm">
               <span className="font-medium text-text-primary dark:text-white">{confirmDelete?.nome}</span>
               {' '}será removido permanentemente da clínica e não conseguirá mais fazer login.
@@ -362,7 +362,7 @@ export function UsuariosClient({ usuarios, convitesPendentes, meuId, meuRole, li
       <Dialog open={showConviteDialog} onOpenChange={setShowConviteDialog}>
         <DialogContent className="sm:max-w-md rounded-3xl">
           <DialogHeader>
-            <DialogTitle className="font-serif text-2xl">Convidar usuário</DialogTitle>
+            <DialogTitle className="font-heading font-semibold text-xl">Convidar usuário</DialogTitle>
             <DialogDescription>
               Envie um email com link de cadastro. O convite expira em 7 dias.
             </DialogDescription>

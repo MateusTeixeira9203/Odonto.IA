@@ -45,11 +45,25 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
   }
 
-  // Busca o registro do arquivo
+  // Resolve clínica ativa para escopar leitura e escrita ao tenant correto
+  const { data: userRecord } = await supabase
+    .from("users")
+    .select("active_clinica_id")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!userRecord?.active_clinica_id) {
+    return NextResponse.json({ error: "Clínica não encontrada." }, { status: 403 });
+  }
+
+  const clinicId = userRecord.active_clinica_id as string;
+
+  // Busca o registro do arquivo — escopo explícito por clínica
   const { data: arquivo, error: arquivoError } = await supabase
     .from("ficha_arquivos")
     .select("*")
     .eq("id", ficha_arquivo_id)
+    .eq("clinica_id", clinicId)
     .maybeSingle();
 
   if (arquivoError || !arquivo) {
@@ -108,11 +122,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // Atualiza o registro com o texto extraído
+  // Atualiza o registro com o texto extraído — escopo explícito por clínica
   const { error: updateError } = await supabase
     .from("ficha_arquivos")
     .update({ texto_extraido: textoExtraido, processado: true })
-    .eq("id", ficha_arquivo_id);
+    .eq("id", ficha_arquivo_id)
+    .eq("clinica_id", clinicId);
 
   if (updateError) {
     console.error("Erro ao salvar texto extraído:", updateError);

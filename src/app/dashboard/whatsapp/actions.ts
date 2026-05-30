@@ -1,12 +1,9 @@
 'use server';
 
-import { redirect } from 'next/navigation';
-import { getDentistaCached } from '@/lib/get-dentista';
+import { requireRole } from '@/server/auth/roles';
 import { createServiceClient } from '@/lib/supabase/service';
 import { sendWhatsAppText } from '@/lib/whatsapp/evolution';
 import { STATES } from '@/lib/whatsapp/states';
-
-// ─── Tipos públicos ───────────────────────────────────────────────────────────
 
 export interface ConversaItem {
   id: string;
@@ -25,27 +22,14 @@ export interface MensagemItem {
   created_at: string;
 }
 
-// ─── Guard de role ────────────────────────────────────────────────────────────
-
-async function verificarAcesso() {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect('/login');
-  if (dentista.role !== 'admin' && dentista.role !== 'secretaria') {
-    redirect('/dashboard');
-  }
-  return dentista;
-}
-
-// ─── Leitura ──────────────────────────────────────────────────────────────────
-
 export async function listarConversas(): Promise<ConversaItem[]> {
-  const dentista = await verificarAcesso();
+  const { clinicId } = await requireRole(['admin', 'secretaria']);
   const db = createServiceClient();
 
   const { data } = await db
     .from('conversas_bot')
     .select('id, telefone, etapa, ativo, ultimo_contato, paciente:pacientes(id, nome)')
-    .eq('clinica_id', dentista.clinica_id)
+    .eq('clinica_id', clinicId)
     .order('ultimo_contato', { ascending: false })
     .limit(60);
 
@@ -53,58 +37,57 @@ export async function listarConversas(): Promise<ConversaItem[]> {
 }
 
 export async function buscarMensagens(conversaId: string): Promise<MensagemItem[]> {
-  await verificarAcesso();
+  const { clinicId } = await requireRole(['admin', 'secretaria']);
   const db = createServiceClient();
 
   const { data } = await db
     .from('mensagens_bot')
     .select('id, direcao, conteudo, tipo, created_at')
     .eq('conversa_id', conversaId)
+    .eq('clinica_id', clinicId)
     .order('created_at', { ascending: true })
     .limit(200);
 
   return (data ?? []) as MensagemItem[];
 }
 
-// ─── Ações ────────────────────────────────────────────────────────────────────
-
 export async function assumirConversa(conversaId: string): Promise<{ ok: boolean }> {
-  await verificarAcesso();
+  const { clinicId } = await requireRole(['admin', 'secretaria']);
   const db = createServiceClient();
 
   const { error } = await db
     .from('conversas_bot')
     .update({ ativo: false, etapa: STATES.HUMANO })
-    .eq('id', conversaId);
+    .eq('id', conversaId)
+    .eq('clinica_id', clinicId);
 
   return { ok: !error };
 }
 
 export async function finalizarConversa(conversaId: string): Promise<{ ok: boolean }> {
-  await verificarAcesso();
+  const { clinicId } = await requireRole(['admin', 'secretaria']);
   const db = createServiceClient();
 
   const { error } = await db
     .from('conversas_bot')
     .update({ ativo: true, etapa: STATES.INICIO, contexto: {} })
-    .eq('id', conversaId);
+    .eq('id', conversaId)
+    .eq('clinica_id', clinicId);
 
   return { ok: !error };
 }
 
 export async function enviarMensagemManual(
   conversaId: string,
-  clinicaId: string,
   telefone: string,
   conteudo: string,
 ): Promise<{ ok: boolean; aviso?: string }> {
-  await verificarAcesso();
+  const { clinicId } = await requireRole(['admin', 'secretaria']);
   const db = createServiceClient();
 
-  // Salva no histórico independente do envio via API
   await db.from('mensagens_bot').insert({
     conversa_id: conversaId,
-    clinica_id:  clinicaId,
+    clinica_id:  clinicId,
     direcao:     'saida',
     conteudo,
     tipo:        'texto',

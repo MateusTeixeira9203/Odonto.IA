@@ -1,14 +1,21 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Silencia o conflito webpack/turbopack (Next.js 16 usa Turbopack por padrão)
   turbopack: {},
+  // tsc --noEmit roda separadamente no CI (script "typecheck").
+  // Desabilitar a checagem redundante do next build evita OOM em máquinas com menos RAM.
+  typescript: { ignoreBuildErrors: true },
   images: {
     remotePatterns: [
       {
         protocol: "https",
         hostname: "*.supabase.co",
         pathname: "/storage/v1/object/public/**",
+      },
+      {
+        protocol: "https",
+        hostname: "*.supabase.co",
+        pathname: "/storage/v1/object/sign/**",
       },
       {
         protocol: "https",

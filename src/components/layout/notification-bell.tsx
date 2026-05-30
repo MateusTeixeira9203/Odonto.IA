@@ -60,6 +60,17 @@ export function NotificationBell({ isExpanded }: NotificationBellProps) {
     } catch { /* best-effort */ }
   }, []);
 
+  // Marca todas as notificações de banco como lidas ao abrir o painel
+  const markAllNotifsRead = useCallback(() => {
+    alerts.filter(a => a.isNotif).forEach(a => { void markRead(a.id); });
+  }, [alerts, markRead]);
+
+  const handleBellClick = useCallback(() => {
+    const opening = !open;
+    setOpen(opening);
+    if (opening) markAllNotifsRead();
+  }, [open, markAllNotifsRead]);
+
   const handleAlertClick = useCallback(async (alert: DexAlert) => {
     if (alert.isNotif) await markRead(alert.id);
     setOpen(false);
@@ -91,11 +102,12 @@ export function NotificationBell({ isExpanded }: NotificationBellProps) {
   return (
     <div ref={panelRef} className="relative">
       <button
-        onClick={() => setOpen(v => !v)}
-        className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium text-sm transition-all group w-full text-zinc-400 hover:bg-white/5 hover:text-white border-l-2 border-transparent ${!isExpanded && 'justify-center'}`}
+        onClick={handleBellClick}
+        title={!isExpanded ? 'Notificações' : undefined}
+        className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium text-sm transition-all group w-full text-white/40 hover:bg-white/[0.06] hover:text-white/90 border-l-2 border-transparent ${!isExpanded && 'justify-center'}`}
         aria-label="Notificações"
       >
-        <Bell className="w-4 h-4 shrink-0 text-zinc-400 group-hover:text-white" />
+        <Bell className="w-4 h-4 shrink-0 text-white/35 group-hover:text-white/70" />
 
         {loaded && totalCount > 0 && (
           <motion.span

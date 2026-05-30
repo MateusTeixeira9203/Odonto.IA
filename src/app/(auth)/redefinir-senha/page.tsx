@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Eye, EyeOff, Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { DentIALogo } from "@/components/ui/dent-ia-logo";
+import { OdontoIALogo } from "@/components/ui/dent-ia-logo";
 
 const redefinirSchema = z
   .object({
@@ -110,9 +110,9 @@ export default function RedefinirSenhaPage(): React.JSX.Element {
       >
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-teal text-white mb-4 shadow-lg">
-            <DentIALogo className="w-7 h-7" />
+            <OdontoIALogo className="w-7 h-7" />
           </div>
-          <h1 className="font-serif text-4xl text-text-primary mb-2">Nova senha</h1>
+          <h1 className="font-heading font-bold text-4xl text-text-primary mb-2">Nova senha</h1>
           <p className="text-text-secondary text-sm font-medium">
             Escolha uma senha segura com pelo menos 8 caracteres.
           </p>
@@ -141,10 +141,10 @@ export default function RedefinirSenhaPage(): React.JSX.Element {
                 animate={{ opacity: 1, scale: 1 }}
                 className="text-center py-4"
               >
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-50 text-red-500 mb-4">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-coral/10 text-coral mb-4">
                   <AlertTriangle className="w-8 h-8" />
                 </div>
-                <h3 className="font-serif text-2xl text-text-primary mb-2">Link Expirado</h3>
+                <h3 className="font-heading font-semibold text-2xl text-text-primary mb-2">Link Expirado</h3>
                 <p className="text-sm text-text-secondary mb-6">
                   Este link expirou ou já foi utilizado. Solicite um novo para continuar.
                 </p>
@@ -181,7 +181,7 @@ export default function RedefinirSenhaPage(): React.JSX.Element {
                 >
                   <CheckCircle2 className="w-8 h-8" />
                 </motion.div>
-                <h3 className="font-serif text-2xl text-text-primary mb-2">Senha atualizada!</h3>
+                <h3 className="font-heading font-semibold text-2xl text-text-primary mb-2">Senha atualizada!</h3>
                 <p className="text-sm text-text-secondary">
                   Redirecionando para o login...
                 </p>

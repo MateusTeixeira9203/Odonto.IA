@@ -1,18 +1,16 @@
 import { createServerClient } from "@supabase/ssr";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
+
+export type MiddlewareSession = {
+  id: string;
+  email?: string;
+} | null;
 
 export interface UpdateSessionResult {
   response: NextResponse;
-  session: { user: { id: string }; access_token: string } | null;
-  supabase: SupabaseClient | null;
+  session: MiddlewareSession;
 }
 
-/**
- * Atualiza a sessão do Supabase no middleware.
- * Necessário para refresh automático de tokens expirados.
- * Retorna response, sessão e cliente para uso na proteção de rotas.
- */
 export async function updateSession(
   request: NextRequest
 ): Promise<UpdateSessionResult> {
@@ -26,7 +24,7 @@ export async function updateSession(
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    return { response, session: null, supabase: null };
+    return { response, session: null };
   }
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
@@ -42,16 +40,13 @@ export async function updateSession(
     },
   });
 
-  // Valida a sessão contra o servidor (getUser faz chamada real ao Supabase,
-  // ao contrário de getSession que apenas lê o cookie local).
-  // Isso garante que sessões de usuários deletados sejam tratadas como inválidas.
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const session = user
-    ? ({ user: { id: user.id }, access_token: "" } as const)
+  const session: MiddlewareSession = user
+    ? { id: user.id, email: user.email ?? undefined }
     : null;
 
-  return { response, session, supabase };
+  return { response, session };
 }

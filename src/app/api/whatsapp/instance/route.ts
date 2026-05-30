@@ -26,14 +26,31 @@ async function getAuthorizedClinica(): Promise<{ clinicaId: string } | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data } = await supabase
-    .from('dentistas')
-    .select('clinica_id, role')
-    .eq('user_id', user.id)
+  // Resolve clínica ativa via users.active_clinica_id (fonte canônica)
+  const { data: userRecord } = await supabase
+    .from('users')
+    .select('active_clinica_id')
+    .eq('id', user.id)
     .maybeSingle();
 
-  if (!data || (data.role !== 'admin' && data.role !== 'secretaria')) return null;
-  return { clinicaId: data.clinica_id as string };
+  if (!userRecord?.active_clinica_id) return null;
+
+  const clinicId = userRecord.active_clinica_id as string;
+
+  // Valida role via clinica_usuarios (fonte canônica de role)
+  const { data: membership } = await supabase
+    .from('clinica_usuarios')
+    .select('role')
+    .eq('usuario_id', user.id)
+    .eq('clinica_id', clinicId)
+    .eq('status', 'ativo')
+    .maybeSingle();
+
+  if (!membership || (membership.role !== 'admin' && membership.role !== 'secretaria')) {
+    return null;
+  }
+
+  return { clinicaId: clinicId };
 }
 
 // ─── POST — criar instância ───────────────────────────────────────────────────
@@ -55,7 +72,7 @@ export async function POST(_req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Já existe uma instância ativa para esta clínica.' }, { status: 409 });
   }
 
-  const instanceName = `dentai-${auth.clinicaId.replace(/-/g, '').slice(0, 10)}`;
+  const instanceName = `odonto-ia-${auth.clinicaId.replace(/-/g, '').slice(0, 8)}`;
 
   try {
     const result = await createInstance(instanceName);

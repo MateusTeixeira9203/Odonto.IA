@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { hasDentistaRegistro } from "@/lib/auth";
+import { requireUser } from "@/server/auth/user";
 import { LogoMark } from "@/components/dentai/Logo";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { NeuralBackground } from "@/components/layout/NeuralBackground";
@@ -10,17 +9,15 @@ export default async function OnboardingLayout({
 }: {
   children: React.ReactNode;
 }): Promise<React.JSX.Element> {
-  const supabase = await createClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const { supabase, user } = await requireUser();
 
-  if (!session) {
-    redirect("/login?redirectTo=/onboarding");
-  }
+  const { data: dentista } = await supabase
+    .from("dentistas")
+    .select("id")
+    .eq("user_id", user.id)
+    .maybeSingle();
 
-  const temDentista = await hasDentistaRegistro(supabase);
-  if (temDentista) {
+  if (dentista) {
     redirect("/dashboard");
   }
 
@@ -28,13 +25,11 @@ export default async function OnboardingLayout({
     <div className="relative min-h-screen flex flex-col bg-bg">
       <NeuralBackground />
 
-      {/* Barra superior */}
       <div className="relative z-10 flex items-center justify-between px-6 py-4 border-b border-border bg-surface/70 backdrop-blur-sm">
         <LogoMark />
         <ThemeToggle />
       </div>
 
-      {/* Conteúdo centralizado */}
       <div className="relative z-10 flex flex-1 items-start justify-center px-4 py-10">
         {children}
       </div>

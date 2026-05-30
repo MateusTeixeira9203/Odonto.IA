@@ -107,7 +107,7 @@ export function GaleriaImagens({
                     src={doc.url}
                     alt={doc.nome}
                     fill
-                    className="object-cover group-hover:scale-110 transition-transform duration-500"
+                    className="object-cover group-hover:scale-105 transition-transform duration-300"
                     referrerPolicy="no-referrer"
                     sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 20vw"
                   />

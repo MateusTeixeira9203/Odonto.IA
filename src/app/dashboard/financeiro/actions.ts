@@ -1,12 +1,9 @@
 'use server';
 
-import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
-import { getDentistaCached } from '@/lib/get-dentista';
-import { createClient } from '@/lib/supabase/server';
+import { requireClinicContext } from '@/server/auth/clinic';
 import { inserirNotificacao } from '@/lib/notificacoes';
-
-// ─── Tipos ────────────────────────────────────────────────────────────────────
+import { buildCsv } from '@/lib/export/csv';
 
 export type Despesa = {
   id: string;
@@ -27,9 +24,7 @@ export type SaldoMes = {
 };
 
 export type ChartPoint = {
-  /** "Jan", "Fev", … */
   mes: string;
-  /** "2026-04" */
   mesISO: string;
   receita: number;
   despesas: number;
@@ -41,15 +36,11 @@ export type NovaDespesaForm = {
   tipo: 'fixo' | 'variavel';
   data: string;
   descricao?: string;
-  /** ID do dentista a quem esta despesa pertence.
-   *  Obrigatório quando quem cria é secretária no Plano CLÍNICA. */
   dentistaId?: string;
 };
 
 export type DayPoint = {
-  /** "Seg", "Ter", … ou "Hoje" */
   dia: string;
-  /** "2026-04-11" */
   diaISO: string;
   receita: number;
   despesas: number;
@@ -75,15 +66,34 @@ export type NovaReceitaForm = {
 };
 
 export type HoraClinicaResult = {
-  /** Soma das despesas fixas do mês */
   despesasFixas: number;
-  /** Total de horas de trabalho no mês conforme agenda cadastrada (null = sem horários) */
   horasNoMes: number | null;
-  /** despesasFixas / horasNoMes (null quando horasNoMes é null ou zero) */
   custoPorHora: number | null;
 };
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+export type PagamentoPago = {
+  id: string;
+  clinica_id: string;
+  orcamento_id: string;
+  paciente_id: string;
+  paciente_nome: string;
+  dentista_id: string;
+  valor: number;
+  forma_pagamento: string | null;
+  data_pagamento: string;
+  created_at: string;
+};
+
+export type PagamentoPendente = {
+  id: string;
+  orcamento_id: string;
+  paciente_id: string;
+  paciente_nome: string;
+  dentista_id: string;
+  valor: number;
+  data_vencimento: string | null;
+  created_at: string;
+};
 
 const MES_PT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
@@ -99,73 +109,66 @@ function mesWindow(mesISO: string): { inicio: string; fim: string; inicioDate: s
   };
 }
 
-// ─── Actions ──────────────────────────────────────────────────────────────────
-
-/** Lista despesas de um mês (YYYY-MM).
- *  Dentistas vêem apenas as próprias; secretária/admin vêem todas da clínica. */
 export async function listarDespesas(mesISO: string): Promise<Despesa[]> {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect('/login');
+  const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
 
   const { inicioDate, fimDate } = mesWindow(mesISO);
-  const supabase = await createClient();
 
   let query = supabase
     .from('despesas')
     .select('*')
-    .eq('clinica_id', dentista.clinica_id)
+    .eq('clinica_id', clinicId)
     .gte('data', inicioDate)
     .lt('data', fimDate)
     .order('data', { ascending: false });
 
-  // Silo de privacidade: dentista vê apenas suas próprias despesas
-  if (dentista.role === 'dentista') {
-    query = query.eq('dentista_id', dentista.id);
+  // Admin e dentista têm escopo individual: veem apenas os próprios registros
+  if (role !== 'secretaria') {
+    query = query.eq('dentista_id', dentistaId);
   }
 
   const { data } = await query;
   return (data ?? []) as Despesa[];
 }
 
-/** Calcula receita, despesas e lucro líquido de um mês.
- *  Dentistas têm silo: vêem apenas as próprias despesas. */
 export async function calcularSaldoMes(mesISO: string): Promise<SaldoMes> {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect('/login');
+  const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
 
   const { inicio, fim, inicioDate, fimDate } = mesWindow(mesISO);
-  const supabase = await createClient();
+  const scopado = role !== 'secretaria';
 
   let despesasQuery = supabase
     .from('despesas')
     .select('valor')
-    .eq('clinica_id', dentista.clinica_id)
+    .eq('clinica_id', clinicId)
     .gte('data', inicioDate)
     .lt('data', fimDate);
 
-  if (dentista.role === 'dentista') {
-    despesasQuery = despesasQuery.eq('dentista_id', dentista.id);
+  let pagamentosQuery = supabase
+    .from('pagamentos')
+    .select('valor')
+    .eq('clinica_id', clinicId)
+    .eq('status', 'pago')
+    .gte('data_pagamento', inicioDate)
+    .lt('data_pagamento', fimDate);
+
+  let receitasQuery = supabase
+    .from('receitas_manuais')
+    .select('valor')
+    .eq('clinica_id', clinicId)
+    .gte('data', inicioDate)
+    .lt('data', fimDate);
+
+  if (scopado) {
+    despesasQuery   = despesasQuery.eq('dentista_id', dentistaId);
+    pagamentosQuery = pagamentosQuery.eq('dentista_id', dentistaId);
+    receitasQuery   = receitasQuery.eq('dentista_id', dentistaId);
   }
 
   const [{ data: pagamentos }, { data: despesasData }, { data: receitasData }] = await Promise.all([
-    supabase
-      .from('pagamentos')
-      .select('valor')
-      .eq('clinica_id', dentista.clinica_id)
-      .eq('status', 'pago')
-      .gte('created_at', inicio)
-      .lt('created_at', fim),
+    pagamentosQuery,
     despesasQuery,
-    (() => {
-      let q = supabase
-        .from('receitas_manuais')
-        .select('valor')
-        .eq('clinica_id', dentista.clinica_id)
-        .gte('data', inicioDate)
-        .lt('data', fimDate);
-      if (dentista.role === 'dentista') q = q.eq('dentista_id', dentista.id);
-      return q;
-    })(),
+    receitasQuery,
   ]);
 
   const receitaPagamentos = (pagamentos  ?? []).reduce((s, p) => s + Number(p.valor), 0);
@@ -175,14 +178,10 @@ export async function calcularSaldoMes(mesISO: string): Promise<SaldoMes> {
   return { receita, despesas, saldo: receita - despesas };
 }
 
-/** Retorna pontos de dados por dia nos últimos 7 dias (receita + despesas). */
 export async function listarUltimos7Dias(): Promise<DayPoint[]> {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect('/login');
+  const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
 
-  const supabase = await createClient();
   const now = new Date();
-
   const dias: Date[] = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date(now);
@@ -190,24 +189,28 @@ export async function listarUltimos7Dias(): Promise<DayPoint[]> {
     dias.push(d);
   }
   const inicioDate = dias[0].toISOString().split('T')[0];
+  const scopado = role !== 'secretaria';
 
   let despesas7Query = supabase
     .from('despesas')
     .select('valor, data')
-    .eq('clinica_id', dentista.clinica_id)
+    .eq('clinica_id', clinicId)
     .gte('data', inicioDate);
 
-  if (dentista.role === 'dentista') {
-    despesas7Query = despesas7Query.eq('dentista_id', dentista.id);
+  let pagamentosQuery = supabase
+    .from('pagamentos')
+    .select('valor, data_pagamento')
+    .eq('clinica_id', clinicId)
+    .eq('status', 'pago')
+    .gte('data_pagamento', inicioDate);
+
+  if (scopado) {
+    despesas7Query  = despesas7Query.eq('dentista_id', dentistaId);
+    pagamentosQuery = pagamentosQuery.eq('dentista_id', dentistaId);
   }
 
   const [{ data: pagamentos }, { data: despesasData }] = await Promise.all([
-    supabase
-      .from('pagamentos')
-      .select('valor, data_pagamento')
-      .eq('clinica_id', dentista.clinica_id)
-      .eq('status', 'pago')
-      .gte('data_pagamento', inicioDate),
+    pagamentosQuery,
     despesas7Query,
   ]);
 
@@ -228,27 +231,34 @@ export async function listarUltimos7Dias(): Promise<DayPoint[]> {
   });
 }
 
-/** Retorna pontos de dados para os últimos N meses (receita + despesas). */
 export async function listarUltimosMeses(n = 6): Promise<ChartPoint[]> {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect('/login');
+  const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
 
-  const supabase = await createClient();
   const now = new Date();
   const inicioJanela = new Date(now.getFullYear(), now.getMonth() - n + 1, 1);
+  const scopado = role !== 'secretaria';
+
+  let pagamentosQuery = supabase
+    .from('pagamentos')
+    .select('valor, data_pagamento')
+    .eq('clinica_id', clinicId)
+    .eq('status', 'pago')
+    .gte('data_pagamento', inicioJanela.toISOString().split('T')[0]);
+
+  let despesasQuery = supabase
+    .from('despesas')
+    .select('valor, data')
+    .eq('clinica_id', clinicId)
+    .gte('data', inicioJanela.toISOString().split('T')[0]);
+
+  if (scopado) {
+    pagamentosQuery = pagamentosQuery.eq('dentista_id', dentistaId);
+    despesasQuery   = despesasQuery.eq('dentista_id', dentistaId);
+  }
 
   const [{ data: pagamentos }, { data: despesasData }] = await Promise.all([
-    supabase
-      .from('pagamentos')
-      .select('valor, created_at')
-      .eq('clinica_id', dentista.clinica_id)
-      .eq('status', 'pago')
-      .gte('created_at', inicioJanela.toISOString()),
-    supabase
-      .from('despesas')
-      .select('valor, data')
-      .eq('clinica_id', dentista.clinica_id)
-      .gte('data', inicioJanela.toISOString().split('T')[0]),
+    pagamentosQuery,
+    despesasQuery,
   ]);
 
   const result: ChartPoint[] = [];
@@ -258,7 +268,7 @@ export async function listarUltimosMeses(n = 6): Promise<ChartPoint[]> {
     const mesISO = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 
     const receita = (pagamentos ?? [])
-      .filter(p => (p.created_at as string).startsWith(mesISO))
+      .filter(p => (p.data_pagamento as string)?.startsWith(mesISO))
       .reduce((s, p) => s + Number(p.valor), 0);
 
     const desp = (despesasData ?? [])
@@ -271,30 +281,22 @@ export async function listarUltimosMeses(n = 6): Promise<ChartPoint[]> {
   return result;
 }
 
-/** Cria uma nova despesa.
- *  Admin/dentista: dentista_id é o próprio ID.
- *  Secretária: deve passar form.dentistaId (dentista alvo). */
 export async function criarDespesa(
   form: NovaDespesaForm,
 ): Promise<{ ok: boolean; id?: string; erro?: string }> {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect('/login');
+  const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
 
-  // Secretária deve sempre especificar o dentista alvo
-  const dentistaAlvoId =
-    dentista.role === 'secretaria'
-      ? form.dentistaId ?? null
-      : dentista.id;
+  // Secretária precisa especificar o dentista alvo; dentista/admin usa o próprio ID
+  const dentistaAlvoId = role === 'secretaria' ? form.dentistaId ?? null : dentistaId;
 
-  if (dentista.role === 'secretaria' && !dentistaAlvoId) {
+  if (role === 'secretaria' && !dentistaAlvoId) {
     return { ok: false, erro: 'Selecione o dentista responsável pela despesa' };
   }
 
-  const supabase = await createClient();
   const { data, error } = await supabase
     .from('despesas')
     .insert({
-      clinica_id:  dentista.clinica_id,
+      clinica_id:  clinicId,
       dentista_id: dentistaAlvoId,
       valor:       form.valor,
       categoria:   form.categoria.trim() || 'outro',
@@ -307,18 +309,17 @@ export async function criarDespesa(
 
   if (error) return { ok: false, erro: error.message };
 
-  // Notifica o dentista alvo quando quem lança é a secretária
-  if (dentista.role === 'secretaria' && dentistaAlvoId) {
+  if (role === 'secretaria' && dentistaAlvoId) {
     const valor = form.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     await inserirNotificacao(supabase, {
-      clinicaId:       dentista.clinica_id,
-      paraRole:        'dentista',
-      paraDentistaId:  dentistaAlvoId,
-      deDentistaId:    dentista.id,
-      tipo:            'sistema',
-      titulo:          `Nova despesa lançada — ${form.categoria}`,
-      mensagem:        `A secretária registrou uma saída de ${valor}${form.descricao ? ` (${form.descricao})` : ''} em seu nome.`,
-      href:            '/dashboard/financeiro',
+      clinicaId:      clinicId,
+      paraRole:       'dentista',
+      paraDentistaId: dentistaAlvoId,
+      deDentistaId:   dentistaId,
+      tipo:           'sistema',
+      titulo:         `Nova despesa lançada — ${form.categoria}`,
+      mensagem:       `A secretária registrou uma saída de ${valor}${form.descricao ? ` (${form.descricao})` : ''} em seu nome.`,
+      href:           '/dashboard/financeiro',
     });
   }
 
@@ -327,19 +328,16 @@ export async function criarDespesa(
   return { ok: true, id: (data as { id: string }).id };
 }
 
-/** Remove uma despesa (com validação de clinica_id). */
 export async function excluirDespesa(
   id: string,
 ): Promise<{ ok: boolean; erro?: string }> {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect('/login');
+  const { supabase, clinicId } = await requireClinicContext();
 
-  const supabase = await createClient();
   const { error } = await supabase
     .from('despesas')
     .delete()
     .eq('id', id)
-    .eq('clinica_id', dentista.clinica_id);
+    .eq('clinica_id', clinicId);
 
   if (error) return { ok: false, erro: error.message };
 
@@ -348,52 +346,42 @@ export async function excluirDespesa(
   return { ok: true };
 }
 
-// ─── Receitas Manuais ─────────────────────────────────────────────────────────
-
-/** Lista entradas manuais de um mês (YYYY-MM).
- *  Dentistas têm silo: vêem apenas as próprias receitas. */
 export async function listarReceitas(mesISO: string): Promise<ReceitaManual[]> {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect('/login');
+  const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
 
   const { inicioDate, fimDate } = mesWindow(mesISO);
-  const supabase = await createClient();
 
   let query = supabase
     .from('receitas_manuais')
     .select('*')
-    .eq('clinica_id', dentista.clinica_id)
+    .eq('clinica_id', clinicId)
     .gte('data', inicioDate)
     .lt('data', fimDate)
     .order('data', { ascending: false });
 
-  if (dentista.role === 'dentista') {
-    query = query.eq('dentista_id', dentista.id);
+  if (role !== 'secretaria') {
+    query = query.eq('dentista_id', dentistaId);
   }
 
   const { data } = await query;
   return (data ?? []) as ReceitaManual[];
 }
 
-/** Cria uma nova entrada manual. */
 export async function criarReceita(
   form: NovaReceitaForm,
 ): Promise<{ ok: boolean; id?: string; erro?: string }> {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect('/login');
+  const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
 
-  const dentistaAlvoId =
-    dentista.role === 'secretaria' ? form.dentistaId ?? null : dentista.id;
+  const dentistaAlvoId = role === 'secretaria' ? form.dentistaId ?? null : dentistaId;
 
-  if (dentista.role === 'secretaria' && !dentistaAlvoId) {
+  if (role === 'secretaria' && !dentistaAlvoId) {
     return { ok: false, erro: 'Selecione o dentista responsável pela entrada' };
   }
 
-  const supabase = await createClient();
   const { data, error } = await supabase
     .from('receitas_manuais')
     .insert({
-      clinica_id:  dentista.clinica_id,
+      clinica_id:  clinicId,
       dentista_id: dentistaAlvoId,
       valor:       form.valor,
       forma:       form.forma,
@@ -405,19 +393,18 @@ export async function criarReceita(
 
   if (error) return { ok: false, erro: error.message };
 
-  // Notifica o dentista alvo quando quem lança é a secretária
-  if (dentista.role === 'secretaria' && dentistaAlvoId) {
+  if (role === 'secretaria' && dentistaAlvoId) {
     const valor = form.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     const forma = { pix: 'PIX', dinheiro: 'Dinheiro', transferencia: 'Transferência', outro: 'Outro' }[form.forma] ?? form.forma;
     await inserirNotificacao(supabase, {
-      clinicaId:       dentista.clinica_id,
-      paraRole:        'dentista',
-      paraDentistaId:  dentistaAlvoId,
-      deDentistaId:    dentista.id,
-      tipo:            'sistema',
-      titulo:          `Nova entrada lançada — ${forma}`,
-      mensagem:        `A secretária registrou uma entrada de ${valor}${form.descricao ? ` (${form.descricao})` : ''} em seu nome.`,
-      href:            '/dashboard/financeiro',
+      clinicaId:      clinicId,
+      paraRole:       'dentista',
+      paraDentistaId: dentistaAlvoId,
+      deDentistaId:   dentistaId,
+      tipo:           'sistema',
+      titulo:         `Nova entrada lançada — ${forma}`,
+      mensagem:       `A secretária registrou uma entrada de ${valor}${form.descricao ? ` (${form.descricao})` : ''} em seu nome.`,
+      href:           '/dashboard/financeiro',
     });
   }
 
@@ -426,19 +413,16 @@ export async function criarReceita(
   return { ok: true, id: (data as { id: string }).id };
 }
 
-/** Remove uma entrada manual. */
 export async function excluirReceita(
   id: string,
 ): Promise<{ ok: boolean; erro?: string }> {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect('/login');
+  const { supabase, clinicId } = await requireClinicContext();
 
-  const supabase = await createClient();
   const { error } = await supabase
     .from('receitas_manuais')
     .delete()
     .eq('id', id)
-    .eq('clinica_id', dentista.clinica_id);
+    .eq('clinica_id', clinicId);
 
   if (error) return { ok: false, erro: error.message };
 
@@ -447,31 +431,23 @@ export async function excluirReceita(
   return { ok: true };
 }
 
-// ─── Hora Clínica ─────────────────────────────────────────────────────────────
-
-/** Calcula o custo por hora clínica: despesas fixas do mês ÷ horas agendadas.
- *  Horas calculadas a partir de horarios_disponiveis da clínica para o mês. */
 export async function calcularHoraClinica(mesISO: string): Promise<HoraClinicaResult> {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect('/login');
+  const { supabase, clinicId } = await requireClinicContext();
 
   const { inicioDate, fimDate } = mesWindow(mesISO);
-  const supabase = await createClient();
 
   const [{ data: despesasFixas }, { data: horarios }] = await Promise.all([
-    // Soma apenas despesas fixas do mês
     supabase
       .from('despesas')
       .select('valor')
-      .eq('clinica_id', dentista.clinica_id)
+      .eq('clinica_id', clinicId)
       .eq('tipo', 'fixo')
       .gte('data', inicioDate)
       .lt('data', fimDate),
-    // Horários ativos da clínica
     supabase
       .from('horarios_disponiveis')
       .select('dia_semana, hora_inicio, hora_fim')
-      .eq('clinica_id', dentista.clinica_id)
+      .eq('clinica_id', clinicId)
       .eq('ativo', true),
   ]);
 
@@ -481,7 +457,6 @@ export async function calcularHoraClinica(mesISO: string): Promise<HoraClinicaRe
     return { despesasFixas: totalFixas, horasNoMes: null, custoPorHora: null };
   }
 
-  // Conta quantas vezes cada dia_semana ocorre no mês
   const [ano, mes] = mesISO.split('-').map(Number);
   const diasNoMes = new Date(ano, mes, 0).getDate();
   const contadorDia: Record<number, number> = {};
@@ -490,7 +465,6 @@ export async function calcularHoraClinica(mesISO: string): Promise<HoraClinicaRe
     contadorDia[dow] = (contadorDia[dow] ?? 0) + 1;
   }
 
-  // Soma horas de trabalho: horas/dia × ocorrências do dia no mês
   let horasNoMes = 0;
   for (const h of horarios) {
     const [sh, sm] = (h.hora_inicio as string).split(':').map(Number);
@@ -503,4 +477,150 @@ export async function calcularHoraClinica(mesISO: string): Promise<HoraClinicaRe
 
   const custoPorHora = horasNoMes > 0 ? totalFixas / horasNoMes : null;
   return { despesasFixas: totalFixas, horasNoMes, custoPorHora };
+}
+
+// ─── Export ───────────────────────────────────────────────────────────────────
+
+export async function exportarFinanceiroCsv(
+  mesISO: string,
+): Promise<{ csv: string; filename: string }> {
+  const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
+  const { inicioDate, fimDate } = mesWindow(mesISO);
+  const scopado = role !== 'secretaria';
+
+  type Row = { tipo: string; data: string; descricao: string; forma: string; valor: number };
+
+  let despesasQ = supabase.from('despesas').select('valor, data, descricao, categoria, tipo')
+    .eq('clinica_id', clinicId).gte('data', inicioDate).lt('data', fimDate);
+  let receitasQ = supabase.from('receitas_manuais').select('valor, data, descricao, forma')
+    .eq('clinica_id', clinicId).gte('data', inicioDate).lt('data', fimDate);
+  let pagamentosQ = supabase
+    .from('pagamentos')
+    .select('valor, data_pagamento, forma_pagamento, paciente:pacientes(nome)')
+    .eq('clinica_id', clinicId).eq('status', 'pago')
+    .gte('data_pagamento', inicioDate).lt('data_pagamento', fimDate);
+
+  if (scopado) {
+    despesasQ   = despesasQ.eq('dentista_id', dentistaId);
+    receitasQ   = receitasQ.eq('dentista_id', dentistaId);
+    pagamentosQ = pagamentosQ.eq('dentista_id', dentistaId);
+  }
+
+  const [{ data: despesas }, { data: receitas }, { data: pagamentos }] =
+    await Promise.all([despesasQ, receitasQ, pagamentosQ]);
+
+  type RawDesp = { valor: number; data: string; descricao: string | null; categoria: string; tipo: string };
+  type RawRec  = { valor: number; data: string; descricao: string | null; forma: string };
+  type RawPag  = { valor: number; data_pagamento: string | null; forma_pagamento: string | null; paciente: { nome: string } | { nome: string }[] | null };
+
+  const rows: Row[] = [
+    ...((despesas ?? []) as RawDesp[]).map(d => ({
+      tipo: 'Saída', data: d.data,
+      descricao: d.descricao ?? d.categoria,
+      forma: d.tipo === 'fixo' ? 'Fixo' : 'Variável',
+      valor: -d.valor,
+    })),
+    ...((receitas ?? []) as RawRec[]).map(r => ({
+      tipo: 'Entrada Manual', data: r.data,
+      descricao: r.descricao ?? r.forma,
+      forma: r.forma.toUpperCase(),
+      valor: r.valor,
+    })),
+    ...((pagamentos ?? []) as unknown as RawPag[]).filter(p => p.data_pagamento).map(p => {
+      const pac = Array.isArray(p.paciente) ? p.paciente[0] : p.paciente;
+      return {
+        tipo: 'Recebimento', data: p.data_pagamento!,
+        descricao: (pac as { nome: string } | null)?.nome ?? 'Paciente',
+        forma: p.forma_pagamento ?? '—',
+        valor: p.valor,
+      };
+    }),
+  ].sort((a, b) => a.data.localeCompare(b.data));
+
+  const csv = buildCsv(rows, [
+    { header: 'Tipo',        value: r => r.tipo },
+    { header: 'Data',        value: r => r.data },
+    { header: 'Descrição',   value: r => r.descricao },
+    { header: 'Forma',       value: r => r.forma },
+    { header: 'Valor (R$)',  value: r => r.valor.toFixed(2).replace('.', ',') },
+  ]);
+
+  return { csv, filename: `financeiro-${mesISO}.csv` };
+}
+
+export async function listarPagamentosPagos(mesISO: string): Promise<PagamentoPago[]> {
+  const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
+
+  const { inicioDate, fimDate } = mesWindow(mesISO);
+
+  let query = supabase
+    .from('pagamentos')
+    .select('id, clinica_id, orcamento_id, paciente_id, dentista_id, valor, forma_pagamento, data_pagamento, created_at, paciente:pacientes(nome)')
+    .eq('clinica_id', clinicId)
+    .eq('status', 'pago')
+    .gte('data_pagamento', inicioDate)
+    .lt('data_pagamento', fimDate)
+    .order('data_pagamento', { ascending: false });
+
+  if (role !== 'secretaria') {
+    query = query.eq('dentista_id', dentistaId);
+  }
+
+  const { data } = await query;
+
+  type Raw = {
+    id: string; clinica_id: string; orcamento_id: string; paciente_id: string;
+    dentista_id: string; valor: number; forma_pagamento: string | null;
+    data_pagamento: string | null; created_at: string;
+    paciente: { nome: string } | null;
+  };
+
+  return ((data ?? []) as unknown as Raw[])
+    .filter(p => p.data_pagamento != null)
+    .map(p => ({
+      id:              p.id,
+      clinica_id:      p.clinica_id,
+      orcamento_id:    p.orcamento_id,
+      paciente_id:     p.paciente_id,
+      paciente_nome:   p.paciente?.nome ?? 'Paciente',
+      dentista_id:     p.dentista_id,
+      valor:           Number(p.valor),
+      forma_pagamento: p.forma_pagamento,
+      data_pagamento:  p.data_pagamento!,
+      created_at:      p.created_at,
+    }));
+}
+
+export async function listarPagamentosPendentes(): Promise<PagamentoPendente[]> {
+  const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
+
+  let query = supabase
+    .from('pagamentos')
+    .select('id, orcamento_id, paciente_id, dentista_id, valor, data_vencimento, created_at, paciente:pacientes(nome)')
+    .eq('clinica_id', clinicId)
+    .eq('status', 'pendente')
+    .order('data_vencimento', { ascending: true, nullsFirst: false });
+
+  if (role !== 'secretaria') {
+    query = query.eq('dentista_id', dentistaId);
+  }
+
+  const { data } = await query;
+
+  type Raw = {
+    id: string; orcamento_id: string; paciente_id: string; dentista_id: string;
+    valor: number; data_vencimento: string | null; created_at: string;
+    paciente: { nome: string } | null;
+  };
+
+  return ((data ?? []) as unknown as Raw[]).map(p => ({
+    id:             p.id,
+    orcamento_id:   p.orcamento_id,
+    paciente_id:    p.paciente_id,
+    paciente_nome:  p.paciente?.nome ?? 'Paciente',
+    dentista_id:    p.dentista_id,
+    valor:          Number(p.valor),
+    data_vencimento: p.data_vencimento,
+    created_at:     p.created_at,
+  }));
 }

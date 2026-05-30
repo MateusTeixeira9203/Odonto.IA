@@ -1,10 +1,10 @@
-import { DentIALogo } from '@/components/ui/dent-ia-logo';
+import { OdontoIALogo } from '@/components/ui/dent-ia-logo';
 
 /**
- * Lockup canônico do Dent IA — ícone + wordmark.
+ * Lockup canônico do Odonto.IA — ícone + wordmark.
  *
- * variant="dark"  → fundo escuro/teal  (texto branco, IA em branco itálico)
- * variant="light" → fundo claro        (texto escuro, IA em teal-lt itálico)
+ * variant="dark"  → fundo escuro/teal  (texto branco, .IA em branco itálico)
+ * variant="light" → fundo claro        (texto escuro, .IA em teal-lt itálico)
  */
 export function BrandLockup({
   variant = 'dark',
@@ -22,10 +22,9 @@ export function BrandLockup({
 
   return (
     <div className="flex items-center gap-3">
-      <DentIALogo className={`${iconSize} ${iconColor} shrink-0`} />
+      <OdontoIALogo className={`${iconSize} ${iconColor} shrink-0`} />
       <span className={`font-heading ${textSize} ${wordColor} tracking-widest leading-none`}>
-        DENT{' '}
-        <em className={`italic ${iaColor}`}>IA</em>
+        Odonto<em className={`italic ${iaColor}`}>.IA</em>
       </span>
     </div>
   );

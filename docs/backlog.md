@@ -1,23 +1,16 @@
 # Backlog — DentIA
 
 Documento vivo de organização do que precisa ser feito, refinado ou corrigido.
-Atualizado em: 2026-05-04
+Atualizado em: 2026-05-05
 
 ---
-
-## 📅 Tarefas do Dia — 2026-05-04
-
-- [ ] **Reativar o DEX** — desbloquear widget e onboarding em `dashboard-shell.tsx`; reconectar modo consulta ao fluxo principal; revisar e commitar mudanças pendentes em `patient-context/route.ts`
-
----
+relatorio final do mes
 
 ## 🔴 Prioridade Alta — Completar antes de ir a produção
 
 ### DEX — Assistente IA
-- [ ] **Reativar o DEX** — widget e onboarding estão comentados em `dashboard-shell.tsx`. Reativar após validação dos testes.
-- [ ] **Modo Consulta** — tela em `/consulta/[agendamentoId]` está funcional mas desconectada do fluxo principal. Decidir se integra ao perfil do paciente ou mantém rota separada.
-- [ ] **Briefing automático** — rota `/api/dex/briefing` funcionando, mas depende do DEX estar ativo.
-- [ ] **Formatar evolução** — rota `/api/dex/formatar-evolucao` pronta, integrada ao modo consulta. Revisar edge cases de resposta da IA.
+- [x] **Reativar o DEX** — widget ativo para dentista/admin; tour de onboarding ativo para todos os roles.
+- [x] **Modo Consulta** — `/consulta/[agendamentoId]` funcional: guard de role, cálculo de idade, server action para salvar ficha, botão "Iniciar consulta" na agenda.
 - [ ] **Contexto do paciente** — rota `/api/dex/patient-context` com mudanças pendentes (unstaged). Revisar e commitar.
 
 ### Fluxo da Secretária
@@ -33,16 +26,16 @@ Atualizado em: 2026-05-04
 ## 🟡 Prioridade Média — Refinamentos importantes
 
 ### Fichas Clínicas
-- [ ] **Export do prontuário completo** — botão sutil no cabeçalho do perfil do paciente para baixar histórico completo como HTML estilizado (abre no browser, Ctrl+P para PDF). Sem dependência extra. Fichas, procedimentos, orçamentos e agendamentos em um arquivo só.
+- [x] **Export do prontuário completo** — botão "Exportar" no perfil do paciente abre `/api/pacientes/[id]/prontuario` (HTML estilizado, Ctrl+P para PDF). Fichas, orçamentos e agendamentos em um arquivo só.
+- [x] **PDF da ficha** — item "Imprimir Ficha" no dropdown da evolução abre `/api/fichas/[id]/pdf` (HTML→Print).
 - [ ] **Extração de imagem com IA** — rota `/api/extrair-imagem` existe mas não tem botão na interface. Adicionar ação nas fotos de raio-x.
-- [ ] **PDF da ficha** — gerar PDF da evolução clínica para impressão ou envio. Coluna `pdf_url` existe no schema, sem implementação.
 
 ### Orçamentos
-- [ ] **PDF do orçamento** — coluna `pdf_url` existe no banco mas não há rota, action ou UI para gerar. Alta demanda dos dentistas.
+- [x] **PDF do orçamento** — `BotaoDownloadPDF` abre `/api/orcamentos/[id]/pdf` (HTML→Print, sem dependência binária). Rota usa `buildOrcamentoHTML` de `prontuario-html.ts`.
 - [ ] **Envio por WhatsApp** — deep link `wa.me` existe, mas envio automático com PDF anexado não está implementado.
 
 ### Agendamentos
-- [ ] **Detecção de conflito de horário no front** — conflito é validado na action server-side, mas o formulário não avisa antes de submeter.
+- [x] **Detecção de conflito de horário no front** — `conflitoNovo` e `conflitoEdicao` (useMemo local, sem roundtrip) exibem aviso âmbar no modal de novo agendamento e no modo edição.
 - [ ] **Notificação de lembrete** — tabela `agendamentos` tem coluna `whatsapp_reminder_sent`. Falta o job que dispara o lembrete.
 - [ ] **Integração Google Calendar** — OAuth2 implementado (`google-provider.ts`), sync bidirecional parcial. Testar fluxo completo de import/export.
 
@@ -86,13 +79,30 @@ Atualizado em: 2026-05-04
 | `any` no código | Vários | Alguns casts `as unknown as X` ainda existem. Revisar e tipar corretamente. |
 | Estados do bot desatualizados | `lib/whatsapp/states.ts` | Mudanças unstaged. Revisar antes de reativar o bot. |
 | Contexto DEX | `api/dex/patient-context/route.ts` | Mudanças unstaged. Revisar e commitar ou descartar. |
-| `update_updated_at` search_path | migration | Função com `search_path` mutável. Fix simples com `SET search_path = public`. |
-| Funções SECURITY DEFINER expostas para `anon` | banco | `get_my_clinica_id`, `get_my_role`, `get_my_dentista_id` acessíveis sem login via REST. Revogar EXECUTE para anon. |
-| RLS `WITH CHECK (true)` em clinicas | banco | INSERT na tabela `clinicas` sem restrição para usuários autenticados. |
 
 ---
 
 ## ✅ Feito recentemente (referência)
+
+### Exportações HTML→Print + Conflito de Horário (2026-05-05)
+- **Prontuário completo** — rota `GET /api/pacientes/[id]/prontuario` retorna HTML estilizado com fichas, orçamentos e agendamentos. Botão "Exportar" no perfil do paciente.
+- **PDF da ficha** — rota `GET /api/fichas/[id]/pdf` retorna HTML da evolução clínica. Item "Imprimir Ficha" no dropdown da FichasTab.
+- **PDF do orçamento** — rota `GET /api/orcamentos/[id]/pdf` reescrita com `buildOrcamentoHTML` (HTML→Print). `BotaoDownloadPDF` simplificado para `window.open()`.
+- **Conflito de horário** — `conflitoNovo` e `conflitoEdicao` em `agendamentos-client.tsx` detectam sobreposição localmente (sem chamada ao servidor) e exibem aviso âmbar tanto no modal "Novo Agendamento" quanto no modo edição.
+
+### DEX + Tour de Onboarding (2026-05-05)
+- **Tour ativado para todos os roles** — `DexOnboarding` renderizado para dentista, admin e secretaria; `DexWidget` gateado para dentista/admin apenas.
+- **Secretaria sem FINALE** — tour da secretaria encerra com "Concluir" no último passo (Financeiro), sem animação do widget que ela não tem.
+- **SimFinanceiro (novo)** — simulação do painel financeiro: cards animados com counter (Receita/Despesas/Lucro), gráfico de barras 6 meses, transações recentes deslizando.
+- **SimOrcamento redesenhado** — dark panel com lista de 3 orçamentos; badge animado `enviado → aprovado`; botão "Registrar Pagamento" que confirma pagamento; botão "Enviar pelo WhatsApp".
+- **SimAgendamento corrigido** — removido `fixed inset-0` que cobria o painel esquerdo do DEX; campo "Procedimento" substituído por "Observações" (alinhado com o modal real).
+- **FINANCEIRO virou simulação** — passo antes era spotlight; agora exibe `SimFinanceiro` no painel direito para admin, dentista e secretaria.
+- **Textos de todos os passos revisados** — descrições e bullets mais específicos e didáticos para cada role.
+
+### Fixes de Segurança (2026-05-04)
+- **REVOKE EXECUTE anon** — `get_my_clinica_id`, `get_my_role` e `get_my_dentista_id` eram chamáveis sem autenticação via REST. Revogado acesso para `anon`; `get_convite_by_token` mantido acessível (necessário para validar links de convite).
+- **`clinicas_insert_policy`** — `WITH CHECK (true)` substituído por verificação de que o usuário não tem dentista registrado, bloqueando secretárias e dentistas convidados de criarem clínicas via API.
+- **`update_updated_at` search_path** — função criada sem `SET search_path = public`; corrigida via migration 051.
 
 ### Fluxo de Convites (2026-05-04)
 - **Auditoria completa** — mapeados todos os problemas do fluxo: metadados ausentes no JWT, redirect sem distinção de role, convite deletado em vez de marcado, contador de vagas não descontava convites pendentes.
@@ -123,3 +133,16 @@ Atualizado em: 2026-05-04
 - Migration `045_fichas_assinatura` — colunas `assinatura_url` e `assinado_em`
 - Fix de performance RLS — `(select auth.uid())` em 17 políticas
 - 8 índices criados em FKs sem cobertura; 3 índices duplicados removidos
+
+
+Rota /api/dex/chat:                                                                                                                                                                                    
+  - Modelo: gemini-2.0-flash → gemini-2.5-flash (consistente com briefing e formatar-evolucao que funcionam)                                                                                             
+  - systemInstruction: agora passa como { parts: [{ text: systemPrompt }] } em vez de string nua — formato explícito que o SDK v1.x aceita sem ambiguidade                                               
+  - Erro do catch: agora retorna a mensagem real do erro em vez de texto genérico                                                                                                                        
+                                                            
+  Widget dex-widget.tsx:                                                                                                                                                                                 
+  - Agora checa res.ok — se a API retornar status 4xx/5xx, o erro real aparece no chat em vez de silenciosamente mostrar o fallback "Não consegui gerar..."                                              
+  - Isso também facilita diagnosticar problemas futuros (você vai ver a mensagem de erro exata do Gemini direto no chat)                                                                                 
+                                                                                                                                                                                                         
+  Se ainda não funcionar após isso, o próximo passo seria ver a mensagem de erro que vai aparecer no chat — ela vai dizer exatamente o que está falhando (ex: chave de API inválida, modelo sem acesso,
+  quota esgotada etc.)

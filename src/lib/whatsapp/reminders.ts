@@ -102,7 +102,7 @@ export async function sendReminders(): Promise<ReminderResult> {
       .gte('data_hora', now.toISOString())
       .lte('data_hora', em.toISOString())
       .eq('whatsapp_reminder_sent', false)
-      .neq('status', 'cancelado');
+      .neq('status', 'cancelled');
 
     if (error) {
       console.error(`[reminders] Erro ao buscar agendamentos da clínica ${config.clinica_id}:`, error.message);

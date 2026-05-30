@@ -128,7 +128,7 @@ async function criarAgendamento(
     dentista_id:     dentistaId,
     data_hora:       dataHora.toISOString(),
     duracao_minutos: duracaoMinutos,
-    status:          'agendado',
+    status:          'scheduled',
     origem:          'bot',
   });
   if (error) throw new Error(`Erro ao criar agendamento: ${error.message}`);
@@ -386,7 +386,7 @@ export async function processMessage(
         const db = createServiceClient();
         await db
           .from('agendamentos')
-          .update({ status: 'confirmado' })
+          .update({ status: 'confirmed' })
           .eq('id', agendamentoId);
 
         const dataHora = ctx.data_hora as string | undefined;

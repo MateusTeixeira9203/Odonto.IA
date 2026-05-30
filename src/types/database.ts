@@ -1,6 +1,46 @@
 export interface Clinica {
   id: string;
   nome: string;
+  status: 'ativa' | 'cancelada' | 'suspensa';
+  limite_dentistas: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Identidade global — espelha auth.users + active_clinica_id */
+export interface User {
+  id: string;
+  email: string;
+  active_clinica_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ClinicaUsuarioRole   = 'admin' | 'dentista' | 'secretaria';
+export type ClinicaUsuarioStatus = 'ativo' | 'removido' | 'pendente';
+
+/** Fonte da verdade de membership multi-tenant */
+export interface ClinicaUsuario {
+  id: string;
+  usuario_id: string;
+  clinica_id: string;
+  role: ClinicaUsuarioRole;
+  status: ClinicaUsuarioStatus;
+  invited_by: string | null;
+  joined_at: string;
+  removed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Perfil de domínio operacional da secretária */
+export interface Secretaria {
+  id: string;
+  usuario_id: string;
+  clinica_id: string;
+  nome: string;
+  telefone: string | null;
+  must_change_password: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -36,6 +76,10 @@ export interface Paciente {
   estado: string | null;
   whatsapp: string | null;
   observacoes: string | null;
+  followup_pendente: boolean;
+  followup_nota: string | null;
+  followup_em: string | null;
+  followup_snooze_ate: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -150,6 +194,15 @@ export interface ConfiguracaoClinica {
   updated_at: string;
 }
 
+export type AgendamentoStatus =
+  | 'scheduled'
+  | 'confirmed'
+  | 'checked_in'
+  | 'in_progress'
+  | 'completed'
+  | 'cancelled'
+  | 'no_show';
+
 export interface Agendamento {
   id: string;
   clinica_id: string;
@@ -157,7 +210,7 @@ export interface Agendamento {
   dentista_id: string;
   data_hora: string;
   duracao_minutos: number;
-  status: 'agendado' | 'confirmado' | 'cancelado' | 'realizado' | 'faltou';
+  status: AgendamentoStatus;
   origem: 'manual' | 'bot' | 'app';
   observacoes: string | null;
   confirmado_em: string | null;
@@ -270,6 +323,26 @@ export interface MensagemBot {
   conteudo: string;
   tipo: 'texto' | 'imagem' | 'audio' | 'documento';
   metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ConviteStatus = 'pendente' | 'aceito' | 'expirado' | 'cancelado';
+
+export interface Convite {
+  id: string;
+  clinica_id: string;
+  email: string;
+  role: DentistaRole;
+  token: string;
+  status: ConviteStatus;
+  expires_at: string;
+  /** FK dentistas.id — legado, mantido para compatibilidade */
+  convidado_por: string | null;
+  /** FK users.id — novo campo (migration 056) */
+  invited_by: string | null;
+  /** FK users.id — usuário que aceitou o convite */
+  accepted_by: string | null;
   created_at: string;
   updated_at: string;
 }

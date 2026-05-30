@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
-import { isSuperUser } from '@/lib/super-user';
+import { criarConvite } from '@/server/services/invites';
 
-// POST — envia convite via Supabase Auth (admin ou secretaria autenticados)
+// POST — admin convida dentista
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -13,105 +13,51 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
   }
 
-  const { data: dentista } = await supabase
-    .from('dentistas')
-    .select('id, clinica_id, role')
-    .eq('user_id', user.id)
+  // Resolução canônica: users.active_clinica_id → clinica_usuarios (não dentistas)
+  const { data: userRecord } = await supabase
+    .from('users')
+    .select('active_clinica_id')
+    .eq('id', user.id)
     .maybeSingle();
 
-  if (!dentista || !['admin', 'secretaria'].includes(dentista.role as string)) {
-    return NextResponse.json({ error: 'Sem permissão' }, { status: 403 });
+  if (!userRecord?.active_clinica_id) {
+    return NextResponse.json({ error: 'Clínica ativa não encontrada' }, { status: 403 });
   }
 
-  let body: { email: string; role: 'dentista' | 'secretaria' };
+  const clinicId = userRecord.active_clinica_id as string;
+
+  const db = createServiceClient();
+  const { data: membership } = await db
+    .from('clinica_usuarios')
+    .select('role')
+    .eq('usuario_id', user.id)
+    .eq('clinica_id', clinicId)
+    .eq('status', 'ativo')
+    .maybeSingle();
+
+  if (!membership || membership.role !== 'admin') {
+    return NextResponse.json({ error: 'Apenas administradores podem convidar dentistas' }, { status: 403 });
+  }
+
+  let body: { email: string };
   try {
-    body = (await request.json()) as { email: string; role: 'dentista' | 'secretaria' };
+    body = (await request.json()) as { email: string };
   } catch {
     return NextResponse.json({ error: 'Corpo inválido' }, { status: 400 });
   }
 
-  const { email, role } = body;
-
-  if (!email || !['dentista', 'secretaria'].includes(role)) {
-    return NextResponse.json({ error: 'email e role são obrigatórios' }, { status: 400 });
+  if (!body.email) {
+    return NextResponse.json({ error: 'email é obrigatório' }, { status: 400 });
   }
 
-  // Verifica limite de dentistas — super-usuário não tem limite
-  if (role === 'dentista' && !isSuperUser(user.email)) {
-    const [{ data: clinica }, { count }] = await Promise.all([
-      supabase
-        .from('clinicas')
-        .select('limite_dentistas')
-        .eq('id', dentista.clinica_id)
-        .single(),
-      supabase
-        .from('dentistas')
-        .select('*', { count: 'exact', head: true })
-        .eq('clinica_id', dentista.clinica_id)
-        .neq('role', 'secretaria')
-        .eq('ativo', true),
-    ]);
+  const result = await criarConvite(
+    { userId: user.id, clinicId, role: membership.role },
+    { email: body.email },
+  );
 
-    if (clinica && count !== null && count >= clinica.limite_dentistas) {
-      return NextResponse.json(
-        { error: `Limite de ${clinica.limite_dentistas} dentistas atingido` },
-        { status: 400 }
-      );
-    }
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
-  // Verifica se já existe convite pendente para este email
-  const { data: conviteExistente } = await supabase
-    .from('convites')
-    .select('id')
-    .eq('clinica_id', dentista.clinica_id)
-    .eq('email', email)
-    .gt('expires_at', new Date().toISOString())
-    .maybeSingle();
-
-  if (conviteExistente) {
-    return NextResponse.json(
-      { error: 'Já existe um convite pendente para este email' },
-      { status: 400 }
-    );
-  }
-
-  const origin = new URL(request.url).origin;
-  const service = createServiceClient();
-
-  // Envia convite — metadados no JWT servem de fallback caso a tabela convites falhe
-  const { data: inviteData, error: inviteError } = await service.auth.admin.inviteUserByEmail(email, {
-    data: {
-      role,
-      clinica_id: dentista.clinica_id,
-      convidado_por: dentista.id,
-    },
-    redirectTo: `${origin}/auth/callback`,
-  });
-
-  if (inviteError) {
-    if (inviteError.message?.includes('already been registered')) {
-      return NextResponse.json(
-        { error: 'Este email já possui uma conta no DentIA' },
-        { status: 400 }
-      );
-    }
-    return NextResponse.json(
-      { error: `Erro ao enviar convite: ${inviteError.message}` },
-      { status: 500 }
-    );
-  }
-
-  console.log('[convite] inviteUserByEmail OK, user id:', inviteData?.user?.id);
-
-  // Registra na tabela convites (service role — funciona para qualquer role)
-  await service.from('convites').insert({
-    clinica_id: dentista.clinica_id,
-    email,
-    role,
-    token: crypto.randomUUID(),
-    convidado_por: dentista.id,
-  });
-
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, link: result.link });
 }

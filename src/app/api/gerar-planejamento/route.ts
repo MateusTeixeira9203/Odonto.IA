@@ -1,25 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenAI } from '@google/genai';
-import { createClient } from '@/lib/supabase/server';
+import { getDentistaCached } from '@/lib/get-dentista';
+import { withRateLimit } from '@/lib/rate-limit';
+import { generateText, generateStructured } from '@/lib/ai/provider';
+import { logAICall } from '@/lib/ai/logger';
 
 interface GerarPlanejamentoBody {
   titulo?: string;
   procedimentos?: string[];
   completo?: boolean;
+  /** Nome do paciente — usado para tornar o texto mais pessoal quando fornecido */
+  pacienteNome?: string;
+}
+
+interface SecaoGerada {
+  title: string;
+  content: string;
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  // Verifica autenticação
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
-  }
+  const limited = await withRateLimit(req, 'gerar-planejamento', 20, 60_000);
+  if (limited) return limited;
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
+  const dentista = await getDentistaCached();
+  if (!dentista) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
+  if (dentista.role === 'secretaria') return NextResponse.json({ error: 'Sem permissão.' }, { status: 403 });
+
+  if (!process.env.GEMINI_API_KEY) {
     return NextResponse.json({ error: 'GEMINI_API_KEY não configurada.' }, { status: 500 });
   }
 
@@ -30,70 +36,87 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Body inválido.' }, { status: 400 });
   }
 
-  const { titulo, procedimentos = [], completo } = body;
-  const listaProced = procedimentos.length > 0 ? procedimentos.join(', ') : 'sem procedimentos definidos';
+  const { titulo, procedimentos = [], completo, pacienteNome } = body;
+  const listaProced = procedimentos.length > 0 ? procedimentos.join(', ') : 'procedimentos a definir';
+  const nomePaciente = pacienteNome?.trim() || 'o(a) paciente';
 
-  const ai = new GoogleGenAI({ apiKey });
+  const callStart = Date.now();
 
   try {
     if (completo) {
-      // Gera plano completo com múltiplas seções
       const prompt = `Você é um assistente odontológico especializado em comunicação com pacientes.
-Gere um plano de tratamento completo em português, em linguagem simples e acolhedora, para um dentista apresentar ao paciente.
+Gere um plano de tratamento para ${nomePaciente} em português, em linguagem simples e acolhedora.
+Procedimentos: ${listaProced}
 
-Procedimentos previstos: ${listaProced}
-
-Retorne APENAS um JSON válido (sem markdown, sem blocos de código) com este formato exato:
+Retorne JSON com este formato:
 {
   "secoes": [
     { "title": "Situação Atual", "content": "..." },
     { "title": "Tratamento Proposto", "content": "..." },
+    { "title": "O Que Esperar", "content": "..." },
     { "title": "Próximos Passos", "content": "..." }
   ]
 }
 
-Cada seção deve ter 2-4 frases em linguagem simples, sem jargão técnico excessivo.`;
+Regras:
+- Cada seção: 2-4 frases em linguagem simples, empática, sem jargão técnico
+- Não use markdown nos textos de content
+- Mencione o nome do paciente apenas na primeira seção`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-1.5-flash',
-        contents: prompt,
+      const result = await generateStructured<{ secoes: SecaoGerada[] }>({ prompt, feature: 'gerar-planejamento' });
+
+      logAICall({
+        feature:    'gerar-planejamento',
+        provider:   result.provider,
+        model:      result.model,
+        latencyMs:  result.latencyMs,
+        success:    true,
+        dentistaId: dentista.id,
+        clinicaId:  dentista.clinica_id,
       });
 
-      const text = response.text ?? '';
-      // Remove eventual markdown de bloco de código
-      const clean = text.replace(/```(?:json)?/g, '').replace(/```/g, '').trim();
+      const secoes = Array.isArray(result.data.secoes) ? result.data.secoes : [];
+      return NextResponse.json({ secoes });
 
-      let parsed: { secoes?: Array<{ title: string; content: string }> };
-      try {
-        parsed = JSON.parse(clean) as typeof parsed;
-      } catch {
-        return NextResponse.json({ error: 'Resposta inválida da IA.' }, { status: 500 });
-      }
-
-      return NextResponse.json({ secoes: parsed.secoes ?? [] });
     } else {
-      // Gera conteúdo de uma seção específica
-      if (!titulo) {
+      if (!titulo?.trim()) {
         return NextResponse.json({ error: '"titulo" é obrigatório.' }, { status: 400 });
       }
 
       const prompt = `Você é um assistente odontológico especializado em comunicação com pacientes.
-Escreva em português, em linguagem simples e acolhedora, o conteúdo da seção "${titulo}" de um plano de tratamento dentário.
-
+Escreva em português, linguagem simples e acolhedora, o conteúdo da seção "${titulo}" de um plano de tratamento.
 Procedimentos previstos: ${listaProced}
+Paciente: ${nomePaciente}
 
-Responda APENAS com o texto da seção, sem títulos, sem markdown, entre 2 e 4 frases claras e empáticas.`;
+Responda APENAS com o texto, sem títulos, sem markdown, entre 2 e 4 frases claras e empáticas.`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-1.5-flash',
-        contents: prompt,
+      const result = await generateText({ prompt, feature: 'gerar-planejamento' });
+
+      logAICall({
+        feature:    'gerar-planejamento',
+        provider:   result.provider,
+        model:      result.model,
+        latencyMs:  result.latencyMs,
+        success:    true,
+        dentistaId: dentista.id,
+        clinicaId:  dentista.clinica_id,
       });
 
-      const texto = (response.text ?? '').trim();
-      return NextResponse.json({ texto });
+      return NextResponse.json({ texto: result.data });
     }
   } catch (err) {
-    console.error('Erro ao gerar planejamento com Gemini:', err);
+    const errorMsg = err instanceof Error ? err.message : 'Erro interno';
+    logAICall({
+      feature:    'gerar-planejamento',
+      provider:   'gemini',
+      model:      'gemini-2.5-flash',
+      latencyMs:  Date.now() - callStart,
+      success:    false,
+      dentistaId: dentista.id,
+      clinicaId:  dentista.clinica_id,
+      error:      errorMsg,
+    });
+    console.error('[gerar-planejamento] Erro:', err);
     return NextResponse.json({ error: 'Erro ao gerar planejamento com IA.' }, { status: 500 });
   }
 }

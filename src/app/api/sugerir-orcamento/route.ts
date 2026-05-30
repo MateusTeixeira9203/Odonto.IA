@@ -4,7 +4,8 @@ import { createClient } from '@/lib/supabase/server';
 
 interface SugerirOrcamentoBody {
   texto: string;
-  clinicaId: string;
+  // clinicaId removido — resolvido server-side a partir de users.active_clinica_id.
+  // Aceitar clinicaId do cliente sem validação permitiria ler tabelas de preços de qualquer clínica.
 }
 
 export interface ItemSugerido {
@@ -25,6 +26,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
   }
 
+  // Resolve clínica ativa — fonte canônica é users.active_clinica_id, não o body do cliente
+  const { data: userRecord } = await supabase
+    .from('users')
+    .select('active_clinica_id')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (!userRecord?.active_clinica_id) {
+    return NextResponse.json({ error: 'Clínica não encontrada.' }, { status: 403 });
+  }
+
+  const clinicId = userRecord.active_clinica_id as string;
+
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: 'GEMINI_API_KEY não configurada.' }, { status: 500 });
@@ -41,11 +55,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: '"texto" é obrigatório.' }, { status: 400 });
   }
 
-  // Busca procedimentos da clínica para o AI usar como referência de preços
+  // Busca procedimentos da clínica ativa (clinicId resolvido server-side)
   const { data: procedimentosClinica } = await supabase
     .from('procedimentos')
     .select('nome, preco_padrao')
-    .eq('clinica_id', body.clinicaId)
+    .eq('clinica_id', clinicId)
     .eq('ativo', true)
     .order('nome');
 

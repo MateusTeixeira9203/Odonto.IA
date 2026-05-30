@@ -1,53 +1,40 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { requirePermission } from "@/server/authorization/guards";
 import { redirect } from "next/navigation";
 
-/**
- * Cria uma nova ficha para o paciente e retorna o ID criado.
- */
 export async function createFicha(
   pacienteId: string
 ): Promise<{ fichaId: string } | { error: string }> {
-  const supabase = await createClient();
+  const { supabase, user, clinicId } = await requirePermission('prontuarios_edit');
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/login");
-
-  // Busca dentista e clinica_id do usuário logado
-  const { data: dentista } = await supabase
+  const { data: dentistaPerfil } = await supabase
     .from("dentistas")
-    .select("id, clinica_id")
+    .select("id")
     .eq("user_id", user.id)
+    .eq("clinica_id", clinicId)
     .maybeSingle();
 
-  if (!dentista) {
-    return { error: "Dentista não encontrado. Faça o onboarding primeiro." };
-  }
+  if (!dentistaPerfil) redirect("/onboarding");
 
-  // Verifica se o paciente pertence à mesma clínica
   const { data: paciente } = await supabase
     .from("pacientes")
     .select("id")
     .eq("id", pacienteId)
-    .eq("clinica_id", dentista.clinica_id)
+    .eq("clinica_id", clinicId)
     .maybeSingle();
 
   if (!paciente) {
     return { error: "Paciente não encontrado." };
   }
 
-  // Cria a ficha com status 'aberta'
   const { data: ficha, error } = await supabase
     .from("fichas")
     .insert({
-      clinica_id: dentista.clinica_id,
+      clinica_id:  clinicId,
       paciente_id: pacienteId,
-      dentista_id: dentista.id,
-      status: "aberta",
+      dentista_id: dentistaPerfil.id,
+      status:      "aberta",
     })
     .select("id")
     .single();

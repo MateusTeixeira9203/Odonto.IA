@@ -1,108 +1,116 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenAI } from '@google/genai';
 import { getDentistaCached } from '@/lib/get-dentista';
 import { createClient } from '@/lib/supabase/server';
+import { withRateLimit } from '@/lib/rate-limit';
+import { generateStructured } from '@/lib/ai/provider';
+import { logAICall } from '@/lib/ai/logger';
+import { getCached, setCached } from '@/lib/ai/cache';
+import { buildBriefingPrompt, sanitizeBriefingOutput, type BriefingOutput } from '@/lib/ai/prompts/briefing';
+import { buildConsultationContext } from '@/lib/ai/context';
 
-/**
- * GET /api/dex/briefing?agendamentoId=xxx
- * Gera um resumo pré-consulta do paciente usando IA.
- * Lê fichas anteriores, alergias, histórico de tratamentos.
- */
+const CACHE_TTL_SECONDS = 60 * 60;
+const RATE_LIMIT_MAX    = 20;
+const RATE_LIMIT_WINDOW = 60_000;
+
+export interface BriefingResponse extends BriefingOutput {
+  pacienteNome: string;
+  hora: string;
+  cached: boolean;
+}
+
 export async function GET(req: NextRequest): Promise<NextResponse> {
+  const limited = await withRateLimit(req, 'dex:briefing', RATE_LIMIT_MAX, RATE_LIMIT_WINDOW);
+  if (limited) return limited;
+
   const dentista = await getDentistaCached();
   if (!dentista) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
 
   const agendamentoId = req.nextUrl.searchParams.get('agendamentoId');
   if (!agendamentoId) return NextResponse.json({ error: 'agendamentoId obrigatório' }, { status: 400 });
 
-  const apiKey = process.env.GEMINI_API_KEY ?? process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-  if (!apiKey) return NextResponse.json({ error: 'GEMINI_API_KEY não configurada' }, { status: 500 });
+  if (!process.env.GEMINI_API_KEY) {
+    return NextResponse.json({ error: 'GEMINI_API_KEY não configurada' }, { status: 500 });
+  }
+
+  const today    = new Date().toISOString().split('T')[0];
+  const cacheKey = `briefing:${agendamentoId}:${today}`;
+  const cached   = await getCached<BriefingResponse>(cacheKey);
+  if (cached) return NextResponse.json({ ...cached, cached: true });
 
   const supabase = await createClient();
+  const ctx = await buildConsultationContext(agendamentoId, dentista.clinica_id, supabase);
+  if (!ctx) return NextResponse.json({ error: 'Agendamento ou paciente não encontrado' }, { status: 404 });
 
-  // Busca o agendamento com dados do paciente
-  const { data: ag } = await supabase
-    .from('agendamentos')
-    .select('data_hora, duracao_minutos, observacoes, paciente:pacientes(id, nome, data_nascimento, telefone, observacoes)')
-    .eq('id', agendamentoId)
-    .eq('clinica_id', dentista.clinica_id)
-    .maybeSingle();
+  const { paciente, hora, observacoesAgendamento } = ctx;
 
-  if (!ag) return NextResponse.json({ error: 'Agendamento não encontrado' }, { status: 404 });
+  const prompt = buildBriefingPrompt({
+    pacienteNome:           paciente.nome,
+    idadeStr:               paciente.idadeStr,
+    hora,
+    observacoesAgendamento,
+    observacoesPaciente:    paciente.observacoes,
+    fichas: paciente.fichasRecentes.map((f) => ({
+      data:          f.data,
+      queixa:        f.queixa,
+      anotacoes:     f.anotacoes,
+      alergias:      f.alergias,
+      medicamentos:  f.medicamentos,
+      historicoDental: f.historicoDental,
+    })),
+    orcamentos: paciente.orcamentosAbertos.map((o) => ({
+      status: o.status,
+      total:  o.total,
+      itens:  o.descricao ? o.descricao.split(', ') : [],
+      diasAtualizacao: o.diasAtualizacao,
+    })),
+    planejamento: paciente.planejamentoAtivo
+      ? {
+          titulo: paciente.planejamentoAtivo.titulo,
+          etapas: paciente.planejamentoAtivo.etapas,
+        }
+      : null,
+  });
 
-  const paciente = ag.paciente as unknown as {
-    id: string;
-    nome: string;
-    data_nascimento: string | null;
-    telefone: string | null;
-    observacoes: string | null;
-  } | null;
-
-  if (!paciente) return NextResponse.json({ error: 'Paciente não encontrado' }, { status: 404 });
-
-  // Busca últimas 3 fichas do paciente
-  const { data: fichas } = await supabase
-    .from('fichas')
-    .select('created_at, queixa_principal, anotacoes, dentes_afetados')
-    .eq('paciente_id', paciente.id)
-    .eq('clinica_id', dentista.clinica_id)
-    .order('created_at', { ascending: false })
-    .limit(3);
-
-  // Busca último orçamento aprovado
-  const { data: ultimoOrc } = await supabase
-    .from('orcamentos')
-    .select('total, status, created_at, orcamento_itens(descricao)')
-    .eq('paciente_id', paciente.id)
-    .eq('clinica_id', dentista.clinica_id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  // Calcula idade
-  const idadeStr = paciente.data_nascimento
-    ? `${new Date().getFullYear() - new Date(paciente.data_nascimento).getFullYear()} anos`
-    : 'idade não informada';
-
-  const fichasTexto = (fichas ?? []).map((f, i) => {
-    const data = new Date(f.created_at as string).toLocaleDateString('pt-BR');
-    return `Consulta ${i + 1} (${data}): ${f.queixa_principal ?? ''} — ${f.anotacoes ?? 'sem anotações'}`;
-  }).join('\n') || 'Nenhuma consulta anterior registrada.';
-
-  const orcTexto = ultimoOrc
-    ? `Último orçamento: R$ ${(ultimoOrc.total as number ?? 0).toFixed(2)} (${ultimoOrc.status})`
-    : 'Sem orçamentos anteriores.';
-
-  const hora = new Date(ag.data_hora as string).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-
-  const prompt = `Você é o DEX, assistente clínico de uma clínica odontológica.
-Gere um briefing pré-consulta CONCISO (máximo 5 itens com bullet points •) para o dentista que vai atender este paciente agora.
-Foque em: alergias, histórico recente, tratamentos em andamento, pontos de atenção.
-Tom: direto, profissional, como se fosse um lembrete rápido antes de entrar no consultório.
-Responda em português brasileiro.
-
-DADOS DO PACIENTE:
-Nome: ${paciente.nome}
-Idade: ${idadeStr}
-Horário: ${hora}
-Observações do agendamento: ${(ag.observacoes as string | null) ?? 'nenhuma'}
-Observações gerais: ${paciente.observacoes ?? 'nenhuma'}
-
-HISTÓRICO DE FICHAS:
-${fichasTexto}
-
-${orcTexto}`;
-
-  const ai = new GoogleGenAI({ apiKey });
+  const callStart = Date.now();
   try {
-    const result = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
+    const result = await generateStructured<BriefingOutput>({ prompt, feature: 'briefing' });
+    const briefingData = sanitizeBriefingOutput(result.data);
+
+    const response: BriefingResponse = {
+      ...briefingData,
+      pacienteNome: paciente.nome,
+      hora,
+      cached: false,
+    };
+
+    await setCached(cacheKey, response, CACHE_TTL_SECONDS);
+
+    logAICall({
+      feature:    'briefing',
+      provider:   result.provider,
+      model:      result.model,
+      latencyMs:  result.latencyMs,
+      success:    true,
+      dentistaId: dentista.id,
+      clinicaId:  dentista.clinica_id,
+      pacienteId: paciente.id,
     });
-    const briefing = (result.text ?? '').trim();
-    return NextResponse.json({ briefing, pacienteNome: paciente.nome, hora });
+
+    return NextResponse.json(response);
   } catch (err) {
-    console.error('[dex/briefing] Erro Gemini:', err);
+    const errorMsg = err instanceof Error ? err.message : 'Erro interno';
+    logAICall({
+      feature:    'briefing',
+      provider:   'gemini',
+      model:      'gemini-2.5-flash',
+      latencyMs:  Date.now() - callStart,
+      success:    false,
+      dentistaId: dentista.id,
+      clinicaId:  dentista.clinica_id,
+      pacienteId: paciente.id,
+      error:      errorMsg,
+    });
+    console.error('[dex/briefing] Erro:', err);
     return NextResponse.json({ error: 'Erro ao gerar briefing' }, { status: 500 });
   }
 }

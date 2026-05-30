@@ -60,7 +60,7 @@ function getUpstashLimiter(limit: number, windowSecs: number): Ratelimit {
       new Ratelimit({
         redis,
         limiter: Ratelimit.slidingWindow(limit, `${windowSecs} s`),
-        prefix: 'dentai',
+        prefix: 'odonto-ia',
       })
     );
   }

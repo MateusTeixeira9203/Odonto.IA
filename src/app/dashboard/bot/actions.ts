@@ -1,7 +1,6 @@
 'use server';
 
-import { redirect } from 'next/navigation';
-import { getDentistaCached } from '@/lib/get-dentista';
+import { requireRole } from '@/server/auth/roles';
 import { createServiceClient } from '@/lib/supabase/service';
 import {
   getBotMensagens,
@@ -9,43 +8,21 @@ import {
   type BotMensagens,
 } from '@/lib/whatsapp/template';
 
-// Nota: DEFAULTS_MENSAGENS e BotMensagens devem ser importados diretamente de
-// @/lib/whatsapp/template — arquivos 'use server' só podem exportar async functions.
-
-// ─── Guard ────────────────────────────────────────────────────────────────────
-
-async function verificarAcesso() {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect('/login');
-  if (dentista.role !== 'admin' && dentista.role !== 'secretaria') redirect('/dashboard');
-  return dentista;
-}
-
-// ─── Actions ──────────────────────────────────────────────────────────────────
-
-/**
- * Carrega as mensagens configuradas para a clínica do usuário autenticado.
- */
 export async function carregarMensagensBot(): Promise<BotMensagens> {
-  const dentista = await verificarAcesso();
-  return getBotMensagens(dentista.clinica_id);
+  const { clinicId } = await requireRole(['admin', 'secretaria']);
+  return getBotMensagens(clinicId);
 }
 
-/**
- * Salva as mensagens personalizadas para a clínica.
- * Preserva os outros campos de bot_config (whatsapp_number, horários, etc.).
- */
 export async function salvarMensagensBot(
   form: BotMensagens,
 ): Promise<{ ok: boolean; erro?: string }> {
-  const dentista = await verificarAcesso();
+  const { clinicId } = await requireRole(['admin', 'secretaria']);
   const db = createServiceClient();
 
-  // Verifica se já existe uma linha para esta clínica
   const { data: existing } = await db
     .from('bot_config')
     .select('clinica_id')
-    .eq('clinica_id', dentista.clinica_id)
+    .eq('clinica_id', clinicId)
     .maybeSingle();
 
   const d = DEFAULTS_MENSAGENS;
@@ -62,12 +39,12 @@ export async function salvarMensagensBot(
     const { error } = await db
       .from('bot_config')
       .update({ ...payload, updated_at: new Date().toISOString() })
-      .eq('clinica_id', dentista.clinica_id);
+      .eq('clinica_id', clinicId);
     if (error) return { ok: false, erro: error.message };
   } else {
     const { error } = await db
       .from('bot_config')
-      .insert({ clinica_id: dentista.clinica_id, ...payload });
+      .insert({ clinica_id: clinicId, ...payload });
     if (error) return { ok: false, erro: error.message };
   }
 

@@ -1,6 +1,4 @@
-import { redirect } from 'next/navigation';
-import { getDentistaCached } from '@/lib/get-dentista';
-import { createClient } from '@/lib/supabase/server';
+import { requireRole } from '@/server/auth/roles';
 import { UsuariosClient } from './_components/usuarios-client';
 import type { DentistaRole } from '@/types/database';
 
@@ -22,30 +20,33 @@ export type ConvitePendente = {
 };
 
 export default async function UsuariosPage() {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect('/login');
-  if (dentista.role === 'secretaria') redirect('/dashboard');
+  const { supabase, user, clinicId, role } = await requireRole(['admin', 'dentista']);
 
-  const supabase = await createClient();
-
-  const [{ data: usuarios }, { data: convites }, { data: clinica }] = await Promise.all([
-    supabase
-      .from('dentistas')
-      .select('id, nome, email, role, ativo, created_at')
-      .eq('clinica_id', dentista.clinica_id)
-      .order('created_at', { ascending: true }),
-    supabase
-      .from('convites')
-      .select('id, email, role, expires_at, created_at')
-      .eq('clinica_id', dentista.clinica_id)
-      .gt('expires_at', new Date().toISOString())
-      .order('created_at', { ascending: false }),
-    supabase
-      .from('clinicas')
-      .select('limite_dentistas')
-      .eq('id', dentista.clinica_id)
-      .single(),
-  ]);
+  const [{ data: dentistaPerfil }, { data: usuarios }, { data: convites }, { data: clinica }] =
+    await Promise.all([
+      supabase
+        .from('dentistas')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('clinica_id', clinicId)
+        .maybeSingle(),
+      supabase
+        .from('dentistas')
+        .select('id, nome, email, role, ativo, created_at')
+        .eq('clinica_id', clinicId)
+        .order('created_at', { ascending: true }),
+      supabase
+        .from('convites')
+        .select('id, email, role, expires_at, created_at')
+        .eq('clinica_id', clinicId)
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('clinicas')
+        .select('limite_dentistas')
+        .eq('id', clinicId)
+        .single(),
+    ]);
 
   const dentistasAtivos = (usuarios ?? []).filter(
     (u) => (u as UsuarioRow).role !== 'secretaria' && (u as UsuarioRow).ativo
@@ -60,8 +61,8 @@ export default async function UsuariosPage() {
     <UsuariosClient
       usuarios={(usuarios as UsuarioRow[]) ?? []}
       convitesPendentes={(convites as ConvitePendente[]) ?? []}
-      meuId={dentista.id}
-      meuRole={dentista.role}
+      meuId={dentistaPerfil?.id ?? ''}
+      meuRole={role as DentistaRole}
       limiteDentistas={limiteDentistas}
       convitesRestantes={convitesRestantes}
     />

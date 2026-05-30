@@ -21,6 +21,8 @@ import {
   XCircle,
   ArrowRight,
   PenLine,
+  Bell,
+  FileText,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { atualizarStatusAgendamento, type StatusAgendamento } from '@/app/dashboard/agendamentos/actions';
@@ -29,6 +31,16 @@ import { AssinaturaRecepcaoModal } from '@/components/fichas/AssinaturaRecepcaoM
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 export type { StatusAgendamento };
+
+export type PendenciaItem = {
+  tipo: 'orcamento_parado' | 'pagamento_vencido' | 'followup_pendente';
+  prioridade: 'high' | 'medium' | 'low';
+  pacienteId: string | null;
+  pacienteNome: string;
+  descricao: string;
+  href: string;
+  diasAtrasado?: number;
+};
 
 export type AgendamentoHoje = {
   id: string;
@@ -56,26 +68,27 @@ export type SecretariaDashboardProps = {
     venceHoje: number;
     venceSemana: number;
   };
+  pendencias: PendenciaItem[];
 };
 
 // ─── Status config ────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<StatusAgendamento, { label: string; color: string; dot: string }> = {
-  agendado:       { label: 'Aguardando',     color: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400',   dot: 'bg-amber-400' },
-  confirmado:     { label: 'Confirmado',     color: 'bg-teal-pale text-teal border-teal/20 dark:bg-teal/10 dark:text-teal-lt',                dot: 'bg-teal' },
-  na_recepcao:    { label: 'Na recepção',    color: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400',        dot: 'bg-blue-500' },
-  em_atendimento: { label: 'Em atendimento', color: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400', dot: 'bg-purple-500 animate-pulse' },
-  realizado:      { label: 'Realizado',      color: 'bg-surface-alt text-text-secondary border-border',                                       dot: 'bg-border' },
-  faltou:         { label: 'Faltou',         color: 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:text-red-400',             dot: 'bg-red-500' },
-  cancelado:      { label: 'Cancelado',      color: 'bg-surface-alt text-text-secondary border-border',                                       dot: 'bg-border' },
+  scheduled:   { label: 'Aguardando',     color: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400',      dot: 'bg-amber-400' },
+  confirmed:   { label: 'Confirmado',     color: 'bg-teal-pale text-teal border-teal/20 dark:bg-teal/10 dark:text-teal-lt',                   dot: 'bg-teal' },
+  checked_in:  { label: 'Na recepção',    color: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400',           dot: 'bg-blue-500' },
+  in_progress: { label: 'Em atendimento', color: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400', dot: 'bg-purple-500 animate-pulse' },
+  completed:   { label: 'Realizado',      color: 'bg-surface-alt text-text-secondary border-border',                                          dot: 'bg-border' },
+  no_show:     { label: 'Faltou',         color: 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:text-red-400',                dot: 'bg-red-500' },
+  cancelled:   { label: 'Cancelado',      color: 'bg-surface-alt text-text-secondary border-border',                                          dot: 'bg-border' },
 };
 
 // Próximos status que a secretária pode atribuir inline
 const PROXIMOS_STATUS: Partial<Record<StatusAgendamento, { label: string; next: StatusAgendamento }>> = {
-  agendado:    { label: 'Confirmar',       next: 'confirmado' },
-  confirmado:  { label: 'Check-in',        next: 'na_recepcao' },
-  na_recepcao: { label: 'Em atendimento',  next: 'em_atendimento' },
-  em_atendimento: { label: 'Finalizar',    next: 'realizado' },
+  scheduled:   { label: 'Confirmar',       next: 'confirmed' },
+  confirmed:   { label: 'Check-in',        next: 'checked_in' },
+  checked_in:  { label: 'Em atendimento',  next: 'in_progress' },
+  in_progress: { label: 'Finalizar',       next: 'completed' },
 };
 
 // ─── Sub-componentes ──────────────────────────────────────────────────────────
@@ -122,7 +135,7 @@ function MetricCard({
 
 // ─── Card de agendamento ──────────────────────────────────────────────────────
 
-const STATUSES_ASSINATURA: StatusAgendamento[] = ['na_recepcao', 'em_atendimento', 'realizado'];
+const STATUSES_ASSINATURA: StatusAgendamento[] = ['checked_in', 'in_progress', 'completed'];
 
 function AgendamentoCard({
   agendamento,
@@ -199,7 +212,7 @@ function AgendamentoCard({
       )}
 
       {/* Marcar faltou */}
-      {(agendamento.status === 'agendado' || agendamento.status === 'confirmado') && (
+      {(agendamento.status === 'scheduled' || agendamento.status === 'confirmed') && (
         <div className="relative shrink-0">
           <button
             onClick={() => setOpen(o => !o)}
@@ -217,7 +230,7 @@ function AgendamentoCard({
                 className="absolute right-0 top-8 z-10 bg-surface border border-border rounded-xl shadow-lg p-1 min-w-[120px]"
               >
                 <button
-                  onClick={() => { onStatusChange(agendamento.id, 'faltou'); setOpen(false); }}
+                  onClick={() => { onStatusChange(agendamento.id, 'no_show'); setOpen(false); }}
                   className="flex items-center gap-2 px-3 py-2 text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg w-full text-left transition-colors"
                 >
                   <XCircle className="w-3.5 h-3.5" /> Faltou
@@ -238,6 +251,7 @@ export function SecretariaDashboard({
   agendamentos,
   dentistas,
   metricas,
+  pendencias,
 }: SecretariaDashboardProps) {
   const [dentistaSelecionado, setDentistaSelecionado] = useState<string>('todos');
   const [lista, setLista] = useState<AgendamentoHoje[]>(agendamentos);
@@ -280,7 +294,7 @@ export function SecretariaDashboard({
         className="flex items-start justify-between gap-4 mb-8"
       >
         <div>
-          <h1 className="font-heading text-3xl md:text-4xl text-text-primary mb-1">
+          <h1 className="font-heading font-bold text-3xl md:text-4xl text-text-primary mb-1">
             {saudacao}, {nome.split(' ')[0]}!
           </h1>
           <p className="text-text-secondary text-sm capitalize">{dataFormatada}</p>
@@ -362,6 +376,83 @@ export function SecretariaDashboard({
           </div>
         </motion.div>
       )}
+
+      {/* ── Saúde operacional (pendências ou estado positivo) ─────────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="mb-6"
+      >
+        <div className="bg-surface rounded-2xl border border-border shadow-sm overflow-hidden">
+          {pendencias.length > 0 ? (
+            <>
+              {/* Header */}
+              <div className="flex items-center gap-2.5 px-5 pt-4 pb-3 border-b border-border/60">
+                <div className="w-6 h-6 rounded-lg bg-surface-alt flex items-center justify-center">
+                  <Bell className="w-3.5 h-3.5 text-text-secondary" />
+                </div>
+                <span className="font-semibold text-sm text-text-primary">Atenção necessária</span>
+                <span className="font-mono text-[10px] text-text-secondary bg-surface-alt px-2 py-0.5 rounded-full border border-border ml-auto">
+                  {pendencias.length}
+                </span>
+              </div>
+              {/* Lista com prioridade */}
+              <div className="divide-y divide-border/40">
+                {pendencias.map((p, i) => {
+                  const Icon = p.tipo === 'pagamento_vencido'
+                    ? DollarSign
+                    : p.tipo === 'orcamento_parado' ? FileText : UserCheck;
+                  const prioLeft = p.prioridade === 'high'
+                    ? 'border-l-2 border-coral/50'
+                    : p.prioridade === 'medium'
+                      ? 'border-l-2 border-amber-400/50'
+                      : '';
+                  const dotColor = p.prioridade === 'high'
+                    ? 'bg-coral/70'
+                    : p.prioridade === 'medium'
+                      ? 'bg-amber-400'
+                      : 'bg-border';
+                  return (
+                    <Link
+                      key={i}
+                      href={p.href}
+                      className={`flex items-center gap-3 px-4 py-3 hover:bg-surface-alt transition-colors group ${prioLeft}`}
+                    >
+                      <div className="relative shrink-0">
+                        <div className="w-7 h-7 rounded-lg bg-surface-alt flex items-center justify-center">
+                          <Icon className="w-3.5 h-3.5 text-text-secondary" />
+                        </div>
+                        {p.prioridade !== 'low' && (
+                          <div className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full ${dotColor}`} />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-text-primary truncate leading-tight">
+                          {p.pacienteNome}
+                        </p>
+                        <p className="text-xs text-text-secondary truncate">{p.descricao}</p>
+                      </div>
+                      <ArrowRight className="w-3.5 h-3.5 text-text-secondary opacity-0 group-hover:opacity-60 transition-opacity shrink-0" />
+                    </Link>
+                  );
+                })}
+              </div>
+            </>
+          ) : (
+            /* Empty state premium */
+            <div className="flex items-center gap-3 px-5 py-4">
+              <div className="w-7 h-7 rounded-lg bg-teal/10 flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-3.5 h-3.5 text-teal" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-text-primary">Tudo sob controle</p>
+                <p className="text-xs text-text-secondary">Nenhuma pendência operacional no momento.</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </motion.div>
 
       {/* ── Grid principal ────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-6">
@@ -515,7 +606,7 @@ export function SecretariaDashboard({
               <div className="space-y-2">
                 {dentistas.map(d => {
                   const count = lista.filter(a => a.dentista?.id === d.id).length;
-                  const naRecepcao = lista.filter(a => a.dentista?.id === d.id && a.status === 'na_recepcao').length;
+                  const naRecepcao = lista.filter(a => a.dentista?.id === d.id && a.status === 'checked_in').length;
                   return (
                     <button
                       key={d.id}

@@ -62,7 +62,7 @@ export function SignaturePad({ onClear, padRef }: SignaturePadProps) {
       <button
         type="button"
         onClick={handleClear}
-        className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors self-start px-1"
+        className="flex items-center gap-1.5 text-xs font-semibold text-text-secondary hover:text-text-primary transition-colors self-start px-1"
       >
         <RotateCcw className="w-3.5 h-3.5" />
         Limpar

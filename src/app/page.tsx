@@ -43,7 +43,7 @@ const faqs = [
   {
     question: 'Preciso de treinamento para usar?',
     answer:
-      'O DentIA foi desenhado para ser intuitivo. Se você sabe usar o WhatsApp, você sabe usar o DentIA. A interface é minimalista e foca no que realmente importa para o seu dia a dia.',
+      'O Odonto.IA foi desenhado para ser intuitivo. Se você sabe usar o WhatsApp, você sabe usar o Odonto.IA. A interface é minimalista e foca no que realmente importa para o seu dia a dia.',
   },
 ];
 
@@ -352,7 +352,7 @@ export default function LandingPage() {
           <div className="max-w-3xl mx-auto">
             <motion.div {...fadeUp} className="text-center mb-16">
               <h2 className="text-3xl md:text-4xl font-heading mb-4 text-text-primary">Dúvidas Frequentes</h2>
-              <p className="text-text-secondary">Tudo o que você precisa saber sobre o DentIA.</p>
+              <p className="text-text-secondary">Tudo o que você precisa saber sobre o Odonto.IA.</p>
             </motion.div>
 
             <motion.div {...fadeUp}>
@@ -436,7 +436,7 @@ export default function LandingPage() {
               <span className="text-2xl font-heading font-medium text-text-primary">
                 Dent<span className="italic text-teal">IA</span>
               </span>
-              <p className="text-sm text-text-secondary">© 2024 DentIA. Todos os direitos reservados.</p>
+              <p className="text-sm text-text-secondary">© 2024 Odonto.IA. Todos os direitos reservados.</p>
             </div>
 
             <div className="flex gap-8">

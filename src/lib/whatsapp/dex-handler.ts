@@ -171,7 +171,7 @@ async function cmdAgenda(clinicaId: string, db: SupabaseClient): Promise<string>
     .from('agendamentos')
     .select('data_hora, observacoes, paciente:pacientes(nome)')
     .eq('clinica_id', clinicaId)
-    .neq('status', 'cancelado')
+    .neq('status', 'cancelled')
     .gte('data_hora', inicio.toISOString())
     .lte('data_hora', fim.toISOString())
     .order('data_hora', { ascending: true });
@@ -251,7 +251,7 @@ async function cmdProximoPaciente(clinicaId: string, db: SupabaseClient): Promis
     .from('agendamentos')
     .select('data_hora, observacoes, paciente:pacientes(nome)')
     .eq('clinica_id', clinicaId)
-    .neq('status', 'cancelado')
+    .neq('status', 'cancelled')
     .gte('data_hora', agora)
     .order('data_hora', { ascending: true })
     .limit(1);

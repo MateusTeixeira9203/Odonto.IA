@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { format } from 'date-fns';
 import { getDentistaCached } from '@/lib/get-dentista';
 import { createClient } from '@/lib/supabase/server';
-import { listarDespesas, listarReceitas, calcularSaldoMes, listarUltimosMeses, calcularHoraClinica } from './actions';
+import { listarDespesas, listarReceitas, calcularSaldoMes, listarUltimosMeses, calcularHoraClinica, listarPagamentosPagos, listarPagamentosPendentes } from './actions';
 import { FinanceiroClient } from './_components/financeiro-client';
 import { PageTransition } from '@/components/layout/page-transition';
 import { UpsellPage } from '@/components/upsell-page';
@@ -61,12 +61,14 @@ export default async function FinanceiroPage({ searchParams }: PageProps) {
     dentistasClinica = data ?? [];
   }
 
-  const [despesas, receitas, saldo, chartData, horaClinica] = await Promise.all([
+  const [despesas, receitas, saldo, chartData, horaClinica, pagamentosPagos, pagamentosPendentes] = await Promise.all([
     listarDespesas(mesAtual),
     listarReceitas(mesAtual),
     calcularSaldoMes(mesAtual),
     listarUltimosMeses(6),
     calcularHoraClinica(mesAtual),
+    listarPagamentosPagos(mesAtual),
+    listarPagamentosPendentes(),
   ]);
 
   return (
@@ -84,6 +86,8 @@ export default async function FinanceiroPage({ searchParams }: PageProps) {
         dentistaId={dentista.id}
         dentistasClinica={dentistasClinica}
         initialDentistaFiltro={dentistaParam ?? ''}
+        pagamentosPagosIniciais={pagamentosPagos}
+        pagamentosPendentesIniciais={pagamentosPendentes}
       />
     </PageTransition>
   );

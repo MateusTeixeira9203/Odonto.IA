@@ -1,94 +1,61 @@
-import { type NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
-// Rotas que requerem autenticação para sair (redirect → dashboard se logado)
-const ROTAS_AUTH = ["/login", "/cadastro", "/esqueci-senha", "/redefinir-senha"];
+const PUBLIC_ROUTES = ["/", "/planos"];
+const AUTH_ROUTES = ["/login", "/cadastro", "/esqueci-senha"];
+const ALWAYS_ALLOWED_AUTH_ROUTES = ["/redefinir-senha"];
 
-// Rotas públicas acessíveis por qualquer um, inclusive autenticados (sem redirect)
-const ROTAS_SEMPRE_PUBLICAS = ["/", "/planos"];
-
-function isRotaAuth(pathname: string): boolean {
-  return ROTAS_AUTH.some((r) => r === pathname);
+function isPublicRoute(pathname: string): boolean {
+  return PUBLIC_ROUTES.includes(pathname);
 }
 
-function isRotaSemprePublica(pathname: string): boolean {
-  return ROTAS_SEMPRE_PUBLICAS.some((r) => r === pathname);
+function isAuthRoute(pathname: string): boolean {
+  return AUTH_ROUTES.includes(pathname);
 }
 
-// Mantido para retrocompatibilidade interna
-function isRotaPublica(pathname: string): boolean {
-  return isRotaAuth(pathname) || isRotaSemprePublica(pathname);
+function isAlwaysAllowedAuthRoute(pathname: string): boolean {
+  return ALWAYS_ALLOWED_AUTH_ROUTES.includes(pathname);
+}
+
+function isProtectedRoute(pathname: string): boolean {
+  return (
+    pathname.startsWith("/dashboard") || pathname.startsWith("/onboarding")
+  );
+}
+
+// Cria redirect preservando todos os cookies de updateSession() (token refresh, cleanup).
+// Response.redirect() descarta cookies — NextResponse.redirect() + cópia manual garante
+// que o refresh do JWT e a limpeza de sessão expirada cheguem ao browser.
+function createRedirectResponse(sourceResponse: NextResponse, url: URL): NextResponse {
+  const redirectResponse = NextResponse.redirect(url);
+  sourceResponse.cookies.getAll().forEach(({ name, value, ...options }) => {
+    redirectResponse.cookies.set(name, value, options);
+  });
+  return redirectResponse;
 }
 
 export async function proxy(request: NextRequest) {
-  const { response, session, supabase } = await updateSession(request);
+  const { response, session } = await updateSession(request);
   const { pathname } = request.nextUrl;
 
-  // Rotas sempre públicas (landing + planos): qualquer um acessa, sem redirect
-  if (isRotaSemprePublica(pathname)) {
+  if (isPublicRoute(pathname) || isAlwaysAllowedAuthRoute(pathname)) {
     return response;
   }
 
-  // Rotas de auth: se autenticado, redireciona para dashboard ou onboarding
-  // Exceto /redefinir-senha, que precisa permanecer acessível para o fluxo de recovery
-  if (isRotaAuth(pathname)) {
-    if (session && supabase && pathname !== "/redefinir-senha") {
-      const { data } = await supabase
-        .from("dentistas")
-        .select("id")
-        .eq("user_id", session.user.id)
-        .limit(1)
-        .maybeSingle();
-
-      return Response.redirect(
-        new URL(data ? "/dashboard" : "/onboarding", request.url)
-      );
-    }
-    return response;
-  } // end isRotaAuth
-
-  // /onboarding: só autenticado
-  if (pathname === "/onboarding") {
-    if (!session) {
-      const redirectUrl = new URL("/login", request.url);
-      redirectUrl.searchParams.set("redirectTo", "/onboarding");
-      return Response.redirect(redirectUrl);
-    }
-    // Se já tem dentista, vai para dashboard
-    if (supabase) {
-      const { data } = await supabase
-        .from("dentistas")
-        .select("id")
-        .eq("user_id", session.user.id)
-        .limit(1)
-        .maybeSingle();
-
-      if (data) {
-        return Response.redirect(new URL("/dashboard", request.url));
-      }
+  if (isAuthRoute(pathname)) {
+    if (session) {
+      return createRedirectResponse(response, new URL("/dashboard", request.url));
     }
     return response;
   }
 
-  // /dashboard/*: autenticado + deve ter dentista
-  if (pathname.startsWith("/dashboard")) {
+  if (isProtectedRoute(pathname)) {
     if (!session) {
       const redirectUrl = new URL("/login", request.url);
       redirectUrl.searchParams.set("redirectTo", pathname);
-      return Response.redirect(redirectUrl);
+      return createRedirectResponse(response, redirectUrl);
     }
-    if (supabase) {
-      const { data } = await supabase
-        .from("dentistas")
-        .select("id")
-        .eq("user_id", session.user.id)
-        .limit(1)
-        .maybeSingle();
-
-      if (!data) {
-        return Response.redirect(new URL("/onboarding", request.url));
-      }
-    }
+    return response;
   }
 
   return response;
@@ -96,6 +63,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|api/|favicon\\.ico|robots\\.txt|sitemap\\.xml|manifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?|ttf|eot)$).*)",
   ],
 };

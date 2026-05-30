@@ -1,95 +1,100 @@
 import { createServiceClient } from '@/lib/supabase/service';
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { ChargeEventSchema } from '@/lib/billing/schemas';
+import { logBilling } from '@/lib/billing/logger';
 
 export const dynamic = 'force-dynamic';
 
-/**
- * Payload de evento de cobrança da Abacate Pay.
- * Usado para pagamentos avulsos (Pix/boleto) vinculados a orçamentos.
- */
-interface AbacateChargeEvent {
-  event: string;
-  data: {
-    id: string;
-    status: string;
-    amount: number; // em centavos
-    metadata?: {
-      orcamento_id?: string;
-      paciente_id?: string;
-      clinica_id?: string;
-      forma_pagamento?: string;
-    };
-  };
+const PROVIDER = 'abacatepay' as const;
+
+function verifySignature(body: string, signature: string, secret: string): boolean {
+  const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(body).digest('hex');
+  const sigBuf = Buffer.from(signature);
+  const expBuf = Buffer.from(expected);
+  return sigBuf.length === expBuf.length && crypto.timingSafeEqual(sigBuf, expBuf);
 }
 
 /**
  * POST /api/webhooks/abacatepay
+ *
  * Recebe confirmações de pagamento de cobrança Pix/boleto da Abacate Pay
  * e registra o pagamento no orçamento vinculado.
  *
- * Diferente de /api/webhooks/abacate (billing de assinaturas de plano),
+ * Diferente de /api/webhooks/abacate (billing de assinatura de plano),
  * este endpoint trata cobranças avulsas de pacientes.
  *
- * Metadados esperados na cobrança:
- *   metadata.orcamento_id — ID do orçamento a ser pago
- *   metadata.paciente_id  — ID do paciente
- *   metadata.clinica_id   — ID da clínica (validação extra)
- *   metadata.forma_pagamento — "pix" | "boleto" (opcional, default "pix")
+ * Resolução de clínica:
+ *   Lida diretamente do campo metadata.clinica_id embedded na cobrança.
+ *   Validada cruzando com o orcamento_id via eq('clinica_id', clinica_id).
+ *
+ * Segurança:
+ *   - HMAC-SHA256 timing-safe
+ *   - Zod valida shape do payload
+ *   - Clínica validada via cross-check com orcamentos.clinica_id
+ *   - Idempotência via pagamentos.external_payment_id UNIQUE
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const webhookSecret = process.env.ABACATE_PAY_WEBHOOK_SECRET;
-
   if (!webhookSecret) {
-    console.error('[AbacatePay Webhook] ABACATE_PAY_WEBHOOK_SECRET não configurado');
-    return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 });
+    logBilling({ provider: PROVIDER, event_type: 'unknown', outcome: 'error', reason: 'ABACATE_PAY_WEBHOOK_SECRET not configured' });
+    return NextResponse.json({ error: 'Configuration error' }, { status: 500 });
   }
 
   const body = await request.text();
-
-  // Verificação de assinatura HMAC-SHA256 (mesmo padrão do webhook de billing)
   const signature = request.headers.get('x-webhook-signature') ?? '';
-  const expectedSignature =
-    'sha256=' + crypto.createHmac('sha256', webhookSecret).update(body).digest('hex');
 
-  if (signature.length !== expectedSignature.length) {
-    console.warn('[AbacatePay Webhook] Tamanho de assinatura inválido');
-    return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+  if (!verifySignature(body, signature, webhookSecret)) {
+    logBilling({ provider: PROVIDER, event_type: 'unknown', outcome: 'invalid_signature' });
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))) {
-    console.warn('[AbacatePay Webhook] Assinatura inválida');
-    return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
-  }
-
-  let event: AbacateChargeEvent;
+  let raw: unknown;
   try {
-    event = JSON.parse(body) as AbacateChargeEvent;
+    raw = JSON.parse(body);
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
   }
 
-  // Apenas processa confirmações de cobrança
-  if (event.event !== 'charge.paid' && event.event !== 'billing.confirmed') {
+  const parsed = ChargeEventSchema.safeParse(raw);
+  if (!parsed.success) {
+    logBilling({ provider: PROVIDER, event_type: 'unknown', outcome: 'invalid_payload', reason: parsed.error.message });
+    return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+  }
+
+  const event     = parsed.data;
+  const eventType = event.event;
+  const paymentId = event.data.id;
+
+  if (eventType !== 'charge.paid' && eventType !== 'billing.confirmed') {
+    logBilling({ provider: PROVIDER, event_type: eventType, payment_id: paymentId, outcome: 'skipped' });
     return NextResponse.json({ received: true, skipped: true });
   }
 
-  const { orcamento_id, paciente_id, clinica_id, forma_pagamento } = event.data.metadata ?? {};
-
-  if (!orcamento_id || !paciente_id || !clinica_id) {
-    console.error('[AbacatePay Webhook] Metadados de orçamento ausentes:', event.data.metadata);
-    return NextResponse.json(
-      { error: 'Missing metadata (orcamento_id, paciente_id, clinica_id)' },
-      { status: 400 },
-    );
+  const meta = event.data.metadata;
+  if (!meta?.orcamento_id || !meta.paciente_id || !meta.clinica_id) {
+    logBilling({ provider: PROVIDER, event_type: eventType, payment_id: paymentId, outcome: 'invalid_payload', reason: 'Missing required metadata fields' });
+    return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
   }
 
-  const valorReais = event.data.amount / 100; // Abacate Pay envia em centavos
-  const hoje = new Date().toISOString().split('T')[0];
-
+  const { orcamento_id, paciente_id, clinica_id, forma_pagamento } = meta;
   const service = createServiceClient();
 
-  // Verifica que o orçamento pertence à clínica informada
+  // ── 1. Idempotência ────────────────────────────────────────────────────────
+
+  const { data: existingPag } = await service
+    .from('pagamentos')
+    .select('id')
+    .eq('external_payment_id', paymentId)
+    .maybeSingle();
+
+  if (existingPag) {
+    logBilling({ provider: PROVIDER, event_type: eventType, payment_id: paymentId, clinic_id: clinica_id, outcome: 'duplicate' });
+    return NextResponse.json({ received: true, duplicate: true });
+  }
+
+  // ── 2. Validação cruzada: orçamento pertence à clínica ────────────────────
+
   const { data: orcamento, error: orcError } = await service
     .from('orcamentos')
     .select('id, status, dentista_id, total')
@@ -98,28 +103,34 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     .maybeSingle();
 
   if (orcError || !orcamento) {
-    console.error('[AbacatePay Webhook] Orçamento não encontrado:', { orcamento_id, clinica_id });
-    return NextResponse.json({ error: 'Orcamento not found' }, { status: 404 });
+    logBilling({ provider: PROVIDER, event_type: eventType, payment_id: paymentId, clinic_id: clinica_id, outcome: 'not_found', reason: `orcamento_id=${orcamento_id} not found for clinica_id=${clinica_id}` });
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  // Insere o registro de pagamento
+  // ── 3. Registrar pagamento ─────────────────────────────────────────────────
+
+  const valorReais = event.data.amount / 100;
+  const hoje = new Date().toISOString().split('T')[0];
+
   const { error: pagError } = await service.from('pagamentos').insert({
     orcamento_id,
     paciente_id,
-    dentista_id: orcamento.dentista_id ?? null,
+    dentista_id:          orcamento.dentista_id ?? null,
     clinica_id,
-    valor: valorReais,
-    status: 'pago',
-    forma_pagamento: forma_pagamento ?? 'pix',
-    data_pagamento: hoje,
+    valor:                valorReais,
+    status:               'pago',
+    forma_pagamento:      forma_pagamento ?? 'pix',
+    data_pagamento:       hoje,
+    external_payment_id:  paymentId,
   });
 
   if (pagError) {
-    console.error('[AbacatePay Webhook] Erro ao inserir pagamento:', pagError);
-    return NextResponse.json({ error: 'Failed to record payment' }, { status: 500 });
+    logBilling({ provider: PROVIDER, event_type: eventType, payment_id: paymentId, clinic_id: clinica_id, outcome: 'error', reason: 'Failed to insert pagamento' });
+    return NextResponse.json({ error: 'Processing error' }, { status: 500 });
   }
 
-  // Atualiza o status do orçamento para 'aprovado' se ainda não estava
+  // ── 4. Atualizar status do orçamento ──────────────────────────────────────
+
   if (orcamento.status !== 'aprovado') {
     await service
       .from('orcamentos')
@@ -128,8 +139,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       .eq('clinica_id', clinica_id);
   }
 
-  console.log(
-    `[AbacatePay Webhook] Pagamento R$ ${valorReais.toFixed(2)} registrado — orcamento_id=${orcamento_id}`,
-  );
+  logBilling({
+    provider: PROVIDER,
+    event_type: eventType,
+    payment_id: paymentId,
+    clinic_id: clinica_id,
+    outcome: 'processed',
+    reason: `R$ ${valorReais.toFixed(2)} — orcamento_id=${orcamento_id}`,
+  });
   return NextResponse.json({ received: true });
 }

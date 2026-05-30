@@ -12,17 +12,17 @@ export type AtendimentoHoje = {
 };
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  agendado:       { label: 'Agendado',      color: 'bg-surface-alt text-text-secondary' },
-  confirmado:     { label: 'Confirmado',    color: 'bg-teal/10 text-teal' },
-  na_recepcao:    { label: 'Na Recepção',   color: 'bg-teal/20 text-teal font-bold' },
-  em_atendimento: { label: 'Em Atendimento',color: 'bg-teal text-white' },
-  realizado:      { label: 'Realizado',     color: 'bg-teal/10 text-teal' },
-  cancelado:      { label: 'Cancelado',     color: 'bg-coral/10 text-coral' },
-  faltou:         { label: 'Faltou',        color: 'bg-coral/10 text-coral' },
+  scheduled:   { label: 'Agendado',      color: 'bg-surface-alt text-text-secondary' },
+  confirmed:   { label: 'Confirmado',    color: 'bg-teal/10 text-teal' },
+  checked_in:  { label: 'Na Recepção',   color: 'bg-teal/20 text-teal font-bold' },
+  in_progress: { label: 'Em Atendimento',color: 'bg-teal text-white' },
+  completed:   { label: 'Realizado',     color: 'bg-teal/10 text-teal' },
+  cancelled:   { label: 'Cancelado',     color: 'bg-coral/10 text-coral' },
+  no_show:     { label: 'Faltou',        color: 'bg-coral/10 text-coral' },
 };
 
 function isCheckedIn(status: string) {
-  return status === 'na_recepcao' || status === 'em_atendimento';
+  return status === 'checked_in' || status === 'in_progress';
 }
 
 export function AtendimentosHoje({ atendimentos }: { atendimentos: AtendimentoHoje[] }) {

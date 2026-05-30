@@ -1,10 +1,13 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getDentistaCached } from '@/lib/get-dentista';
 import { createClient } from '@/lib/supabase/server';
+import { withRateLimit } from '@/lib/rate-limit';
 
 export interface DexContextData {
   agendamentosHoje: number;
+  agendamentosHojeList: { hora: string; paciente: string; status: string }[];
   orcamentosPendentes: number;
+  orcamentosAtrasados30d: number;
   proximoPaciente: string | null;
   proximoAgendamentoId: string | null;
   proximoHorario: string | null;
@@ -19,7 +22,10 @@ export interface DexContextData {
  * GET /api/dex/context
  * Retorna dados contextuais do dia para o DEX gerar a saudação personalizada.
  */
-export async function GET(): Promise<NextResponse> {
+export async function GET(req: NextRequest): Promise<NextResponse> {
+  const limited = await withRateLimit(req, 'dex:context', 60, 60_000);
+  if (limited) return limited;
+
   try {
     const dentista = await getDentistaCached();
     if (!dentista) {
@@ -46,6 +52,8 @@ export async function GET(): Promise<NextResponse> {
 
     const tresDiasAtras = new Date(agora);
     tresDiasAtras.setDate(tresDiasAtras.getDate() - 3);
+    const trintaDiasAtras = new Date(agora);
+    trintaDiasAtras.setDate(agora.getDate() - 30);
 
     // Padrão MM-DD para filtrar aniversariantes do dia
     const mesStr = String(agora.getMonth() + 1).padStart(2, '0');
@@ -54,7 +62,9 @@ export async function GET(): Promise<NextResponse> {
 
     const [
       agendamentosRes,
+      agendamentosListRes,
       orcamentosRes,
+      orcamentosAtrasados30dRes,
       proximoRes,
       pagamentosHojeRes,
       followUpRes,
@@ -68,7 +78,18 @@ export async function GET(): Promise<NextResponse> {
         .eq('clinica_id', dentista.clinica_id)
         .gte('data_hora', hojeInicio.toISOString())
         .lte('data_hora', hojeFim.toISOString())
-        .not('status', 'eq', 'cancelado'),
+        .not('status', 'eq', 'cancelled'),
+
+      // Lista completa dos agendamentos de hoje (para o painel)
+      supabase
+        .from('agendamentos')
+        .select('data_hora, status, paciente:pacientes(nome)')
+        .eq('clinica_id', dentista.clinica_id)
+        .gte('data_hora', hojeInicio.toISOString())
+        .lte('data_hora', hojeFim.toISOString())
+        .not('status', 'eq', 'cancelled')
+        .order('data_hora', { ascending: true })
+        .limit(10),
 
       supabase
         .from('orcamentos')
@@ -76,13 +97,21 @@ export async function GET(): Promise<NextResponse> {
         .eq('clinica_id', dentista.clinica_id)
         .in('status', ['rascunho', 'enviado']),
 
+      // Orçamentos enviados há +30 dias sem resposta
+      supabase
+        .from('orcamentos')
+        .select('id', { count: 'exact', head: true })
+        .eq('clinica_id', dentista.clinica_id)
+        .eq('status', 'enviado')
+        .lte('updated_at', trintaDiasAtras.toISOString()),
+
       supabase
         .from('agendamentos')
         .select('id, data_hora, paciente:pacientes(nome)')
         .eq('clinica_id', dentista.clinica_id)
         .gte('data_hora', agora.toISOString())
         .lte('data_hora', hojeFim.toISOString())
-        .not('status', 'eq', 'cancelado')
+        .not('status', 'eq', 'cancelled')
         .order('data_hora', { ascending: true })
         .limit(1)
         .maybeSingle(),
@@ -117,7 +146,7 @@ export async function GET(): Promise<NextResponse> {
         .eq('clinica_id', dentista.clinica_id)
         .gte('data_hora', semanaInicio.toISOString())
         .lte('data_hora', semanaFim.toISOString())
-        .not('status', 'eq', 'cancelado'),
+        .not('status', 'eq', 'cancelled'),
 
       // Orçamentos aprovados esta semana
       supabase
@@ -135,6 +164,12 @@ export async function GET(): Promise<NextResponse> {
       ? new Date(proximoRes.data.data_hora as string).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
       : null;
 
+    const agendamentosHojeList = (agendamentosListRes.data ?? []).map((ag) => ({
+      hora: new Date(ag.data_hora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      paciente: (ag.paciente as unknown as { nome: string } | null)?.nome ?? 'Paciente',
+      status: ag.status as string,
+    }));
+
     const aniversariantes = (aniversariantesRes.data ?? []).map((p) => ({
       nome: p.nome as string,
       id: p.id as string,
@@ -142,7 +177,9 @@ export async function GET(): Promise<NextResponse> {
 
     return NextResponse.json({
       agendamentosHoje:          agendamentosRes.count ?? 0,
+      agendamentosHojeList,
       orcamentosPendentes:       orcamentosRes.count ?? 0,
+      orcamentosAtrasados30d:    orcamentosAtrasados30dRes.count ?? 0,
       proximoPaciente:           pacienteData?.nome ?? null,
       proximoAgendamentoId:      (proximoRes.data?.id as string | null) ?? null,
       proximoHorario,
@@ -156,7 +193,9 @@ export async function GET(): Promise<NextResponse> {
     console.error('[dex/context] Erro:', err);
     return NextResponse.json({
       agendamentosHoje: 0,
+      agendamentosHojeList: [],
       orcamentosPendentes: 0,
+      orcamentosAtrasados30d: 0,
       proximoPaciente: null,
       proximoAgendamentoId: null,
       proximoHorario: null,

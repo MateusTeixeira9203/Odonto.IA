@@ -11,7 +11,10 @@ import {
   Plus,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { DexLoader } from '@/components/ui/dex-loader';
 import { GaleriaImagens } from '@/components/fichas/galeria-imagens';
+import { toast } from 'sonner';
+import { toStoragePath } from '@/lib/storage/url';
 
 interface Document {
   id: string;
@@ -21,6 +24,7 @@ interface Document {
   date: string;
   source: string;
   url: string;
+  storagePath: string;
 }
 
 const CATEGORIES = ['Radiografias', 'Fotografias', 'Documentos', 'Outros'] as const;
@@ -107,8 +111,26 @@ export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
 
       if (error) throw error;
 
-      const formattedDocs = (data ?? []).map((doc: Record<string, unknown>) => {
+      const rows = data ?? [];
+
+      // Extract storage paths (handles both old public URLs and new path-only values)
+      const paths = rows.map((doc: Record<string, unknown>) =>
+        toStoragePath(doc.url as string, 'fichas'),
+      );
+
+      // Batch-generate signed URLs for all documents (1-hour expiry)
+      const { data: signedList } = paths.length > 0
+        ? await supabase.storage.from('fichas').createSignedUrls(paths, 3600)
+        : { data: [] };
+
+      const signedMap = new Map<string, string>();
+      (signedList ?? []).forEach((entry) => {
+        if (entry.path && entry.signedUrl) signedMap.set(entry.path, entry.signedUrl);
+      });
+
+      const formattedDocs = rows.map((doc: Record<string, unknown>) => {
         const nome = doc.nome as string;
+        const storagePath = toStoragePath(doc.url as string, 'fichas');
         return {
           id: doc.id as string,
           name: nome,
@@ -120,7 +142,8 @@ export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
             year: 'numeric',
           }),
           source: (doc.origem as string | undefined) ?? 'Upload Direto',
-          url: doc.url as string,
+          url: signedMap.get(storagePath) ?? storagePath,
+          storagePath,
         };
       });
 
@@ -147,11 +170,11 @@ export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
     const grandes = files.filter(f => f.size > MAX_UPLOAD_SIZE);
 
     if (invalidos.length > 0) {
-      alert(`Tipo não permitido: ${invalidos.map(f => f.name).join(', ')}\nUse imagens, PDF, DOC, DOCX, XLS, XLSX, PPT ou PPTX.`);
+      toast.error(`Tipo não permitido: ${invalidos.map(f => f.name).join(', ')}. Use imagens, PDF, DOC, DOCX, XLS, XLSX, PPT ou PPTX.`);
       return;
     }
     if (grandes.length > 0) {
-      alert(`Arquivos muito grandes (máx 20 MB): ${grandes.map(f => f.name).join(', ')}`);
+      toast.error(`Arquivos muito grandes (máx 20 MB): ${grandes.map(f => f.name).join(', ')}`);
       return;
     }
 
@@ -174,7 +197,10 @@ export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
           .upload(storagePath, file, { upsert: false });
         if (storageErr) throw storageErr;
 
-        const { data: urlData } = supabase.storage.from('fichas').getPublicUrl(storagePath);
+        const { data: signedData } = await supabase.storage
+          .from('fichas')
+          .createSignedUrl(storagePath, 3600);
+        const displayUrl = signedData?.signedUrl ?? '';
 
         const { data: docData, error: dbErr } = await supabase
           .from('paciente_documentos')
@@ -182,7 +208,7 @@ export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
             paciente_id: patientId,
             clinica_id: clinicaId,
             nome: file.name,
-            url: urlData.publicUrl,
+            url: storagePath,
             categoria: getCategoryFromFile(file),
           })
           .select('id, created_at')
@@ -201,7 +227,8 @@ export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
             year: 'numeric',
           }),
           source: 'Upload Direto',
-          url: urlData.publicUrl,
+          url: displayUrl,
+          storagePath,
         });
       } catch (err) {
         console.error(`Erro no upload de ${file.name}:`, err);
@@ -213,7 +240,7 @@ export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
       setDocuments(prev => [...novos.reverse(), ...prev]);
     }
     if (erros.length > 0) {
-      alert(`Erro ao enviar: ${erros.join(', ')}`);
+      toast.error(`Erro ao enviar: ${erros.join(', ')}`);
     }
 
     setIsUploading(false);
@@ -227,7 +254,7 @@ export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
 
     try {
       const supabase = createClient();
-      const storagePath = doc.url.split('/storage/v1/object/public/fichas/')[1];
+      const { storagePath } = doc;
 
       await Promise.all([
         supabase.from('paciente_documentos').delete().eq('id', docId),
@@ -240,7 +267,7 @@ export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
       setSelecionados(prev => prev.filter(id => id !== docId));
     } catch (error) {
       console.error('Erro ao excluir documento:', error);
-      alert('Erro ao excluir documento. Tente novamente.');
+      toast.error('Erro ao excluir documento. Tente novamente.');
     }
   };
 
@@ -344,9 +371,7 @@ export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
 
       {/* Categorias com galeria */}
       {loading ? (
-        <div className="flex items-center justify-center p-20">
-          <Loader2 className="w-8 h-8 animate-spin text-teal" />
-        </div>
+        <DexLoader className="p-20" />
       ) : (
         CATEGORIES.map(category => {
           const docsInCategory = filteredDocs.filter(d => d.category === category);

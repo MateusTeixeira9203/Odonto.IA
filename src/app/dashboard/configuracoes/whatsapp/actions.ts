@@ -1,7 +1,6 @@
 'use server';
 
-import { redirect } from 'next/navigation';
-import { getDentistaCached } from '@/lib/get-dentista';
+import { requireRole } from '@/server/auth/roles';
 import { createServiceClient } from '@/lib/supabase/service';
 
 export interface BotConfigForm {
@@ -15,22 +14,15 @@ export interface BotConfigForm {
   reminder_message: string;
 }
 
-async function verificarAcesso() {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect('/login');
-  if (dentista.role !== 'secretaria') redirect('/dashboard');
-  return dentista;
-}
-
 export async function salvarBotConfig(form: BotConfigForm): Promise<{ ok: boolean; erro?: string }> {
-  const dentista = await verificarAcesso();
+  const { clinicId } = await requireRole(['secretaria']);
   const db = createServiceClient();
 
   const { error } = await db
     .from('bot_config')
     .upsert(
       {
-        clinica_id:                dentista.clinica_id,
+        clinica_id:                clinicId,
         whatsapp_number:           form.whatsapp_number,
         welcome_message:           form.welcome_message,
         working_hours_start:       form.working_hours_start,
@@ -49,13 +41,13 @@ export async function salvarBotConfig(form: BotConfigForm): Promise<{ ok: boolea
 }
 
 export async function carregarBotConfig(): Promise<BotConfigForm | null> {
-  const dentista = await verificarAcesso();
+  const { clinicId } = await requireRole(['secretaria']);
   const db = createServiceClient();
 
   const { data } = await db
     .from('bot_config')
     .select('*')
-    .eq('clinica_id', dentista.clinica_id)
+    .eq('clinica_id', clinicId)
     .maybeSingle();
 
   if (!data) return null;

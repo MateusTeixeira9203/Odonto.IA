@@ -1,13 +1,11 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
-import { getDentistaCached } from '@/lib/get-dentista';
+import { requireUser } from '@/server/auth/user';
+import { requireClinicContext } from '@/server/auth/clinic';
 import { revalidatePath } from 'next/cache';
 
 export async function salvarAvatarUrl(avatarUrl: string): Promise<{ error?: string }> {
-  const supabase = await createClient();
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-  if (userError || !user) return { error: 'Sessão inválida.' };
+  const { supabase, user } = await requireUser();
 
   const { error } = await supabase
     .from('dentistas')
@@ -21,9 +19,7 @@ export async function salvarAvatarUrl(avatarUrl: string): Promise<{ error?: stri
 }
 
 export async function removerAvatar(): Promise<{ error?: string }> {
-  const supabase = await createClient();
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-  if (userError || !user) return { error: 'Sessão inválida.' };
+  const { supabase, user } = await requireUser();
 
   const { error } = await supabase
     .from('dentistas')
@@ -46,9 +42,7 @@ export interface PerfilData {
 }
 
 export async function salvarPerfil(data: PerfilData): Promise<{ error?: string }> {
-  const supabase = await createClient();
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-  if (userError || !user) return { error: 'Sessão inválida.' };
+  const { supabase, user } = await requireUser();
 
   const { error } = await supabase
     .from('dentistas')
@@ -73,15 +67,14 @@ export async function salvarPerfil(data: PerfilData): Promise<{ error?: string }
 }
 
 export async function salvarNomeClinica(nome: string): Promise<{ error?: string }> {
-  const dentista = await getDentistaCached();
-  if (!dentista) return { error: 'Sessão inválida.' };
-  if (dentista.role !== 'admin') return { error: 'Sem permissão.' };
+  const { supabase, clinicId, role } = await requireClinicContext();
 
-  const supabase = await createClient();
+  if (role !== 'admin') return { error: 'Sem permissão.' };
+
   const { error } = await supabase
     .from('clinicas')
     .update({ nome })
-    .eq('id', dentista.clinica_id);
+    .eq('id', clinicId);
 
   if (error) {
     console.error('Erro ao salvar nome da clínica:', error);

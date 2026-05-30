@@ -139,7 +139,7 @@ function buildEventBody(data: AppointmentData) {
   const description = [
     `Dentista: ${data.dentistaNome}`,
     data.observacoes ? `Obs: ${data.observacoes}` : null,
-    '\nGerado pelo Dent IA',
+    '\nGerado pelo Odonto.IA',
   ]
     .filter(Boolean)
     .join('\n');
@@ -318,7 +318,7 @@ export async function importGoogleCalendarEvents(
 
     if (existente) { skipped++; continue; }
 
-    // Também pular se google_event_id já existe (eventos criados pelo DentIA)
+    // Também pular se google_event_id já existe (eventos criados pelo Odonto.IA)
     const { data: existenteGE } = await supabase
       .from('agendamentos')
       .select('id')
@@ -374,7 +374,7 @@ export async function importGoogleCalendarEvents(
         paciente_id:     pacienteId,
         data_hora:       event.start.dateTime,
         duracao_minutos: duracaoMinutos,
-        status:          'agendado',
+        status:          'scheduled',
         origem:          'app',
         observacoes:     event.description?.substring(0, 500) ?? null,
         google_event_id: gcEventId,

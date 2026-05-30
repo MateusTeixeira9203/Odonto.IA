@@ -215,7 +215,7 @@ export async function sendDentistList(
         }],
       },
     ],
-    'DentIA — Assistente Virtual',
+    'Odonto.IA — Assistente Virtual',
   );
 
   return dentistas;
@@ -298,7 +298,7 @@ export async function sendDateList(
       title: 'Próximas Datas Disponíveis',
       rows:  datas.map(d => ({ rowId: d.iso, title: d.label })),
     }],
-    'DentIA — Assistente Virtual',
+    'Odonto.IA — Assistente Virtual',
   );
 
   return datas.map(d => d.iso);
@@ -353,7 +353,7 @@ export async function sendHoraList(
     .from('agendamentos')
     .select('data_hora')
     .eq('dentista_id', dentistaId)
-    .neq('status', 'cancelado')
+    .neq('status', 'cancelled')
     .gte('data_hora', diaStartUTC.toISOString())
     .lt('data_hora', diaEndUTC.toISOString());
 
@@ -409,7 +409,7 @@ export async function sendHoraList(
       title: 'Horários Disponíveis',
       rows:  slots.map(s => ({ rowId: s.iso, title: s.label })),
     }],
-    'DentIA — Assistente Virtual',
+    'Odonto.IA — Assistente Virtual',
   );
 
   return { slots, duracaoMinutos };

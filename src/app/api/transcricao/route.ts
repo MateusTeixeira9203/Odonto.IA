@@ -37,7 +37,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const supabase = await createClient();
 
-  // Verifica se o usuário está autenticado
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -45,6 +44,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!user) {
     return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
   }
+
+  // Resolve clínica ativa — escopa o update de ficha à clínica do usuário
+  const { data: userRecord } = await supabase
+    .from("users")
+    .select("active_clinica_id")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!userRecord?.active_clinica_id) {
+    return NextResponse.json({ error: "Clínica não encontrada." }, { status: 403 });
+  }
+
+  const clinicId = userRecord.active_clinica_id as string;
 
   // 1. Gera URL assinada para download do áudio no Storage
   const { data: signedData, error: signedError } = await supabase.storage
@@ -94,11 +106,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // 4. Atualiza a ficha com a transcrição
+  // 4. Atualiza a ficha com a transcrição — escopo explícito por clínica
   const { error: updateError } = await supabase
     .from("fichas")
     .update({ transcricao: transcricaoTexto })
-    .eq("id", ficha_id);
+    .eq("id", ficha_id)
+    .eq("clinica_id", clinicId);
 
   if (updateError) {
     console.error("Erro ao salvar transcrição:", updateError);

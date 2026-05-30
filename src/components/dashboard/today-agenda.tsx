@@ -29,9 +29,12 @@ interface TodayAgendaProps {
 export function TodayAgenda({ agendamentos }: TodayAgendaProps) {
   if (agendamentos.length === 0) {
     return (
-      <div className="bg-surface rounded-2xl border border-border shadow-sm p-10 text-center">
-        <Calendar className="w-8 h-8 text-border mx-auto mb-3" />
-        <p className="text-text-secondary text-sm font-medium">
+      <div className="bg-surface rounded-2xl border border-border shadow-sm p-10 flex flex-col items-center justify-center text-center">
+        <div className="w-12 h-12 rounded-2xl bg-surface-alt border border-border flex items-center justify-center mb-4">
+          <Calendar className="w-5 h-5 text-text-secondary" />
+        </div>
+        <p className="text-sm font-semibold text-text-primary mb-1">Agenda vazia</p>
+        <p className="text-text-secondary text-xs leading-relaxed">
           Nenhum atendimento agendado para hoje.
         </p>
       </div>

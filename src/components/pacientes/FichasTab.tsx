@@ -10,6 +10,7 @@ import {
   MoreVertical,
   Edit2,
   FileText,
+  Download,
   Upload,
   Check,
   User,
@@ -19,6 +20,7 @@ import {
   PenLine,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { DexLoader } from "@/components/ui/dex-loader";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,14 +36,20 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { createClient } from "@/lib/supabase/client";
 import { HelpTooltip } from "@/components/ui/help-tooltip";
 import { criarOrcamento } from "@/app/dashboard/orcamentos/actions";
 import { toast } from 'sonner';
 import { temFeature, type PlanoId } from "@/lib/planos";
-import { SignaturePad } from "@/components/fichas/SignaturePad";
+import { Odontograma } from "@/components/odontograma/Odontograma";
+import dynamic from 'next/dynamic';
 import type SignaturePadLib from 'signature_pad';
+const SignaturePad = dynamic(
+  () => import('@/components/fichas/SignaturePad').then(m => m.SignaturePad),
+  { ssr: false }
+);
 
 interface ToothNote {
   tooth: number;
@@ -86,9 +94,6 @@ type FichaDB = {
   assinatura_url: string | null;
   assinado_em: string | null;
 };
-
-const TEETH_UPPER = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
-const TEETH_LOWER = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
 
 const ALLOWED_MIME: Record<string, boolean> = {
   'image/jpeg': true,
@@ -248,6 +253,17 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
     }
   }, [patientId, clinicaId, fetchFichas]);
 
+  // Dentes mencionados em fichas anteriores — usados pelo odontograma premium
+  const historicalTeeth = React.useMemo(() => {
+    const set = new Set<number>();
+    evolutions.forEach((e) =>
+      e.teethNotes.forEach((tn) => {
+        if (tn.tooth < 90) set.add(tn.tooth); // exclui constantes de arcada (97,98,99)
+      })
+    );
+    return set;
+  }, [evolutions]);
+
   const startRecording = async (): Promise<void> => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -269,7 +285,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
       setIsRecording(true);
     } catch (err) {
       console.error("Erro ao acessar microfone:", err);
-      alert("Não foi possível acessar o microfone.");
+      toast.error('Não foi possível acessar o microfone.');
     }
   };
 
@@ -537,12 +553,11 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
         .upload(storagePath, blob, { upsert: true, contentType: 'image/png' });
       if (storageErr) throw storageErr;
 
-      const { data: urlData } = supabase.storage.from('fichas').getPublicUrl(storagePath);
       const assinadoEm = new Date().toISOString();
 
       const { error: dbErr } = await supabase
         .from('fichas')
-        .update({ assinatura_url: urlData.publicUrl, assinado_em: assinadoEm })
+        .update({ assinatura_url: storagePath, assinado_em: assinadoEm })
         .eq('id', signingFichaId)
         .eq('clinica_id', clinicaId);
       if (dbErr) throw dbErr;
@@ -550,7 +565,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
       setEvolutions((prev) =>
         prev.map((e) =>
           e.id === signingFichaId
-            ? { ...e, assinaturaUrl: urlData.publicUrl, assinadoEm: assinadoEm }
+            ? { ...e, assinaturaUrl: storagePath, assinadoEm: assinadoEm }
             : e
         )
       );
@@ -582,11 +597,11 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
     e.target.value = '';
 
     if (!ALLOWED_MIME[file.type]) {
-      alert('Tipo não permitido. Use JPG, PNG, WEBP, PDF ou DOCX.');
+      toast.error('Tipo não permitido. Use JPG, PNG, WEBP, PDF ou DOCX.');
       return;
     }
     if (file.size > MAX_UPLOAD_SIZE) {
-      alert('Arquivo muito grande. Máximo 10 MB.');
+      toast.error('Arquivo muito grande. Máximo 10 MB.');
       return;
     }
 
@@ -600,7 +615,10 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
         .upload(storagePath, file, { upsert: false });
       if (storageErr) throw storageErr;
 
-      const { data: urlData } = supabase.storage.from('fichas').getPublicUrl(storagePath);
+      const { data: signedData } = await supabase.storage
+        .from('fichas')
+        .createSignedUrl(storagePath, 3600);
+      const displayUrl = signedData?.signedUrl ?? '';
 
       const { data: doc, error: dbErr } = await supabase
         .from('paciente_documentos')
@@ -608,7 +626,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
           paciente_id: patientId,
           clinica_id: clinicaId,
           nome: file.name,
-          url: urlData.publicUrl,
+          url: storagePath,
           categoria: getCategoria(file.type),
         })
         .select('id')
@@ -617,11 +635,11 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
 
       setUploadedFiles((prev) => [
         ...prev,
-        { name: file.name, url: urlData.publicUrl, docId: doc.id as string, storagePath },
+        { name: file.name, url: displayUrl, docId: doc.id as string, storagePath },
       ]);
     } catch (err) {
       console.error('Erro no upload:', err);
-      alert('Erro ao fazer upload. Tente novamente.');
+      toast.error('Erro ao fazer upload. Tente novamente.');
     } finally {
       setIsUploading(false);
     }
@@ -702,16 +720,14 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center p-20">
-        <Loader2 className="w-8 h-8 animate-spin text-teal" />
-      </div>
+      <DexLoader className="p-20" />
     );
   }
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="font-heading text-2xl text-foreground">Histórico Clínico</h2>
+        <h2 className="font-heading text-2xl text-text-primary">Histórico Clínico</h2>
         {!isPanelOpen && (
           <Button
             onClick={() => setIsPanelOpen(true)}
@@ -731,17 +747,17 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
             exit={{ opacity: 0, height: 0, marginTop: 0 }}
             className="overflow-hidden"
           >
-            <div className="bg-muted/30 border border-border/60 rounded-2xl p-4 md:p-6 flex flex-col lg:flex-row gap-6 lg:gap-8">
+            <div className="bg-surface-alt/30 border border-border/60 rounded-2xl p-4 md:p-6 flex flex-col lg:flex-row gap-6 lg:gap-8">
               {/* Coluna Esquerda */}
               <div className="flex-[3] flex flex-col gap-6">
                 <div className="flex-1">
-                  <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-[0.15em] mb-2">
+                  <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-[0.15em] mb-2">
                     Tipo de Registro
                   </label>
                   <select
                     value={formData.type}
                     onChange={(e) => setFormData((f) => ({ ...f, type: e.target.value }))}
-                    className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-sm font-medium text-foreground outline-none focus:border-teal transition-colors"
+                    className="w-full bg-surface-alt border border-border rounded-xl px-4 py-2.5 text-sm font-medium text-text-primary outline-none focus:border-teal transition-colors"
                   >
                     <option value="Avaliação">Avaliação</option>
                     <option value="Evolução">Evolução</option>
@@ -753,7 +769,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
 
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-[0.15em] flex items-center">
+                    <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-[0.15em] flex items-center">
                       Observações Gerais
                       <HelpTooltip content="Fale os procedimentos e a IA transcreve automaticamente." />
                     </label>
@@ -787,7 +803,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                     ) : (
                       <span
                         title="Disponível no Plano Básico"
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-muted text-muted-foreground cursor-not-allowed select-none"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-surface-alt text-text-secondary cursor-not-allowed select-none"
                       >
                         <Lock className="w-3.5 h-3.5" /> Gravar Voz (IA)
                       </span>
@@ -797,7 +813,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                     value={formData.observation}
                     onChange={(e) => setFormData((f) => ({ ...f, observation: e.target.value }))}
                     placeholder="Descreva os procedimentos realizados, queixas do paciente, etc..."
-                    className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm font-medium text-foreground outline-none focus:border-teal transition-colors min-h-[120px] resize-y"
+                    className="w-full bg-surface-alt border border-border rounded-xl px-4 py-3 text-sm font-medium text-text-primary outline-none focus:border-teal transition-colors min-h-[120px] resize-y"
                   />
                   {/* Indicador do DEX escutando */}
                   <AnimatePresence>
@@ -818,12 +834,12 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
 
                 {/* Seção de procedimentos — sempre visível, sem layout shift */}
                 <div className="space-y-3">
-                  <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-[0.15em]">
+                  <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-[0.15em]">
                     Procedimentos
                   </label>
 
                   {selectedTeeth.length === 0 && sharedTeeth.length === 0 ? (
-                    <div className="min-h-[88px] flex items-center justify-center text-xs text-muted-foreground bg-background rounded-xl border border-dashed border-border/60">
+                    <div className="min-h-[88px] flex items-center justify-center text-xs text-text-secondary bg-surface-alt rounded-xl border border-dashed border-border/60">
                       {selectionMode === 'arch'
                         ? 'Selecione uma arcada ao lado'
                         : 'Selecione dentes no odontograma ao lado'}
@@ -834,7 +850,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                       {selectedTeeth.length > 0 && (
                         <div className="space-y-3">
                           {sharedTeeth.length > 0 && (
-                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Individuais</span>
+                            <span className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">Individuais</span>
                           )}
                           {selectedTeeth.map((tooth) => {
                             const tn = formData.teethNotes.find((t) => t.tooth === tooth);
@@ -863,10 +879,10 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                                         value={note}
                                         onChange={(e) => handleToothNoteChange(tooth, idx, e.target.value)}
                                         placeholder={`Procedimento ${idx + 1}...`}
-                                        className="flex-1 bg-background border border-border rounded-xl px-4 py-2.5 text-sm font-medium text-foreground outline-none focus:border-teal transition-colors"
+                                        className="flex-1 bg-surface-alt border border-border rounded-xl px-4 py-2.5 text-sm font-medium text-text-primary outline-none focus:border-teal transition-colors"
                                       />
                                       {notes.length > 1 && (
-                                        <button type="button" onClick={() => removeToothNote(tooth, idx)} className="p-1.5 text-muted-foreground hover:text-red-500 transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20">
+                                        <button type="button" onClick={() => removeToothNote(tooth, idx)} className="p-1.5 text-text-secondary hover:text-red-500 transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20">
                                           <X className="w-3.5 h-3.5" />
                                         </button>
                                       )}
@@ -889,7 +905,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                           {selectedTeeth.length > 0 && (
                             <div className="flex items-center gap-2">
                               <div className="flex-1 h-px bg-border/60" />
-                              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest shrink-0">Grupo</span>
+                              <span className="text-[10px] font-bold text-text-secondary uppercase tracking-widest shrink-0">Grupo</span>
                               <div className="flex-1 h-px bg-border/60" />
                             </div>
                           )}
@@ -906,7 +922,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                             </div>
                           )}
                           {sharedTeeth.length === 0 ? (
-                            <div className="min-h-[60px] flex items-center justify-center text-xs text-muted-foreground bg-background rounded-xl border border-dashed border-border/60">
+                            <div className="min-h-[60px] flex items-center justify-center text-xs text-text-secondary bg-surface-alt rounded-xl border border-dashed border-border/60">
                               Selecione os dentes no odontograma
                             </div>
                           ) : (
@@ -918,10 +934,10 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                                     value={note}
                                     onChange={(e) => handleSharedNoteChange(idx, e.target.value)}
                                     placeholder={`Procedimento ${idx + 1} para todos os dentes...`}
-                                    className="flex-1 bg-background border border-teal/30 rounded-xl px-4 py-2.5 text-sm font-medium text-foreground outline-none focus:border-teal transition-colors"
+                                    className="flex-1 bg-surface-alt border border-teal/30 rounded-xl px-4 py-2.5 text-sm font-medium text-text-primary outline-none focus:border-teal transition-colors"
                                   />
                                   {sharedNotes.length > 1 && (
-                                    <button type="button" onClick={() => removeSharedNote(idx)} className="p-1.5 text-muted-foreground hover:text-red-500 transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20">
+                                    <button type="button" onClick={() => removeSharedNote(idx)} className="p-1.5 text-text-secondary hover:text-red-500 transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20">
                                       <X className="w-3.5 h-3.5" />
                                     </button>
                                   )}
@@ -940,7 +956,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-[0.15em] mb-2">
+                  <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-[0.15em] mb-2">
                     Anexos
                   </label>
                   <input
@@ -953,7 +969,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploading}
-                    className="w-full border-2 border-dashed border-border hover:border-teal bg-background rounded-xl py-6 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-teal transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full border-2 border-dashed border-border hover:border-teal bg-surface-alt rounded-xl py-6 flex flex-col items-center justify-center gap-2 text-text-secondary hover:text-teal transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isUploading ? (
                       <Loader2 className="w-6 h-6 animate-spin" />
@@ -969,15 +985,15 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                       {uploadedFiles.map((f) => (
                         <div
                           key={f.docId}
-                          className="flex items-center justify-between px-3 py-2 bg-muted rounded-xl border border-border/40"
+                          className="flex items-center justify-between px-3 py-2 bg-surface-alt rounded-xl border border-border/40"
                         >
-                          <div className="flex items-center gap-2 text-xs font-medium text-foreground min-w-0">
+                          <div className="flex items-center gap-2 text-xs font-medium text-text-primary min-w-0">
                             <FileText className="w-3.5 h-3.5 text-teal shrink-0" />
                             <span className="truncate">{f.name}</span>
                           </div>
                           <button
                             onClick={() => void handleRemoveFile(f.docId, f.storagePath)}
-                            className="p-1 text-muted-foreground hover:text-red-500 transition-colors shrink-0 ml-2"
+                            className="p-1 text-text-secondary hover:text-red-500 transition-colors shrink-0 ml-2"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -990,7 +1006,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                 <div className="flex items-center justify-end gap-3 pt-4 border-t border-border/60">
                   <button
                     onClick={closePanel}
-                    className="px-5 py-2.5 rounded-xl font-semibold text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                    className="px-5 py-2.5 rounded-xl font-semibold text-sm text-text-secondary hover:text-text-primary hover:bg-surface-alt transition-colors"
                   >
                     Cancelar
                   </button>
@@ -1010,21 +1026,21 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
               </div>
 
               {/* Odontograma */}
-              <div className="flex-[2] bg-background rounded-xl border border-border/60 p-4 md:p-6 flex flex-col">
+              <div className="flex-[2] bg-surface-alt rounded-xl border border-border/60 p-4 md:p-6 flex flex-col">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-heading text-lg text-foreground flex items-center">
+                  <h3 className="font-heading text-lg text-text-primary flex items-center">
                     Odontograma
                     <HelpTooltip content="Escolha o tipo de seleção e marque os dentes ou arcadas afetados." />
                   </h3>
-                  {selectionMode !== 'arch' && (
-                    <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  {selectionMode === 'arch' && (
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
                       <div className="w-2.5 h-2.5 rounded-sm bg-teal" /> Selecionado
                     </div>
                   )}
                 </div>
 
                 {/* Seletor de modo */}
-                <div className="flex gap-1 p-1 bg-muted rounded-xl mb-6">
+                <div className="flex gap-1 p-1 bg-surface-alt rounded-xl mb-6">
                   {([
                     { id: 'single', label: 'Dente único' },
                     { id: 'multiple', label: 'Múltiplos' },
@@ -1035,8 +1051,8 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                       onClick={() => handleModeChange(id)}
                       className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-bold transition-all ${
                         selectionMode === id
-                          ? 'bg-background shadow-sm text-foreground'
-                          : 'text-muted-foreground hover:text-foreground'
+                          ? 'bg-surface-alt shadow-sm text-text-primary'
+                          : 'text-text-secondary hover:text-text-primary'
                       }`}
                     >
                       {label}
@@ -1045,37 +1061,18 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                 </div>
 
                 {selectionMode !== 'arch' ? (
-                  <div className="flex-1 flex flex-col justify-center gap-8">
-                    <div className="flex justify-center gap-1 md:gap-1.5 flex-wrap">
-                      {TEETH_UPPER.map((tooth) => (
-                        <ToothButton
-                          key={tooth}
-                          num={tooth}
-                          isSelected={selectedTeeth.includes(tooth) || sharedTeeth.includes(tooth)}
-                          isShared={sharedTeeth.includes(tooth)}
-                          isUpper={true}
-                          showCheckbox={selectionMode === 'multiple'}
-                          onClick={() => toggleTooth(tooth)}
-                        />
-                      ))}
-                    </div>
-                    <div className="flex justify-center gap-1 md:gap-1.5 flex-wrap">
-                      {TEETH_LOWER.map((tooth) => (
-                        <ToothButton
-                          key={tooth}
-                          num={tooth}
-                          isSelected={selectedTeeth.includes(tooth) || sharedTeeth.includes(tooth)}
-                          isShared={sharedTeeth.includes(tooth)}
-                          isUpper={false}
-                          showCheckbox={selectionMode === 'multiple'}
-                          onClick={() => toggleTooth(tooth)}
-                        />
-                      ))}
-                    </div>
+                  <div className="flex-1 flex flex-col justify-center">
+                    <Odontograma
+                      selectedTeeth={selectedTeeth}
+                      sharedTeeth={sharedTeeth}
+                      historicalTeeth={historicalTeeth}
+                      onToothToggle={toggleTooth}
+                      showCheckbox={selectionMode === 'multiple'}
+                    />
                   </div>
                 ) : (
                   <div className="flex-1 flex flex-col justify-center gap-3">
-                    <p className="text-xs text-muted-foreground text-center mb-1">
+                    <p className="text-xs text-text-secondary text-center mb-1">
                       Selecione a área afetada pelo procedimento
                     </p>
                     {[
@@ -1089,11 +1086,11 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                         className={`w-full px-4 py-3 rounded-xl text-sm font-semibold border-2 transition-all flex items-center justify-between ${
                           selectedTeeth.includes(id)
                             ? 'bg-teal border-teal text-white'
-                            : 'bg-muted border-border text-foreground hover:border-teal hover:text-teal'
+                            : 'bg-surface-alt border-border text-text-primary hover:border-teal hover:text-teal'
                         }`}
                       >
                         <span>{label}</span>
-                        <span className={`text-[10px] font-normal ${selectedTeeth.includes(id) ? 'text-white/70' : 'text-muted-foreground'}`}>
+                        <span className={`text-[10px] font-normal ${selectedTeeth.includes(id) ? 'text-white/70' : 'text-text-secondary'}`}>
                           {sub}
                         </span>
                       </button>
@@ -1101,11 +1098,11 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                   </div>
                 )}
 
-                <div className="mt-6 text-center text-xs text-muted-foreground font-medium">
-                  {selectionMode === 'single' && 'Clique em um dente para adicionar observações.'}
-                  {selectionMode === 'multiple' && 'Clique em vários dentes para marcar juntos.'}
-                  {selectionMode === 'arch' && 'Procedimentos em toda a arcada ou boca.'}
-                </div>
+                {selectionMode === 'arch' && (
+                  <div className="mt-4 text-center text-xs text-text-secondary font-medium">
+                    Procedimentos em toda a arcada ou boca.
+                  </div>
+                )}
               </div>
             </div>
           </motion.div>
@@ -1114,9 +1111,9 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
 
       {/* Timeline */}
       {evolutions.length === 0 && !isPanelOpen && (
-        <div className="bg-card rounded-2xl border border-border p-12 text-center">
-          <FileText className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-muted-foreground text-sm">
+        <div className="bg-surface rounded-2xl border border-border p-12 text-center">
+          <FileText className="w-10 h-10 text-text-secondary/30 mx-auto mb-3" />
+          <p className="text-text-secondary text-sm">
             Nenhuma evolução registrada. Clique em &ldquo;Nova Evolução&rdquo; para começar.
           </p>
         </div>
@@ -1137,9 +1134,9 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: idx * 0.05 }}
-            className="relative pl-12 group"
+            className="relative pl-10 sm:pl-12 group"
           >
-            <div className={`absolute left-0 top-1 w-10 h-10 rounded-full bg-card border-2 flex items-center justify-center z-10 shadow-sm group-hover:scale-110 transition-transform ${allDone ? 'border-emerald-500' : 'border-teal'}`}>
+            <div className={`absolute left-0 top-1 w-10 h-10 rounded-full bg-surface border-2 flex items-center justify-center z-10 shadow-sm group-hover:scale-110 transition-transform ${allDone ? 'border-emerald-500' : 'border-teal'}`}>
               {allDone
                 ? <Check className="w-4 h-4 text-emerald-500" />
                 : <div className="w-2 h-2 rounded-full bg-teal" />
@@ -1147,23 +1144,23 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
             </div>
 
             <div
-              className="bg-card rounded-2xl border border-border/60 shadow-sm p-6 hover:shadow-md transition-all"
+              className="bg-surface rounded-2xl border border-border/60 shadow-sm p-6 hover:shadow-md transition-all"
               style={allDone ? { boxShadow: '-3px 0 0 0 #10b981, 0 1px 3px rgba(0,0,0,0.06)' } : undefined}
             >
-              <div className="flex justify-between items-start mb-4">
-                <div className="space-y-1">
+              <div className="flex flex-wrap justify-between items-start mb-4 gap-2">
+                <div className="space-y-1 min-w-0">
                   <div className="flex items-center gap-3 flex-wrap">
                     <span className="bg-teal/10 text-teal px-2.5 py-1 rounded-md text-[9px] font-bold uppercase tracking-widest">
                       {evo.type}
                     </span>
-                    <h4 className="text-sm font-bold text-foreground">{evo.date}</h4>
+                    <h4 className="text-sm font-bold text-text-primary">{evo.date}</h4>
                     {totalProcs > 0 && (
                       <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold border ${allDone ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/20'}`}>
                         {allDone ? '✓ Concluído' : `${doneProcs}/${totalProcs} realizados`}
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-medium">
+                  <div className="flex items-center gap-2 text-[10px] text-text-secondary font-medium">
                     <User className="w-3 h-3" /> {evo.professional}
                   </div>
                 </div>
@@ -1177,7 +1174,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                   ) : (
                     <button
                       onClick={() => setSigningFichaId(evo.id)}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold border border-border text-muted-foreground hover:border-teal hover:text-teal transition-colors"
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 min-h-[36px] rounded-lg text-[10px] font-bold border border-border text-text-secondary hover:border-teal hover:text-teal transition-colors"
                     >
                       <PenLine className="w-3 h-3" />
                       Assinar
@@ -1186,7 +1183,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
 
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <button className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground">
+                      <button className="p-2 hover:bg-surface-alt rounded-lg transition-colors text-text-secondary hover:text-text-primary">
                         <MoreVertical className="w-4 h-4" />
                       </button>
                     </DropdownMenuTrigger>
@@ -1194,6 +1191,10 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                       <DropdownMenuItem onClick={() => handleEdit(evo)}>
                         <Edit2 className="w-3 h-3" /> Editar
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => window.open(`/api/fichas/${evo.id}/pdf`, '_blank')}>
+                        <Download className="w-3 h-3" /> Imprimir Ficha
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
                       <DropdownMenuItem
                         onClick={() => setShowDeleteConfirm(evo.id)}
                         className="text-red-500 focus:text-red-500"
@@ -1206,7 +1207,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
               </div>
 
               {evo.observation && (
-                <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+                <p className="text-sm text-text-secondary leading-relaxed mb-4">
                   {evo.observation}
                 </p>
               )}
@@ -1216,7 +1217,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                   {evo.teethNotes.map((tn) => (
                     <div
                       key={tn.tooth}
-                      className="bg-muted rounded-lg border border-border/40 px-3 py-2"
+                      className="bg-surface-alt rounded-lg border border-border/40 px-3 py-2"
                     >
                       <span className="font-mono text-[10px] font-bold text-teal block mb-1.5">
                         {tn.tooth in ARCH_LABELS ? ARCH_LABELS[tn.tooth] : `D${tn.tooth}`}
@@ -1234,7 +1235,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                               <div className={`w-4 h-4 rounded border shrink-0 flex items-center justify-center transition-all ${done ? 'bg-emerald-500 border-emerald-500' : 'border-border group-hover/proc:border-teal'}`}>
                                 {done && <Check className="w-2.5 h-2.5 text-white" />}
                               </div>
-                              <span className={`text-[11px] font-medium transition-all ${done ? 'line-through text-muted-foreground' : 'text-foreground group-hover/proc:text-teal'}`}>
+                              <span className={`text-[11px] font-medium transition-all ${done ? 'line-through text-text-secondary' : 'text-text-primary group-hover/proc:text-teal'}`}>
                                 {n}
                               </span>
                             </button>
@@ -1251,7 +1252,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                   {evo.files.map((f, i) => (
                     <div
                       key={i}
-                      className="flex items-center gap-2 px-3 py-2 bg-muted rounded-xl border border-border/40 text-[10px] font-bold text-foreground"
+                      className="flex items-center gap-2 px-3 py-2 bg-surface-alt rounded-xl border border-border/40 text-[10px] font-bold text-text-primary"
                     >
                       <FileText className="w-3 h-3 text-teal" /> {f}
                     </div>
@@ -1274,27 +1275,27 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
           }
         }}
       >
-        <DialogContent className="max-w-lg rounded-2xl bg-card border-border max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg rounded-2xl bg-surface border-border max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="font-heading text-xl text-foreground flex items-center gap-2">
+            <DialogTitle className="font-heading text-xl text-text-primary flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-teal" />
               Orçamento sugerido pela IA
             </DialogTitle>
-            <DialogDescription className="text-muted-foreground text-sm">
+            <DialogDescription className="text-text-secondary text-sm">
               Com base na evolução registrada, identifiquei os seguintes procedimentos.
               Ajuste os valores e confirme para criar o rascunho de orçamento.
             </DialogDescription>
           </DialogHeader>
 
           {isDexAnalyzing ? (
-            <div className="py-10 flex flex-col items-center gap-3 text-muted-foreground">
+            <div className="py-10 flex flex-col items-center gap-3 text-text-secondary">
               <Loader2 className="w-7 h-7 animate-spin text-teal" />
               <p className="text-sm font-medium">Analisando procedimentos...</p>
             </div>
           ) : orcamentoSugerido && (
             <div className="space-y-3 my-2">
               {orcamentoSugerido.map((item, idx) => (
-                <div key={idx} className="bg-muted rounded-xl border border-border/60 p-3 space-y-2">
+                <div key={idx} className="bg-surface-alt rounded-xl border border-border/60 p-3 space-y-2">
                   <input
                     type="text"
                     value={item.descricao}
@@ -1303,11 +1304,11 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                         prev?.map((it, i) => i === idx ? { ...it, descricao: e.target.value } : it) ?? null
                       )
                     }
-                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:border-teal transition-colors"
+                    className="w-full bg-surface-alt border border-border rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-teal transition-colors"
                   />
                   <div className="flex gap-2">
                     <div className="space-y-0.5">
-                      <label className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">
+                      <label className="text-[10px] text-text-secondary font-bold uppercase tracking-wider">
                         Qtd
                       </label>
                       <input
@@ -1321,11 +1322,11 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                             ) ?? null
                           )
                         }
-                        className="w-16 bg-background border border-border rounded-lg px-2 py-2 text-sm font-mono text-foreground outline-none focus:border-teal"
+                        className="w-16 bg-surface-alt border border-border rounded-lg px-2 py-2 text-sm font-mono text-text-primary outline-none focus:border-teal"
                       />
                     </div>
                     <div className="space-y-0.5 flex-1">
-                      <label className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">
+                      <label className="text-[10px] text-text-secondary font-bold uppercase tracking-wider">
                         Valor (R$)
                       </label>
                       <input
@@ -1340,14 +1341,14 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                             ) ?? null
                           )
                         }
-                        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm font-mono text-foreground outline-none focus:border-teal"
+                        className="w-full bg-surface-alt border border-border rounded-lg px-3 py-2 text-sm font-mono text-text-primary outline-none focus:border-teal"
                       />
                     </div>
                   </div>
                 </div>
               ))}
               <div className="bg-teal/10 rounded-xl p-3 flex justify-between items-center border border-teal/20">
-                <span className="text-sm font-bold text-foreground">Total estimado</span>
+                <span className="text-sm font-bold text-text-primary">Total estimado</span>
                 <span className="font-mono font-bold text-teal">
                   {orcamentoSugerido
                     .reduce((s, i) => s + i.quantidade * i.preco, 0)
@@ -1362,7 +1363,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
               variant="outline"
               onClick={() => setOrcamentoSugerido(null)}
               disabled={criandoOrcamento || isDexAnalyzing}
-              className="rounded-xl border-border text-foreground hover:bg-muted"
+              className="rounded-xl border-border text-text-primary hover:bg-surface-alt"
             >
               Ignorar
             </Button>
@@ -1383,13 +1384,13 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
 
       {/* Dialog: Assinatura do Paciente */}
       <Dialog open={!!signingFichaId} onOpenChange={(open) => { if (!open) setSigningFichaId(null); }}>
-        <DialogContent className="max-w-md rounded-2xl bg-card border-border">
+        <DialogContent className="max-w-md rounded-2xl bg-surface border-border">
           <DialogHeader>
-            <DialogTitle className="font-heading text-xl text-foreground flex items-center gap-2">
+            <DialogTitle className="font-heading text-xl text-text-primary flex items-center gap-2">
               <PenLine className="w-5 h-5 text-teal" />
               Assinatura do Paciente
             </DialogTitle>
-            <DialogDescription className="text-muted-foreground text-sm">
+            <DialogDescription className="text-text-secondary text-sm">
               Vire a tela para o paciente e peça que assine com o dedo ou mouse.
             </DialogDescription>
           </DialogHeader>
@@ -1401,7 +1402,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
               variant="outline"
               onClick={() => setSigningFichaId(null)}
               disabled={isSavingSignature}
-              className="rounded-xl border-border text-foreground hover:bg-muted"
+              className="rounded-xl border-border text-text-primary hover:bg-surface-alt"
             >
               Cancelar
             </Button>
@@ -1435,13 +1436,13 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="relative bg-card rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center border border-border/40"
+              className="relative bg-surface rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center border border-border/40"
             >
               <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
                 <Trash2 className="w-8 h-8 text-red-500" />
               </div>
-              <h3 className="font-heading text-2xl text-foreground mb-2">Excluir Evolução?</h3>
-              <p className="text-muted-foreground text-sm mb-8">
+              <h3 className="font-heading text-2xl text-text-primary mb-2">Excluir Evolução?</h3>
+              <p className="text-text-secondary text-sm mb-8">
                 Esta ação não pode ser desfeita. O registro será removido permanentemente.
               </p>
               <div className="flex gap-3">
@@ -1467,42 +1468,3 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
   );
 }
 
-function ToothButton({
-  num,
-  isSelected,
-  isShared,
-  isUpper,
-  showCheckbox,
-  onClick,
-}: {
-  num: number;
-  isSelected: boolean;
-  isShared: boolean;
-  isUpper: boolean;
-  showCheckbox: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`relative w-9 h-11 md:w-10 md:h-12 border-2 flex items-center justify-center font-mono text-[10px] md:text-xs font-bold transition-all active:scale-95 ${
-        isUpper ? "rounded-t-md rounded-b-sm" : "rounded-b-md rounded-t-sm"
-      } ${
-        isShared
-          ? "bg-teal/20 border-teal text-teal shadow-md scale-110 z-10"
-          : isSelected
-          ? "bg-teal border-teal text-white shadow-md scale-110 z-10"
-          : "bg-muted border-border text-muted-foreground hover:border-teal hover:text-teal"
-      }`}
-    >
-      {num}
-      {showCheckbox && (
-        <div
-          className={`absolute top-0.5 right-0.5 w-2 h-2 rounded-sm border transition-all ${
-            isShared ? 'bg-teal border-teal' : isSelected ? 'bg-white border-white' : 'border-muted-foreground/50'
-          }`}
-        />
-      )}
-    </button>
-  );
-}

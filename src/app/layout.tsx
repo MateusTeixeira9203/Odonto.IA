@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 
-const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
+const geist = Geist({ subsets: ['latin'], variable: '--font-geist' });
 
 const dmSerif = DM_Serif_Display({
   weight: ['400'],
@@ -26,7 +26,7 @@ const dmMono = DM_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Dent IA | Inteligência Odontológica',
+  title: 'Odonto.IA | Inteligência Odontológica',
   description: 'Micro-SaaS odontológico para dentistas.',
 };
 

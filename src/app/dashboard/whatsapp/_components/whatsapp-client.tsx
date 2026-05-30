@@ -251,7 +251,6 @@ export function WhatsAppClient({ initialConversas, clinicaId }: Props) {
 
     const resultado = await enviarMensagemManual(
       conversaSelecionada.id,
-      clinicaId,
       conversaSelecionada.telefone,
       conteudo,
     );

@@ -1,21 +1,30 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  ArrowLeft, Clock, FileText,
-  CreditCard, ChevronDown, ChevronUp, Loader2,
-  Check, Edit2, X, Mic, MicOff, Bot, Sparkles,
+  ArrowLeft,
+  Loader2,
+  Check, Edit2, X, Mic, MicOff, Bot, Play,
 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { toast } from 'sonner';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
+import { salvarFichaConsulta, iniciarAtendimentoConsulta, finalizarConsulta } from '../actions';
 import type { EvolucaoFormatada } from '@/app/api/dex/formatar-evolucao/route';
+import { ConsultationSidebar } from './consultation-sidebar';
+import { FinalizeConsultationDialog } from './finalize-consultation-dialog';
+import { BotaoMensagemIA } from '@/components/orcamentos/botao-mensagem-ia';
 
-// ── Odontograma simplificado ─────────────────────────────────────────────────
+// ── Odontograma premium ──────────────────────────────────────────────────────
 
 const TEETH_UPPER = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
 const TEETH_LOWER = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
+
+const TOOTH_W: Record<number, string> = {
+  1: 'w-6', 2: 'w-6', 3: 'w-6', 4: 'w-7', 5: 'w-7', 6: 'w-8', 7: 'w-8', 8: 'w-8',
+};
+const tw = (t: number) => TOOTH_W[t % 10] ?? 'w-7';
 
 function MiniOdontograma({
   selected,
@@ -27,32 +36,48 @@ function MiniOdontograma({
   const toggle = (t: number) =>
     onChange(selected.includes(t) ? selected.filter(x => x !== t) : [...selected, t]);
 
-  const ToothBtn = ({ t }: { t: number }) => {
-    const active = selected.includes(t);
-    return (
-      <button
-        onClick={() => toggle(t)}
-        className="w-7 h-7 rounded-md text-[10px] font-mono font-semibold transition-all hover:scale-105 active:scale-95"
-        style={{
-          background: active ? '#2f9c85' : '#f5f3ef',
-          color: active ? '#fff' : '#8a8a8a',
-          border: `1px solid ${active ? '#2f9c85' : '#d4d1ca'}`,
-          boxShadow: active ? '0 2px 6px rgba(47,156,133,0.30)' : 'none',
-        }}
-      >
-        {t}
-      </button>
-    );
-  };
-
   return (
-    <div className="space-y-2">
-      <div className="flex gap-1 flex-wrap justify-center">
-        {TEETH_UPPER.map(t => <ToothBtn key={t} t={t} />)}
+    <div className="space-y-1">
+      {/* Upper row */}
+      <div className="flex justify-center items-end gap-0.5">
+        {TEETH_UPPER.map((t, i) => {
+          const active = selected.includes(t);
+          return (
+            <div key={t} className="flex items-end">
+              {i === 8 && <div className="w-px h-6 bg-border mx-0.5 self-stretch" />}
+              <button
+                onClick={() => toggle(t)}
+                title={`Dente ${t}`}
+                className={`${tw(t)} h-8 rounded-t-md rounded-b-[2px] border text-[9px] font-mono font-bold transition-all hover:scale-105 active:scale-95 ${
+                  active
+                    ? 'bg-teal border-teal text-white -translate-y-1 shadow-[0_3px_8px_rgba(47,156,133,0.4)]'
+                    : 'bg-surface-alt border-border text-text-secondary hover:border-teal/50 hover:text-teal hover:bg-teal/5'
+                }`}
+              >{t}</button>
+            </div>
+          );
+        })}
       </div>
-      <div className="h-px bg-border mx-2" />
-      <div className="flex gap-1 flex-wrap justify-center">
-        {TEETH_LOWER.map(t => <ToothBtn key={t} t={t} />)}
+      <div className="h-px bg-border/60" />
+      {/* Lower row */}
+      <div className="flex justify-center items-start gap-0.5">
+        {TEETH_LOWER.map((t, i) => {
+          const active = selected.includes(t);
+          return (
+            <div key={t} className="flex items-start">
+              {i === 8 && <div className="w-px h-6 bg-border mx-0.5 self-stretch" />}
+              <button
+                onClick={() => toggle(t)}
+                title={`Dente ${t}`}
+                className={`${tw(t)} h-8 rounded-b-md rounded-t-[2px] border text-[9px] font-mono font-bold transition-all hover:scale-105 active:scale-95 ${
+                  active
+                    ? 'bg-teal border-teal text-white translate-y-1 shadow-[0_-3px_8px_rgba(47,156,133,0.4)]'
+                    : 'bg-surface-alt border-border text-text-secondary hover:border-teal/50 hover:text-teal hover:bg-teal/5'
+                }`}
+              >{t}</button>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -84,14 +109,18 @@ interface ConsultaClientProps {
   agendamentoId: string;
   paciente: Paciente;
   hora: string;
-  procedimento: string | null;
   observacoesAgendamento: string | null;
   ultimaQueixa: string | null;
   ultimasAnotacoes: string | null;
   fichas: Ficha[];
   orcamentos: Orcamento[];
-  dentistaId: string;
-  clinicaId: string;
+  agendamentoStatus: string;
+  alertasClinicos: string[];
+  planejamento: {
+    id: string;
+    titulo: string;
+    etapas: { id: string; titulo: string; dente: string | null; descricao_simples: string | null; status: string; ordem: number }[];
+  } | null;
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -100,14 +129,14 @@ export function ConsultaClient({
   agendamentoId,
   paciente,
   hora,
-  procedimento,
   observacoesAgendamento,
   ultimaQueixa,
   ultimasAnotacoes,
   fichas,
   orcamentos,
-  dentistaId,
-  clinicaId,
+  agendamentoStatus,
+  alertasClinicos,
+  planejamento,
 }: ConsultaClientProps) {
   const router = useRouter();
   const [textoLivre, setTextoLivre] = useState('');
@@ -115,25 +144,16 @@ export function ConsultaClient({
   const [evolucao, setEvolucao] = useState<EvolucaoFormatada | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [fichasExpanded, setFichasExpanded] = useState(false);
-  const [briefing, setBriefing] = useState<string | null>(null);
-  const [briefingLoading, setBriefingLoading] = useState(true);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [isFinalizando, setIsFinalizando] = useState(false);
+  const [aptStatus, setAptStatus] = useState(agendamentoStatus);
+  const [isIniciando, setIsIniciando] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const { status: micStatus, startRecording, stopRecording } = useAudioRecorder();
 
   const firstName = paciente.nome.split(' ')[0];
-
-  // Gera briefing IA automaticamente ao entrar no modo consulta
-  useEffect(() => {
-    setBriefingLoading(true);
-    fetch(`/api/dex/briefing?agendamentoId=${agendamentoId}`)
-      .then(r => r.json() as Promise<{ briefing?: string }>)
-      .then(d => setBriefing(d.briefing ?? null))
-      .catch(() => setBriefing(null))
-      .finally(() => setBriefingLoading(false));
-  }, [agendamentoId]);
 
   const handleVoice = useCallback(async () => {
     if (micStatus === 'recording') {
@@ -178,31 +198,60 @@ export function ConsultaClient({
   const handleSalvar = async () => {
     if (!evolucao) return;
     setIsSaving(true);
-    try {
-      const supabase = createClient();
-      const { error } = await supabase.from('fichas').insert({
-        clinica_id: clinicaId,
-        paciente_id: paciente.id,
-        dentista_id: dentistaId,
-        queixa_principal: evolucao.queixa_principal,
-        anotacoes: evolucao.anotacoes,
-        dentes_afetados: evolucao.dentes_afetados,
-        dentes_observacoes: evolucao.dentes_observacoes,
-        status: 'concluida',
-      });
-      if (error) throw error;
-
-      await supabase
-        .from('agendamentos')
-        .update({ status: 'realizado' })
-        .eq('id', agendamentoId);
-
-      setSaved(true);
-      setTimeout(() => router.push(`/dashboard/pacientes/${paciente.id}`), 1800);
-    } catch (err) {
-      console.error('[consulta] salvar ficha:', err);
+    const result = await salvarFichaConsulta({
+      agendamentoId,
+      pacienteId: paciente.id,
+      queixa_principal: evolucao.queixa_principal,
+      anotacoes: evolucao.anotacoes,
+      dentes_afetados: evolucao.dentes_afetados,
+      dentes_observacoes: evolucao.dentes_observacoes,
+    });
+    if (result.error) {
+      toast.error(result.error);
       setIsSaving(false);
+      return;
     }
+    setSaved(true);
+    setTimeout(() => router.push(`/dashboard/pacientes/${paciente.id}`), 1800);
+  };
+
+  const handleIniciarAtendimento = async () => {
+    setIsIniciando(true);
+    const result = await iniciarAtendimentoConsulta(agendamentoId);
+    if (result.error) {
+      toast.error(result.error);
+    } else {
+      setAptStatus('in_progress');
+      toast.success('Atendimento iniciado!');
+    }
+    setIsIniciando(false);
+  };
+
+  const handleFinalizar = async (wizardData: {
+    resumo: string;
+    conduta: string;
+    proximosPassos: string;
+    followUpData: string;
+  }) => {
+    if (!evolucao) return;
+    setIsFinalizando(true);
+    const result = await finalizarConsulta({
+      agendamentoId,
+      pacienteId: paciente.id,
+      queixa_principal: evolucao.queixa_principal,
+      anotacoes: evolucao.anotacoes,
+      dentes_afetados: evolucao.dentes_afetados,
+      dentes_observacoes: evolucao.dentes_observacoes,
+      ...wizardData,
+    });
+    if (result.error) {
+      toast.error(result.error);
+      setIsFinalizando(false);
+      return;
+    }
+    setWizardOpen(false);
+    setSaved(true);
+    setTimeout(() => router.push(`/dashboard/pacientes/${paciente.id}`), 1800);
   };
 
   return (
@@ -229,168 +278,57 @@ export function ConsultaClient({
           <span className="font-mono text-xs text-text-secondary bg-surface-alt px-2 py-0.5 rounded-md">{hora}</span>
         </div>
 
-        <div className="w-24" />
+        <div className="flex items-center gap-3">
+          {/* Iniciar Atendimento — dentista/admin only, only when not yet in_progress */}
+          {aptStatus !== 'in_progress' && aptStatus !== 'completed' && (
+            <button
+              onClick={() => void handleIniciarAtendimento()}
+              disabled={isIniciando}
+              className="px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all flex items-center gap-2"
+              style={{ background: '#2f9c85', boxShadow: '0 2px 12px rgba(47,156,133,0.25)' }}
+            >
+              {isIniciando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+              Iniciar Atendimento
+            </button>
+          )}
+          {aptStatus === 'in_progress' && (
+            <span className="text-[11px] font-bold px-3 py-1.5 rounded-full bg-teal text-white uppercase tracking-wider">
+              Em Atendimento
+            </span>
+          )}
+          {(aptStatus === 'in_progress' || aptStatus === 'completed') && (
+            <BotaoMensagemIA
+              variant="icon"
+              pacienteNome={paciente.nome}
+              dentistaNome=""
+              dataHora={hora}
+              defaultTipo="follow_up"
+            />
+          )}
+          <div className="w-4" />
+        </div>
       </header>
 
       {/* Body */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-col md:flex-row flex-1 md:overflow-hidden">
 
-        {/* ── Coluna esquerda: Briefing + dados do paciente ─────────────── */}
-        <aside className="w-80 shrink-0 border-r border-border bg-surface overflow-y-auto flex flex-col">
-
-          {/* Paciente */}
-          <div className="p-5 border-b border-border">
-            <div className="font-heading text-xl text-text-primary mb-0.5">{paciente.nome}</div>
-            {paciente.idadeStr && (
-              <div className="text-xs text-text-secondary font-medium">{paciente.idadeStr}</div>
-            )}
-            {procedimento && (
-              <div className="mt-2 text-xs bg-teal-pale text-teal px-2.5 py-1 rounded-lg font-semibold w-fit">
-                {procedimento}
-              </div>
-            )}
-          </div>
-
-          {/* Última consulta */}
-          {(ultimaQueixa || ultimasAnotacoes) && (
-            <div className="p-4 border-b border-border">
-              <div className="flex items-center gap-2 mb-2">
-                <Clock className="w-3.5 h-3.5 text-text-secondary shrink-0" />
-                <span className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">Última consulta</span>
-              </div>
-              {ultimaQueixa && (
-                <p className="text-xs font-semibold text-text-primary mb-1">{ultimaQueixa}</p>
-              )}
-              {ultimasAnotacoes && (
-                <p className="text-xs text-text-secondary leading-relaxed line-clamp-4">{ultimasAnotacoes}</p>
-              )}
-            </div>
-          )}
-
-          {/* Briefing DEX */}
-          <div className="p-4 border-b border-border">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
-                style={{ background: '#2f9c85' }}>
-                <Bot className="w-3 h-3 text-white" />
-              </div>
-              <span className="text-[10px] font-bold text-teal uppercase tracking-widest flex items-center gap-1">
-                Briefing DEX
-                {!briefingLoading && briefing && <Sparkles className="w-3 h-3" />}
-              </span>
-            </div>
-            {briefingLoading ? (
-              <div className="flex items-center gap-2 text-xs text-text-secondary py-1">
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                Gerando briefing...
-              </div>
-            ) : briefing ? (
-              <p className="text-xs text-text-secondary leading-relaxed whitespace-pre-line">{briefing}</p>
-            ) : (
-              <p className="text-xs text-text-secondary italic">Não foi possível gerar o briefing.</p>
-            )}
-          </div>
-
-          {/* Motivo da consulta */}
-          {observacoesAgendamento && (
-            <div className="p-4 border-b border-border">
-              <div className="flex items-center gap-2 mb-1.5">
-                <Clock className="w-3.5 h-3.5 text-text-secondary" />
-                <span className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">Motivo</span>
-              </div>
-              <p className="text-xs text-text-secondary leading-relaxed">{observacoesAgendamento}</p>
-            </div>
-          )}
-
-          {/* Observações do paciente */}
-          {paciente.observacoes && (
-            <div className="p-4 border-b border-border">
-              <div className="flex items-center gap-2 mb-1.5">
-                <FileText className="w-3.5 h-3.5 text-text-secondary" />
-                <span className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">Observações</span>
-              </div>
-              <p className="text-xs text-text-secondary leading-relaxed">{paciente.observacoes}</p>
-            </div>
-          )}
-
-          {/* Histórico de fichas */}
-          <div className="p-4 border-b border-border">
-            <button
-              onClick={() => setFichasExpanded(v => !v)}
-              className="flex items-center justify-between w-full"
-            >
-              <div className="flex items-center gap-2">
-                <FileText className="w-3.5 h-3.5 text-text-secondary" />
-                <span className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">
-                  Histórico ({fichas.length})
-                </span>
-              </div>
-              {fichasExpanded
-                ? <ChevronUp className="w-3.5 h-3.5 text-text-secondary" />
-                : <ChevronDown className="w-3.5 h-3.5 text-text-secondary" />}
-            </button>
-            <AnimatePresence>
-              {fichasExpanded && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="overflow-hidden"
-                >
-                  <div className="mt-3 space-y-3">
-                    {fichas.length === 0 && (
-                      <p className="text-xs text-text-secondary italic">Nenhuma consulta anterior.</p>
-                    )}
-                    {fichas.map((f, i) => (
-                      <div key={i} className="bg-surface-alt rounded-xl p-3">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-[10px] font-mono text-text-secondary">{f.data}</span>
-                          {f.dentes.length > 0 && (
-                            <span className="text-[10px] font-mono text-teal">{f.dentes.join(', ')}</span>
-                          )}
-                        </div>
-                        {f.queixa && <p className="text-xs font-semibold text-text-primary mb-0.5">{f.queixa}</p>}
-                        {f.anotacoes && <p className="text-xs text-text-secondary leading-relaxed line-clamp-3">{f.anotacoes}</p>}
-                      </div>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* Orçamentos */}
-          {orcamentos.length > 0 && (
-            <div className="p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <CreditCard className="w-3.5 h-3.5 text-text-secondary" />
-                <span className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">Orçamentos</span>
-              </div>
-              <div className="space-y-2">
-                {orcamentos.map((o, i) => (
-                  <div key={i} className="bg-surface-alt rounded-xl p-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-mono text-sm font-bold text-text-primary">
-                        R$ {o.total.toFixed(2).replace('.', ',')}
-                      </span>
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${
-                        o.status === 'aprovado' ? 'bg-teal-pale text-teal' : 'bg-surface-alt text-text-secondary border border-border'
-                      }`}>
-                        {o.status}
-                      </span>
-                    </div>
-                    {o.itens.length > 0 && (
-                      <p className="text-xs text-text-secondary line-clamp-2">{o.itens.join(', ')}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </aside>
+        {/* ── Coluna esquerda: Sidebar ──────────────────────────────────── */}
+        <ConsultationSidebar
+          agendamentoId={agendamentoId}
+          pacienteNome={paciente.nome}
+          idadeStr={paciente.idadeStr}
+          observacoes={paciente.observacoes}
+          observacoesAgendamento={observacoesAgendamento}
+          ultimaQueixa={ultimaQueixa}
+          ultimasAnotacoes={ultimasAnotacoes}
+          fichas={fichas}
+          orcamentos={orcamentos}
+          alertasClinicos={alertasClinicos}
+          planejamento={planejamento}
+        />
 
         {/* ── Coluna direita: Escrita livre / Evolução ──────────────────── */}
-        <main className="flex-1 flex flex-col p-6 overflow-y-auto">
+        <main className="flex-1 flex flex-col p-4 md:p-6 overflow-y-auto min-h-0">
           <AnimatePresence mode="wait">
 
             {/* ── Texto livre ── */}
@@ -604,17 +542,26 @@ export function ConsultaClient({
                   </div>
                 )}
 
-                {/* Salvar */}
+                {/* Finalizar Consulta */}
+                <button
+                  onClick={() => setWizardOpen(true)}
+                  disabled={isSaving || isFinalizando}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-40"
+                  style={{ background: '#2f9c85', color: '#fff', boxShadow: '0 2px 12px rgba(47,156,133,0.30)' }}
+                >
+                  {(isSaving || isFinalizando)
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Salvando...</>
+                    : <><Check className="w-4 h-4" /> Finalizar Consulta</>
+                  }
+                </button>
+
+                {/* Salvar simples (fallback) */}
                 <button
                   onClick={() => void handleSalvar()}
-                  disabled={isSaving}
-                  className="w-full py-3.5 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-                  style={{ background: '#2f9c85', color: '#fff', boxShadow: '0 4px 16px rgba(47,156,133,0.35)' }}
+                  disabled={isSaving || isFinalizando}
+                  className="w-full py-3.5 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50 text-text-secondary hover:text-text-primary border border-border bg-transparent"
                 >
-                  {isSaving
-                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Salvando...</>
-                    : <><Check className="w-4 h-4" /> Salvar na ficha clínica</>
-                  }
+                  Salvar sem resumo
                 </button>
               </motion.div>
             )}
@@ -622,6 +569,13 @@ export function ConsultaClient({
           </AnimatePresence>
         </main>
       </div>
+
+      <FinalizeConsultationDialog
+        open={wizardOpen}
+        onOpenChange={setWizardOpen}
+        onFinalize={handleFinalizar}
+        isSaving={isFinalizando}
+      />
     </div>
   );
 }

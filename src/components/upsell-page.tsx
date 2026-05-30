@@ -72,8 +72,8 @@ export function UpsellPage({
               <Sparkles className="w-3 h-3" />
               Plano {config.label}
             </div>
-            <h2 className="font-heading text-3xl text-foreground">{featureName}</h2>
-            <p className="text-muted-foreground text-sm leading-relaxed max-w-sm mx-auto">
+            <h2 className="font-heading text-3xl text-text-primary">{featureName}</h2>
+            <p className="text-text-secondary text-sm leading-relaxed max-w-sm mx-auto">
               {featureDescription}
             </p>
           </div>
@@ -86,13 +86,10 @@ export function UpsellPage({
                 initial={{ opacity: 0, x: -12 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.15 + i * 0.06 }}
-                className="flex items-start gap-3 text-sm text-foreground"
+                className="flex items-start gap-3 text-sm text-text-primary"
               >
-                <span
-                  className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5"
-                  style={{ background: 'rgba(47,156,133,0.15)' }}
-                >
-                  <Check className="w-3 h-3" style={{ color: '#2f9c85' }} />
+                <span className="w-5 h-5 rounded-full bg-teal/15 flex items-center justify-center shrink-0 mt-0.5">
+                  <Check className="w-3 h-3 text-teal" />
                 </span>
                 {b}
               </motion.li>
@@ -101,9 +98,9 @@ export function UpsellPage({
 
           {/* Preço + CTA */}
           <div className="space-y-4 pt-2">
-            <p className="text-muted-foreground text-xs">
+            <p className="text-text-secondary text-xs">
               A partir de{' '}
-              <span className="font-mono text-foreground font-semibold text-base">
+              <span className="font-mono text-text-primary font-semibold text-base">
                 R$&nbsp;{config.preco}
               </span>
               /mês
@@ -119,7 +116,7 @@ export function UpsellPage({
               Fazer Upgrade para {config.label}
               <ArrowUpRight className="w-4 h-4" />
             </Link>
-            <p className="text-muted-foreground text-xs">
+            <p className="text-text-secondary text-xs">
               Cancele quando quiser · Sem fidelidade
             </p>
           </div>

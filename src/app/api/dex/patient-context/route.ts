@@ -1,18 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDentistaCached } from '@/lib/get-dentista';
 import { createClient } from '@/lib/supabase/server';
+import { buildPatientContext, type PatientContext } from '@/lib/ai/context';
 
-export interface DexPatientContext {
-  nome: string;
-  idade: string;
-  observacoes: string | null;
-  fichasRecentes: { data: string; queixa: string; anotacoes: string }[];
-  orcamentosAbertos: { descricao: string; total: number; status: string }[];
-}
+// Re-export so dex-widget.tsx can import DexPatientContext from this route
+export type DexPatientContext = PatientContext;
 
 /**
  * GET /api/dex/patient-context?patientId=xxx
- * Retorna resumo clínico do paciente para o DEX exibir quando aberto no perfil.
+ * Retorna resumo clínico completo do paciente para o DEX exibir quando aberto no perfil.
  */
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const dentista = await getDentistaCached();
@@ -22,65 +18,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   if (!patientId) return NextResponse.json({ error: 'patientId obrigatório' }, { status: 400 });
 
   const supabase = await createClient();
+  const ctx = await buildPatientContext(patientId, dentista.clinica_id, supabase);
 
-  const [pacienteRes, fichasRes, orcRes] = await Promise.all([
-    supabase
-      .from('pacientes')
-      .select('nome, data_nascimento, observacoes')
-      .eq('id', patientId)
-      .eq('clinica_id', dentista.clinica_id)
-      .maybeSingle(),
+  if (!ctx) return NextResponse.json({ error: 'Paciente não encontrado' }, { status: 404 });
 
-    supabase
-      .from('fichas')
-      .select('created_at, queixa_principal, anotacoes')
-      .eq('paciente_id', patientId)
-      .eq('clinica_id', dentista.clinica_id)
-      .order('created_at', { ascending: false })
-      .limit(3),
-
-    supabase
-      .from('orcamentos')
-      .select('total, status, orcamento_itens(descricao)')
-      .eq('paciente_id', patientId)
-      .eq('clinica_id', dentista.clinica_id)
-      .in('status', ['rascunho', 'enviado', 'aprovado'])
-      .order('created_at', { ascending: false })
-      .limit(3),
-  ]);
-
-  if (!pacienteRes.data) return NextResponse.json({ error: 'Paciente não encontrado' }, { status: 404 });
-
-  const p = pacienteRes.data as {
-    nome: string;
-    data_nascimento: string | null;
-    observacoes: string | null;
-  };
-
-  const idade = p.data_nascimento
-    ? `${new Date().getFullYear() - new Date(p.data_nascimento).getFullYear()} anos`
-    : 'idade não informada';
-
-  const fichasRecentes = (fichasRes.data ?? []).map((f) => ({
-    data: new Date(f.created_at as string).toLocaleDateString('pt-BR'),
-    queixa: (f.queixa_principal as string | null) ?? 'sem queixa registrada',
-    anotacoes: (f.anotacoes as string | null) ?? 'sem anotações',
-  }));
-
-  const orcamentosAbertos = (orcRes.data ?? []).map((o) => {
-    const itens = (o.orcamento_itens as { descricao: string }[] | null) ?? [];
-    return {
-      descricao: itens.map((i) => i.descricao).filter(Boolean).join(', ') || 'sem descrição',
-      total: (o.total as number) ?? 0,
-      status: o.status as string,
-    };
-  });
-
-  return NextResponse.json({
-    nome: p.nome,
-    idade,
-    observacoes: p.observacoes,
-    fichasRecentes,
-    orcamentosAbertos,
-  } satisfies DexPatientContext);
+  return NextResponse.json(ctx satisfies DexPatientContext);
 }

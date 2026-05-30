@@ -77,7 +77,7 @@ interface Props {
 export function GanhosDespesasChart({ data }: Props) {
   if (data.every(d => d.receita === 0 && d.despesas === 0)) {
     return (
-      <div className="h-48 flex items-center justify-center text-[--color-gray-md] text-sm">
+      <div className="h-48 flex items-center justify-center text-text-secondary text-sm">
         Sem dados financeiros ainda para exibir o gráfico.
       </div>
     );

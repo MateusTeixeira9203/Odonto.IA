@@ -20,10 +20,12 @@ export type AgendamentoRow = {
   created_at: string;
   paciente: { id: string; nome: string } | null;
   dentista: { id: string; nome: string } | null;
+  /** Quem criou o agendamento — null se o próprio dentista ou bot */
+  criador: { id: string; nome: string } | null;
 };
 
 interface PageProps {
-  searchParams: Promise<{ mes?: string }>;
+  searchParams: Promise<{ mes?: string; novo?: string }>;
 }
 
 export default async function AgendamentosPage({ searchParams }: PageProps) {
@@ -31,7 +33,7 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
   if (!dentista) redirect('/login');
 
   // Determinar o mês sendo visualizado (default: mês atual)
-  const { mes } = await searchParams;
+  const { mes, novo } = await searchParams;
   const mesDate =
     mes && /^\d{4}-\d{2}$/.test(mes) ? parseISO(`${mes}-01`) : new Date();
   const mesAtual = format(mesDate, 'yyyy-MM');
@@ -47,7 +49,7 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
   const query = supabase
     .from('agendamentos')
     .select(
-      'id, clinica_id, paciente_id, dentista_id, data_hora, duracao_minutos, status, origem, observacoes, created_at, paciente:pacientes(id, nome), dentista:dentistas!agendamentos_dentista_id_fkey(id, nome)'
+      'id, clinica_id, paciente_id, dentista_id, data_hora, duracao_minutos, status, origem, observacoes, created_at, paciente:pacientes(id, nome), dentista:dentistas!agendamentos_dentista_id_fkey(id, nome), criador:dentistas!agendamentos_created_by_fkey(id, nome)'
     )
     .eq('clinica_id', dentista.clinica_id)
     .gte('data_hora', inicioMes)
@@ -91,7 +93,7 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
   }
 
   // Todos os dentistas podem gerenciar a própria agenda independente do plano.
-  // Secretária cria em nome do dentista (status 'agendado', pendente de confirmação).
+  // Secretária cria em nome do dentista (status 'scheduled', pendente de confirmação).
   const canEdit = true;
 
   return (
@@ -107,6 +109,7 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
         temSecretaria={temSecretaria}
         mesAtual={mesAtual}
         canEdit={canEdit}
+        autoOpenNovo={novo === '1'}
       />
     </PageTransition>
   );

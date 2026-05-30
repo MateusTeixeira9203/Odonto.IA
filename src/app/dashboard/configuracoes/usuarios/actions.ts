@@ -1,78 +1,111 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
-import { createServiceClient } from '@/lib/supabase/service';
+import { requireRole } from '@/server/auth/roles';
 import { revalidatePath } from 'next/cache';
+import {
+  criarConvite,
+  cancelarConvite,
+  renovarConvite,
+} from '@/server/services/invites';
+import {
+  criarSecretaria,
+  removerMembro,
+  resetarSenhaSecretaria,
+} from '@/server/services/team';
 
-export async function deletarUsuario(dentistaId: string): Promise<{ success: true }> {
-  const supabase = await createClient();
-  const service = createServiceClient();
+function ctx(clinicId: string, userId: string, role: string) {
+  return { clinicId, userId, role };
+}
 
-  // Usuário autenticado
-  const { data: { user: currentUser } } = await supabase.auth.getUser();
-  if (!currentUser) throw new Error('Não autenticado');
+// ─── Convites ────────────────────────────────────────────────────────────────
 
-  // Verificar se o usuário atual é admin (busca por user_id, não por id)
-  const { data: euDentista } = await supabase
+export async function enviarConvite(
+  email: string,
+): Promise<{ ok: boolean; error?: string; link?: string }> {
+  const { clinicId, user, role } = await requireRole(['admin']);
+  const result = await criarConvite(ctx(clinicId, user.id, role), { email });
+  if (!result.ok) return result;
+  revalidatePath('/dashboard/configuracoes/usuarios');
+  return { ok: true, link: result.link };
+}
+
+export async function cancelarConviteAction(
+  conviteId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const { clinicId, user, role } = await requireRole(['admin']);
+  const result = await cancelarConvite(ctx(clinicId, user.id, role), conviteId);
+  if (result.ok) revalidatePath('/dashboard/configuracoes/usuarios');
+  return result;
+}
+
+export async function renovarConviteAction(
+  conviteId: string,
+): Promise<{ ok: boolean; error?: string; link?: string }> {
+  const { clinicId, user, role } = await requireRole(['admin']);
+  const result = await renovarConvite(ctx(clinicId, user.id, role), conviteId);
+  if (result.ok) revalidatePath('/dashboard/configuracoes/usuarios');
+  return result;
+}
+
+// ─── Secretárias ─────────────────────────────────────────────────────────────
+
+export async function criarSecretariaAction(
+  nome: string,
+  email: string,
+  telefone?: string,
+): Promise<{ ok: boolean; error?: string; senhaTemporaria?: string }> {
+  const { clinicId, user, role } = await requireRole(['admin']);
+  const result = await criarSecretaria(ctx(clinicId, user.id, role), { nome, email, telefone });
+  if (result.ok) revalidatePath('/dashboard/configuracoes/usuarios');
+  return result;
+}
+
+export async function resetarSenhaSecretariaAction(
+  secretariaUserId: string,
+): Promise<{ ok: boolean; error?: string; senhaTemporaria?: string }> {
+  const { clinicId, user, role } = await requireRole(['admin']);
+  return resetarSenhaSecretaria(ctx(clinicId, user.id, role), secretariaUserId);
+}
+
+// ─── Remoção ─────────────────────────────────────────────────────────────────
+
+export async function removerMembroAction(
+  membroUserId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const { clinicId, user, role } = await requireRole(['admin']);
+  const result = await removerMembro(ctx(clinicId, user.id, role), membroUserId);
+  if (result.ok) revalidatePath('/dashboard/configuracoes/usuarios');
+  return result;
+}
+
+/**
+ * Compat: UI ainda passa dentistaId (PK da tabela dentistas).
+ * Resolve para user_id e delega para removerMembro.
+ */
+export async function deletarUsuario(
+  dentistaId: string,
+): Promise<{ success: true }> {
+  const { clinicId, user, role, supabase } = await requireRole(['admin']);
+
+  if (role !== 'admin') throw new Error('Apenas administradores podem remover usuários.');
+
+  const { data: dentista } = await supabase
     .from('dentistas')
-    .select('id, role')
-    .eq('user_id', currentUser.id)
-    .single();
-
-  if (!euDentista || euDentista.role !== 'admin') {
-    throw new Error('Apenas administradores podem excluir usuários');
-  }
-
-  // Não permitir excluir a si mesmo
-  if (dentistaId === euDentista.id) {
-    throw new Error('Você não pode excluir sua própria conta');
-  }
-
-  // Buscar o dentista alvo (user_id é necessário para deletar do Auth)
-  const { data: alvo, error: fetchError } = await supabase
-    .from('dentistas')
-    .select('id, user_id, email, clinica_id, role')
+    .select('user_id, id')
     .eq('id', dentistaId)
+    .eq('clinica_id', clinicId)
     .single();
 
-  if (fetchError || !alvo) {
-    throw new Error('Usuário não encontrado');
-  }
+  if (!dentista) throw new Error('Usuário não encontrado.');
 
-  // Impedir excluir o único admin da clínica
-  if (alvo.role === 'admin') {
-    const { count } = await supabase
-      .from('dentistas')
-      .select('id', { count: 'exact', head: true })
-      .eq('clinica_id', alvo.clinica_id)
-      .eq('role', 'admin');
+  if (dentista.user_id === user.id) throw new Error('Você não pode se remover da clínica.');
 
-    if ((count ?? 0) <= 1) {
-      throw new Error('Não é possível excluir o único administrador da clínica');
-    }
-  }
+  const result = await removerMembro(
+    ctx(clinicId, user.id, role),
+    dentista.user_id as string,
+  );
 
-  // Remover convites pendentes associados ao email (best-effort)
-  if (alvo.email) {
-    await service
-      .from('convites')
-      .delete()
-      .eq('email', alvo.email)
-      .eq('clinica_id', alvo.clinica_id);
-  }
-
-  // Deletar da tabela dentistas (FKs de fichas/orcamentos/agendamentos/pagamentos
-  // já foram migradas para ON DELETE SET NULL em 027_dentista_fk_set_null)
-  const { error: deleteDentistaError } = await supabase
-    .from('dentistas')
-    .delete()
-    .eq('id', dentistaId);
-
-  if (deleteDentistaError) throw new Error(deleteDentistaError.message);
-
-  // Deletar do Auth via service role (usa user_id, não dentistas.id)
-  const { error: deleteAuthError } = await service.auth.admin.deleteUser(alvo.user_id);
-  if (deleteAuthError) throw new Error(deleteAuthError.message);
+  if (!result.ok) throw new Error(result.error ?? 'Erro ao remover membro.');
 
   revalidatePath('/dashboard/configuracoes/usuarios');
   return { success: true };

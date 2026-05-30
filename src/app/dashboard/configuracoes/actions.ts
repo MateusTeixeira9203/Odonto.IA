@@ -1,10 +1,27 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
-import { getDentistaCached } from "@/lib/get-dentista";
+import { requireClinicContext } from "@/server/auth/clinic";
+import { requirePermission } from "@/server/authorization/guards";
+import { revalidatePath } from "next/cache";
 
-// --- Clínica ---
+export async function salvarPerfil(data: {
+  nome: string;
+  cro: string;
+}): Promise<{ error?: string }> {
+  const { supabase, user } = await requireClinicContext();
+
+  const { error } = await supabase
+    .from('dentistas')
+    .update({ nome: data.nome.trim(), cro: data.cro.trim() || null })
+    .eq('user_id', user.id);
+
+  if (error) {
+    console.error('Erro ao salvar perfil:', error);
+    return { error: error.message };
+  }
+
+  return {};
+}
 
 export interface ClinicaFormData {
   nome_clinica: string;
@@ -15,28 +32,22 @@ export interface ClinicaFormData {
   convenios: string[];
 }
 
-/**
- * Faz upsert das configurações da clínica.
- */
 export async function salvarClinica(
   data: ClinicaFormData
 ): Promise<{ error?: string }> {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect("/login");
-
-  const supabase = await createClient();
+  const { supabase, clinicId } = await requirePermission('configuracoes');
 
   const { error } = await supabase
     .from("configuracoes_clinica")
     .upsert(
       {
-        clinica_id: dentista.clinica_id,
-        nome_clinica: data.nome_clinica,
-        telefone: data.telefone,
-        endereco: data.endereco,
+        clinica_id:       clinicId,
+        nome_clinica:     data.nome_clinica,
+        telefone:         data.telefone,
+        endereco:         data.endereco,
         formas_pagamento: data.formas_pagamento,
-        aceita_convenio: data.aceita_convenio,
-        convenios: data.convenios,
+        aceita_convenio:  data.aceita_convenio,
+        convenios:        data.convenios,
       },
       { onConflict: "clinica_id" }
     );
@@ -49,8 +60,6 @@ export async function salvarClinica(
   return {};
 }
 
-// --- Horários ---
-
 export interface HorarioDia {
   dia_semana: number;
   hora_inicio: string;
@@ -59,23 +68,24 @@ export interface HorarioDia {
   ativo: boolean;
 }
 
-/**
- * Substitui todos os horários do dentista (delete + insert).
- * Só persiste os dias marcados como ativos.
- */
 export async function salvarHorarios(
   horarios: HorarioDia[]
 ): Promise<{ error?: string }> {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect("/login");
+  const { supabase, user, clinicId } = await requireClinicContext();
 
-  const supabase = await createClient();
+  const { data: dentistaPerfil } = await supabase
+    .from("dentistas")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("clinica_id", clinicId)
+    .maybeSingle();
 
-  // Remove todos os registros existentes do dentista
+  if (!dentistaPerfil) return { error: 'Dentista não encontrado.' };
+
   const { error: deleteError } = await supabase
     .from("horarios_disponiveis")
     .delete()
-    .eq("dentista_id", dentista.id);
+    .eq("dentista_id", dentistaPerfil.id);
 
   if (deleteError) {
     console.error("Erro ao limpar horários:", deleteError);
@@ -85,13 +95,13 @@ export async function salvarHorarios(
   const linhas = horarios
     .filter((h) => h.ativo)
     .map((h) => ({
-      clinica_id: dentista.clinica_id,
-      dentista_id: dentista.id,
-      dia_semana: h.dia_semana,
-      hora_inicio: h.hora_inicio,
-      hora_fim: h.hora_fim,
+      clinica_id:        clinicId,
+      dentista_id:       dentistaPerfil.id,
+      dia_semana:        h.dia_semana,
+      hora_inicio:       h.hora_inicio,
+      hora_fim:          h.hora_fim,
       intervalo_minutos: h.intervalo_minutos,
-      ativo: true,
+      ativo:             true,
     }));
 
   if (linhas.length === 0) return {};
@@ -108,36 +118,27 @@ export async function salvarHorarios(
   return {};
 }
 
-// --- Procedimentos da clínica ---
-
 export interface ProcedimentoUpdateData {
   nome: string;
   preco_padrao: number;
   duracao_minutos: number;
 }
 
-/**
- * Atualiza nome, preço e duração de um procedimento da clínica.
- * Filtra por clinica_id obtido do servidor — nunca do cliente.
- */
 export async function atualizarProcedimento(
   id: string,
   data: ProcedimentoUpdateData
 ): Promise<{ error?: string }> {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect("/login");
-
-  const supabase = await createClient();
+  const { supabase, clinicId } = await requirePermission('configuracoes');
 
   const { error } = await supabase
     .from("procedimentos")
     .update({
-      nome: data.nome,
-      preco_padrao: data.preco_padrao,
+      nome:            data.nome,
+      preco_padrao:    data.preco_padrao,
       duracao_minutos: data.duracao_minutos,
     })
     .eq("id", id)
-    .eq("clinica_id", dentista.clinica_id);
+    .eq("clinica_id", clinicId);
 
   if (error) {
     console.error("Erro ao atualizar procedimento:", error);
@@ -147,24 +148,17 @@ export async function atualizarProcedimento(
   return {};
 }
 
-/**
- * Ativa ou desativa um procedimento da clínica.
- * Filtra por clinica_id obtido do servidor — nunca do cliente.
- */
 export async function toggleProcedimento(
   id: string,
   ativo: boolean
 ): Promise<{ error?: string }> {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect("/login");
-
-  const supabase = await createClient();
+  const { supabase, clinicId } = await requirePermission('configuracoes');
 
   const { error } = await supabase
     .from("procedimentos")
     .update({ ativo })
     .eq("id", id)
-    .eq("clinica_id", dentista.clinica_id);
+    .eq("clinica_id", clinicId);
 
   if (error) {
     console.error("Erro ao togglear procedimento:", error);
@@ -182,21 +176,14 @@ export interface NovoProcedimentoData {
   duracao_minutos: number;
 }
 
-/**
- * Cria um novo procedimento na tabela da clínica.
- * clinica_id sempre vem do servidor via getDentistaCached().
- */
 export async function criarProcedimento(
   data: NovoProcedimentoData
 ): Promise<{ error?: string }> {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect("/login");
-
-  const supabase = await createClient();
+  const { supabase, clinicId } = await requirePermission('configuracoes');
 
   const { error } = await supabase
     .from("procedimentos")
-    .insert({ ...data, clinica_id: dentista.clinica_id, ativo: true });
+    .insert({ ...data, clinica_id: clinicId, ativo: true });
 
   if (error) {
     console.error("Erro ao criar procedimento:", error);

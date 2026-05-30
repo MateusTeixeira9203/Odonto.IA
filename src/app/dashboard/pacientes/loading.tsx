@@ -7,7 +7,7 @@ export default function PacientesLoading(): React.JSX.Element {
         <Skeleton className="h-9 w-36 rounded" />
         <Skeleton className="h-10 w-40 rounded" />
       </div>
-      <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
+      <div className="bg-surface rounded-2xl border border-border shadow-sm overflow-hidden">
         <div className="p-4 border-b border-border">
           <Skeleton className="h-10 w-full max-w-md rounded-xl" />
         </div>

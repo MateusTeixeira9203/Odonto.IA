@@ -24,6 +24,10 @@ const DEMO_PACIENTE: Omit<Paciente, 'clinica_id'> = {
   estado: 'SP',
   whatsapp: null,
   observacoes: null,
+  followup_pendente: false,
+  followup_nota: null,
+  followup_em: null,
+  followup_snooze_ate: null,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 };

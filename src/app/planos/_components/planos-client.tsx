@@ -151,7 +151,7 @@ export function PlanosClient({
         {/* Erro global */}
         {errorMsg && (
           <div className="max-w-md mx-auto mt-4 px-6">
-            <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 text-sm">
+            <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-coral/10 border border-coral/20 text-coral text-sm">
               <AlertCircle className="w-4 h-4 shrink-0" />
               {errorMsg}
             </div>

@@ -1,10 +1,10 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { requireClinicContext } from "@/server/auth/clinic";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { getDentistaCached } from "@/lib/get-dentista";
 import { inserirNotificacao } from "@/lib/notificacoes";
+import { registrarLog } from "@/lib/activity-log";
 
 export type FormaPagamento =
   | "dinheiro"
@@ -16,42 +16,67 @@ export type FormaPagamento =
 
 export type StatusOrcamento = "rascunho" | "enviado" | "aprovado" | "recusado";
 
-/**
- * Atualiza o status de um orçamento (ex: rascunho → enviado → aprovado).
- * Verifica que o orçamento pertence à clínica do dentista autenticado.
- */
 export async function atualizarStatusOrcamento(
   orcamentoId: string,
   status: StatusOrcamento
 ): Promise<{ error?: string }> {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect("/login");
-  const clinicaId = dentista.clinica_id;
+  const { supabase, user, clinicId } = await requireClinicContext();
 
-  const supabase = await createClient();
+  const { data: dentistaPerfil } = await supabase
+    .from("dentistas")
+    .select("id, nome")
+    .eq("user_id", user.id)
+    .eq("clinica_id", clinicId)
+    .maybeSingle();
+
+  if (!dentistaPerfil) redirect("/onboarding");
+
+  const updateData: Record<string, unknown> = { status };
+  if (status === 'aprovado') {
+    updateData.aprovado_por_id = dentistaPerfil.id;
+    updateData.aprovado_em     = new Date().toISOString();
+  }
 
   const { error } = await supabase
     .from("orcamentos")
-    .update({ status })
+    .update(updateData)
     .eq("id", orcamentoId)
-    .eq("clinica_id", clinicaId);
+    .eq("clinica_id", clinicId);
 
   if (error) {
     console.error("Erro ao atualizar status do orçamento:", error);
-    return { error: error.message };
+    return { error: 'Não foi possível atualizar o orçamento. Tente novamente.' };
   }
 
-  if (status === 'enviado' || status === 'aprovado') {
+  if (status === 'enviado' || status === 'aprovado' || status === 'recusado') {
     const { data: orc } = await supabase
       .from('orcamentos')
       .select('paciente_id, dentista_id, total, paciente:pacientes(nome)')
       .eq('id', orcamentoId)
       .maybeSingle();
-    const pacNome = (orc?.paciente as unknown as { nome: string } | null)?.nome ?? 'paciente';
+
+    const pacNome   = (orc?.paciente as unknown as { nome: string } | null)?.nome ?? 'paciente';
+    const actionLog = status === 'aprovado' ? 'orcamento.aprovado' as const
+      : status === 'enviado' ? 'orcamento.enviado' as const
+      : 'orcamento.recusado' as const;
+
+    registrarLog(supabase, {
+      clinicaId:   clinicId,
+      actorId:     dentistaPerfil.id,
+      actorNome:   (dentistaPerfil as { id: string; nome: string }).nome,
+      pacienteId:  orc?.paciente_id as string | undefined,
+      entityType:  'orcamento',
+      entityId:    orcamentoId,
+      action:      actionLog,
+      metadata:    { paciente_nome: pacNome, status_anterior: null, status_novo: status },
+    });
+
+    if (status === 'recusado') return {};
+
     await inserirNotificacao(supabase, {
-      clinicaId:    clinicaId,
+      clinicaId:    clinicId,
       paraRole:     'secretaria',
-      deDentistaId: dentista.id,
+      deDentistaId: dentistaPerfil.id,
       tipo:         status === 'enviado' ? 'orcamento_enviado' : 'briefing',
       titulo:       status === 'enviado'
         ? `Orçamento enviado — ${pacNome}`
@@ -62,7 +87,6 @@ export async function atualizarStatusOrcamento(
       href:         '/dashboard/orcamentos',
     });
 
-    // Ao aprovar, cria um pagamento pendente automaticamente se ainda não houver nenhum
     if (status === 'aprovado' && orc && orc.total && orc.total > 0) {
       const { count } = await supabase
         .from('pagamentos')
@@ -71,12 +95,12 @@ export async function atualizarStatusOrcamento(
 
       if ((count ?? 0) === 0) {
         await supabase.from('pagamentos').insert({
-          orcamento_id:   orcamentoId,
-          paciente_id:    orc.paciente_id as string,
-          dentista_id:    orc.dentista_id as string,
-          clinica_id:     clinicaId,
-          valor:          orc.total as number,
-          status:         'pendente',
+          orcamento_id:    orcamentoId,
+          paciente_id:     orc.paciente_id as string,
+          dentista_id:     orc.dentista_id as string,
+          clinica_id:      clinicId,
+          valor:           orc.total as number,
+          status:          'pendente',
           forma_pagamento: null,
           data_pagamento:  null,
           data_vencimento: null,
@@ -88,44 +112,43 @@ export async function atualizarStatusOrcamento(
   return {};
 }
 
-/**
- * Marca um pagamento como pago com a forma de pagamento informada.
- * Verifica que o pagamento pertence à clínica do dentista autenticado.
- */
 export async function marcarPagamentoPago(
   pagamentoId: string,
   formaPagamento: FormaPagamento
 ): Promise<{ error?: string }> {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect("/login");
-  const clinicaId = dentista.clinica_id;
+  const { supabase, user, clinicId } = await requireClinicContext();
 
-  const supabase = await createClient();
+  const { data: dentistaPerfil } = await supabase
+    .from("dentistas")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("clinica_id", clinicId)
+    .maybeSingle();
+
+  if (!dentistaPerfil) redirect("/onboarding");
 
   const hoje = new Date().toISOString().split("T")[0];
 
   const { error } = await supabase
     .from("pagamentos")
     .update({
-      status: "pago",
+      status:          "pago",
       forma_pagamento: formaPagamento,
-      data_pagamento: hoje,
-      marcado_por_id: dentista.id,
+      data_pagamento:  hoje,
+      marcado_por_id:  dentistaPerfil.id,
     })
     .eq("id", pagamentoId)
-    .eq("clinica_id", clinicaId);
+    .eq("clinica_id", clinicId);
 
   if (error) {
     console.error("Erro ao marcar pagamento como pago:", error);
-    return { error: error.message };
+    return { error: 'Não foi possível registrar o pagamento. Tente novamente.' };
   }
 
+  revalidatePath('/dashboard/financeiro');
   return {};
 }
 
-/**
- * Cria um novo orçamento com seus itens para o paciente informado.
- */
 export async function criarOrcamento(dados: {
   pacienteId: string;
   desconto?: number;
@@ -135,15 +158,20 @@ export async function criarOrcamento(dados: {
     quantidade: number;
     precoUnitario: number;
   }>;
-  /** Preenchido pela secretária para atribuir o orçamento a um dentista específico */
   dentistaId?: string;
 }): Promise<{ error?: string; id?: string }> {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect("/login");
+  const { supabase, user, clinicId } = await requireClinicContext();
 
-  const dentistaAlvoId = dados.dentistaId ?? dentista.id;
+  const { data: dentistaPerfil } = await supabase
+    .from("dentistas")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("clinica_id", clinicId)
+    .maybeSingle();
 
-  const supabase = await createClient();
+  if (!dentistaPerfil) redirect("/onboarding");
+
+  const dentistaAlvoId = dados.dentistaId ?? dentistaPerfil.id;
 
   const subtotal = dados.itens.reduce(
     (sum, item) => sum + item.quantidade * item.precoUnitario,
@@ -155,10 +183,10 @@ export async function criarOrcamento(dados: {
   const { data: orc, error: orcError } = await supabase
     .from("orcamentos")
     .insert({
-      clinica_id: dentista.clinica_id,
-      dentista_id: dentistaAlvoId,
-      paciente_id: dados.pacienteId,
-      status: "rascunho",
+      clinica_id:   clinicId,
+      dentista_id:  dentistaAlvoId,
+      paciente_id:  dados.pacienteId,
+      status:       "rascunho",
       total,
       desconto,
       validade_dias: 30,
@@ -171,13 +199,13 @@ export async function criarOrcamento(dados: {
   }
 
   const itensInsert = dados.itens.map((item) => ({
-    orcamento_id: orc.id,
-    clinica_id: dentista.clinica_id,
-    descricao: item.descricao,
+    orcamento_id:    orc.id,
+    clinica_id:      clinicId,
+    descricao:       item.descricao,
     procedimento_id: item.procedimentoId ?? null,
-    quantidade: item.quantidade,
-    preco_unitario: item.precoUnitario,
-    preco_total: item.quantidade * item.precoUnitario,
+    quantidade:      item.quantidade,
+    preco_unitario:  item.precoUnitario,
+    preco_total:     item.quantidade * item.precoUnitario,
   }));
 
   const { error: itensError } = await supabase
@@ -193,41 +221,41 @@ export async function criarOrcamento(dados: {
   return { id: orc.id };
 }
 
-/**
- * Registra um novo pagamento para o orçamento informado.
- * Quando o total pago iguala ou supera o total do orçamento, marca automaticamente como aprovado.
- */
 export async function registrarPagamento(dados: {
   orcamentoId: string;
   pacienteId: string;
   valor: number;
   formaPagamento: FormaPagamento;
   data: string;
-  /** Data combinada (vencimento) — se no futuro, cria parcela pendente em vez de pago */
   dataVencimento?: string;
-  /** dentista_id do orçamento — necessário quando quem registra é a secretária */
   dentistaId?: string;
 }): Promise<{ error?: string; id?: string; autoAprovado?: boolean }> {
-  const sessao = await getDentistaCached();
-  if (!sessao) redirect("/login");
+  const { supabase, user, clinicId, role } = await requireClinicContext();
 
-  const supabase = await createClient();
+  const { data: dentistaPerfil } = await supabase
+    .from("dentistas")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("clinica_id", clinicId)
+    .maybeSingle();
 
-  const dentistaId = dados.dentistaId ?? sessao.id;
+  if (!dentistaPerfil) redirect("/onboarding");
+
+  const dentistaId = dados.dentistaId ?? dentistaPerfil.id;
   const hoje = new Date().toISOString().split('T')[0];
   const isAgendado = dados.dataVencimento && dados.dataVencimento > hoje;
 
   const { data, error } = await supabase
     .from("pagamentos")
     .insert({
-      orcamento_id: dados.orcamentoId,
-      paciente_id: dados.pacienteId,
-      dentista_id: dentistaId,
-      clinica_id: sessao.clinica_id,
-      valor: dados.valor,
-      status: isAgendado ? 'pendente' : 'pago',
+      orcamento_id:    dados.orcamentoId,
+      paciente_id:     dados.pacienteId,
+      dentista_id:     dentistaId,
+      clinica_id:      clinicId,
+      valor:           dados.valor,
+      status:          isAgendado ? 'pendente' : 'pago',
       forma_pagamento: isAgendado ? null : dados.formaPagamento,
-      data_pagamento: isAgendado ? null : dados.data,
+      data_pagamento:  isAgendado ? null : dados.data,
       data_vencimento: dados.dataVencimento ?? null,
     })
     .select("id")
@@ -237,13 +265,12 @@ export async function registrarPagamento(dados: {
     return { error: error.message };
   }
 
-  // Verificar se o total pago agora cobre o orçamento → auto-aprovar
   let autoAprovado = false;
   const { data: orcRow } = await supabase
     .from("orcamentos")
     .select("total, status")
     .eq("id", dados.orcamentoId)
-    .eq("clinica_id", sessao.clinica_id)
+    .eq("clinica_id", clinicId)
     .single();
 
   if (orcRow && orcRow.status === "enviado") {
@@ -259,22 +286,21 @@ export async function registrarPagamento(dados: {
         .from("orcamentos")
         .update({ status: "aprovado" })
         .eq("id", dados.orcamentoId)
-        .eq("clinica_id", sessao.clinica_id);
+        .eq("clinica_id", clinicId);
       autoAprovado = true;
     }
   }
 
-  // Secretária registrando pagamento → notifica o dentista dono do orçamento
-  if (sessao.role === 'secretaria' && dados.dentistaId) {
+  if (role === 'secretaria' && dados.dentistaId) {
     const { data: pac } = await supabase
       .from('pacientes').select('nome').eq('id', dados.pacienteId).maybeSingle();
     const pacNome = (pac as { nome: string } | null)?.nome ?? 'paciente';
     const valorFmt = dados.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     await inserirNotificacao(supabase, {
-      clinicaId:      sessao.clinica_id,
+      clinicaId:      clinicId,
       paraRole:       'dentista',
       paraDentistaId: dados.dentistaId,
-      deDentistaId:   sessao.id,
+      deDentistaId:   dentistaPerfil.id,
       tipo:           'briefing',
       titulo:         `Pagamento recebido — ${pacNome}`,
       mensagem:       `Secretária registrou ${valorFmt} (${dados.formaPagamento.replace(/_/g, ' ')}) do paciente ${pacNome}.`,
@@ -282,13 +308,21 @@ export async function registrarPagamento(dados: {
     });
   }
 
+  registrarLog(supabase, {
+    clinicaId:   clinicId,
+    actorId:     dentistaPerfil.id,
+    pacienteId:  dados.pacienteId,
+    entityType:  'pagamento',
+    entityId:    data.id,
+    action:      'pagamento.registrado',
+    metadata:    { valor: dados.valor, forma: dados.formaPagamento, orcamento_id: dados.orcamentoId },
+  });
+
   revalidatePath("/dashboard/orcamentos");
+  revalidatePath('/dashboard/financeiro');
   return { id: data.id, autoAprovado };
 }
 
-/**
- * Edita os itens de um orçamento (delete + reinsert) e atualiza o total.
- */
 export async function editarOrcamento(
   orcamentoId: string,
   itens: Array<{
@@ -299,28 +333,24 @@ export async function editarOrcamento(
   }>,
   desconto = 0
 ): Promise<{ error?: string }> {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect("/login");
-  const clinicaId = dentista.clinica_id;
-
-  const supabase = await createClient();
+  const { supabase, clinicId } = await requireClinicContext();
 
   const { error: delError } = await supabase
     .from("orcamento_itens")
     .delete()
     .eq("orcamento_id", orcamentoId)
-    .eq("clinica_id", clinicaId);
+    .eq("clinica_id", clinicId);
 
   if (delError) return { error: delError.message };
 
   const itensInsert = itens.map((item) => ({
-    orcamento_id: orcamentoId,
-    clinica_id: clinicaId,
-    descricao: item.descricao,
+    orcamento_id:    orcamentoId,
+    clinica_id:      clinicId,
+    descricao:       item.descricao,
     procedimento_id: item.procedimento_id ?? null,
-    quantidade: item.quantidade,
-    preco_unitario: item.preco_unitario,
-    preco_total: item.quantidade * item.preco_unitario,
+    quantidade:      item.quantidade,
+    preco_unitario:  item.preco_unitario,
+    preco_total:     item.quantidade * item.preco_unitario,
   }));
 
   const { error: insError } = await supabase.from("orcamento_itens").insert(itensInsert);
@@ -333,7 +363,7 @@ export async function editarOrcamento(
     .from("orcamentos")
     .update({ total, desconto })
     .eq("id", orcamentoId)
-    .eq("clinica_id", clinicaId);
+    .eq("clinica_id", clinicId);
 
   if (updError) return { error: updError.message };
 
@@ -341,61 +371,60 @@ export async function editarOrcamento(
   return {};
 }
 
-/**
- * Registra pagamento rápido (dinheiro ou pix) e marca o orçamento como aprovado.
- * Usada pela secretária via botões de ação rápida.
- */
 export async function registrarPagamentoRapido(dados: {
   orcamentoId: string;
   pacienteId: string;
   total: number;
   formaPagamento: FormaPagamento;
-  /** dentista_id do orçamento — necessário quando quem registra é a secretária */
   dentistaId?: string;
 }): Promise<{ error?: string; id?: string }> {
-  const sessao = await getDentistaCached();
-  if (!sessao) redirect("/login");
+  const { supabase, user, clinicId, role } = await requireClinicContext();
 
-  const supabase = await createClient();
+  const { data: dentistaPerfil } = await supabase
+    .from("dentistas")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("clinica_id", clinicId)
+    .maybeSingle();
+
+  if (!dentistaPerfil) redirect("/onboarding");
+
+  const dentistaId = dados.dentistaId ?? dentistaPerfil.id;
   const hoje = new Date().toISOString().split("T")[0];
-
-  const dentistaId = dados.dentistaId ?? sessao.id;
 
   const { data, error } = await supabase
     .from("pagamentos")
     .insert({
-      orcamento_id: dados.orcamentoId,
-      paciente_id: dados.pacienteId,
-      dentista_id: dentistaId,
-      clinica_id: sessao.clinica_id,
-      valor: dados.total,
-      status: "pago",
+      orcamento_id:    dados.orcamentoId,
+      paciente_id:     dados.pacienteId,
+      dentista_id:     dentistaId,
+      clinica_id:      clinicId,
+      valor:           dados.total,
+      status:          "pago",
       forma_pagamento: dados.formaPagamento,
-      data_pagamento: hoje,
+      data_pagamento:  hoje,
     })
     .select("id")
     .single();
 
   if (error) return { error: error.message };
 
-  // Marca orçamento como aprovado automaticamente
   await supabase
     .from("orcamentos")
     .update({ status: "aprovado" })
     .eq("id", dados.orcamentoId)
-    .eq("clinica_id", sessao.clinica_id);
+    .eq("clinica_id", clinicId);
 
-  // Secretária registrando → notifica o dentista dono do orçamento
-  if (sessao.role === 'secretaria' && dados.dentistaId) {
+  if (role === 'secretaria' && dados.dentistaId) {
     const { data: pac } = await supabase
       .from('pacientes').select('nome').eq('id', dados.pacienteId).maybeSingle();
     const pacNome = (pac as { nome: string } | null)?.nome ?? 'paciente';
     const valorFmt = dados.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     await inserirNotificacao(supabase, {
-      clinicaId:      sessao.clinica_id,
+      clinicaId:      clinicId,
       paraRole:       'dentista',
       paraDentistaId: dados.dentistaId,
-      deDentistaId:   sessao.id,
+      deDentistaId:   dentistaPerfil.id,
       tipo:           'briefing',
       titulo:         `Pagamento recebido — ${pacNome}`,
       mensagem:       `Secretária registrou ${valorFmt} (${dados.formaPagamento.replace(/_/g, ' ')}) de ${pacNome}. Orçamento aprovado.`,
@@ -404,39 +433,45 @@ export async function registrarPagamentoRapido(dados: {
   }
 
   revalidatePath("/dashboard/orcamentos");
+  revalidatePath('/dashboard/financeiro');
   return { id: data.id };
 }
 
-/**
- * Exclui um orçamento junto com seus itens e pagamentos.
- */
 export async function excluirOrcamento(
   orcamentoId: string,
   pacienteId?: string
 ): Promise<{ error?: string }> {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect("/login");
-  const clinicaId = dentista.clinica_id;
+  const { supabase, clinicId } = await requireClinicContext();
 
-  const supabase = await createClient();
+  // Protege exclusão de orçamentos com pagamentos já registrados
+  const { count: pagoCount } = await supabase
+    .from('pagamentos')
+    .select('id', { count: 'exact', head: true })
+    .eq('orcamento_id', orcamentoId)
+    .eq('clinica_id', clinicId)
+    .eq('status', 'pago');
+
+  if ((pagoCount ?? 0) > 0) {
+    return { error: 'Este orçamento possui pagamentos registrados. Altere o status antes de excluir.' };
+  }
 
   await supabase
     .from("pagamentos")
     .delete()
     .eq("orcamento_id", orcamentoId)
-    .eq("clinica_id", clinicaId);
+    .eq("clinica_id", clinicId);
 
   await supabase
     .from("orcamento_itens")
     .delete()
     .eq("orcamento_id", orcamentoId)
-    .eq("clinica_id", clinicaId);
+    .eq("clinica_id", clinicId);
 
   const { error } = await supabase
     .from("orcamentos")
     .delete()
     .eq("id", orcamentoId)
-    .eq("clinica_id", clinicaId);
+    .eq("clinica_id", clinicId);
 
   if (error) return { error: error.message };
 

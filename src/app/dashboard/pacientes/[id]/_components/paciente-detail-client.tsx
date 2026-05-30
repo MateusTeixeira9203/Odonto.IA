@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, useEffect, useCallback } from 'react';
+import { useState, useTransition, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
@@ -11,6 +11,7 @@ import {
   CreditCard,
   Plus,
   Edit2,
+  FileDown,
   ChevronRight,
   Calendar,
   CheckCircle2,
@@ -44,10 +45,22 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { DocumentosTab } from '@/components/pacientes/DocumentosTab';
-import { PlanejamentoTab } from '@/components/pacientes/PlanejamentoTab';
-import { FichasTab } from '@/components/pacientes/FichasTab';
+import dynamic from 'next/dynamic';
+
+const TabSkeleton = () => (
+  <div className="animate-pulse space-y-4 p-4">
+    {[0, 1, 2].map((i) => (
+      <div key={i} className="h-16 rounded-xl bg-surface-alt" />
+    ))}
+  </div>
+);
+
+const DocumentosTab   = dynamic(() => import('@/components/pacientes/DocumentosTab').then(m => m.DocumentosTab),     { ssr: false, loading: () => <TabSkeleton /> });
+const PlanejamentoTab = dynamic(() => import('@/components/pacientes/PlanejamentoTab').then(m => m.PlanejamentoTab), { ssr: false, loading: () => <TabSkeleton /> });
+const FichasTab       = dynamic(() => import('@/components/pacientes/FichasTab').then(m => m.FichasTab),             { ssr: false, loading: () => <TabSkeleton /> });
 import { createClient } from '@/lib/supabase/client';
+import { saveRecentPatient } from '@/components/command-palette/command-palette';
+import { marcarFollowUp, limparFollowUp, snoozeFollowUp } from '../../followup-actions';
 import { atualizarPaciente } from '../actions';
 import type { DentistaRole } from '@/types/database';
 import type { PlanoId } from '@/lib/planos';
@@ -63,9 +76,17 @@ import {
 } from '@/app/dashboard/orcamentos/actions';
 import { criarAgendamento } from '@/app/dashboard/agendamentos/actions';
 import type { Paciente } from '@/types/database';
+import type { TimelineEvent } from '@/server/patients/get-visible-timeline-events';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
+import { STATUS_ORCAMENTO } from '@/lib/constants/orcamento-status';
+import type { OrcamentoComItens, OrcamentoItem, Pagamento, FichaParaOrc, ProcedimentoClinica, NovoOrcItem, OrcEditItem } from './types';
+import { EditarPacienteModal } from './modals/editar-paciente-modal';
+import { DetalheOrcamentoModal } from './modals/detalhe-orcamento-modal';
+import { ConfirmarDeleteOrcModal } from './modals/confirmar-delete-orc-modal';
+import { NovaConsultaModal } from './modals/nova-consulta-modal';
+import { NovoOrcamentoModal } from './modals/novo-orcamento-modal';
 
 type FichaRecente = {
   id: string;
@@ -92,12 +113,23 @@ type PendenciaItem = {
 
 const ARCH_LABEL_SHORT: Record<number, string> = { 97: 'Sup.', 98: 'Inf.', 99: 'Boca' };
 
-type FichaParaOrc = {
+type AgendamentoTabItem = {
   id: string;
-  created_at: string;
-  queixa_principal: string | null;
-  dentes_afetados: number[];
-  dentes_observacoes: Record<string, string>;
+  data_hora: string;
+  status: string;
+  observacoes: string | null;
+  duracao_minutos: number;
+  dentista: { nome: string } | null;
+};
+
+const STATUS_AGENDA_MAP: Record<string, { label: string; cls: string }> = {
+  scheduled:   { label: 'Agendado',       cls: 'bg-surface-alt text-text-secondary' },
+  confirmed:   { label: 'Confirmado',     cls: 'bg-teal/10 text-teal' },
+  completed:   { label: 'Realizado',      cls: 'bg-teal/10 text-teal' },
+  cancelled:   { label: 'Cancelado',      cls: 'bg-coral/10 text-coral' },
+  no_show:     { label: 'Não compareceu', cls: 'bg-coral/10 text-coral' },
+  in_progress: { label: 'Em andamento',   cls: 'bg-teal/10 text-teal' },
+  rescheduled: { label: 'Reagendado',     cls: 'bg-surface-alt text-text-secondary' },
 };
 
 type AgendamentoProximo = {
@@ -109,44 +141,6 @@ type AgendamentoProximo = {
   dentista: { nome: string } | null;
 };
 
-type OrcamentoItem = {
-  id: string;
-  descricao: string | null;
-  preco_total: number | null;
-  quantidade: number;
-};
-
-type Pagamento = {
-  id: string;
-  valor: number;
-  status: string;
-  forma_pagamento: string | null;
-};
-
-type OrcamentoComItens = {
-  id: string;
-  status: 'rascunho' | 'enviado' | 'aprovado' | 'recusado';
-  total: number | null;
-  created_at: string;
-  validade_dias: number;
-  condicoes_pagamento: string | null;
-  itens: OrcamentoItem[];
-  pagamentos: Pagamento[];
-};
-
-interface ProcedimentoClinica {
-  id: string;
-  nome: string;
-  preco_padrao: number | null;
-}
-
-interface NovoOrcItem {
-  procedimentoId: string;
-  descricao: string;
-  quantidade: number;
-  preco: number;
-}
-
 interface PacienteDetailClientProps {
   paciente: Paciente;
   agendamentoProximo: AgendamentoProximo | null;
@@ -155,14 +149,9 @@ interface PacienteDetailClientProps {
   dentistaId: string;
   role: DentistaRole;
   plano: PlanoId;
+  fichasRecentesSSR?: FichaRecente[];
+  timeline?: TimelineEvent[];
 }
-
-const STATUS_ORCAMENTO: Record<string, { label: string; cls: string }> = {
-  rascunho: { label: 'Rascunho', cls: 'bg-muted text-muted-foreground' },
-  enviado: { label: 'Enviado', cls: 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400' },
-  aprovado: { label: 'Aprovado', cls: 'bg-teal/10 text-teal' },
-  recusado: { label: 'Recusado', cls: 'bg-red-500/10 text-red-500' },
-};
 
 export function PacienteDetailClient({
   paciente,
@@ -172,13 +161,22 @@ export function PacienteDetailClient({
   dentistaId,
   role,
   plano,
+  fichasRecentesSSR,
+  timeline = [],
 }: PacienteDetailClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
   const showClinicalTabs = role === 'admin' || role === 'dentista';
 
-  const [activeTab, setActiveTab] = useState('visao-geral');
+  const [activeTab, setActiveTab] = useState('resumo');
+  const [mountedTabs, setMountedTabs] = useState<Set<string>>(() => new Set(['resumo']));
+
+  const handleTabChange = useCallback((tab: string) => {
+    setActiveTab(tab);
+    setMountedTabs(prev => prev.has(tab) ? prev : new Set([...prev, tab]));
+  }, []);
+
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const [editNome, setEditNome] = useState(paciente.nome);
@@ -188,11 +186,19 @@ export function PacienteDetailClient({
   const [editError, setEditError] = useState<string | null>(null);
 
   // Orçamentos — cópia local para atualizações otimistas
-  // Sincroniza com o prop sempre que o servidor retornar dados atualizados (ex: após router.refresh())
   const [orcamentosState, setOrcamentosState] = useState<OrcamentoComItens[]>(orcamentos);
+  useEffect(() => { setOrcamentosState(orcamentos); }, [orcamentos]);
+
+  // Persiste paciente como recente para a Command Palette
   useEffect(() => {
-    setOrcamentosState(orcamentos);
-  }, [orcamentos]);
+    saveRecentPatient({ id: paciente.id, nome: paciente.nome });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paciente.id]);
+
+  // Aba Agenda — lazy fetch ao abrir pela primeira vez
+  const [agendamentosTabData, setAgendamentosTabData] = useState<AgendamentoTabItem[] | null>(null);
+  const [loadingAgendamentos, setLoadingAgendamentos] = useState(false);
+
   const [detalheOrcId, setDetalheOrcId] = useState<string | null>(null);
   const [isNovoOrcOpen, setIsNovoOrcOpen] = useState(false);
   const [procedimentosClinica, setProcedimentosClinica] = useState<ProcedimentoClinica[]>([]);
@@ -214,9 +220,7 @@ export function PacienteDetailClient({
 
   // Edição de orçamento
   const [orcEditMode, setOrcEditMode] = useState(false);
-  const [orcEditItens, setOrcEditItens] = useState<
-    Array<{ id?: string; descricao: string; quantidade: number; preco_unitario: number }>
-  >([]);
+  const [orcEditItens, setOrcEditItens] = useState<OrcEditItem[]>([]);
   const [orcEditSaving, setOrcEditSaving] = useState(false);
   const [orcEditError, setOrcEditError] = useState<string | null>(null);
 
@@ -235,8 +239,19 @@ export function PacienteDetailClient({
   const [consultaSaving, setConsultaSaving] = useState(false);
   const [consultaError, setConsultaError] = useState<string | null>(null);
 
-  // Atividades recentes (visão geral)
-  const [fichasRecentes, setFichasRecentes] = useState<FichaRecente[]>([]);
+  // Atividades recentes (visão geral) — inicializado do SSR, sem roundtrip extra ao montar
+  const [fichasRecentes, setFichasRecentes] = useState<FichaRecente[]>(fichasRecentesSSR ?? []);
+  // Sincroniza quando servidor re-renderizar (ex: após router.refresh())
+  useEffect(() => {
+    if (fichasRecentesSSR !== undefined) setFichasRecentes(fichasRecentesSSR);
+  }, [fichasRecentesSSR]);
+
+  // Follow-up
+  const [followupPendente, setFollowupPendente] = useState<boolean>(paciente.followup_pendente ?? false);
+  const [followupNota, setFollowupNota] = useState<string>(paciente.followup_nota ?? '');
+  const [showFollowupInput, setShowFollowupInput] = useState(false);
+  const [showSnoozeMenu, setShowSnoozeMenu] = useState(false);
+  const [followupSaving, setFollowupSaving] = useState(false);
 
   // Pendências — widget persistente acima das abas
   const [pendencias, setPendencias] = useState<PendenciaItem[]>([]);
@@ -265,11 +280,28 @@ export function PacienteDetailClient({
   useEffect(() => {
     const handler = (e: Event) => {
       const tabValue = (e as CustomEvent<string>).detail;
-      if (tabValue) setActiveTab(tabValue);
+      if (tabValue) handleTabChange(tabValue);
     };
     window.addEventListener('dex:switch-tab', handler);
     return () => window.removeEventListener('dex:switch-tab', handler);
-  }, []);
+  }, [handleTabChange]);
+
+  useEffect(() => {
+    if (activeTab !== 'agenda' || agendamentosTabData !== null) return;
+    setLoadingAgendamentos(true);
+    const supabase = createClient();
+    void supabase
+      .from('agendamentos')
+      .select('id, data_hora, status, observacoes, duracao_minutos, dentista:dentistas(nome)')
+      .eq('paciente_id', paciente.id)
+      .eq('clinica_id', clinicaId)
+      .order('data_hora', { ascending: false })
+      .limit(50)
+      .then(({ data }) => {
+        setAgendamentosTabData((data as unknown as AgendamentoTabItem[]) ?? []);
+        setLoadingAgendamentos(false);
+      });
+  }, [activeTab, agendamentosTabData, paciente.id, clinicaId]);
 
   const iniciais = paciente.nome
     .split(' ')
@@ -295,14 +327,79 @@ export function PacienteDetailClient({
 
   // Orçamento selecionado no detalhe
   const detalheOrc = orcamentosState.find((o) => o.id === detalheOrcId) ?? null;
-  const novoOrcTotal = novoOrcItens.reduce((s, i) => s + i.quantidade * i.preco, 0);
+  const novoOrcTotal = useMemo(
+    () => novoOrcItens.reduce((s, i) => s + i.quantidade * i.preco, 0),
+    [novoOrcItens]
+  );
 
-  const totalPago = orcamentosState
-    .flatMap((o) => o.pagamentos)
-    .filter((p) => p.status === 'pago')
-    .reduce((sum, p) => sum + p.valor, 0);
+  const resumoFinanceiro = useMemo(() => {
+    const allPagamentos = orcamentosState.flatMap(o => o.pagamentos);
+    return {
+      totalAprovado: orcamentosState
+        .filter(o => o.status === 'aprovado')
+        .reduce((s, o) => s + (o.total ?? 0), 0),
+      totalPago: allPagamentos
+        .filter(p => p.status === 'pago')
+        .reduce((s, p) => s + p.valor, 0),
+      totalPendente: allPagamentos
+        .filter(p => p.status === 'pendente')
+        .reduce((s, p) => s + p.valor, 0),
+      temHistorico: allPagamentos.length > 0,
+    };
+  }, [orcamentosState]);
 
-  const totalOrcado = orcamentosState.reduce((sum, o) => sum + (o.total ?? 0), 0);
+  const handleMarcarFollowUp = async () => {
+    setFollowupSaving(true);
+    const res = await marcarFollowUp(paciente.id, followupNota || undefined);
+    if (res.ok) {
+      setFollowupPendente(true);
+      setShowFollowupInput(false);
+      toast.success('Follow-up marcado');
+    } else {
+      toast.error(res.erro ?? 'Erro ao marcar');
+    }
+    setFollowupSaving(false);
+  };
+
+  const handleLimparFollowUp = async () => {
+    const notaAnterior = followupNota;
+    setFollowupSaving(true);
+    const res = await limparFollowUp(paciente.id);
+    if (res.ok) {
+      setFollowupPendente(false);
+      setFollowupNota('');
+      toast.success('Follow-up concluído', {
+        action: {
+          label: 'Desfazer',
+          onClick: async () => {
+            const restore = await marcarFollowUp(paciente.id, notaAnterior || undefined);
+            if (restore.ok) {
+              setFollowupPendente(true);
+              setFollowupNota(notaAnterior);
+              toast.success('Follow-up restaurado');
+            }
+          },
+        },
+        duration: 6000,
+      });
+    } else {
+      toast.error(res.erro ?? 'Não foi possível concluir o follow-up. Tente novamente.');
+    }
+    setFollowupSaving(false);
+  };
+
+  const handleSnooze = async (days: number) => {
+    setShowSnoozeMenu(false);
+    setFollowupSaving(true);
+    const res = await snoozeFollowUp(paciente.id, days);
+    if (res.ok) {
+      const label = days === 1 ? 'amanhã' : `${days} dias`;
+      toast.success(`Follow-up adiado para ${label}`);
+    } else {
+      toast.error(res.erro ?? 'Erro ao adiar');
+    }
+    setFollowupSaving(false);
+  };
 
   const handleSaveEdit = () => {
     setEditError(null);
@@ -335,14 +432,17 @@ export function PacienteDetailClient({
 
     if (!showClinicalTabs) return;
 
-    void supabase
-      .from('fichas')
-      .select('id, created_at, queixa_principal, anotacoes, dentista:dentistas(nome)')
-      .eq('paciente_id', paciente.id)
-      .eq('clinica_id', clinicaId)
-      .order('created_at', { ascending: false })
-      .limit(5)
-      .then(({ data }) => setFichasRecentes((data as unknown as FichaRecente[]) ?? []));
+    // fichasRecentes já foram carregadas no servidor — evita roundtrip desnecessário
+    if (fichasRecentesSSR === undefined) {
+      void supabase
+        .from('fichas')
+        .select('id, created_at, queixa_principal, anotacoes, dentista:dentistas(nome)')
+        .eq('paciente_id', paciente.id)
+        .eq('clinica_id', clinicaId)
+        .order('created_at', { ascending: false })
+        .limit(5)
+        .then(({ data }) => setFichasRecentes((data as unknown as FichaRecente[]) ?? []));
+    }
 
     void supabase
       .from('fichas')
@@ -435,10 +535,12 @@ export function PacienteDetailClient({
       setPagError(result.error);
     } else {
       const novoPag: Pagamento = {
-        id: result.id ?? crypto.randomUUID(),
+        id:              result.id ?? crypto.randomUUID(),
         valor,
-        status: 'pago',
+        status:          'pago',
         forma_pagamento: pagForm.formaPagamento,
+        data_pagamento:  pagForm.data,
+        marcado_por:     null,
       };
       setOrcamentosState((prev) =>
         prev.map((o) =>
@@ -671,13 +773,13 @@ export function PacienteDetailClient({
       >
         <button
           onClick={() => router.push('/dashboard/pacientes')}
-          className="p-2 hover:bg-card rounded-xl transition-colors border border-transparent hover:border-border/40"
+          className="p-2 hover:bg-surface rounded-xl transition-colors border border-transparent hover:border-border/40"
         >
-          <ArrowLeft className="w-5 h-5 text-muted-foreground" />
+          <ArrowLeft className="w-5 h-5 text-text-secondary" />
         </button>
         <div>
-          <h1 className="font-heading text-3xl md:text-4xl text-foreground">{paciente.nome}</h1>
-          <p className="text-muted-foreground text-sm font-medium mt-1">
+          <h1 className="font-heading font-bold text-3xl md:text-4xl text-text-primary">{paciente.nome}</h1>
+          <p className="text-text-secondary text-sm font-medium mt-1">
             Paciente desde {membroDesde}
             {dataNascimento && ` • Nascimento: ${dataNascimento}`}
           </p>
@@ -692,29 +794,29 @@ export function PacienteDetailClient({
           className="space-y-6"
         >
           {/* Header Card */}
-          <div className="bg-card rounded-2xl border border-border/60 shadow-sm p-6 flex flex-wrap items-center justify-between gap-6">
+          <div className="bg-surface rounded-2xl border border-border/60 shadow-sm p-6 flex flex-wrap items-center justify-between gap-6">
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-2xl bg-teal flex items-center justify-center text-white font-bold text-xl shadow-lg">
                 {iniciais}
               </div>
               <div className="space-y-1">
                 {paciente.telefone && (
-                  <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <div className="flex items-center gap-2 text-sm font-medium text-text-primary">
                     <Phone className="w-4 h-4 text-teal" /> {paciente.telefone}
                   </div>
                 )}
                 {paciente.email && (
-                  <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <div className="flex items-center gap-2 text-sm font-medium text-text-primary">
                     <Mail className="w-4 h-4 text-teal" /> {paciente.email}
                   </div>
                 )}
                 {endereco && (
-                  <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <div className="flex items-center gap-2 text-sm font-medium text-text-primary">
                     <MapPin className="w-4 h-4 text-teal" /> {endereco}
                   </div>
                 )}
                 {!paciente.telefone && !paciente.email && !endereco && (
-                  <div className="text-sm text-muted-foreground">Sem informações de contato</div>
+                  <div className="text-sm text-text-secondary">Sem informações de contato</div>
                 )}
               </div>
             </div>
@@ -728,73 +830,75 @@ export function PacienteDetailClient({
               </button>
               <button
                 onClick={() => setIsEditModalOpen(true)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-muted rounded-xl text-xs font-bold text-foreground hover:bg-accent transition-colors border border-border/40"
+                className="flex items-center gap-2 px-4 py-2.5 bg-surface-alt rounded-xl text-xs font-bold text-text-primary hover:bg-surface-alt/70 transition-colors border border-border/40"
               >
                 <Edit2 className="w-3.5 h-3.5" />
                 Editar Perfil
+              </button>
+              <button
+                onClick={() => window.open(`/api/pacientes/${paciente.id}/prontuario`, '_blank')}
+                className="flex items-center gap-2 px-4 py-2.5 bg-surface-alt rounded-xl text-xs font-bold text-text-primary hover:bg-surface-alt/70 transition-colors border border-border/40"
+                title="Exportar prontuário completo"
+              >
+                <FileDown className="w-3.5 h-3.5" />
+                Exportar
               </button>
             </div>
           </div>
 
           {/* Tabs — IDs usados pelo tour DEX */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="bg-card p-1.5 rounded-2xl border border-border/60 shadow-sm mb-6 flex-wrap h-auto gap-1">
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+            <TabsList className="bg-surface p-1.5 rounded-2xl border border-border/60 shadow-sm mb-6 flex-wrap h-auto gap-1">
               {(
                 [
-                  ['visao-geral',  'Visão Geral',      undefined],
-                  ...(showClinicalTabs ? [['fichas',       'Fichas Clínicas', 'tab-fichas'      ] as const] : []),
-                  ...(showClinicalTabs ? [['planejamento', 'Planejamento',    'tab-apresentacao'] as const] : []),
-                  ['orcamentos',   'Orçamentos',       'tab-orcamento'   ],
-                  ['documentos',   'Documentos',       'tab-documentos'  ],
+                  ['resumo',        'Resumo',       undefined],
+                  ...(showClinicalTabs ? [['tratamento',   'Tratamento',   'tab-apresentacao'] as const] : []),
+                  ...(showClinicalTabs ? [['ficha-clinica','Ficha Clínica','tab-fichas'      ] as const] : []),
+                  ['agenda',        'Agenda',        undefined],
+                  ['orcamentos',    'Orçamentos',   'tab-orcamento'   ],
+                  ['arquivos',      'Arquivos',     'tab-documentos'  ],
                 ] as [string, string, string | undefined][]
               ).map(([val, label, tourId]) => (
                 <TabsTrigger
                   key={val}
                   id={tourId}
                   value={val}
-                  className={`rounded-xl px-5 py-2.5 text-sm font-bold text-muted-foreground transition-all duration-300 data-[state=active]:bg-teal/10 data-[state=active]:text-teal data-[state=active]:border data-[state=active]:border-teal/20 data-[state=active]:shadow-none hover:text-foreground${tourId && highlightedTab === tourId ? ' ring-2 ring-[#2f9c85]/60 shadow-[0_0_14px_rgba(47,156,133,0.45)]' : ''}`}
+                  className={`rounded-xl px-5 py-2.5 text-sm font-bold text-text-secondary transition-all duration-300 data-[state=active]:bg-teal/10 data-[state=active]:text-teal data-[state=active]:border data-[state=active]:border-teal/20 data-[state=active]:shadow-none hover:text-text-primary${tourId && highlightedTab === tourId ? ' ring-2 ring-teal/60 shadow-[0_0_14px_theme(colors.teal/0.45)]' : ''}`}
                 >
                   {label}
                 </TabsTrigger>
               ))}
             </TabsList>
 
-            <div className="flex gap-6 items-start">
+            <div className="flex flex-col-reverse lg:flex-row gap-6 items-start">
               {/* Conteúdo da aba */}
               <div className="flex-1 min-w-0">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeTab}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-              >
-                {/* Visão Geral */}
-                <TabsContent value="visao-geral" className="mt-0 space-y-6">
+              <div>
+                {/* Resumo */}
+                <TabsContent value="resumo" className="mt-0 space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Próxima Consulta */}
-                    <div className="bg-card rounded-2xl border border-border/60 shadow-sm p-6">
+                    <div className="bg-surface rounded-2xl border border-border/60 shadow-sm p-6">
                       <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-heading text-xl text-foreground">Próxima Consulta</h3>
+                        <h3 className="font-heading text-xl text-text-primary">Próxima Consulta</h3>
                         <Clock className="w-5 h-5 text-teal" />
                       </div>
                       {agendamentoProximo ? (
                         <div className="space-y-3">
-                          <div className="flex items-center gap-4 p-4 bg-muted rounded-2xl border border-border/20">
-                            <div className="w-12 h-12 bg-card rounded-xl flex flex-col items-center justify-center shadow-sm shrink-0">
+                          <div className="flex items-center gap-4 p-4 bg-surface-alt rounded-2xl border border-border/20">
+                            <div className="w-12 h-12 bg-surface rounded-xl flex flex-col items-center justify-center shadow-sm shrink-0">
                               <span className="text-[10px] font-bold text-teal uppercase">
                                 {format(parseISO(agendamentoProximo.data_hora), 'MMM', { locale: ptBR })}
                               </span>
-                              <span className="text-lg font-bold text-foreground leading-none">
+                              <span className="text-lg font-bold text-text-primary leading-none">
                                 {format(parseISO(agendamentoProximo.data_hora), 'dd')}
                               </span>
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="font-bold text-sm text-foreground">
+                              <div className="font-bold text-sm text-text-primary">
                                 {agendamentoProximo.observacoes ?? 'Consulta agendada'}
                               </div>
-                              <div className="text-xs text-muted-foreground mt-0.5">
+                              <div className="text-xs text-text-secondary mt-0.5">
                                 {format(parseISO(agendamentoProximo.data_hora), "EEEE, 'às' HH:mm", {
                                   locale: ptBR,
                                 })}
@@ -817,80 +921,201 @@ export function PacienteDetailClient({
                           )}
                         </div>
                       ) : (
-                        <div className="p-4 bg-muted rounded-2xl border border-border/20 text-center">
-                          <p className="text-sm text-muted-foreground">Nenhuma consulta agendada.</p>
+                        <div className="p-4 bg-surface-alt rounded-2xl border border-border/20 text-center">
+                          <p className="text-sm text-text-secondary">Nenhuma consulta agendada.</p>
                         </div>
                       )}
                       <button
-                        onClick={() => router.push('/dashboard/agendamentos')}
+                        onClick={() => setActiveTab('agenda')}
                         className="w-full mt-4 py-3 text-xs font-bold text-teal hover:text-teal-lt transition-colors flex items-center justify-center gap-2"
                       >
-                        Ver Agendamentos <ChevronRight className="w-4 h-4" />
+                        Ver Agenda <ChevronRight className="w-4 h-4" />
                       </button>
                     </div>
 
-                    {/* Resumo Financeiro */}
-                    <div className="bg-card rounded-2xl border border-border/60 shadow-sm p-6">
+                    {/* Status do Paciente */}
+                    <div className="bg-surface rounded-2xl border border-border/60 shadow-sm p-6">
                       <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-heading text-xl text-foreground">Resumo Financeiro</h3>
-                        <CreditCard className="w-5 h-5 text-teal" />
+                        <h3 className="font-heading text-xl text-text-primary">Status</h3>
+                        <ClipboardList className="w-5 h-5 text-teal" />
                       </div>
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-muted-foreground font-medium">
-                            Total orçado
-                          </span>
-                          <span className="font-mono text-sm font-bold text-foreground">
-                            R${' '}
-                            {totalOrcado.toLocaleString('pt-BR', {
-                              minimumFractionDigits: 2,
-                            })}
+                      <div className="space-y-0">
+                        <div className="flex items-center justify-between py-3 border-b border-border/40">
+                          <span className="text-xs text-text-secondary font-medium">Pendências clínicas</span>
+                          <span className="font-mono text-sm font-bold text-text-primary">
+                            {pendencias.filter((p) => !pendenciasConcluidas.has(p.globalKey)).length}
                           </span>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-muted-foreground font-medium">
-                            Total pago
+                        <div className="flex items-center justify-between py-3 border-b border-border/40">
+                          <span className="text-xs text-text-secondary font-medium">Orçamentos em aberto</span>
+                          <span className="font-mono text-sm font-bold text-text-primary">
+                            {orcamentosState.filter((o) => ['rascunho', 'enviado'].includes(o.status)).length}
                           </span>
+                        </div>
+                        <div className="flex items-center justify-between py-3">
+                          <span className="text-xs text-text-secondary font-medium">Orçamentos aprovados</span>
                           <span className="font-mono text-sm font-bold text-teal">
-                            R${' '}
-                            {totalPago.toLocaleString('pt-BR', {
-                              minimumFractionDigits: 2,
-                            })}
-                          </span>
-                        </div>
-                        <div className="h-px bg-border w-full" />
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-muted-foreground font-medium">
-                            {orcamentosState.length} orçamento{orcamentosState.length !== 1 ? 's' : ''} no total
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {orcamentosState.filter((o) => o.status === 'aprovado').length} aprovado
-                            {orcamentosState.filter((o) => o.status === 'aprovado').length !== 1
-                              ? 's'
-                              : ''}
+                            {orcamentosState.filter((o) => o.status === 'aprovado').length}
                           </span>
                         </div>
                       </div>
-                      <button
-                        onClick={() => setActiveTab('orcamentos')}
-                        className="w-full mt-4 py-3 bg-muted hover:bg-accent rounded-xl text-xs font-bold text-foreground transition-colors"
-                      >
-                        Ver Orçamentos
-                      </button>
+                      {/* Follow-up */}
+                      <div className="mt-0 border-t border-border/40 pt-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-text-secondary font-medium">Follow-up</span>
+                          {followupPendente ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-bold uppercase tracking-wider bg-teal/10 text-teal px-2 py-0.5 rounded-full">
+                                pendente
+                              </span>
+                              <button
+                                onClick={() => void handleLimparFollowUp()}
+                                disabled={followupSaving}
+                                className="text-[10px] text-text-secondary hover:text-teal transition-colors disabled:opacity-40"
+                                title="Concluir follow-up"
+                              >
+                                {followupSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : '✓'}
+                              </button>
+                              <div className="relative">
+                                <button
+                                  onClick={() => setShowSnoozeMenu(v => !v)}
+                                  className="text-[10px] text-text-secondary hover:text-text-primary transition-colors"
+                                  title="Adiar"
+                                >
+                                  Adiar
+                                </button>
+                                {showSnoozeMenu && (
+                                  <div className="absolute right-0 top-5 z-20 bg-surface border border-border rounded-xl shadow-lg p-1 min-w-[120px]">
+                                    {[
+                                      { label: 'Amanhã', days: 1 },
+                                      { label: '3 dias', days: 3 },
+                                      { label: '7 dias', days: 7 },
+                                    ].map(opt => (
+                                      <button
+                                        key={opt.days}
+                                        onClick={() => void handleSnooze(opt.days)}
+                                        className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-text-primary hover:bg-surface-alt rounded-lg transition-colors"
+                                      >
+                                        {opt.label}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setShowFollowupInput(v => !v)}
+                              className="text-xs text-teal hover:text-teal-lt font-semibold transition-colors"
+                            >
+                              {showFollowupInput ? 'Cancelar' : '+ Marcar'}
+                            </button>
+                          )}
+                        </div>
+                        {followupPendente && paciente.followup_nota && (
+                          <p className="text-xs text-text-secondary mt-1 italic leading-relaxed">{paciente.followup_nota}</p>
+                        )}
+                        {showFollowupInput && !followupPendente && (
+                          <div className="mt-2 space-y-2">
+                            <input
+                              type="text"
+                              placeholder="Nota (opcional)"
+                              value={followupNota}
+                              onChange={e => setFollowupNota(e.target.value)}
+                              className="w-full text-xs border border-border rounded-lg px-2.5 py-1.5 bg-surface-alt text-text-primary placeholder:text-text-secondary outline-none focus:ring-1 focus:ring-teal/40"
+                              maxLength={120}
+                            />
+                            <button
+                              onClick={() => void handleMarcarFollowUp()}
+                              disabled={followupSaving}
+                              className="w-full py-1.5 bg-teal text-white rounded-lg text-xs font-bold hover:bg-teal-lt transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                            >
+                              {followupSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                              Marcar Follow-up
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex gap-2 mt-3">
+                        <button
+                          onClick={() => void abrirNovoOrcamento()}
+                          disabled={isLoadingFichaParaOrc}
+                          className="flex-1 py-2.5 bg-surface-alt hover:bg-surface-alt/70 rounded-xl text-xs font-bold text-text-primary transition-colors border border-border/40 disabled:opacity-50"
+                        >
+                          Novo Orçamento
+                        </button>
+                        <button
+                          onClick={() => setActiveTab('orcamentos')}
+                          className="flex-1 py-2.5 bg-surface-alt hover:bg-surface-alt/70 rounded-xl text-xs font-bold text-text-primary transition-colors border border-border/40"
+                        >
+                          Ver Orçamentos
+                        </button>
+                      </div>
                     </div>
                   </div>
 
+                  {/* Resumo Financeiro do Paciente */}
+                  {resumoFinanceiro.temHistorico && (
+                    <div className="bg-surface rounded-2xl border border-border/60 shadow-sm p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-heading text-xl text-text-primary">Financeiro</h3>
+                        <CreditCard className="w-5 h-5 text-teal" />
+                      </div>
+                      <div className="grid grid-cols-3 gap-3 mb-4">
+                        <div className="bg-surface-alt rounded-xl p-3 text-center">
+                          <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-text-secondary mb-1">Aprovado</p>
+                          <p className="font-mono text-base font-bold text-text-primary tabular-nums">
+                            {resumoFinanceiro.totalAprovado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </p>
+                        </div>
+                        <div className="bg-teal/5 rounded-xl p-3 text-center border border-teal/15">
+                          <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-text-secondary mb-1">Recebido</p>
+                          <p className="font-mono text-base font-bold text-teal tabular-nums">
+                            {resumoFinanceiro.totalPago.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </p>
+                        </div>
+                        <div className={`rounded-xl p-3 text-center ${
+                          resumoFinanceiro.totalPendente > 0
+                            ? 'bg-coral/5 border border-coral/15'
+                            : 'bg-surface-alt'
+                        }`}>
+                          <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-text-secondary mb-1">Pendente</p>
+                          <p className={`font-mono text-base font-bold tabular-nums ${
+                            resumoFinanceiro.totalPendente > 0 ? 'text-coral' : 'text-text-secondary'
+                          }`}>
+                            {resumoFinanceiro.totalPendente.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </p>
+                        </div>
+                      </div>
+                      {resumoFinanceiro.totalAprovado > 0 && (
+                        <div className="w-full bg-surface-alt rounded-full h-1.5 overflow-hidden">
+                          <div
+                            className="h-full bg-teal rounded-full transition-all duration-500"
+                            style={{ width: `${Math.min(100, (resumoFinanceiro.totalPago / resumoFinanceiro.totalAprovado) * 100)}%` }}
+                          />
+                        </div>
+                      )}
+                      <button
+                        onClick={() => setActiveTab('orcamentos')}
+                        className="w-full mt-3 py-2.5 text-xs font-bold text-teal hover:text-teal-lt transition-colors flex items-center justify-center gap-2"
+                      >
+                        Ver Orçamentos <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+
                   {/* Atividade Recente — apenas para dentista/admin */}
                   {showClinicalTabs && (
-                    <div className="bg-card rounded-2xl border border-border/60 shadow-sm p-6">
+                    <div className="bg-surface rounded-2xl border border-border/60 shadow-sm p-6">
                       <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-heading text-xl text-foreground">Atividade Recente</h3>
+                        <h3 className="font-heading text-xl text-text-primary">Atividade Recente</h3>
                         <FileText className="w-5 h-5 text-teal" />
                       </div>
                       {fichasRecentes.length === 0 ? (
                         <div className="text-center py-6">
-                          <FileText className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
-                          <p className="text-sm text-muted-foreground">Nenhum registro clínico ainda.</p>
+                          <FileText className="w-8 h-8 text-text-secondary/30 mx-auto mb-2" />
+                          <p className="text-sm text-text-secondary">Nenhum registro clínico ainda.</p>
                         </div>
                       ) : (
                         <div className="space-y-1">
@@ -903,16 +1128,16 @@ export function PacienteDetailClient({
                                 <FileText className="w-4 h-4 text-teal" />
                               </div>
                               <div className="flex-1 min-w-0">
-                                <div className="text-sm font-medium text-foreground truncate">
+                                <div className="text-sm font-medium text-text-primary truncate">
                                   {ficha.queixa_principal ?? 'Evolução clínica'}
                                 </div>
                                 {ficha.anotacoes && (
-                                  <div className="text-xs text-muted-foreground truncate mt-0.5">
+                                  <div className="text-xs text-text-secondary truncate mt-0.5">
                                     {ficha.anotacoes}
                                   </div>
                                 )}
                                 <div className="flex items-center gap-3 mt-1">
-                                  <span className="text-[10px] text-muted-foreground">
+                                  <span className="text-[10px] text-text-secondary">
                                     {format(parseISO(ficha.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                                   </span>
                                   {ficha.dentista && (
@@ -928,34 +1153,86 @@ export function PacienteDetailClient({
                       )}
                     </div>
                   )}
+
+                  {/* Timeline do paciente — todos os roles */}
+                  {timeline.length > 0 && (
+                    <div className="bg-surface rounded-2xl border border-border/60 shadow-sm p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-heading text-xl text-text-primary">Histórico</h3>
+                        <Clock className="w-5 h-5 text-teal" />
+                      </div>
+                      <div className="relative">
+                        <div className="absolute left-3.5 top-0 bottom-0 w-px bg-border/60" />
+                        <div className="space-y-0">
+                          {timeline.slice(0, 8).map((event, idx) => {
+                            const dotColor =
+                              event.type === 'payment_registered' ? 'bg-teal'
+                              : event.type === 'appointment_cancelled' ? 'bg-coral'
+                              : event.type === 'consultation_created' ? 'bg-teal'
+                              : 'bg-surface-alt border border-border';
+                            return (
+                              <div key={event.id} className="flex gap-4 pb-4 last:pb-0">
+                                <div className="relative z-10 mt-1 shrink-0">
+                                  <div className={`w-3 h-3 rounded-full ${dotColor}`} />
+                                </div>
+                                <div className="flex-1 min-w-0 pb-0">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <p className="text-sm font-medium text-text-primary leading-snug">
+                                      {event.title}
+                                    </p>
+                                    <span className="text-[10px] font-mono text-text-secondary shrink-0">
+                                      {format(parseISO(event.timestamp), 'dd/MM', { locale: ptBR })}
+                                    </span>
+                                  </div>
+                                  {event.description && (
+                                    <p className="text-xs text-text-secondary mt-0.5 truncate">{event.description}</p>
+                                  )}
+                                  {event.actor && (
+                                    <p className="text-[11px] text-teal mt-0.5">{event.actor}</p>
+                                  )}
+                                  {idx < timeline.slice(0, 8).length - 1 && (
+                                    <div className="h-px bg-border/30 mt-3" />
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </TabsContent>
 
                 {showClinicalTabs && (
-                  <TabsContent value="fichas" className="mt-0">
-                    <FichasTab
-                      patientId={paciente.id}
-                      clinicaId={clinicaId}
-                      dentistaId={dentistaId}
-                      plano={plano}
-                    />
+                  <TabsContent value="ficha-clinica" className="mt-0">
+                    {mountedTabs.has('ficha-clinica') && (
+                      <FichasTab
+                        patientId={paciente.id}
+                        clinicaId={clinicaId}
+                        dentistaId={dentistaId}
+                        plano={plano}
+                      />
+                    )}
                   </TabsContent>
                 )}
 
                 {showClinicalTabs && (
-                  <TabsContent value="planejamento" className="mt-0">
-                  {temFeature(plano, 'planejamentoIA') ? (
-                    <PlanejamentoTab patientId={paciente.id} clinicaId={clinicaId} patientName={paciente.nome} />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
-                      <div className="w-14 h-14 rounded-2xl bg-teal/10 border border-teal/20 flex items-center justify-center">
-                        <Lock className="w-6 h-6 text-teal" />
-                      </div>
-                      <div>
-                        <p className="font-bold text-foreground mb-1">Disponível no Plano Básico</p>
-                        <p className="text-sm text-muted-foreground max-w-xs">Faça upgrade para acessar o Planejamento com IA — apresentações visuais e planos de tratamento completos.</p>
-                      </div>
-                    </div>
-                  )}
+                  <TabsContent value="tratamento" className="mt-0">
+                    {mountedTabs.has('tratamento') && (
+                      temFeature(plano, 'planejamentoIA') ? (
+                        <PlanejamentoTab patientId={paciente.id} clinicaId={clinicaId} patientName={paciente.nome} />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
+                          <div className="w-14 h-14 rounded-2xl bg-teal/10 border border-teal/20 flex items-center justify-center">
+                            <Lock className="w-6 h-6 text-teal" />
+                          </div>
+                          <div>
+                            <p className="font-bold text-text-primary mb-1">Disponível no Plano Básico</p>
+                            <p className="text-sm text-text-secondary max-w-xs">Faça upgrade para acessar o Planejamento com IA — apresentações visuais e planos de tratamento completos.</p>
+                          </div>
+                        </div>
+                      )
+                    )}
                   </TabsContent>
                 )}
 
@@ -963,7 +1240,7 @@ export function PacienteDetailClient({
                 <TabsContent value="orcamentos" className="mt-0 space-y-4">
                   {/* Botão novo orçamento — sempre visível */}
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground font-medium">
+                    <span className="text-sm text-text-secondary font-medium">
                       {orcamentosState.length} orçamento{orcamentosState.length !== 1 ? 's' : ''}
                     </span>
                     <button
@@ -981,12 +1258,12 @@ export function PacienteDetailClient({
                   </div>
 
                   {orcamentosState.length === 0 ? (
-                    <div className="bg-card rounded-2xl border border-border shadow-sm p-8 text-center">
+                    <div className="bg-surface rounded-2xl border border-border shadow-sm p-8 text-center">
                       <CreditCard className="w-12 h-12 text-teal/20 mx-auto mb-4" />
-                      <h3 className="font-heading text-2xl text-foreground mb-2">
+                      <h3 className="font-heading text-2xl text-text-primary mb-2">
                         Nenhum orçamento
                       </h3>
-                      <p className="text-muted-foreground text-sm max-w-md mx-auto">
+                      <p className="text-text-secondary text-sm max-w-md mx-auto">
                         Nenhum orçamento ainda. Clique em + Novo Orçamento para criar.
                       </p>
                     </div>
@@ -1003,11 +1280,11 @@ export function PacienteDetailClient({
                         <div
                           key={orc.id}
                           onClick={() => setDetalheOrcId(orc.id)}
-                          className="bg-card rounded-2xl border border-border/60 shadow-sm p-6 cursor-pointer hover:border-teal/30 transition-colors"
+                          className="bg-surface rounded-2xl border border-border/60 shadow-sm p-6 cursor-pointer hover:border-teal/30 transition-colors"
                         >
                           <div className="flex items-start justify-between mb-4">
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
+                              <div className="w-10 h-10 rounded-xl bg-surface-alt flex items-center justify-center">
                                 <StatusIcon className="w-5 h-5 text-teal" />
                               </div>
                               <div>
@@ -1018,7 +1295,7 @@ export function PacienteDetailClient({
                                     {st.label}
                                   </span>
                                 </div>
-                                <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                                <div className="text-xs text-text-secondary mt-0.5 flex items-center gap-1">
                                   <Calendar className="w-3 h-3" />
                                   {format(parseISO(orc.created_at), 'dd/MM/yyyy', {
                                     locale: ptBR,
@@ -1031,14 +1308,14 @@ export function PacienteDetailClient({
                             </div>
                             <div className="flex items-center gap-3">
                               <div className="text-right">
-                                <div className="font-mono text-lg font-bold text-foreground">
+                                <div className="font-mono text-lg font-bold text-text-primary">
                                   R${' '}
                                   {(orc.total ?? 0).toLocaleString('pt-BR', {
                                     minimumFractionDigits: 2,
                                   })}
                                 </div>
                               </div>
-                              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                              <ChevronRight className="w-4 h-4 text-text-secondary" />
                             </div>
                           </div>
 
@@ -1049,14 +1326,14 @@ export function PacienteDetailClient({
                                   key={item.id}
                                   className="flex items-center justify-between text-xs"
                                 >
-                                  <div className="flex items-center gap-2 text-muted-foreground">
+                                  <div className="flex items-center gap-2 text-text-secondary">
                                     <FileText className="w-3 h-3" />
                                     {item.descricao ?? '—'}
                                     {item.quantidade > 1 && (
                                       <span className="font-mono">×{item.quantidade}</span>
                                     )}
                                   </div>
-                                  <span className="font-mono text-foreground font-medium">
+                                  <span className="font-mono text-text-primary font-medium">
                                     R${' '}
                                     {(item.preco_total ?? 0).toLocaleString('pt-BR', {
                                       minimumFractionDigits: 2,
@@ -1069,7 +1346,7 @@ export function PacienteDetailClient({
 
                           {orc.pagamentos.length > 0 && (
                             <div className="pt-3 border-t border-border/40">
-                              <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">
+                              <div className="text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-2">
                                 Pagamentos
                               </div>
                               {orc.pagamentos.map((pg) => (
@@ -1077,7 +1354,7 @@ export function PacienteDetailClient({
                                   key={pg.id}
                                   className="flex items-center justify-between text-xs"
                                 >
-                                  <span className="text-muted-foreground capitalize">
+                                  <span className="text-text-secondary capitalize">
                                     {pg.forma_pagamento ?? 'Não informado'} •{' '}
                                     <span
                                       className={
@@ -1087,7 +1364,7 @@ export function PacienteDetailClient({
                                       {pg.status}
                                     </span>
                                   </span>
-                                  <span className="font-mono font-medium text-foreground">
+                                  <span className="font-mono font-medium text-text-primary">
                                     R${' '}
                                     {pg.valor.toLocaleString('pt-BR', {
                                       minimumFractionDigits: 2,
@@ -1103,13 +1380,99 @@ export function PacienteDetailClient({
                   )}
                 </TabsContent>
 
-                {/* Documentos */}
-                <TabsContent value="documentos" className="mt-0">
-                  <DocumentosTab patientId={paciente.id} clinicaId={clinicaId} />
+                {/* Agenda do paciente */}
+                <TabsContent value="agenda" className="mt-0 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-text-secondary font-medium">
+                      Histórico de consultas
+                    </span>
+                    <button
+                      onClick={() => { setConsultaError(null); setIsNovaConsultaOpen(true); }}
+                      className="bg-teal text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 hover:bg-teal-lt transition-all shadow-md"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Nova Consulta
+                    </button>
+                  </div>
+
+                  {loadingAgendamentos ? (
+                    <div className="space-y-3">
+                      {[0, 1, 2].map((i) => (
+                        <div key={i} className="bg-surface rounded-2xl border border-border/60 p-5 animate-pulse">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-surface-alt rounded-xl shrink-0" />
+                            <div className="flex-1 space-y-2">
+                              <div className="h-3 w-20 bg-surface-alt rounded" />
+                              <div className="h-4 w-48 bg-surface-alt rounded" />
+                              <div className="h-3 w-32 bg-surface-alt rounded" />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : agendamentosTabData?.length === 0 ? (
+                    <div className="bg-surface rounded-2xl border border-border shadow-sm p-10 text-center">
+                      <Calendar className="w-12 h-12 text-teal/20 mx-auto mb-4" />
+                      <h3 className="font-heading text-2xl text-text-primary mb-2">Nenhuma consulta</h3>
+                      <p className="text-text-secondary text-sm">Nenhuma consulta registrada para este paciente ainda.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {agendamentosTabData?.map((ag) => {
+                        const statusInfo = STATUS_AGENDA_MAP[ag.status] ?? { label: ag.status, cls: 'bg-surface-alt text-text-secondary' };
+                        const isUpcoming = new Date(ag.data_hora) > new Date();
+                        return (
+                          <div
+                            key={ag.id}
+                            className="bg-surface rounded-2xl border border-border/60 shadow-sm p-5 flex items-start gap-4"
+                          >
+                            <div className="w-12 h-12 bg-surface-alt rounded-xl flex flex-col items-center justify-center shrink-0">
+                              <span className="text-[10px] font-bold text-teal uppercase">
+                                {format(parseISO(ag.data_hora), 'MMM', { locale: ptBR })}
+                              </span>
+                              <span className="text-base font-bold text-text-primary leading-none">
+                                {format(parseISO(ag.data_hora), 'dd')}
+                              </span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="mb-1">
+                                <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md ${statusInfo.cls}`}>
+                                  {statusInfo.label}
+                                </span>
+                              </div>
+                              <div className="font-medium text-sm text-text-primary">
+                                {format(parseISO(ag.data_hora), "EEEE, 'às' HH:mm", { locale: ptBR })}
+                              </div>
+                              {ag.observacoes && (
+                                <div className="text-xs text-text-secondary mt-0.5 truncate">{ag.observacoes}</div>
+                              )}
+                              {ag.dentista && (
+                                <div className="text-xs text-teal mt-0.5 font-medium">{ag.dentista.nome}</div>
+                              )}
+                            </div>
+                            {showClinicalTabs && isUpcoming && !['cancelled', 'no_show', 'completed'].includes(ag.status) && (
+                              <button
+                                onClick={() => router.push(`/consulta/${ag.id}`)}
+                                className="shrink-0 px-3 py-1.5 bg-teal text-white rounded-lg text-xs font-bold hover:bg-teal-lt transition-colors"
+                              >
+                                Iniciar
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </TabsContent>
-              </motion.div>
-            </AnimatePresence>
-              </div>{/* fim flex-1 */}
+
+                {/* Arquivos */}
+                <TabsContent value="arquivos" className="mt-0">
+                  {mountedTabs.has('arquivos') && (
+                    <DocumentosTab patientId={paciente.id} clinicaId={clinicaId} />
+                  )}
+                </TabsContent>
+              </div>
+            </div>{/* fim flex-1 */}
 
               {/* Sidebar: Procedimentos Pendentes */}
               <AnimatePresence>
@@ -1124,13 +1487,13 @@ export function PacienteDetailClient({
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: 16 }}
                       transition={{ duration: 0.2 }}
-                      className="w-72 shrink-0 sticky top-6"
+                      className="w-full lg:w-72 shrink-0 lg:sticky lg:top-6"
                     >
-                      <div className="bg-card rounded-2xl border border-border/60 shadow-sm p-5">
+                      <div className="bg-surface rounded-2xl border border-border/60 shadow-sm p-5">
                         <div className="flex items-center justify-between mb-4">
                           <div className="flex items-center gap-2">
                             <ClipboardList className="w-4 h-4 text-teal" />
-                            <h3 className="font-heading text-base text-foreground">Pendências</h3>
+                            <h3 className="font-heading text-base text-text-primary">Pendências</h3>
                           </div>
                           <div className="flex items-center gap-1.5">
                             {doneCount > 0 && (
@@ -1151,7 +1514,7 @@ export function PacienteDetailClient({
                             <div className="w-7 h-7 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0">
                               <Check className="w-3.5 h-3.5 text-emerald-500" />
                             </div>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-xs text-text-secondary">
                               {total === 0 ? 'Nenhum procedimento.' : 'Tudo concluído!'}
                             </p>
                           </div>
@@ -1162,14 +1525,14 @@ export function PacienteDetailClient({
                                 key={item.globalKey}
                                 onClick={() => void togglePendencia(item)}
                                 disabled={togglingPendencia === item.globalKey}
-                                className="flex items-center gap-2 w-full p-2 rounded-xl bg-muted hover:bg-accent border border-border/40 hover:border-teal/30 transition-all text-left group disabled:opacity-50"
+                                className="flex items-center gap-2 w-full p-2 rounded-xl bg-surface-alt hover:bg-surface-alt/70 border border-border/40 hover:border-teal/30 transition-all text-left group disabled:opacity-50"
                               >
                                 <div className="w-3.5 h-3.5 rounded border-2 border-border group-hover:border-teal shrink-0 transition-colors flex items-center justify-center">
                                   {togglingPendencia === item.globalKey && (
                                     <Loader2 className="w-2 h-2 animate-spin text-teal" />
                                   )}
                                 </div>
-                                <span className="text-[11px] text-foreground truncate flex-1">{item.descricao}</span>
+                                <span className="text-[11px] text-text-primary truncate flex-1">{item.descricao}</span>
                                 <span className="text-[9px] font-mono font-bold text-teal shrink-0 bg-teal/10 px-1 py-0.5 rounded">
                                   {ARCH_LABEL_SHORT[item.tooth] ?? `D${item.tooth}`}
                                 </span>
@@ -1177,8 +1540,8 @@ export function PacienteDetailClient({
                             ))}
                             {pending.length > 8 && (
                               <button
-                                onClick={() => setActiveTab('fichas')}
-                                className="w-full text-center text-[11px] text-muted-foreground hover:text-teal transition-colors py-1"
+                                onClick={() => handleTabChange('ficha-clinica')}
+                                className="w-full text-center text-[11px] text-text-secondary hover:text-teal transition-colors py-1"
                               >
                                 +{pending.length - 8} mais
                               </button>
@@ -1188,7 +1551,7 @@ export function PacienteDetailClient({
 
                         {total > 0 && (
                           <button
-                            onClick={() => setActiveTab('fichas')}
+                            onClick={() => handleTabChange('ficha-clinica')}
                             className="mt-3 w-full text-[11px] font-bold text-teal hover:text-teal-lt transition-colors flex items-center justify-center gap-1 border-t border-border/40 pt-3"
                           >
                             Ver fichas clínicas <ChevronRight className="w-3 h-3" />
@@ -1204,798 +1567,98 @@ export function PacienteDetailClient({
         </motion.div>
       </div>
 
-      {/* Dialog: Editar Perfil */}
-      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent className="max-w-md rounded-2xl bg-card border-border">
-          <DialogHeader>
-            <DialogTitle className="font-heading text-2xl text-foreground">
-              Editar Perfil
-            </DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              Atualize as informações cadastrais do paciente.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-nome">Nome Completo</Label>
-              <Input
-                id="edit-nome"
-                value={editNome}
-                onChange={(e) => setEditNome(e.target.value)}
-                className="rounded-xl bg-muted border-border"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-telefone">Telefone</Label>
-                <Input
-                  id="edit-telefone"
-                  value={editTelefone}
-                  onChange={(e) => setEditTelefone(e.target.value)}
-                  className="rounded-xl bg-muted border-border"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-email">Email</Label>
-                <Input
-                  id="edit-email"
-                  value={editEmail}
-                  onChange={(e) => setEditEmail(e.target.value)}
-                  className="rounded-xl bg-muted border-border"
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-endereco">Endereço</Label>
-              <Input
-                id="edit-endereco"
-                value={editEndereco}
-                onChange={(e) => setEditEndereco(e.target.value)}
-                className="rounded-xl bg-muted border-border"
-              />
-            </div>
-            {editError && <p className="text-xs text-red-500">{editError}</p>}
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsEditModalOpen(false)}
-              className="rounded-xl"
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleSaveEdit}
-              disabled={isPending || !editNome.trim()}
-              className="bg-teal text-white hover:bg-teal-lt rounded-xl disabled:opacity-50"
-            >
-              {isPending ? 'Salvando...' : 'Salvar Alterações'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Dialog: Detalhe do orçamento */}
-      <Dialog
-        open={!!detalheOrcId}
+      <EditarPacienteModal
+        open={isEditModalOpen}
         onOpenChange={(open) => {
+          setIsEditModalOpen(open);
           if (!open) {
-            setDetalheOrcId(null);
-            setPagError(null);
-            setOrcEditMode(false);
-            setOrcEditError(null);
+            setEditNome(paciente.nome);
+            setEditTelefone(paciente.telefone ?? '');
+            setEditEmail(paciente.email ?? '');
+            setEditEndereco(paciente.endereco ?? '');
+            setEditError(null);
           }
         }}
-      >
-        <DialogContent className="max-w-lg rounded-2xl bg-card border-border max-h-[90vh] overflow-y-auto scrollbar-hide">
-          {detalheOrc && (
-            <>
-              <DialogHeader>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1">
-                    <div className="mb-1">
-                      <span
-                        className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md ${STATUS_ORCAMENTO[detalheOrc.status]?.cls ?? ''}`}
-                      >
-                        {STATUS_ORCAMENTO[detalheOrc.status]?.label}
-                      </span>
-                    </div>
-                    <DialogTitle className="font-heading text-2xl text-foreground">
-                      Orçamento de{' '}
-                      {format(parseISO(detalheOrc.created_at), "dd 'de' MMMM 'de' yyyy", {
-                        locale: ptBR,
-                      })}
-                    </DialogTitle>
-                    <p className="font-mono text-xs text-muted-foreground mt-0.5">
-                      {format(parseISO(detalheOrc.created_at), 'dd/MM/yyyy', { locale: ptBR })}
-                    </p>
-                  </div>
-                  {!orcEditMode && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleOpenEditOrc}
-                      className="rounded-xl bg-muted border-border text-foreground hover:bg-muted/80 mt-1"
-                    >
-                      <Edit2 className="w-4 h-4 mr-1" />
-                      Editar
-                    </Button>
-                  )}
-                </div>
-              </DialogHeader>
+        editNome={editNome}
+        setEditNome={setEditNome}
+        editTelefone={editTelefone}
+        setEditTelefone={setEditTelefone}
+        editEmail={editEmail}
+        setEditEmail={setEditEmail}
+        editEndereco={editEndereco}
+        setEditEndereco={setEditEndereco}
+        editError={editError}
+        isPending={isPending}
+        onSave={handleSaveEdit}
+      />
 
-              <div className="space-y-6 py-4">
-                {/* Alterar status */}
-                <div className="space-y-2">
-                  <Label className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
-                    Status
-                  </Label>
-                  <Select
-                    value={detalheOrc.status}
-                    onValueChange={(v) =>
-                      v && void handleStatusChange(detalheOrc.id, v as StatusOrcamento)
-                    }
-                  >
-                    <SelectTrigger className="rounded-xl bg-muted border-border text-foreground">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border-border">
-                      <SelectItem value="rascunho">Rascunho</SelectItem>
-                      <SelectItem value="enviado">Enviado</SelectItem>
-                      <SelectItem value="aprovado">Aprovado</SelectItem>
-                      <SelectItem value="recusado">Recusado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Procedimentos */}
-                <div className="space-y-2">
-                  <div className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
-                    Procedimentos
-                  </div>
-                  {orcEditMode ? (
-                    <div className="space-y-3">
-                      {orcEditItens.map((item, idx) => (
-                        <div key={idx} className="bg-muted rounded-2xl border border-border p-4 space-y-2">
-                          <div className="flex gap-2">
-                            <Input
-                              placeholder="Descrição"
-                              value={item.descricao}
-                              onChange={(e) =>
-                                setOrcEditItens((prev) =>
-                                  prev.map((it, i) =>
-                                    i === idx ? { ...it, descricao: e.target.value } : it
-                                  )
-                                )
-                              }
-                              className="rounded-xl bg-card border-border text-foreground text-sm flex-1"
-                            />
-                            <button
-                              onClick={() =>
-                                setOrcEditItens((prev) => prev.filter((_, i) => i !== idx))
-                              }
-                              className="p-2 rounded-xl hover:bg-red-500/10 text-red-400 hover:text-red-500 transition-colors"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                          <div className="flex gap-2">
-                            <div className="space-y-1 w-20">
-                              <label className="text-[10px] text-muted-foreground">Qtd</label>
-                              <Input
-                                type="number"
-                                min="1"
-                                value={item.quantidade}
-                                onChange={(e) =>
-                                  setOrcEditItens((prev) =>
-                                    prev.map((it, i) =>
-                                      i === idx
-                                        ? { ...it, quantidade: parseInt(e.target.value) || 1 }
-                                        : it
-                                    )
-                                  )
-                                }
-                                className="rounded-xl bg-card border-border text-foreground text-sm font-mono"
-                              />
-                            </div>
-                            <div className="space-y-1 flex-1">
-                              <label className="text-[10px] text-muted-foreground">
-                                Preço unit. (R$)
-                              </label>
-                              <Input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={item.preco_unitario}
-                                onChange={(e) =>
-                                  setOrcEditItens((prev) =>
-                                    prev.map((it, i) =>
-                                      i === idx
-                                        ? { ...it, preco_unitario: parseFloat(e.target.value) || 0 }
-                                        : it
-                                    )
-                                  )
-                                }
-                                className="rounded-xl bg-card border-border text-foreground text-sm font-mono"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                      <button
-                        onClick={() =>
-                          setOrcEditItens((prev) => [
-                            ...prev,
-                            { descricao: '', quantidade: 1, preco_unitario: 0 },
-                          ])
-                        }
-                        className="w-full py-3 border border-dashed border-border rounded-xl text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors flex items-center justify-center gap-2"
-                      >
-                        <Plus className="w-4 h-4" /> Adicionar item
-                      </button>
-                      <div className="bg-teal/10 rounded-xl p-3 border border-teal/20 flex items-center justify-between">
-                        <span className="text-sm font-bold text-foreground">Total</span>
-                        <span className="font-mono text-lg font-bold text-teal">
-                          R${' '}
-                          {orcEditItens
-                            .reduce((sum, i) => sum + i.quantidade * i.preco_unitario, 0)
-                            .toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="bg-muted rounded-2xl p-4 space-y-2">
-                      {detalheOrc.itens.length === 0 && (
-                        <p className="text-sm text-muted-foreground">Nenhum procedimento.</p>
-                      )}
-                      {detalheOrc.itens.map((item) => (
-                        <div
-                          key={item.id}
-                          className="flex items-center justify-between text-sm"
-                        >
-                          <div className="text-foreground">
-                            {item.descricao ?? '—'}
-                            {item.quantidade > 1 && (
-                              <span className="text-muted-foreground font-mono ml-2 text-xs">
-                                ×{item.quantidade}
-                              </span>
-                            )}
-                          </div>
-                          <span className="font-mono text-foreground font-medium">
-                            R${' '}
-                            {(item.preco_total ?? 0).toLocaleString('pt-BR', {
-                              minimumFractionDigits: 2,
-                            })}
-                          </span>
-                        </div>
-                      ))}
-                      <div className="pt-2 border-t border-border/40 flex items-center justify-between font-bold">
-                        <span className="text-sm text-foreground">Total</span>
-                        <span className="font-mono text-lg text-teal">
-                          R${' '}
-                          {(detalheOrc.total ?? 0).toLocaleString('pt-BR', {
-                            minimumFractionDigits: 2,
-                          })}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Histórico de pagamentos */}
-                {detalheOrc.pagamentos.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
-                      Histórico de Pagamentos
-                    </div>
-                    <div className="space-y-2">
-                      {detalheOrc.pagamentos.map((pg) => (
-                        <div
-                          key={pg.id}
-                          className="bg-card rounded-xl border border-border p-3 flex items-center justify-between text-sm"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="text-foreground capitalize">
-                              {pg.forma_pagamento ?? 'Não informado'}
-                            </span>
-                            <span
-                              className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md ${
-                                pg.status === 'pago'
-                                  ? 'bg-teal/10 text-teal'
-                                  : 'bg-yellow-500/10 text-yellow-600'
-                              }`}
-                            >
-                              {pg.status}
-                            </span>
-                          </div>
-                          <span className="font-mono font-medium text-foreground">
-                            R${' '}
-                            {pg.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Registrar pagamento */}
-                <div className="space-y-3 border-t border-border/40 pt-4">
-                  <div className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
-                    Registrar Pagamento
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <Label className="text-foreground text-xs">Valor (R$)</Label>
-                      <Input
-                        type="number"
-                        placeholder="0,00"
-                        min="0"
-                        step="0.01"
-                        value={pagForm.valor}
-                        onChange={(e) =>
-                          setPagForm((f) => ({ ...f, valor: e.target.value }))
-                        }
-                        className="rounded-xl bg-muted border-border text-foreground"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-foreground text-xs">Data</Label>
-                      <Input
-                        type="date"
-                        value={pagForm.data}
-                        onChange={(e) =>
-                          setPagForm((f) => ({ ...f, data: e.target.value }))
-                        }
-                        className="rounded-xl bg-muted border-border text-foreground"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-foreground text-xs">Forma de Pagamento</Label>
-                    <Select
-                      value={pagForm.formaPagamento}
-                      onValueChange={(v) =>
-                        v && setPagForm((f) => ({ ...f, formaPagamento: v as FormaPagamento }))
-                      }
-                    >
-                      <SelectTrigger className="rounded-xl bg-muted border-border text-foreground">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-card border-border">
-                        <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                        <SelectItem value="pix">PIX</SelectItem>
-                        <SelectItem value="cartao_credito">Cartão de Crédito</SelectItem>
-                        <SelectItem value="cartao_debito">Cartão de Débito</SelectItem>
-                        <SelectItem value="boleto">Boleto</SelectItem>
-                        <SelectItem value="outro">Outro</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {pagError && (
-                    <p className="text-xs text-red-500 bg-red-500/10 rounded-lg px-3 py-2">
-                      {pagError}
-                    </p>
-                  )}
-                  <Button
-                    onClick={() => void handleRegistrarPagamento()}
-                    disabled={pagSaving || !pagForm.valor}
-                    className="w-full bg-teal text-white hover:bg-teal-lt rounded-xl disabled:opacity-50"
-                  >
-                    {pagSaving ? 'Salvando...' : 'Confirmar Pagamento'}
-                  </Button>
-                </div>
-              </div>
-
-              <DialogFooter className="flex-col sm:flex-row gap-2">
-                {orcEditMode ? (
-                  <>
-                    {orcEditError && (
-                      <p className="text-xs text-red-500 bg-red-500/10 rounded-lg px-3 py-2 w-full sm:w-auto">
-                        {orcEditError}
-                      </p>
-                    )}
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setOrcEditMode(false);
-                        setOrcEditError(null);
-                      }}
-                      disabled={orcEditSaving}
-                      className="rounded-xl border-border text-foreground hover:bg-muted"
-                    >
-                      Cancelar
-                    </Button>
-                    <Button
-                      onClick={() => void handleSalvarEdicaoOrc()}
-                      disabled={orcEditSaving}
-                      className="bg-teal text-white hover:bg-teal-lt rounded-xl"
-                    >
-                      {orcEditSaving ? 'Salvando...' : 'Salvar Alterações'}
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button
-                      variant="outline"
-                      onClick={() => setConfirmDeleteOrcId(detalheOrcId)}
-                      className="rounded-xl border-red-500/30 text-red-500 hover:bg-red-500/10 mr-auto"
-                    >
-                      <Trash2 className="w-4 h-4 mr-1.5" />
-                      Excluir
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setDetalheOrcId(null);
-                        setPagError(null);
-                      }}
-                      className="rounded-xl border-border text-foreground hover:bg-muted"
-                    >
-                      Fechar
-                    </Button>
-                  </>
-                )}
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Dialog: Confirmar exclusão de orçamento */}
-      <Dialog
-        open={!!confirmDeleteOrcId}
-        onOpenChange={(open) => {
-          if (!open) setConfirmDeleteOrcId(null);
+      <DetalheOrcamentoModal
+        detalheOrc={detalheOrc}
+        detalheOrcId={detalheOrcId}
+        onClose={() => {
+          setDetalheOrcId(null);
+          setPagError(null);
+          setOrcEditMode(false);
+          setOrcEditError(null);
+          setPagForm({ valor: '', formaPagamento: 'pix', data: new Date().toISOString().split('T')[0] });
         }}
-      >
-        <DialogContent className="max-w-sm rounded-2xl bg-card border-border">
-          <DialogHeader>
-            <DialogTitle className="font-heading text-xl text-foreground">
-              Excluir orçamento?
-            </DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              Esta ação é irreversível. Todos os pagamentos vinculados também serão removidos.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setConfirmDeleteOrcId(null)}
-              disabled={orcDeleteSaving}
-              className="rounded-xl border-border text-foreground hover:bg-muted"
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={() => void handleExcluirOrc()}
-              disabled={orcDeleteSaving}
-              className="bg-red-500 text-white hover:bg-red-600 rounded-xl"
-            >
-              {orcDeleteSaving ? 'Excluindo...' : 'Excluir'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        pagForm={pagForm}
+        setPagForm={setPagForm}
+        pagSaving={pagSaving}
+        pagError={pagError}
+        orcEditMode={orcEditMode}
+        setOrcEditMode={setOrcEditMode}
+        orcEditItens={orcEditItens}
+        setOrcEditItens={setOrcEditItens}
+        orcEditSaving={orcEditSaving}
+        orcEditError={orcEditError}
+        setOrcEditError={setOrcEditError}
+        onOpenEditOrc={handleOpenEditOrc}
+        onSalvarEdicaoOrc={handleSalvarEdicaoOrc}
+        onStatusChange={handleStatusChange}
+        onRegistrarPagamento={handleRegistrarPagamento}
+        onDeleteClick={setConfirmDeleteOrcId}
+      />
 
-      {/* Dialog: Nova Consulta */}
-      <Dialog open={isNovaConsultaOpen} onOpenChange={setIsNovaConsultaOpen}>
-        <DialogContent className="max-w-md rounded-2xl bg-card border-border">
-          <DialogHeader>
-            <DialogTitle className="font-heading text-2xl text-foreground">
-              Nova Consulta
-            </DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              Agende uma consulta para {paciente.nome}.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="consulta-data">Data</Label>
-                <Input
-                  id="consulta-data"
-                  type="date"
-                  value={consultaForm.data}
-                  onChange={(e) => setConsultaForm((f) => ({ ...f, data: e.target.value }))}
-                  className="rounded-xl bg-muted border-border text-foreground"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="consulta-hora">Hora</Label>
-                <Input
-                  id="consulta-hora"
-                  type="time"
-                  value={consultaForm.hora}
-                  onChange={(e) => setConsultaForm((f) => ({ ...f, hora: e.target.value }))}
-                  className="rounded-xl bg-muted border-border text-foreground"
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="consulta-duracao">Duração (minutos)</Label>
-              <Input
-                id="consulta-duracao"
-                type="number"
-                min="15"
-                step="15"
-                value={consultaForm.duracao}
-                onChange={(e) => setConsultaForm((f) => ({ ...f, duracao: e.target.value }))}
-                className="rounded-xl bg-muted border-border text-foreground"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="consulta-obs">Observações</Label>
-              <Input
-                id="consulta-obs"
-                placeholder="Ex: Consulta de rotina, limpeza..."
-                value={consultaForm.observacoes}
-                onChange={(e) => setConsultaForm((f) => ({ ...f, observacoes: e.target.value }))}
-                className="rounded-xl bg-muted border-border text-foreground"
-              />
-            </div>
-            {consultaError && (
-              <p className="text-xs text-red-500 bg-red-500/10 rounded-lg px-3 py-2">
-                {consultaError}
-              </p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsNovaConsultaOpen(false)}
-              className="rounded-xl border-border text-foreground hover:bg-muted"
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={() => void handleNovaConsulta()}
-              disabled={consultaSaving}
-              className="bg-teal text-white hover:bg-teal-lt rounded-xl disabled:opacity-50 flex items-center gap-2"
-            >
-              {consultaSaving ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Salvando...</>
-              ) : (
-                'Agendar Consulta'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmarDeleteOrcModal
+        confirmDeleteOrcId={confirmDeleteOrcId}
+        onOpenChange={(open) => { if (!open) setConfirmDeleteOrcId(null); }}
+        orcDeleteSaving={orcDeleteSaving}
+        onExcluir={handleExcluirOrc}
+      />
 
-      {/* Dialog: Novo Orçamento */}
-      <Dialog open={isNovoOrcOpen} onOpenChange={(open) => {
-        setIsNovoOrcOpen(open);
-        if (!open) { setEtapaNovoOrc('itens'); setFichasParaOrc([]); setOrcError(null); }
-      }}>
-        <DialogContent className="max-w-lg rounded-2xl bg-card border-border max-h-[90vh] overflow-y-auto scrollbar-hide">
-          <DialogHeader>
-            <DialogTitle className="font-heading text-2xl text-foreground">
-              {etapaNovoOrc === 'selecionar' ? 'Selecionar Ficha' : 'Novo Orçamento'}
-            </DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              {etapaNovoOrc === 'selecionar'
-                ? 'Escolha qual registro clínico vai gerar o orçamento.'
-                : 'Selecione procedimentos e defina os valores.'}
-            </DialogDescription>
-          </DialogHeader>
+      <NovaConsultaModal
+        open={isNovaConsultaOpen}
+        onOpenChange={(open) => {
+          setIsNovaConsultaOpen(open);
+          if (!open) setConsultaError(null);
+        }}
+        pacienteNome={paciente.nome}
+        consultaForm={consultaForm}
+        setConsultaForm={setConsultaForm}
+        consultaError={consultaError}
+        consultaSaving={consultaSaving}
+        onNovaConsulta={handleNovaConsulta}
+      />
 
-          <div className="space-y-4 py-4">
-            {/* ── Etapa 1: seleção de ficha ── */}
-            {etapaNovoOrc === 'selecionar' && (
-              <div className="space-y-3">
-                {fichasParaOrc.map((ficha) => {
-                  const denteCount = (ficha.dentes_afetados ?? []).length;
-                  const dataFormatada = format(parseISO(ficha.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
-                  return (
-                    <button
-                      key={ficha.id}
-                      onClick={() => selecionarFichaParaOrc(ficha.id)}
-                      className="w-full text-left p-4 rounded-xl border border-border bg-muted hover:border-teal/40 hover:bg-teal/5 transition-all group"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="font-semibold text-sm text-foreground group-hover:text-teal transition-colors truncate">
-                            {ficha.queixa_principal ?? 'Evolução clínica'}
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-0.5">{dataFormatada}</div>
-                        </div>
-                        {denteCount > 0 && (
-                          <span className="shrink-0 text-[10px] font-bold font-mono bg-teal/10 text-teal px-2 py-1 rounded-lg">
-                            {denteCount} dente{denteCount !== 1 ? 's' : ''}
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
-                <button
-                  onClick={() => selecionarFichaParaOrc(null)}
-                  className="w-full py-3 border border-dashed border-border rounded-xl text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors flex items-center justify-center gap-2"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Criar orçamento em branco
-                </button>
-              </div>
-            )}
-
-            {/* ── Etapa 2: edição de itens ── */}
-            {etapaNovoOrc === 'itens' && novoOrcItens.map((item, idx) => (
-              <div key={idx} className="bg-muted rounded-2xl border border-border p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
-                    Procedimento {idx + 1}
-                  </span>
-                  {novoOrcItens.length > 1 && (
-                    <button
-                      onClick={() =>
-                        setNovoOrcItens((prev) => prev.filter((_, i) => i !== idx))
-                      }
-                      className="p-1 text-red-400 hover:text-red-500 transition-colors"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label className="text-foreground text-xs">Procedimento da clínica</Label>
-                  <Select
-                    value={item.procedimentoId}
-                    onValueChange={(v) => {
-                      if (!v) return;
-                      const proc = procedimentosClinica.find((p) => p.id === v);
-                      setNovoOrcItens((prev) =>
-                        prev.map((it, i) =>
-                          i === idx
-                            ? {
-                                ...it,
-                                procedimentoId: v,
-                                descricao: proc?.nome ?? it.descricao,
-                                preco: proc?.preco_padrao ?? it.preco,
-                              }
-                            : it
-                        )
-                      );
-                    }}
-                  >
-                    <SelectTrigger className="rounded-xl bg-card border-border text-foreground">
-                      <SelectValue>
-                        {(v: string | null) =>
-                          v
-                            ? (procedimentosClinica.find((p) => p.id === v)?.nome ?? v)
-                            : 'Selecionar (opcional)...'
-                        }
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border-border">
-                      {procedimentosClinica.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label className="text-foreground text-xs">Descrição *</Label>
-                  <Input
-                    placeholder="Ex: Restauração dente 36"
-                    value={item.descricao}
-                    onChange={(e) =>
-                      setNovoOrcItens((prev) =>
-                        prev.map((it, i) =>
-                          i === idx ? { ...it, descricao: e.target.value } : it
-                        )
-                      )
-                    }
-                    className="rounded-xl bg-card border-border text-foreground"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-foreground text-xs">Qtd</Label>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={item.quantidade}
-                      onChange={(e) =>
-                        setNovoOrcItens((prev) =>
-                          prev.map((it, i) =>
-                            i === idx
-                              ? { ...it, quantidade: parseInt(e.target.value) || 1 }
-                              : it
-                          )
-                        )
-                      }
-                      className="rounded-xl bg-card border-border text-foreground font-mono"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-foreground text-xs">Valor unitário (R$)</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={item.preco}
-                      onChange={(e) =>
-                        setNovoOrcItens((prev) =>
-                          prev.map((it, i) =>
-                            i === idx
-                              ? { ...it, preco: parseFloat(e.target.value) || 0 }
-                              : it
-                          )
-                        )
-                      }
-                      className="rounded-xl bg-card border-border text-foreground font-mono"
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
-
-            {etapaNovoOrc === 'itens' && (
-              <>
-                <button
-                  onClick={() =>
-                    setNovoOrcItens((prev) => [
-                      ...prev,
-                      { procedimentoId: '', descricao: '', quantidade: 1, preco: 0 },
-                    ])
-                  }
-                  className="w-full py-3 border border-dashed border-border rounded-xl text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors flex items-center justify-center gap-2"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Adicionar Procedimento
-                </button>
-
-                <div className="bg-teal/10 rounded-xl p-3 flex items-center justify-between border border-teal/20">
-                  <span className="text-sm font-bold text-foreground">Total</span>
-                  <span className="font-mono text-xl font-bold text-teal">
-                    R$ {novoOrcTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-
-                {orcError && (
-                  <p className="text-xs text-red-500 bg-red-500/10 rounded-lg px-3 py-2">
-                    {orcError}
-                  </p>
-                )}
-              </>
-            )}
-          </div>
-
-          <DialogFooter className="gap-2">
-            {etapaNovoOrc === 'itens' && fichasParaOrc.length > 1 && (
-              <Button
-                variant="outline"
-                onClick={() => setEtapaNovoOrc('selecionar')}
-                disabled={orcSaving}
-                className="rounded-xl border-border text-foreground hover:bg-muted mr-auto"
-              >
-                ← Voltar
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              onClick={() => setIsNovoOrcOpen(false)}
-              className="rounded-xl border-border text-foreground hover:bg-muted"
-            >
-              Cancelar
-            </Button>
-            {etapaNovoOrc === 'itens' && (
-              <Button
-                onClick={() => void handleCriarOrcamento()}
-                disabled={orcSaving}
-                className="bg-teal text-white hover:bg-teal-lt rounded-xl disabled:opacity-50 font-bold"
-              >
-                {orcSaving ? 'Salvando...' : 'Criar Orçamento'}
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <NovoOrcamentoModal
+        open={isNovoOrcOpen}
+        onOpenChange={(open) => {
+          setIsNovoOrcOpen(open);
+          if (!open) { setEtapaNovoOrc('itens'); setFichasParaOrc([]); setOrcError(null); }
+        }}
+        etapaNovoOrc={etapaNovoOrc}
+        setEtapaNovoOrc={setEtapaNovoOrc}
+        fichasParaOrc={fichasParaOrc}
+        orcError={orcError}
+        novoOrcItens={novoOrcItens}
+        setNovoOrcItens={setNovoOrcItens}
+        procedimentosClinica={procedimentosClinica}
+        novoOrcTotal={novoOrcTotal}
+        orcSaving={orcSaving}
+        onCriarOrcamento={handleCriarOrcamento}
+        onSelecionarFicha={selecionarFichaParaOrc}
+      />
     </div>
   );
 }

@@ -42,13 +42,13 @@ export function DashboardHeader({
 
   return (
     <div className="mb-8 md:mb-10">
-      <p className="text-[11px] font-bold text-text-secondary uppercase tracking-[0.2em] mb-1 font-mono capitalize">
+      <p className="text-[11px] font-bold text-text-secondary uppercase tracking-[0.2em] mb-2 font-mono capitalize">
         {dataFormatada}
       </p>
-      <h1 className="font-heading text-3xl md:text-4xl text-text-primary">
+      <h1 className="font-heading font-bold text-4xl md:text-5xl text-text-primary tracking-tight">
         {saudacao}, Dr. {primeiroNome}.
       </h1>
-      <p className="text-text-secondary text-sm font-medium mt-1">{subtitulo}</p>
+      <p className="text-text-secondary text-base font-medium mt-2">{subtitulo}</p>
     </div>
   );
 }

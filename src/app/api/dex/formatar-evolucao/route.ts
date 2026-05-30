@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenAI } from '@google/genai';
 import { getDentistaCached } from '@/lib/get-dentista';
+import { withRateLimit } from '@/lib/rate-limit';
+import { generateStructured } from '@/lib/ai/provider';
+import { logAICall } from '@/lib/ai/logger';
 
 export interface EvolucaoFormatada {
   queixa_principal: string;
@@ -9,17 +11,17 @@ export interface EvolucaoFormatada {
   dentes_observacoes: Record<string, string>;
 }
 
-/**
- * POST /api/dex/formatar-evolucao
- * Recebe texto livre do dentista e retorna campos estruturados da ficha clínica.
- */
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  const limited = await withRateLimit(req, 'dex:formatar-evolucao', 20, 60_000);
+  if (limited) return limited;
+
   try {
     const dentista = await getDentistaCached();
     if (!dentista) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
 
-    const apiKey = process.env.GEMINI_API_KEY ?? process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-    if (!apiKey) return NextResponse.json({ error: 'GEMINI_API_KEY não configurada' }, { status: 500 });
+    if (!process.env.GEMINI_API_KEY) {
+      return NextResponse.json({ error: 'GEMINI_API_KEY não configurada' }, { status: 500 });
+    }
 
     let body: { texto: string; pacienteNome?: string };
     try {
@@ -39,7 +41,7 @@ Retorne SOMENTE um JSON válido, sem markdown, sem explicações, com exatamente
 {
   "queixa_principal": "título curto do procedimento realizado (ex: Extração do elemento 36, Restauração dos dentes 14 e 15)",
   "anotacoes": "texto clínico organizado e completo, incluindo procedimento, anestesia se mencionada, intercorrências, orientações, retorno — em linguagem profissional mas clara",
-  "dentes_afetados": [lista de números de dentes ISO mencionados, ex: 36 ou 14 ou 11 — apenas os números, sem texto],
+  "dentes_afetados": [lista de números de dentes ISO mencionados — apenas números inteiros],
   "dentes_observacoes": {"número_do_dente": "observação específica para aquele dente"}
 }
 
@@ -51,26 +53,24 @@ Regras:
 - Mantenha anotacoes concisas mas completas (2-5 frases)
 - Se o relato mencionar ${body.pacienteNome ? `o paciente "${body.pacienteNome}"` : 'o paciente'}, não repetir o nome nas anotações`;
 
-    const ai = new GoogleGenAI({ apiKey });
-    const result = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: { responseMimeType: 'application/json' },
-    });
+    const callStart = Date.now();
+    const result = await generateStructured<EvolucaoFormatada>({ prompt, feature: 'formatar-evolucao' });
 
-    const raw = (result.text ?? '').trim();
-    let parsed: EvolucaoFormatada;
-    try {
-      parsed = JSON.parse(raw) as EvolucaoFormatada;
-    } catch {
-      return NextResponse.json({ error: 'Gemini retornou JSON inválido' }, { status: 500 });
-    }
-
+    const parsed = result.data;
     parsed.dentes_afetados = (parsed.dentes_afetados ?? [])
       .map((d) => Number(d))
       .filter((d) => !isNaN(d) && d >= 11 && d <= 99);
-
     parsed.dentes_observacoes = parsed.dentes_observacoes ?? {};
+
+    logAICall({
+      feature:    'formatar-evolucao',
+      provider:   result.provider,
+      model:      result.model,
+      latencyMs:  result.latencyMs,
+      success:    true,
+      dentistaId: dentista.id,
+      clinicaId:  dentista.clinica_id,
+    });
 
     return NextResponse.json(parsed satisfies EvolucaoFormatada);
   } catch (err) {

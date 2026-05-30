@@ -1,47 +1,57 @@
-import { redirect } from 'next/navigation';
-import { getDentistaCached } from '@/lib/get-dentista';
-import { createClient } from '@/lib/supabase/server';
+import { requirePermission } from '@/server/authorization/guards';
 import { ConfiguracoesClient } from './_components/configuracoes-client';
 import type { ConfiguracaoClinica, HorarioDisponivel, Procedimento } from '@/types/database';
 import { PageTransition } from '@/components/layout/page-transition';
 
-export default async function ConfiguracoesPage() {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect('/login');
-  if (dentista.role === 'secretaria') redirect('/dashboard');
+export default async function ConfiguracoesPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string>>;
+}) {
+  const { supabase, user, clinicId } = await requirePermission('configuracoes');
 
-  const supabase = await createClient();
+  const params = await searchParams;
+  const abaInicial = params.aba ?? 'clinica';
 
-  // Busca dados reais da clínica, horários e procedimentos em paralelo
-  const [
-    { data: configRaw },
-    { data: horariosRaw },
-    { data: procedimentosRaw },
-  ] = await Promise.all([
-    supabase
-      .from('configuracoes_clinica')
-      .select('*')
-      .eq('clinica_id', dentista.clinica_id)
-      .maybeSingle(),
-    supabase
-      .from('horarios_disponiveis')
-      .select('*')
-      .eq('dentista_id', dentista.id)
-      .order('dia_semana', { ascending: true }),
-    supabase
-      .from('procedimentos')
-      .select('*')
-      .eq('clinica_id', dentista.clinica_id)
-      .order('categoria', { ascending: true }),
-  ]);
+  const { data: dentistaPerfil } = await supabase
+    .from('dentistas')
+    .select('id, nome, cro, clinica:clinicas(nome)')
+    .eq('user_id', user.id)
+    .eq('clinica_id', clinicId)
+    .maybeSingle();
+
+  const [{ data: configRaw }, { data: horariosRaw }, { data: procedimentosRaw }] =
+    await Promise.all([
+      supabase
+        .from('configuracoes_clinica')
+        .select('*')
+        .eq('clinica_id', clinicId)
+        .maybeSingle(),
+      supabase
+        .from('horarios_disponiveis')
+        .select('*')
+        .eq('dentista_id', dentistaPerfil?.id ?? '')
+        .order('dia_semana', { ascending: true }),
+      supabase
+        .from('procedimentos')
+        .select('*')
+        .eq('clinica_id', clinicId)
+        .order('categoria', { ascending: true }),
+    ]);
 
   return (
     <PageTransition>
       <ConfiguracoesClient
-        dentista={{ id: dentista.id, nome: dentista.nome, clinica: dentista.clinica }}
+        dentista={{
+          id: dentistaPerfil?.id ?? '',
+          nome: (dentistaPerfil?.nome as string) ?? '',
+          cro: (dentistaPerfil?.cro as string | null) ?? null,
+          clinica: (dentistaPerfil?.clinica as unknown as { nome: string } | null)?.nome ?? '',
+        }}
         config={(configRaw as ConfiguracaoClinica | null) ?? null}
         horarios={(horariosRaw as HorarioDisponivel[]) ?? []}
         procedimentos={(procedimentosRaw as Procedimento[]) ?? []}
+        abaInicial={abaInicial}
       />
     </PageTransition>
   );

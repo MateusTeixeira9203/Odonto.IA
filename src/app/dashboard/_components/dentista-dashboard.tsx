@@ -9,7 +9,6 @@ import type { DentistaCache } from '@/lib/get-dentista';
 import { DashboardHeader } from '@/components/dashboard/dashboard-header';
 import { MetricsCards } from '@/components/dashboard/metrics-cards';
 import { NextAppointmentHero } from '@/components/dashboard/next-appointment-hero';
-import { TodayAgenda, type AgendamentoHojeItem } from '@/components/dashboard/today-agenda';
 import { AttentionPanel } from '@/components/dashboard/attention-panel';
 
 // ── Tipo local para as rows brutas do Supabase ────────────────────────────────
@@ -107,6 +106,8 @@ export async function DentistaDashboard({ dentista }: { dentista: DentistaCache 
 
   // Próximo = primeiro atendimento não encerrado
   const nextApt = atendimentosHoje.find((a) => !DONE.has(a.status)) ?? null;
+  const allConcluded =
+    atendimentosHoje.length > 0 && atendimentosHoje.every((a) => DONE.has(a.status));
 
   // Última ficha — executa apenas se houver próximo atendimento com paciente
   let ultimaFichaQueixa: string | null = null;
@@ -126,18 +127,12 @@ export async function DentistaDashboard({ dentista }: { dentista: DentistaCache 
     ? {
         id: nextApt.id,
         data_hora: nextApt.data_hora,
+        status: nextApt.status,
         observacoes: nextApt.observacoes,
         paciente: nextApt.paciente,
         ultimaFichaQueixa,
       }
     : null;
-
-  const agendaItems: AgendamentoHojeItem[] = atendimentosHoje.map((a) => ({
-    id: a.id,
-    data_hora: a.data_hora,
-    status: a.status,
-    paciente: a.paciente,
-  }));
 
   return (
     <>
@@ -154,20 +149,16 @@ export async function DentistaDashboard({ dentista }: { dentista: DentistaCache 
         concluidosHoje={concluidosHoje ?? 0}
       />
 
-      <NextAppointmentHero agendamento={heroAgendamento} />
+      <NextAppointmentHero
+        agendamento={heroAgendamento}
+        now={now}
+        allConcluded={allConcluded}
+      />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-8 md:mb-10">
-        <div className="lg:col-span-2">
-          <h2 className="font-heading text-xl text-text-primary mb-4">Agenda de Hoje</h2>
-          <TodayAgenda agendamentos={agendaItems} />
-        </div>
-        <div>
-          <AttentionPanel
-            semConfirmacao={semConfirmacao ?? 0}
-            orcamentosAguardando={orcamentosAguardando ?? 0}
-          />
-        </div>
-      </div>
+      <AttentionPanel
+        semConfirmacao={semConfirmacao ?? 0}
+        orcamentosAguardando={orcamentosAguardando ?? 0}
+      />
     </>
   );
 }
@@ -214,27 +205,12 @@ export function DashboardSkeleton() {
         </div>
       </div>
 
-      {/* Agenda + Atenção */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-        <div className="lg:col-span-2">
-          <div className="h-6 w-36 bg-surface-alt rounded mb-4" />
-          <div className="bg-surface border border-border rounded-2xl overflow-hidden">
-            {[0, 1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="flex items-center gap-4 px-4 py-3.5 border-b border-border last:border-0"
-              >
-                <div className="w-11 h-5 bg-surface-alt rounded shrink-0" />
-                <div className="w-px h-8 bg-surface-alt shrink-0" />
-                <div className="flex-1 h-4 bg-surface-alt rounded" />
-                <div className="w-20 h-6 bg-surface-alt rounded-lg shrink-0" />
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="space-y-3">
-          <div className="h-6 w-32 bg-surface-alt rounded" />
-          <div className="h-28 bg-surface border border-border rounded-2xl" />
+      {/* Atenção */}
+      <div>
+        <div className="h-6 w-36 bg-surface-alt rounded mb-4" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="h-24 bg-surface border border-border rounded-3xl" />
+          <div className="h-24 bg-surface border border-border rounded-3xl" />
         </div>
       </div>
     </div>

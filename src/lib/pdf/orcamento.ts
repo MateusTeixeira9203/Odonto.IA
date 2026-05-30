@@ -382,7 +382,7 @@ function OrcamentoPDF({ data }: { data: OrcamentoData }) {
       createElement(
         Text,
         { style: styles.footer },
-        `Documento gerado em ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR")} • Dent IA`
+        `Documento gerado em ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR")} • Odonto.IA`
       )
     )
   );

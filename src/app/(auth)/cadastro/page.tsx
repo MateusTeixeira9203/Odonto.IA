@@ -10,7 +10,7 @@ import { motion } from "motion/react";
 import { ArrowRight, Mail, Lock, User, Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { DentIALogo } from "@/components/ui/dent-ia-logo";
+import { OdontoIALogo } from "@/components/ui/dent-ia-logo";
 
 const cadastroSchema = z
   .object({
@@ -103,9 +103,9 @@ export default function CadastroPage(): React.JSX.Element {
       >
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-teal text-white mb-4 shadow-lg">
-            <DentIALogo className="w-7 h-7" />
+            <OdontoIALogo className="w-7 h-7" />
           </div>
-          <h1 className="font-serif text-4xl text-text-primary mb-2">Crie sua conta</h1>
+          <h1 className="font-heading font-bold text-4xl text-text-primary mb-2">Crie sua conta</h1>
           <p className="text-text-secondary text-sm font-medium">
             Comece a transformar a gestão da sua clínica.
           </p>

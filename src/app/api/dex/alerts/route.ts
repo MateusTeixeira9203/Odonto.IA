@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDentistaCached } from '@/lib/get-dentista';
 import { createClient } from '@/lib/supabase/server';
+import { withRateLimit } from '@/lib/rate-limit';
 
 export interface DexAlert {
   id: string;
@@ -18,7 +19,10 @@ export interface DexAlert {
  * PATCH /api/dex/alerts
  * Marca uma notificação do BD como lida (body: { id: string }).
  */
-export async function GET(): Promise<NextResponse> {
+export async function GET(req: NextRequest): Promise<NextResponse> {
+  const limited = await withRateLimit(req, 'dex:alerts', 60, 60_000);
+  if (limited) return limited;
+
   try {
     const dentista = await getDentistaCached();
     if (!dentista) return NextResponse.json({ alerts: [] });
@@ -42,7 +46,7 @@ export async function GET(): Promise<NextResponse> {
         .from('agendamentos')
         .select('id', { count: 'exact', head: true })
         .eq('clinica_id', dentista.clinica_id)
-        .eq('status', 'agendado')
+        .eq('status', 'scheduled')
         .gte('data_hora', hojeInicio.toISOString())
         .lte('data_hora', hojeFim.toISOString()),
 
@@ -96,6 +100,18 @@ export async function GET(): Promise<NextResponse> {
     }
 
     // ── Alertas computados ──────────────────────────────────────────────────
+
+    // Perfil incompleto — CRO ausente para dentistas e admins
+    if (dentista.role !== 'secretaria' && !dentista.cro) {
+      alerts.push({
+        id:          'computed_perfil_incompleto',
+        type:        'warning',
+        title:       'Complete seu perfil',
+        description: 'Seu CRO não está cadastrado. Ele aparece em documentos e orçamentos enviados aos pacientes.',
+        href:        dentista.role === 'admin' ? '/dashboard/configuracoes?aba=perfil' : '/dashboard/perfil',
+      });
+    }
+
     const naoConfirmados = agendamentosNaoConfirmados.count ?? 0;
     if (naoConfirmados > 0) {
       alerts.push({

@@ -59,10 +59,10 @@ export function WelcomeModal({ clinicaNome }: Props) {
                 </div>
               </div>
 
-              <h2 className="font-serif text-2xl text-text-primary mb-2">
+              <h2 className="font-heading font-semibold text-2xl text-text-primary mb-2">
                 Bem-vindo(a) à
               </h2>
-              <h3 className="font-serif text-3xl text-teal font-semibold mb-4">
+              <h3 className="font-heading font-bold text-3xl text-teal mb-4">
                 {clinicaNome}
               </h3>
               <p className="text-text-secondary text-sm leading-relaxed mb-8">

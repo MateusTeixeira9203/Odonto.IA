@@ -1,19 +1,18 @@
-import { redirect } from 'next/navigation';
 import { getDentistaCached } from '@/lib/get-dentista';
 import { getInstanceForClinica } from '@/services/whatsapp.service';
+import { requirePermission } from '@/server/authorization/guards';
 import { carregarMensagensBot } from './actions';
 import { DEFAULTS_MENSAGENS } from '@/lib/whatsapp/template';
 import { BotPageClient } from './_components/bot-page-client';
 import { PageTransition } from '@/components/layout/page-transition';
 
 export default async function BotPage() {
+  await requirePermission('whatsapp_config');
+
   const dentista = await getDentistaCached();
-  if (!dentista) redirect('/login');
-  if (dentista.role === 'dentista') redirect('/dashboard');
-  if (dentista.role !== 'admin' && dentista.role !== 'secretaria') redirect('/dashboard');
 
   const [instancia, mensagens] = await Promise.all([
-    getInstanceForClinica(dentista.clinica_id),
+    getInstanceForClinica(dentista!.clinica_id),
     carregarMensagensBot().catch(() => DEFAULTS_MENSAGENS),
   ]);
 
@@ -24,8 +23,8 @@ export default async function BotPage() {
         initialQrcode={instancia?.qrcode ?? null}
         initialInstanceName={instancia?.instanceName ?? null}
         initialMensagens={mensagens}
-        role={dentista.role}
-        clinicaNome={dentista.clinica}
+        role={dentista!.role}
+        clinicaNome={dentista!.clinica}
       />
     </PageTransition>
   );

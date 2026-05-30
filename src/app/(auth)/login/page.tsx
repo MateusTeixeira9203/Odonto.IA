@@ -105,7 +105,7 @@ function LoginFormContent(): React.JSX.Element {
           animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-md"
         >
-          <h1 className="font-serif text-4xl text-text-primary mb-2">Bem-vindo de volta</h1>
+          <h1 className="font-heading font-bold text-4xl text-text-primary mb-2">Bem-vindo de volta</h1>
           <p className="text-text-secondary text-sm font-medium mb-8">Acesse sua conta para gerenciar sua clínica.</p>
 
           <div className="bg-surface rounded-3xl border border-border shadow-sm p-8 w-full max-w-md">

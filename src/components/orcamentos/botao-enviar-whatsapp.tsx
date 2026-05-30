@@ -52,7 +52,7 @@ export function BotaoEnviarWhatsApp({
         `Segue o orçamento #${codigoOrc} no valor de ${valorFormatado}.\n\n` +
         `📄 Acesse o PDF aqui: ${pdfUrl}\n\n` +
         `Qualquer dúvida, estamos à disposição! 😊\n\n` +
-        `_Enviado via Dent IA_`
+        `_Enviado via Odonto.IA_`
     );
 
     window.open(`https://wa.me/${telefoneFormatado}?text=${mensagem}`, "_blank");
@@ -83,7 +83,7 @@ export function BotaoEnviarWhatsApp({
       >
         <MessageCircle className="w-4 h-4 shrink-0" />
         Enviar por WhatsApp
-        {semTelefone && <span className="ml-auto text-[10px] font-normal text-muted-foreground">sem telefone</span>}
+        {semTelefone && <span className="ml-auto text-[10px] font-normal text-text-secondary">sem telefone</span>}
       </button>
     );
   }
@@ -92,7 +92,7 @@ export function BotaoEnviarWhatsApp({
     <button
       onClick={() => void handleEnviar()}
       disabled={semTelefone}
-      className="p-2 rounded-xl hover:bg-teal/10 transition-colors text-muted-foreground hover:text-teal disabled:opacity-40"
+      className="p-2 rounded-xl hover:bg-teal/10 transition-colors text-text-secondary hover:text-teal disabled:opacity-40"
       title={semTelefone ? "Paciente sem telefone cadastrado" : "Enviar por WhatsApp"}
     >
       <MessageCircle className="w-4 h-4" />

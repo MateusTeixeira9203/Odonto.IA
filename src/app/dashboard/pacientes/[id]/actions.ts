@@ -1,22 +1,34 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
-import { getDentistaCached } from "@/lib/get-dentista";
+import { requireClinicContext } from "@/server/auth/clinic";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { format } from "date-fns";
 
 export async function deletarFicha(fichaId: string): Promise<void> {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect("/login");
+  const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
 
-  const supabase = await createClient();
+  if (role === 'secretaria') throw new Error("Sem permissão para apagar fichas clínicas");
+
+  // Dentista só pode apagar fichas que criou (dentista_id = criador/responsável).
+  // Quando o schema evoluir para created_by + responsible_dentista_id, estender aqui.
+  if (role === 'dentista') {
+    const { data: ficha } = await supabase
+      .from("fichas")
+      .select("dentista_id")
+      .eq("id", fichaId)
+      .eq("clinica_id", clinicId)
+      .maybeSingle();
+    if (ficha && ficha.dentista_id !== dentistaId) {
+      throw new Error("Sem permissão para apagar fichas de outro dentista");
+    }
+  }
 
   const { error } = await supabase
     .from("fichas")
     .delete()
     .eq("id", fichaId)
-    .eq("clinica_id", dentista.clinica_id);
+    .eq("clinica_id", clinicId);
 
   if (error) throw new Error("Erro ao apagar ficha");
 }
@@ -36,15 +48,13 @@ export async function atualizarPaciente(
     observacoes?: string | null;
   }
 ): Promise<{ error?: string }> {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect("/login");
+  const { supabase, clinicId } = await requireClinicContext();
 
-  const supabase = await createClient();
   const { error } = await supabase
     .from("pacientes")
     .update({ ...dados, updated_at: new Date().toISOString() })
     .eq("id", pacienteId)
-    .eq("clinica_id", dentista.clinica_id);
+    .eq("clinica_id", clinicId);
 
   if (error) return { error: error.message };
   revalidatePath(`/dashboard/pacientes/${pacienteId}`);
@@ -55,15 +65,13 @@ export async function salvarAnotacoes(
   pacienteId: string,
   observacoes: string
 ): Promise<{ error?: string }> {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect("/login");
+  const { supabase, clinicId } = await requireClinicContext();
 
-  const supabase = await createClient();
   const { error } = await supabase
     .from("pacientes")
     .update({ observacoes, updated_at: new Date().toISOString() })
     .eq("id", pacienteId)
-    .eq("clinica_id", dentista.clinica_id);
+    .eq("clinica_id", clinicId);
 
   if (error) return { error: error.message };
   revalidatePath(`/dashboard/pacientes/${pacienteId}`);
@@ -79,15 +87,28 @@ export async function atualizarFicha(
     status?: "aberta" | "concluida";
   }
 ): Promise<{ error?: string }> {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect("/login");
+  const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
 
-  const supabase = await createClient();
+  if (role === 'secretaria') return { error: "Sem permissão para editar fichas clínicas" };
+
+  // Dentista só pode editar fichas que criou (mesma regra do deletar)
+  if (role === 'dentista') {
+    const { data: ficha } = await supabase
+      .from("fichas")
+      .select("dentista_id")
+      .eq("id", fichaId)
+      .eq("clinica_id", clinicId)
+      .maybeSingle();
+    if (ficha && ficha.dentista_id !== dentistaId) {
+      return { error: "Sem permissão para editar fichas de outro dentista" };
+    }
+  }
+
   const { error } = await supabase
     .from("fichas")
     .update({ ...dados, updated_at: new Date().toISOString() })
     .eq("id", fichaId)
-    .eq("clinica_id", dentista.clinica_id);
+    .eq("clinica_id", clinicId);
 
   if (error) return { error: error.message };
   revalidatePath(`/dashboard/pacientes/${pacienteId}`);
@@ -97,20 +118,18 @@ export async function atualizarFicha(
 export async function gerarPlanejamentoIA(
   pacienteId: string
 ): Promise<{ conteudo?: string; error?: string }> {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect("/login");
+  const { supabase, clinicId, role } = await requireClinicContext();
+
+  if (role === 'secretaria') return { error: "Sem permissão para gerar planejamento clínico" };
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return { error: "Gemini não configurado. Adicione GEMINI_API_KEY." };
 
-  const supabase = await createClient();
-
-  // Busca fichas recentes para contexto
   const { data: fichas } = await supabase
     .from("fichas")
     .select("queixa_principal, anotacoes, alergias, medicamentos_em_uso, created_at")
     .eq("paciente_id", pacienteId)
-    .eq("clinica_id", dentista.clinica_id)
+    .eq("clinica_id", clinicId)
     .order("created_at", { ascending: false })
     .limit(10);
 
@@ -160,20 +179,20 @@ export async function criarFichaInline(dados: {
   anotacoes: string;
   dentesAfetados: string[];
 }): Promise<{ error?: string; id?: string }> {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect("/login");
+  const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
 
-  const supabase = await createClient();
+  if (role === 'secretaria') return { error: "Sem permissão para criar fichas clínicas" };
+
   const { data, error } = await supabase
     .from("fichas")
     .insert({
-      paciente_id: dados.pacienteId,
-      dentista_id: dentista.id,
-      clinica_id: dentista.clinica_id,
+      paciente_id:      dados.pacienteId,
+      dentista_id:      dentistaId,
+      clinica_id:       clinicId,
       queixa_principal: dados.queixaPrincipal || null,
-      anotacoes: dados.anotacoes || null,
-      dentes_afetados: dados.dentesAfetados.length > 0 ? dados.dentesAfetados : null,
-      status: "aberta",
+      anotacoes:        dados.anotacoes || null,
+      dentes_afetados:  dados.dentesAfetados.length > 0 ? dados.dentesAfetados : null,
+      status:           "aberta",
     })
     .select("id")
     .single();

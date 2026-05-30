@@ -7,7 +7,7 @@ import { motion } from "motion/react";
 import { Mail, CheckCircle2, Loader2, ArrowLeft, RefreshCw } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { DentIALogo } from "@/components/ui/dent-ia-logo";
+import { OdontoIALogo } from "@/components/ui/dent-ia-logo";
 
 function VerifiqueEmailContent(): React.JSX.Element {
   const searchParams = useSearchParams();
@@ -52,7 +52,7 @@ function VerifiqueEmailContent(): React.JSX.Element {
       >
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-teal text-white mb-4 shadow-lg">
-            <DentIALogo className="w-7 h-7" />
+            <OdontoIALogo className="w-7 h-7" />
           </div>
           <h1 className="font-heading text-4xl text-text-primary mb-2">
             Verifique seu email

@@ -6,7 +6,8 @@ import { withRateLimit } from "@/lib/rate-limit";
 
 interface ProcessarDocumentoBody {
   ficha_id: string;
-  clinica_id: string;
+  // clinica_id removido — resolvido server-side a partir de users.active_clinica_id.
+  // Aceitar clinica_id do cliente sem validação permitiria inserir em fichas de qualquer clínica.
   nome_original: string;
   storage_url: string;
 }
@@ -23,9 +24,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Body inválido." }, { status: 400 });
   }
 
-  const { ficha_id, clinica_id, nome_original, storage_url } = body;
+  const { ficha_id, nome_original, storage_url } = body;
 
-  if (!ficha_id || !clinica_id || !nome_original || !storage_url) {
+  if (!ficha_id || !nome_original || !storage_url) {
     return NextResponse.json(
       { error: "Campos obrigatórios faltando." },
       { status: 400 }
@@ -40,6 +41,31 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   if (!user) {
     return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+  }
+
+  // Resolve clínica ativa — fonte canônica é users.active_clinica_id, não o body do cliente
+  const { data: userRecord } = await supabase
+    .from("users")
+    .select("active_clinica_id")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!userRecord?.active_clinica_id) {
+    return NextResponse.json({ error: "Clínica não encontrada." }, { status: 403 });
+  }
+
+  const clinicId = userRecord.active_clinica_id as string;
+
+  // Valida que a ficha pertence à clínica ativa antes de inserir
+  const { data: ficha } = await supabase
+    .from("fichas")
+    .select("id")
+    .eq("id", ficha_id)
+    .eq("clinica_id", clinicId)
+    .maybeSingle();
+
+  if (!ficha) {
+    return NextResponse.json({ error: "Ficha não encontrada." }, { status: 404 });
   }
 
   // Gera URL assinada para download do arquivo
@@ -71,22 +97,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   try {
     if (ext === "docx" || ext === "doc") {
-      // Extrai texto de documentos Word com mammoth
       const mammoth = await import("mammoth");
       const result = await mammoth.extractRawText({
         buffer: Buffer.from(fileBuffer),
       });
       textoExtraido = result.value;
     } else if (ext === "pdf") {
-      // Extrai texto de PDFs com pdf-parse
       const pdfParse = (await import("pdf-parse")).default;
       const result = await pdfParse(Buffer.from(fileBuffer));
       textoExtraido = result.text;
     } else if (ext === "txt") {
-      // Lê arquivo de texto diretamente
       textoExtraido = new TextDecoder("utf-8").decode(fileBuffer);
     } else if (ext === "pptx") {
-      // Extrai texto de apresentações PowerPoint com officeparser
       const officeParser = (await import("officeparser")).default;
       const resultado = await officeParser.parseOffice(Buffer.from(fileBuffer), {
         outputErrorToConsole: true,
@@ -103,12 +125,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // Insere registro em ficha_arquivos
+  // Insere registro em ficha_arquivos com clinicId resolvido server-side
   const { data: fichaArquivo, error: insertError } = await supabase
     .from("ficha_arquivos")
     .insert({
       ficha_id,
-      clinica_id,
+      clinica_id: clinicId,
       tipo: "documento",
       nome_original,
       storage_url,

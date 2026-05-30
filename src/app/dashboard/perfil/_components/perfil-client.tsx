@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Camera, Trash2, Loader2, User } from 'lucide-react';
-import { DentIALogo } from '@/components/ui/dent-ia-logo';
+import { OdontoIALogo } from '@/components/ui/dent-ia-logo';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { salvarAvatarUrl, removerAvatar, salvarPerfil, salvarNomeClinica } from '../actions';
@@ -151,7 +151,7 @@ export function PerfilClient({ nome, email, role, clinica, avatarUrl: initialAva
         className="space-y-6"
       >
         <div>
-          <h1 className="font-heading text-3xl text-text-primary mb-1">Meu Perfil</h1>
+          <h1 className="font-heading font-bold text-3xl md:text-4xl text-text-primary mb-1">Meu Perfil</h1>
           <p className="text-text-secondary text-sm">Gerencie suas informações pessoais e foto de perfil.</p>
         </div>
 
@@ -229,7 +229,7 @@ export function PerfilClient({ nome, email, role, clinica, avatarUrl: initialAva
                 <div>
                   <p className="text-[10px] font-mono text-text-secondary uppercase tracking-widest mb-1">Clínica</p>
                   <div className="flex items-center gap-2">
-                    <DentIALogo className="w-3.5 h-3.5 text-teal shrink-0" />
+                    <OdontoIALogo className="w-3.5 h-3.5 text-teal shrink-0" />
                     <p className="text-sm font-medium text-text-primary">{clinica}</p>
                   </div>
                 </div>
@@ -349,7 +349,7 @@ export function PerfilClient({ nome, email, role, clinica, avatarUrl: initialAva
                       Nome da clínica
                     </label>
                     <div className="relative">
-                      <DentIALogo className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-teal pointer-events-none" />
+                      <OdontoIALogo className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-teal pointer-events-none" />
                       <input
                         value={formClinica}
                         onChange={(e) => setFormClinica(e.target.value)}

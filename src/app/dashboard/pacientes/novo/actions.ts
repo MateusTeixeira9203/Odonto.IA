@@ -1,7 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
-import { getDentistaCached } from "@/lib/get-dentista";
+import { requireClinicContext } from "@/server/auth/clinic";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
@@ -16,20 +15,24 @@ interface CreatePacienteInput {
   estado: string | null;
   observacoes: string | null;
   avatar_url?: string | null;
-  /** Preenchido pela secretária para vincular o paciente a um dentista específico */
   dentistaId?: string | null;
 }
 
 export async function createPaciente(
   data: CreatePacienteInput
 ): Promise<{ success: boolean; error?: string }> {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect("/login");
+  const { supabase, user, clinicId } = await requireClinicContext();
 
-  // Secretária fornece dentistaId explicitamente; dentista usa o próprio ID
-  const dentistaAlvo = data.dentistaId ?? dentista.id;
+  const { data: dentistaPerfil } = await supabase
+    .from("dentistas")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("clinica_id", clinicId)
+    .maybeSingle();
 
-  const supabase = await createClient();
+  if (!dentistaPerfil) redirect("/onboarding");
+
+  const dentistaAlvo = data.dentistaId ?? dentistaPerfil.id;
 
   if (data.cpf) {
     const cpfFormatted = data.cpf.trim();
@@ -37,7 +40,7 @@ export async function createPaciente(
     const { data: existente } = await supabase
       .from('pacientes')
       .select('id, nome')
-      .eq('clinica_id', dentista.clinica_id)
+      .eq('clinica_id', clinicId)
       .or(`cpf.eq.${cpfFormatted},cpf.eq.${cpfRaw}`)
       .maybeSingle();
     if (existente) {
@@ -46,18 +49,18 @@ export async function createPaciente(
   }
 
   const { error } = await supabase.from("pacientes").insert({
-    clinica_id: dentista.clinica_id,
-    dentista_id: dentistaAlvo,
-    nome: data.nome,
-    cpf: data.cpf,
-    email: data.email,
-    telefone: data.telefone,
+    clinica_id:      clinicId,
+    dentista_id:     dentistaAlvo,
+    nome:            data.nome,
+    cpf:             data.cpf,
+    email:           data.email,
+    telefone:        data.telefone,
     data_nascimento: data.data_nascimento,
-    endereco: data.endereco,
-    cidade: data.cidade,
-    estado: data.estado,
-    observacoes: data.observacoes,
-    avatar_url: data.avatar_url,
+    endereco:        data.endereco,
+    cidade:          data.cidade,
+    estado:          data.estado,
+    observacoes:     data.observacoes,
+    avatar_url:      data.avatar_url,
   });
 
   if (error) {

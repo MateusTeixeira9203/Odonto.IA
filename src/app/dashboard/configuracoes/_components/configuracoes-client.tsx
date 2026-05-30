@@ -3,13 +3,14 @@
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Building, Clock, Stethoscope, Check, Plus, Loader2, Pencil, X, Users } from 'lucide-react';
+import { Building, Clock, Stethoscope, Check, Plus, Loader2, Pencil, X, Users, UserCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 import type { ConfiguracaoClinica, HorarioDisponivel, Procedimento } from '@/types/database';
 import { HelpTooltip } from '@/components/ui/help-tooltip';
 import {
   salvarClinica,
   salvarHorarios,
+  salvarPerfil,
   atualizarProcedimento,
   toggleProcedimento,
   criarProcedimento,
@@ -28,6 +29,7 @@ const DIAS_SEMANA = [
 ];
 
 const ABAS = [
+  { id: 'perfil', label: 'Meu Perfil', icon: UserCircle },
   { id: 'clinica', label: 'Clínica', icon: Building },
   { id: 'horarios', label: 'Horários', icon: Clock },
   { id: 'procedimentos', label: 'Procedimentos', icon: Stethoscope },
@@ -36,18 +38,39 @@ const ABAS = [
 type Aba = (typeof ABAS)[number]['id'];
 
 interface Props {
-  dentista: { id: string; nome: string; clinica: string };
+  dentista: { id: string; nome: string; cro: string | null; clinica: string };
   config: ConfiguracaoClinica | null;
   horarios: HorarioDisponivel[];
   procedimentos: Procedimento[];
+  abaInicial?: string;
 }
 
-export function ConfiguracoesClient({ dentista, config, horarios, procedimentos: procedimentosIniciais }: Props) {
+export function ConfiguracoesClient({ dentista, config, horarios, procedimentos: procedimentosIniciais, abaInicial }: Props) {
   const pathname = usePathname();
-  const [abaAtiva, setAbaAtiva] = useState<Aba>('clinica');
+  const [abaAtiva, setAbaAtiva] = useState<Aba>((ABAS.some(a => a.id === abaInicial) ? abaInicial : 'clinica') as Aba);
   const [isPending, startTransition] = useTransition();
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // --- Aba Perfil ---
+  const [perfilForm, setPerfilForm] = useState({
+    nome: dentista.nome,
+    cro: dentista.cro ?? '',
+  });
+
+  const handleSalvarPerfil = () => {
+    if (!perfilForm.nome.trim()) return;
+    setSuccessMsg(null);
+    setErrorMsg(null);
+    startTransition(async () => {
+      const result = await salvarPerfil({ nome: perfilForm.nome, cro: perfilForm.cro });
+      if (result.error) {
+        setErrorMsg(result.error);
+      } else {
+        setSuccessMsg('Perfil atualizado com sucesso!');
+      }
+    });
+  };
 
   // --- Aba Clínica ---
   const [clinicaForm, setClinicaForm] = useState({
@@ -191,14 +214,14 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
   const categorias = Array.from(new Set(procedimentos.map((p) => p.categoria)));
 
   return (
-    <div className="p-8 max-w-5xl mx-auto w-full">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto w-full">
       <motion.header
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         className="mb-8"
       >
-        <h1 className="font-heading text-4xl text-foreground mb-2">Configurações</h1>
-        <p className="text-muted-foreground text-sm font-medium">
+        <h1 className="font-heading font-bold text-3xl md:text-4xl text-text-primary mb-2">Configurações</h1>
+        <p className="text-text-secondary text-sm font-medium">
           Gerencie sua clínica, horários e catálogo de procedimentos.
         </p>
       </motion.header>
@@ -212,20 +235,31 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
           className="md:col-span-1 space-y-2"
         >
           <div id="dex-tour-procedimentos" className="space-y-2">
-          {ABAS.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => { setAbaAtiva(id); setSuccessMsg(null); setErrorMsg(null); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm transition-colors ${
-                abaAtiva === id
-                  ? 'bg-teal/10 text-teal border border-teal/20'
-                  : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              {label}
-            </button>
-          ))}
+          {ABAS.map(({ id, label, icon: Icon }) => {
+            const showBadge = id === 'perfil' && !dentista.cro;
+            return (
+              <button
+                key={id}
+                onClick={() => { setAbaAtiva(id); setSuccessMsg(null); setErrorMsg(null); }}
+                className={`relative w-full flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm transition-colors ${
+                  abaAtiva === id
+                    ? 'bg-teal/10 text-teal border border-teal/20'
+                    : 'hover:bg-surface-alt text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                {label}
+                {showBadge && (
+                  <span className="ml-auto flex items-center">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+                    </span>
+                  </span>
+                )}
+              </button>
+            );
+          })}
           </div>
           <Link
             id="dex-tour-equipe"
@@ -233,7 +267,7 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm transition-colors ${
               pathname === '/dashboard/configuracoes/usuarios'
                 ? 'bg-teal/10 text-teal border border-teal/20'
-                : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+                : 'hover:bg-surface-alt text-text-secondary hover:text-text-primary'
             }`}
           >
             <Users className="w-4 h-4" />
@@ -260,25 +294,84 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
             </div>
           )}
 
-          {/* === ABA: CLÍNICA === */}
-          {abaAtiva === 'clinica' && (
-            <div className="bg-card p-6 rounded-2xl border border-border shadow-sm space-y-6">
-              <h2 className="font-heading text-2xl text-foreground">Dados da Clínica</h2>
+          {/* === ABA: MEU PERFIL === */}
+          {abaAtiva === 'perfil' && (
+            <div className="bg-surface p-6 rounded-2xl border border-border shadow-sm space-y-6">
+              <div>
+                <h2 className="font-heading font-bold text-2xl text-text-primary">Meu Perfil</h2>
+                <p className="text-sm text-text-secondary mt-1">
+                  Seu nome e CRO aparecem em documentos, planejamentos e orçamentos gerados.
+                </p>
+              </div>
+
+              {!dentista.cro && (
+                <div className="flex items-start gap-3 p-4 rounded-xl border border-amber-300/40 bg-amber-50/60 dark:bg-amber-900/15 dark:border-amber-500/25">
+                  <div className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 shrink-0 animate-pulse" />
+                  <p className="text-sm text-amber-700 dark:text-amber-400 font-medium">
+                    Seu CRO ainda não foi cadastrado. Preencha abaixo para que ele apareça nos documentos do paciente.
+                  </p>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2 space-y-1.5">
-                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                  <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
+                    Nome completo
+                  </label>
+                  <input
+                    type="text"
+                    value={perfilForm.nome}
+                    onChange={(e) => setPerfilForm((f) => ({ ...f, nome: e.target.value }))}
+                    placeholder="Dr. João da Silva"
+                    className="w-full border border-border rounded-xl px-4 py-2.5 font-sans text-sm bg-surface-alt outline-none focus:border-teal transition-colors text-text-primary"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
+                    CRO
+                  </label>
+                  <input
+                    type="text"
+                    value={perfilForm.cro}
+                    onChange={(e) => setPerfilForm((f) => ({ ...f, cro: e.target.value }))}
+                    placeholder="CRO-SP 12345"
+                    className="w-full border border-border rounded-xl px-4 py-2.5 font-mono text-sm bg-surface-alt outline-none focus:border-teal transition-colors text-text-primary"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  onClick={handleSalvarPerfil}
+                  disabled={isPending || !perfilForm.nome.trim()}
+                  className="bg-teal hover:bg-teal-lt text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition-colors shadow-[0_0_15px_rgba(47,156,133,0.2)] disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {isPending ? 'Salvando...' : 'Salvar Perfil'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* === ABA: CLÍNICA === */}
+          {abaAtiva === 'clinica' && (
+            <div className="bg-surface p-6 rounded-2xl border border-border shadow-sm space-y-6">
+              <h2 className="font-heading font-bold text-2xl text-text-primary">Dados da Clínica</h2>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2 space-y-1.5">
+                  <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
                     Nome da Clínica
                   </label>
                   <input
                     type="text"
                     value={clinicaForm.nome_clinica}
                     onChange={(e) => setClinicaForm((f) => ({ ...f, nome_clinica: e.target.value }))}
-                    className="w-full border border-border rounded-xl px-4 py-2.5 font-sans text-sm bg-muted outline-none focus:border-teal transition-colors text-foreground"
+                    className="w-full border border-border rounded-xl px-4 py-2.5 font-sans text-sm bg-surface-alt outline-none focus:border-teal transition-colors text-text-primary"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                  <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
                     Telefone
                   </label>
                   <input
@@ -286,11 +379,11 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
                     value={clinicaForm.telefone}
                     onChange={(e) => setClinicaForm((f) => ({ ...f, telefone: e.target.value }))}
                     placeholder="(11) 9 9999-9999"
-                    className="w-full border border-border rounded-xl px-4 py-2.5 font-sans text-sm bg-muted outline-none focus:border-teal transition-colors text-foreground"
+                    className="w-full border border-border rounded-xl px-4 py-2.5 font-sans text-sm bg-surface-alt outline-none focus:border-teal transition-colors text-text-primary"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                  <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
                     Endereço
                   </label>
                   <input
@@ -298,14 +391,14 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
                     value={clinicaForm.endereco}
                     onChange={(e) => setClinicaForm((f) => ({ ...f, endereco: e.target.value }))}
                     placeholder="Rua, número, bairro..."
-                    className="w-full border border-border rounded-xl px-4 py-2.5 font-sans text-sm bg-muted outline-none focus:border-teal transition-colors text-foreground"
+                    className="w-full border border-border rounded-xl px-4 py-2.5 font-sans text-sm bg-surface-alt outline-none focus:border-teal transition-colors text-text-primary"
                   />
                 </div>
               </div>
 
               {/* Formas de pagamento */}
               <div className="space-y-2">
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest block">
+                <label className="text-xs font-bold text-text-secondary uppercase tracking-widest block">
                   Formas de Pagamento Aceitas
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -326,7 +419,7 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
                         className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-colors ${
                           ativo
                             ? 'bg-teal/10 text-teal border border-teal/20'
-                            : 'bg-muted text-muted-foreground hover:bg-accent border border-border'
+                            : 'bg-surface-alt text-text-secondary hover:bg-surface-alt border border-border'
                         }`}
                       >
                         {forma.replace(/_/g, ' ')}
@@ -337,10 +430,10 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
               </div>
 
               {/* Convênios */}
-              <div className="flex items-center justify-between p-4 bg-muted rounded-xl">
+              <div className="flex items-center justify-between p-4 bg-surface-alt rounded-xl">
                 <div>
-                  <div className="font-semibold text-sm text-foreground">Aceita Convênio</div>
-                  <div className="text-xs text-muted-foreground">
+                  <div className="font-semibold text-sm text-text-primary">Aceita Convênio</div>
+                  <div className="text-xs text-text-secondary">
                     A clínica atende pacientes com plano odontológico.
                   </div>
                 </div>
@@ -372,10 +465,10 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
 
           {/* === ABA: HORÁRIOS === */}
           {abaAtiva === 'horarios' && (
-            <div className="bg-card p-6 rounded-2xl border border-border shadow-sm space-y-4">
+            <div className="bg-surface p-6 rounded-2xl border border-border shadow-sm space-y-4">
               <div className="flex items-center justify-between">
-                <h2 className="font-heading text-2xl text-foreground">Horários de Atendimento</h2>
-                <span className="text-xs text-muted-foreground font-medium">
+                <h2 className="font-heading font-bold text-2xl text-text-primary">Horários de Atendimento</h2>
+                <span className="text-xs text-text-secondary font-medium">
                   Ative os dias em que você atende
                 </span>
               </div>
@@ -387,7 +480,7 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
                     <div
                       key={dia}
                       className={`p-4 rounded-xl border transition-colors ${
-                        h.ativo ? 'border-teal/20 bg-teal/5' : 'border-border bg-muted/30'
+                        h.ativo ? 'border-teal/20 bg-teal/5' : 'border-border bg-surface-alt/30'
                       }`}
                     >
                       <div className="flex items-center gap-4 flex-wrap">
@@ -400,7 +493,7 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
                             onChange={(e) => updateHorario(dia, 'ativo', e.target.checked)}
                           />
                           <div className="relative w-9 h-5 bg-border rounded-full peer peer-checked:bg-teal after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border after:border-border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4" />
-                          <span className={`text-sm font-semibold ${h.ativo ? 'text-foreground' : 'text-muted-foreground'}`}>
+                          <span className={`text-sm font-semibold ${h.ativo ? 'text-text-primary' : 'text-text-secondary'}`}>
                             {label}
                           </span>
                         </label>
@@ -412,24 +505,24 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
                                 type="time"
                                 value={h.hora_inicio}
                                 onChange={(e) => updateHorario(dia, 'hora_inicio', e.target.value)}
-                                className="border border-border rounded-lg px-2 py-1.5 text-xs font-mono bg-background text-foreground outline-none focus:border-teal"
+                                className="border border-border rounded-lg px-2 py-1.5 text-xs font-mono bg-surface-alt text-text-primary outline-none focus:border-teal"
                               />
-                              <span className="text-muted-foreground text-xs font-medium">até</span>
+                              <span className="text-text-secondary text-xs font-medium">até</span>
                               <input
                                 type="time"
                                 value={h.hora_fim}
                                 onChange={(e) => updateHorario(dia, 'hora_fim', e.target.value)}
-                                className="border border-border rounded-lg px-2 py-1.5 text-xs font-mono bg-background text-foreground outline-none focus:border-teal"
+                                className="border border-border rounded-lg px-2 py-1.5 text-xs font-mono bg-surface-alt text-text-primary outline-none focus:border-teal"
                               />
                             </div>
                             <div className="flex items-center gap-2">
-                              <span className="text-xs text-muted-foreground font-medium">Intervalo:</span>
+                              <span className="text-xs text-text-secondary font-medium">Intervalo:</span>
                               <select
                                 value={h.intervalo_minutos}
                                 onChange={(e) =>
                                   updateHorario(dia, 'intervalo_minutos', parseInt(e.target.value, 10))
                                 }
-                                className="border border-border rounded-lg px-2 py-1.5 text-xs font-mono bg-background text-foreground outline-none focus:border-teal"
+                                className="border border-border rounded-lg px-2 py-1.5 text-xs font-mono bg-surface-alt text-text-primary outline-none focus:border-teal"
                               >
                                 <option value={15}>15 min</option>
                                 <option value={20}>20 min</option>
@@ -462,9 +555,9 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
           {/* === ABA: PROCEDIMENTOS === */}
           {abaAtiva === 'procedimentos' && (
             <div className="space-y-4">
-              <div className="bg-card p-6 rounded-2xl border border-border shadow-sm">
+              <div className="bg-surface p-6 rounded-2xl border border-border shadow-sm">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="font-heading text-2xl text-foreground flex items-center">
+                  <h2 className="font-heading font-bold text-2xl text-text-primary flex items-center">
                     Catálogo de Procedimentos
                     <HelpTooltip content="Cadastre seus procedimentos e valores para uso nos orçamentos." />
                   </h2>
@@ -482,7 +575,7 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-bold text-teal">Novo Procedimento</span>
                       <button onClick={() => setShowNovoProcedimento(false)}>
-                        <X className="w-4 h-4 text-muted-foreground" />
+                        <X className="w-4 h-4 text-text-secondary" />
                       </button>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
@@ -490,31 +583,31 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
                         placeholder="Nome do procedimento *"
                         value={novoProc.nome}
                         onChange={(e) => setNovoProc((f) => ({ ...f, nome: e.target.value }))}
-                        className="col-span-2 border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground outline-none focus:border-teal"
+                        className="col-span-2 border border-border rounded-lg px-3 py-2 text-sm bg-surface-alt text-text-primary outline-none focus:border-teal"
                       />
                       <input
                         placeholder="Categoria (ex: Ortodontia)"
                         value={novoProc.categoria}
                         onChange={(e) => setNovoProc((f) => ({ ...f, categoria: e.target.value }))}
-                        className="border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground outline-none focus:border-teal"
+                        className="border border-border rounded-lg px-3 py-2 text-sm bg-surface-alt text-text-primary outline-none focus:border-teal"
                       />
                       <input
                         placeholder="Preço (R$)"
                         type="number"
                         value={novoProc.preco_padrao}
                         onChange={(e) => setNovoProc((f) => ({ ...f, preco_padrao: e.target.value }))}
-                        className="border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground outline-none focus:border-teal font-mono"
+                        className="border border-border rounded-lg px-3 py-2 text-sm bg-surface-alt text-text-primary outline-none focus:border-teal font-mono"
                       />
                       <input
                         placeholder="Descrição"
                         value={novoProc.descricao}
                         onChange={(e) => setNovoProc((f) => ({ ...f, descricao: e.target.value }))}
-                        className="border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground outline-none focus:border-teal"
+                        className="border border-border rounded-lg px-3 py-2 text-sm bg-surface-alt text-text-primary outline-none focus:border-teal"
                       />
                       <select
                         value={novoProc.duracao_minutos}
                         onChange={(e) => setNovoProc((f) => ({ ...f, duracao_minutos: e.target.value }))}
-                        className="border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground outline-none focus:border-teal font-mono"
+                        className="border border-border rounded-lg px-3 py-2 text-sm bg-surface-alt text-text-primary outline-none focus:border-teal font-mono"
                       >
                         <option value="15">15 min</option>
                         <option value="30">30 min</option>
@@ -539,7 +632,7 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
 
                 {/* Lista por categoria */}
                 {categorias.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-8">
+                  <p className="text-sm text-text-secondary text-center py-8">
                     Nenhum procedimento cadastrado ainda.
                   </p>
                 )}
@@ -548,7 +641,7 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
                   <div key={categoria} className="mb-6">
                     <div className="flex items-center gap-3 mb-3">
                       <div className="h-px flex-1 bg-border" />
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-2">
+                      <span className="text-[10px] font-bold text-text-secondary uppercase tracking-widest px-2">
                         {categoria}
                       </span>
                       <div className="h-px flex-1 bg-border" />
@@ -561,7 +654,7 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
                           <div
                             key={proc.id}
                             className={`p-4 rounded-xl border transition-colors ${
-                              proc.ativo ? 'border-border bg-card' : 'border-border bg-muted/30 opacity-60'
+                              proc.ativo ? 'border-border bg-surface' : 'border-border bg-surface-alt/30 opacity-60'
                             }`}
                           >
                             {editandoId === proc.id ? (
@@ -572,11 +665,11 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
                                   value={editForm.nome}
                                   onChange={(e) => setEditForm((f) => ({ ...f, nome: e.target.value }))}
                                   placeholder="Nome do procedimento"
-                                  className="w-full border border-teal/40 rounded-lg px-3 py-1.5 text-sm font-medium bg-background text-foreground outline-none focus:border-teal transition-colors"
+                                  className="w-full border border-teal/40 rounded-lg px-3 py-1.5 text-sm font-medium bg-surface-alt text-text-primary outline-none focus:border-teal transition-colors"
                                 />
                                 <div className="flex items-center gap-4 flex-wrap">
                                   <div className="flex items-center gap-2">
-                                    <span className="text-xs text-muted-foreground">R$</span>
+                                    <span className="text-xs text-text-secondary">R$</span>
                                     <input
                                       type="number"
                                       value={editForm.preco_padrao}
@@ -586,7 +679,7 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
                                           preco_padrao: parseFloat(e.target.value) || 0,
                                         }))
                                       }
-                                      className="w-24 border border-border rounded-lg px-2 py-1 text-xs font-mono bg-background text-foreground outline-none focus:border-teal"
+                                      className="w-24 border border-border rounded-lg px-2 py-1 text-xs font-mono bg-surface-alt text-text-primary outline-none focus:border-teal"
                                     />
                                   </div>
                                   <div className="flex items-center gap-2">
@@ -598,7 +691,7 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
                                           duracao_minutos: parseInt(e.target.value, 10),
                                         }))
                                       }
-                                      className="border border-border rounded-lg px-2 py-1 text-xs font-mono bg-background text-foreground outline-none focus:border-teal"
+                                      className="border border-border rounded-lg px-2 py-1 text-xs font-mono bg-surface-alt text-text-primary outline-none focus:border-teal"
                                     >
                                       <option value={15}>15 min</option>
                                       <option value={30}>30 min</option>
@@ -617,7 +710,7 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
                                     </button>
                                     <button
                                       onClick={() => setEditandoId(null)}
-                                      className="p-1.5 bg-muted text-muted-foreground rounded-lg hover:bg-accent transition-colors"
+                                      className="p-1.5 bg-surface-alt text-text-secondary rounded-lg hover:bg-surface-alt transition-colors"
                                     >
                                       <X className="w-3.5 h-3.5" />
                                     </button>
@@ -627,11 +720,11 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
                             ) : (
                               // Modo visualização
                               <div className="flex items-center gap-4 flex-wrap">
-                                <span className="font-medium text-sm text-foreground flex-1">
+                                <span className="font-medium text-sm text-text-primary flex-1">
                                   {proc.nome}
                                 </span>
                                 {proc.preco_padrao !== null && (
-                                  <span className="font-mono text-sm font-semibold text-foreground">
+                                  <span className="font-mono text-sm font-semibold text-text-primary">
                                     {proc.preco_padrao.toLocaleString('pt-BR', {
                                       style: 'currency',
                                       currency: 'BRL',
@@ -639,14 +732,14 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
                                   </span>
                                 )}
                                 {proc.duracao_minutos && (
-                                  <span className="text-xs text-muted-foreground font-medium">
+                                  <span className="text-xs text-text-secondary font-medium">
                                     {proc.duracao_minutos} min
                                   </span>
                                 )}
                                 <div className="flex gap-2 ml-auto">
                                   <button
                                     onClick={() => handleEditarProcedimento(proc)}
-                                    className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition-colors"
+                                    className="p-1.5 text-text-secondary hover:text-text-primary rounded-lg hover:bg-surface-alt transition-colors"
                                   >
                                     <Pencil className="w-3.5 h-3.5" />
                                   </button>

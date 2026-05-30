@@ -28,7 +28,7 @@ export function GoogleCalendarSyncButton({ connected }: Props) {
           onClick={() => void handleDisconnect()}
           disabled={isDisconnecting}
           title="Desconectar Google Calendar"
-          className="p-2 rounded-xl border border-border hover:bg-accent text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+          className="p-2 rounded-xl border border-border hover:bg-surface-alt text-text-secondary hover:text-text-primary transition-colors disabled:opacity-50"
         >
           {isDisconnecting ? (
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -43,7 +43,7 @@ export function GoogleCalendarSyncButton({ connected }: Props) {
   return (
     <a
       href="/api/calendar/auth"
-      className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-card hover:bg-accent text-foreground text-sm font-semibold transition-colors"
+      className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-surface hover:bg-surface-alt text-text-primary text-sm font-semibold transition-colors"
     >
       <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
         <path
