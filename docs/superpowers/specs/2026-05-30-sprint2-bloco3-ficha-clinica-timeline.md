@@ -196,6 +196,87 @@ Cada seção tem:
 
 ---
 
+## Regras de Qualidade — Elevação 8/10 → 10/10
+
+Estas regras determinam se a implementação atingiu o objetivo de transformar a Ficha Clínica em história clínica, e não apenas em um accordion bonito.
+
+### Regra 1 — Escaneabilidade acima de tudo
+
+O estado colapsado deve exibir obrigatoriamente:
+- Tipo do registro (badge)
+- Data e profissional
+- Tags clínicas (procedimentos) ou fallback de texto
+
+Teste: um dentista procurando "Canal D36" em 100 registros deve localizá-lo sem abrir nenhum card.
+
+### Regra 2 — Hierarquia visual no estado colapsado
+
+Prioridade visual decrescente no card colapsado:
+1. Tipo do evento (badge)
+2. Data
+3. Tags clínicas
+
+Bordas, ícones e containers não devem ter mais peso visual que o conteúdo.
+
+### Regra 3 — Cada item expandido conta uma história
+
+O card expandido responde "O que aconteceu?" — não "Quais campos foram preenchidos?".
+
+Estrutura obrigatória no expandido:
+- **Queixa Principal**: motivo da consulta
+- **Avaliação Clínica**: achados, diagnóstico, evolução
+- **Procedimentos**: o que foi realizado / indicado
+- **Anexos**: evidências clínicas (quando existirem)
+
+### Regra 4 — Sem parede de texto
+
+Card expandido usa subtítulos de seção, separadores e espaçamento consistente. Nenhum bloco de texto sem contexto visual.
+
+### Regra 5 — Diferenciação visual entre tipos de evento
+
+Visualmente distinguível sem ler o conteúdo:
+- Badge de tipo diferente para cada categoria (Avaliação / Evolução / Retorno / Urgência / Procedimento)
+- Ícone discreto por tipo (opcional, via `lucide-react`)
+- Sem cores agressivas — seguir Design System (teal, coral, amber, surface-alt)
+
+Mapeamento sugerido:
+| Tipo | Badge | Ícone |
+|------|-------|-------|
+| Avaliação | teal/10 text-teal | `Stethoscope` |
+| Evolução | surface-alt text-text-secondary | `FileText` |
+| Retorno | blue/10 text-blue | `RotateCcw` |
+| Urgência | coral/10 text-coral | `AlertCircle` |
+| Procedimento | emerald/10 text-emerald | `Zap` |
+
+### Regra 6 — Ficha Clínica não compete com Tratamento
+
+Ficha Clínica: "O que aconteceu?"  
+Tratamento: "O que precisa ser feito?"
+
+Qualquer elemento que pareça planejamento ou execução futura pertence ao módulo Tratamento. A Ficha é documentação e histórico.
+
+### Regra 7 — Performance percebida
+
+- Expansão/colapso: instantânea, sem jank
+- `overflow: hidden` + `height: 0 → auto` via `motion` — sem reflow de layout
+- O fato de 300 itens estarem no DOM não deve ser perceptível (apenas headers renderizados)
+
+---
+
+## Teste de aceitação final
+
+Antes de considerar concluído, responder afirmativamente a todos:
+
+| # | Cenário | Critério |
+|---|---------|----------|
+| 1 | Timeline com 100 registros | Localizo "Canal · D36" sem abrir nenhum card |
+| 2 | Último atendimento | Entendo o que aconteceu em < 5 segundos |
+| 3 | Impressão geral | Parece prontuário clínico moderno, não lista de accordions |
+| 4 | Separação de módulos | Ficha Clínica claramente separada do Tratamento |
+| 5 | Sensação do dentista | Sente que está navegando pela evolução clínica |
+
+---
+
 ## Critérios de aprovação
 
 1. A Ficha Clínica parece uma história clínica — não uma coleção de registros
