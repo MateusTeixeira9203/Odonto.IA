@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Sidebar } from "@/components/layout/sidebar";
+import { FloatingDock } from "@/components/layout/floating-dock";
+import { MobileHeader } from "@/components/layout/mobile-header";
+import { MobileDrawer } from "@/components/layout/mobile-drawer";
 import { DexWidget } from "@/components/layout/dex-widget";
 import { DexOnboarding } from "@/components/onboarding/dex-onboarding";
 import { NeuralBackground } from "@/components/layout/NeuralBackground";
@@ -21,14 +23,9 @@ interface DashboardShellProps {
 }
 
 export function DashboardShell({ children, nome, clinicaNome, activeClinicId, role, avatarUrl, plano, dentistaId }: DashboardShellProps) {
-  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
-  // Uma vez montado, nunca desmonta — abre subsequentes são só prop changes (instant)
   const [hasMountedPalette, setHasMountedPalette] = useState(false);
-
-  useEffect(() => {
-    setIsSidebarExpanded(window.innerWidth >= 1024);
-  }, []);
 
   // P2 — warm-up do cliente Supabase no idle para primeira busca instantânea
   useEffect(() => {
@@ -44,13 +41,12 @@ export function DashboardShell({ children, nome, clinicaNome, activeClinicId, ro
   }, []);
 
   const openCommandPalette = useCallback(() => {
-    setHasMountedPalette(true); // monta na primeira abertura, nunca desmonta
+    setHasMountedPalette(true);
     setIsCommandPaletteOpen(true);
   }, []);
 
   const closeCommandPalette = useCallback(() => setIsCommandPaletteOpen(false), []);
 
-  // Global keyboard shortcut: Cmd/Ctrl+K
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -67,30 +63,39 @@ export function DashboardShell({ children, nome, clinicaNome, activeClinicId, ro
   }, [isCommandPaletteOpen, openCommandPalette, closeCommandPalette]);
 
   return (
-    <div className="relative flex min-h-screen bg-bg overflow-hidden">
-      {/* Neural pulsando em baixíssima opacidade — não deve competir com o conteúdo */}
+    <div className="relative min-h-screen bg-bg overflow-x-hidden">
       <NeuralBackground opacity={0.15} />
-      <Sidebar
-        isExpanded={isSidebarExpanded}
-        onToggle={() => setIsSidebarExpanded(!isSidebarExpanded)}
+
+      <MobileHeader onOpenDrawer={() => setIsDrawerOpen(true)} />
+
+      <main className="w-full flex flex-col min-h-screen overflow-y-auto pt-14 md:pt-0 pb-28">
+        {children}
+      </main>
+
+      <FloatingDock
         nome={nome}
         clinicaNome={clinicaNome}
-        activeClinicId={activeClinicId}
         role={role}
         avatarUrl={avatarUrl}
         plano={plano}
-        onOpenSearch={openCommandPalette}
       />
-      <main className="flex-1 flex flex-col h-screen overflow-y-auto transition-all duration-300">
-        {children}
-      </main>
-      {/* Tour de onboarding — todos os roles recebem */}
+
+      <MobileDrawer
+        open={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        nome={nome}
+        clinicaNome={clinicaNome}
+        role={role}
+        avatarUrl={avatarUrl}
+        plano={plano}
+      />
+
       <DexOnboarding nome={nome} dentistaId={dentistaId} role={role} plano={plano} />
-      {/* DEX widget — apenas dentista e admin */}
+
       {role !== 'secretaria' && (
         <DexWidget role={role} plano={plano} nome={nome} dentistaId={dentistaId} />
       )}
-      {/* Command Palette — montado uma vez, nunca desmontado (P2 keep-alive) */}
+
       {hasMountedPalette && (
         <CommandPalette
           open={isCommandPaletteOpen}
