@@ -69,8 +69,30 @@ export default async function ConsultaPage({ params }: Props) {
 
   const ultimaFicha = fichas?.[0] ?? null;
   const alertasClinicos: string[] = [];
-  if (ultimaFicha?.alergias) alertasClinicos.push(`Alergias: ${ultimaFicha.alergias as string}`);
-  if (ultimaFicha?.medicamentos_em_uso) alertasClinicos.push(`Medicamentos: ${ultimaFicha.medicamentos_em_uso as string}`);
+  const alergiasSeen = new Set<string>();
+  const medicamentosSeen = new Set<string>();
+  const histMedSeen = new Set<string>();
+
+  for (const f of fichas ?? []) {
+    const alergia = (f.alergias as string | null)?.trim();
+    const med = (f.medicamentos_em_uso as string | null)?.trim();
+    const histMed = (f.historico_medico as string | null)?.trim();
+
+    if (alergia && !alergiasSeen.has(alergia)) {
+      alergiasSeen.add(alergia);
+      alertasClinicos.push(`⚠️ Alergia: ${alergia}`);
+    }
+    if (med && !medicamentosSeen.has(med)) {
+      medicamentosSeen.add(med);
+      alertasClinicos.push(`💊 Medicamentos: ${med}`);
+    }
+    if (histMed && !histMedSeen.has(histMed)) {
+      histMedSeen.add(histMed);
+      // Fix: truncar a 150 chars para não inflar o payload de props do servidor
+      const histMedResumido = histMed.length > 150 ? `${histMed.slice(0, 147)}...` : histMed;
+      alertasClinicos.push(`🏥 Histórico: ${histMedResumido}`);
+    }
+  }
 
   return (
     <ConsultaClient

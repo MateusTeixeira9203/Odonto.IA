@@ -1,87 +1,22 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowLeft,
   Loader2,
-  Check, Edit2, X, Mic, MicOff, Bot, Play,
+  Check, Edit2, Mic, MicOff, Bot, Play, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
-import { salvarFichaConsulta, iniciarAtendimentoConsulta, finalizarConsulta } from '../actions';
+import { salvarFichaConsulta, iniciarAtendimentoConsulta } from '../actions';
 import type { EvolucaoFormatada } from '@/app/api/dex/formatar-evolucao/route';
 import { ConsultationSidebar } from './consultation-sidebar';
-import { FinalizeConsultationDialog } from './finalize-consultation-dialog';
 import { BotaoMensagemIA } from '@/components/orcamentos/botao-mensagem-ia';
-
-// ── Odontograma premium ──────────────────────────────────────────────────────
-
-const TEETH_UPPER = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
-const TEETH_LOWER = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
-
-const TOOTH_W: Record<number, string> = {
-  1: 'w-6', 2: 'w-6', 3: 'w-6', 4: 'w-7', 5: 'w-7', 6: 'w-8', 7: 'w-8', 8: 'w-8',
-};
-const tw = (t: number) => TOOTH_W[t % 10] ?? 'w-7';
-
-function MiniOdontograma({
-  selected,
-  onChange,
-}: {
-  selected: number[];
-  onChange: (teeth: number[]) => void;
-}) {
-  const toggle = (t: number) =>
-    onChange(selected.includes(t) ? selected.filter(x => x !== t) : [...selected, t]);
-
-  return (
-    <div className="space-y-1">
-      {/* Upper row */}
-      <div className="flex justify-center items-end gap-0.5">
-        {TEETH_UPPER.map((t, i) => {
-          const active = selected.includes(t);
-          return (
-            <div key={t} className="flex items-end">
-              {i === 8 && <div className="w-px h-6 bg-border mx-0.5 self-stretch" />}
-              <button
-                onClick={() => toggle(t)}
-                title={`Dente ${t}`}
-                className={`${tw(t)} h-8 rounded-t-md rounded-b-[2px] border text-[9px] font-mono font-bold transition-all hover:scale-105 active:scale-95 ${
-                  active
-                    ? 'bg-teal border-teal text-white -translate-y-1 shadow-[0_3px_8px_rgba(47,156,133,0.4)]'
-                    : 'bg-surface-alt border-border text-text-secondary hover:border-teal/50 hover:text-teal hover:bg-teal/5'
-                }`}
-              >{t}</button>
-            </div>
-          );
-        })}
-      </div>
-      <div className="h-px bg-border/60" />
-      {/* Lower row */}
-      <div className="flex justify-center items-start gap-0.5">
-        {TEETH_LOWER.map((t, i) => {
-          const active = selected.includes(t);
-          return (
-            <div key={t} className="flex items-start">
-              {i === 8 && <div className="w-px h-6 bg-border mx-0.5 self-stretch" />}
-              <button
-                onClick={() => toggle(t)}
-                title={`Dente ${t}`}
-                className={`${tw(t)} h-8 rounded-b-md rounded-t-[2px] border text-[9px] font-mono font-bold transition-all hover:scale-105 active:scale-95 ${
-                  active
-                    ? 'bg-teal border-teal text-white translate-y-1 shadow-[0_-3px_8px_rgba(47,156,133,0.4)]'
-                    : 'bg-surface-alt border-border text-text-secondary hover:border-teal/50 hover:text-teal hover:bg-teal/5'
-                }`}
-              >{t}</button>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+import { VoiceUX } from './voice-ux';
+import { DraftPendingCard } from './draft-pending-card';
+import { MiniOdontograma } from './mini-odontograma';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -145,32 +80,46 @@ export function ConsultaClient({
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
-  const [wizardOpen, setWizardOpen] = useState(false);
-  const [isFinalizando, setIsFinalizando] = useState(false);
   const [aptStatus, setAptStatus] = useState(agendamentoStatus);
   const [isIniciando, setIsIniciando] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [liveTranscript, setLiveTranscript] = useState('');
+  const [confirmedTeeth, setConfirmedTeeth] = useState<number[]>([]);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const { status: micStatus, startRecording, stopRecording } = useAudioRecorder();
+
+  // Fix: cleanup timer ao desmontar para evitar memory leak se usuário sair durante gravação
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
 
   const firstName = paciente.nome.split(' ')[0];
 
   const handleVoice = useCallback(async () => {
     if (micStatus === 'recording') {
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
       setIsTranscribing(true);
       const blob = await stopRecording();
       if (!blob) { setIsTranscribing(false); return; }
       try {
         const fd = new FormData();
         fd.append('audio', blob, 'audio.webm');
-        const res  = await fetch('/api/transcrever', { method: 'POST', body: fd });
+        const res = await fetch('/api/transcrever', { method: 'POST', body: fd });
         const data = await res.json() as { transcricao?: string };
         const texto = data.transcricao?.trim();
         if (texto) {
+          setLiveTranscript(texto);
           setTextoLivre(prev => prev ? `${prev}\n${texto}` : texto);
         }
       } catch { /* silencioso */ } finally { setIsTranscribing(false); }
     } else {
+      setElapsedSeconds(0);
+      setLiveTranscript('');
+      timerRef.current = setInterval(() => setElapsedSeconds(s => s + 1), 1000);
       await startRecording();
     }
   }, [micStatus, startRecording, stopRecording]);
@@ -188,6 +137,7 @@ export function ConsultaClient({
       const data = await res.json() as EvolucaoFormatada & { error?: string };
       if (!res.ok || data.error) throw new Error(data.error ?? 'Erro ao formatar');
       setEvolucao(data);
+      setConfirmedTeeth([]);  // todos dentes do draft começam como amber
     } catch (err) {
       console.error('[consulta] formatar-evolucao:', err);
     } finally {
@@ -198,19 +148,29 @@ export function ConsultaClient({
   const handleSalvar = async () => {
     if (!evolucao) return;
     setIsSaving(true);
+
+    // Fix #2: usa só dentes confirmados pelo dentista (não union com IA)
+    // Dentista DEVE confirmar clicando — amber não confirmado = não salvo
+    const dentesConfirmados = confirmedTeeth;
+
+    // Fix #1: alerta_novo — incluir nas anotações para não perder dado clínico
+    const anotacoesFinais = evolucao.alerta_novo
+      ? `${evolucao.anotacoes}\n\n⚠️ Novo alerta detectado: ${evolucao.alerta_novo}`
+      : evolucao.anotacoes;
+
     const result = await salvarFichaConsulta({
       agendamentoId,
-      pacienteId: paciente.id,
-      queixa_principal: evolucao.queixa_principal,
-      anotacoes: evolucao.anotacoes,
-      dentes_afetados: evolucao.dentes_afetados,
+      pacienteId:         paciente.id,
+      queixa_principal:   evolucao.queixa_principal,
+      anotacoes:          anotacoesFinais,
+      dentes_afetados:    dentesConfirmados,
       dentes_observacoes: evolucao.dentes_observacoes,
+      procedimentos:      evolucao.procedimentos,
+      conduta:            evolucao.conduta,
+      retorno_sugerido:   evolucao.retorno_sugerido,
+      alerta_novo:        evolucao.alerta_novo,
     });
-    if (result.error) {
-      toast.error(result.error);
-      setIsSaving(false);
-      return;
-    }
+    if (result.error) { toast.error(result.error); setIsSaving(false); return; }
     setSaved(true);
     setTimeout(() => router.push(`/dashboard/pacientes/${paciente.id}`), 1800);
   };
@@ -225,33 +185,6 @@ export function ConsultaClient({
       toast.success('Atendimento iniciado!');
     }
     setIsIniciando(false);
-  };
-
-  const handleFinalizar = async (wizardData: {
-    resumo: string;
-    conduta: string;
-    proximosPassos: string;
-    followUpData: string;
-  }) => {
-    if (!evolucao) return;
-    setIsFinalizando(true);
-    const result = await finalizarConsulta({
-      agendamentoId,
-      pacienteId: paciente.id,
-      queixa_principal: evolucao.queixa_principal,
-      anotacoes: evolucao.anotacoes,
-      dentes_afetados: evolucao.dentes_afetados,
-      dentes_observacoes: evolucao.dentes_observacoes,
-      ...wizardData,
-    });
-    if (result.error) {
-      toast.error(result.error);
-      setIsFinalizando(false);
-      return;
-    }
-    setWizardOpen(false);
-    setSaved(true);
-    setTimeout(() => router.push(`/dashboard/pacientes/${paciente.id}`), 1800);
   };
 
   return (
@@ -340,17 +273,15 @@ export function ConsultaClient({
                 exit={{ opacity: 0 }}
                 className="flex flex-col h-full"
               >
-                <div className="mb-4">
-                  <h2 className="font-heading text-2xl text-text-primary mb-1">O que foi feito hoje?</h2>
-                  <p className="text-sm text-text-secondary">
-                    Descreva livremente ou use o microfone para ditar. O DEX vai organizar nos campos da ficha.
-                  </p>
+                <div className="mb-3 flex items-center justify-between">
+                  <span className="text-sm text-text-secondary font-medium">{firstName} · {hora}</span>
+                  <span className="text-xs text-text-secondary font-mono">{textoLivre.length} car.</span>
                 </div>
 
                 <div className="relative flex-1 flex flex-col">
                   <textarea
                     ref={textareaRef}
-                    value={micStatus === 'recording' ? textoLivre : isTranscribing ? textoLivre : textoLivre}
+                    value={textoLivre}
                     onChange={e => setTextoLivre(e.target.value)}
                     placeholder={`Ex: Realizei extração do elemento 36 com anestesia local. Paciente sem intercorrências. Orientado sobre cuidados pós-operatórios. Retorno em 7 dias para remoção dos pontos.`}
                     className="flex-1 w-full rounded-2xl p-5 text-sm leading-relaxed resize-none outline-none bg-surface border border-border focus:border-teal transition-colors text-text-primary placeholder:text-text-secondary"
@@ -385,9 +316,6 @@ export function ConsultaClient({
 
                 <div className="flex items-center justify-between mt-4">
                   <div className="flex items-center gap-3">
-                    <span className="text-xs text-text-secondary font-mono">
-                      {textoLivre.length} caracteres
-                    </span>
                     {/* Botão de voz */}
                     <button
                       onClick={() => void handleVoice()}
@@ -401,9 +329,7 @@ export function ConsultaClient({
                     >
                       {micStatus === 'recording'
                         ? <><MicOff className="w-4 h-4" /> Parar</>
-                        : isTranscribing
-                          ? <><Loader2 className="w-4 h-4 animate-spin" /> Transcrevendo...</>
-                          : <><Mic className="w-4 h-4" /> Ditar</>
+                        : <><Mic className="w-4 h-4" /> Ditar</>
                       }
                     </button>
                   </div>
@@ -453,7 +379,7 @@ export function ConsultaClient({
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="font-heading text-2xl text-text-primary mb-0.5">Confirmar evolução</h2>
-                    <p className="text-sm text-text-secondary">Revise e edite antes de salvar na ficha clínica.</p>
+                    <p className="text-sm text-text-secondary">Revise os campos detectados pela IA antes de salvar.</p>
                   </div>
                   <button
                     onClick={() => setEvolucao(null)}
@@ -464,53 +390,111 @@ export function ConsultaClient({
                 </div>
 
                 {/* Queixa principal */}
-                <div className="bg-surface rounded-2xl border border-border p-5">
-                  <label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest block mb-2">
-                    Tipo / Queixa principal
-                  </label>
+                <DraftPendingCard label="Tipo / Queixa principal">
                   <input
                     value={evolucao.queixa_principal}
                     onChange={e => setEvolucao({ ...evolucao, queixa_principal: e.target.value })}
                     className="w-full text-sm font-semibold text-text-primary bg-transparent outline-none border-b border-border focus:border-teal pb-1 transition-colors"
                   />
-                </div>
+                </DraftPendingCard>
 
                 {/* Anotações */}
-                <div className="bg-surface rounded-2xl border border-border p-5">
-                  <label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest block mb-2">
-                    Anotações clínicas
-                  </label>
+                <DraftPendingCard label="Anotações clínicas">
                   <textarea
                     value={evolucao.anotacoes}
                     onChange={e => setEvolucao({ ...evolucao, anotacoes: e.target.value })}
                     className="w-full text-sm text-text-primary bg-transparent outline-none resize-none leading-relaxed"
-                    rows={5}
+                    rows={4}
                   />
-                </div>
+                </DraftPendingCard>
 
-                {/* Odontograma */}
-                <div className="bg-surface rounded-2xl border border-border p-5">
-                  <label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest block mb-3">
-                    Dentes afetados{evolucao.dentes_afetados.length > 0 && (
-                      <span className="text-teal ml-2 font-mono normal-case text-[11px]">
-                        {evolucao.dentes_afetados.join(', ')}
-                      </span>
-                    )}
-                  </label>
+                {/* Procedimentos (novo campo) — Fix #3: chips removíveis */}
+                {evolucao.procedimentos.length > 0 && (
+                  <DraftPendingCard label="Procedimentos detectados">
+                    <div className="flex flex-wrap gap-2">
+                      {evolucao.procedimentos.map((p, i) => (
+                        <div key={i} className="group flex items-center gap-1 text-xs px-3 py-1 rounded-lg bg-surface-alt border border-border text-text-primary">
+                          <span>{p}</span>
+                          <button
+                            onClick={() => setEvolucao({
+                              ...evolucao,
+                              procedimentos: evolucao.procedimentos.filter((_, idx) => idx !== i),
+                            })}
+                            title="Remover procedimento"
+                            className="ml-1 text-text-secondary hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </DraftPendingCard>
+                )}
+
+                {/* Conduta — Fix #4: sempre visível para documentação obrigatória */}
+                <DraftPendingCard label="Conduta / Orientações">
+                  <textarea
+                    value={evolucao.conduta}
+                    onChange={e => setEvolucao({ ...evolucao, conduta: e.target.value })}
+                    placeholder="Orientações ao paciente, cuidados pós-operatórios, prescrições..."
+                    className="w-full text-sm text-text-primary bg-transparent outline-none resize-none leading-relaxed placeholder:text-text-secondary"
+                    rows={2}
+                  />
+                </DraftPendingCard>
+
+                {/* Alerta novo — Fix #1: exibir e informar dentista para atualizar cadastro */}
+                {evolucao.alerta_novo && (
+                  <DraftPendingCard label="⚠️ Novo alerta detectado">
+                    <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">{evolucao.alerta_novo}</p>
+                    <p className="text-xs text-text-secondary mt-1">
+                      Será registrado nas anotações da ficha. Atualize manualmente o cadastro do paciente se necessário.
+                    </p>
+                  </DraftPendingCard>
+                )}
+
+                {/* Retorno sugerido */}
+                {evolucao.retorno_sugerido && (
+                  <DraftPendingCard label="Retorno sugerido">
+                    <input
+                      value={evolucao.retorno_sugerido}
+                      onChange={e => setEvolucao({ ...evolucao, retorno_sugerido: e.target.value })}
+                      className="w-full text-sm font-semibold text-text-primary bg-transparent outline-none border-b border-border focus:border-teal pb-1 transition-colors"
+                    />
+                  </DraftPendingCard>
+                )}
+
+                {/* Odontograma — Fix #2: salva só confirmedTeeth; botão "Confirmar todos" */}
+                <DraftPendingCard label={
+                  confirmedTeeth.length > 0
+                    ? `Dentes confirmados — ${confirmedTeeth.join(', ')}`
+                    : evolucao.dentes_afetados.length > 0
+                      ? `Dentes detectados — ${evolucao.dentes_afetados.length} aguardando confirmação`
+                      : 'Dentes afetados'
+                }>
                   <MiniOdontograma
-                    selected={evolucao.dentes_afetados}
-                    onChange={dentes => setEvolucao({ ...evolucao, dentes_afetados: dentes })}
+                    selected={confirmedTeeth}
+                    aiDetected={evolucao.dentes_afetados.filter(t => !confirmedTeeth.includes(t))}
+                    onChange={setConfirmedTeeth}
                   />
-                </div>
+                  {/* Atalho para confirmar todos os dentes detectados */}
+                  {evolucao.dentes_afetados.filter(t => !confirmedTeeth.includes(t)).length > 0 && (
+                    <button
+                      onClick={() => setConfirmedTeeth([...new Set([...confirmedTeeth, ...evolucao.dentes_afetados])])}
+                      className="mt-3 text-[11px] text-teal font-semibold hover:opacity-75 transition-opacity"
+                    >
+                      ✓ Confirmar todos os dentes detectados
+                    </button>
+                  )}
+                </DraftPendingCard>
 
-                {/* Observações por dente */}
-                {evolucao.dentes_afetados.length > 0 && (
+                {/* Obs por dente — Fix #2: itera só confirmedTeeth */}
+                {confirmedTeeth.length > 0 && (
                   <div className="bg-surface rounded-2xl border border-border p-5">
                     <label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest block mb-3">
                       Observações por dente
                     </label>
                     <div className="space-y-2">
-                      {evolucao.dentes_afetados.map(dente => (
+                      {confirmedTeeth.map(dente => (
                         <div key={dente} className="flex items-center gap-3">
                           <span className="font-mono text-xs font-bold text-teal w-8 shrink-0">{dente}</span>
                           <input
@@ -522,46 +506,23 @@ export function ConsultaClient({
                             placeholder="Observação para este dente..."
                             className="flex-1 text-sm text-text-primary bg-surface-alt rounded-lg px-3 py-2 outline-none border border-transparent focus:border-teal transition-colors"
                           />
-                          <button
-                            onClick={() => {
-                              const obs = { ...evolucao.dentes_observacoes };
-                              delete obs[String(dente)];
-                              setEvolucao({
-                                ...evolucao,
-                                dentes_afetados: evolucao.dentes_afetados.filter(d => d !== dente),
-                                dentes_observacoes: obs,
-                              });
-                            }}
-                            className="text-text-secondary hover:text-red-500 transition-colors"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* Finalizar Consulta */}
-                <button
-                  onClick={() => setWizardOpen(true)}
-                  disabled={isSaving || isFinalizando}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-40"
-                  style={{ background: '#2f9c85', color: '#fff', boxShadow: '0 2px 12px rgba(47,156,133,0.30)' }}
-                >
-                  {(isSaving || isFinalizando)
-                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Salvando...</>
-                    : <><Check className="w-4 h-4" /> Finalizar Consulta</>
-                  }
-                </button>
-
-                {/* Salvar simples (fallback) */}
+                {/* Botão Confirmar e salvar */}
                 <button
                   onClick={() => void handleSalvar()}
-                  disabled={isSaving || isFinalizando}
-                  className="w-full py-3.5 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50 text-text-secondary hover:text-text-primary border border-border bg-transparent"
+                  disabled={isSaving}
+                  className="w-full flex items-center justify-center gap-2 px-5 py-4 rounded-2xl text-sm font-bold transition-all disabled:opacity-40 text-white"
+                  style={{ background: '#2f9c85', boxShadow: '0 2px 16px rgba(47,156,133,0.30)' }}
                 >
-                  Salvar sem resumo
+                  {isSaving
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Salvando...</>
+                    : <><Check className="w-4 h-4" /> Confirmar e salvar na ficha</>
+                  }
                 </button>
               </motion.div>
             )}
@@ -570,11 +531,12 @@ export function ConsultaClient({
         </main>
       </div>
 
-      <FinalizeConsultationDialog
-        open={wizardOpen}
-        onOpenChange={setWizardOpen}
-        onFinalize={handleFinalizar}
-        isSaving={isFinalizando}
+      <VoiceUX
+        isRecording={micStatus === 'recording'}
+        isTranscribing={isTranscribing}
+        liveTranscript={liveTranscript}
+        elapsedSeconds={elapsedSeconds}
+        onStop={() => void handleVoice()}
       />
     </div>
   );
