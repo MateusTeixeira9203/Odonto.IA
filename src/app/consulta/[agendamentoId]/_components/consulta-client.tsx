@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowLeft,
   Loader2,
-  Check, Edit2, Mic, MicOff, Bot, Play,
+  Check, Edit2, Mic, MicOff, Bot, Play, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
@@ -90,6 +90,13 @@ export function ConsultaClient({
 
   const { status: micStatus, startRecording, stopRecording } = useAudioRecorder();
 
+  // Fix: cleanup timer ao desmontar para evitar memory leak se usuário sair durante gravação
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
+
   const firstName = paciente.nome.split(' ')[0];
 
   const handleVoice = useCallback(async () => {
@@ -141,17 +148,27 @@ export function ConsultaClient({
   const handleSalvar = async () => {
     if (!evolucao) return;
     setIsSaving(true);
-    const allTeeth = [...new Set([...confirmedTeeth, ...evolucao.dentes_afetados])];
+
+    // Fix #2: usa só dentes confirmados pelo dentista (não union com IA)
+    // Dentista DEVE confirmar clicando — amber não confirmado = não salvo
+    const dentesConfirmados = confirmedTeeth;
+
+    // Fix #1: alerta_novo — incluir nas anotações para não perder dado clínico
+    const anotacoesFinais = evolucao.alerta_novo
+      ? `${evolucao.anotacoes}\n\n⚠️ Novo alerta detectado: ${evolucao.alerta_novo}`
+      : evolucao.anotacoes;
+
     const result = await salvarFichaConsulta({
       agendamentoId,
-      pacienteId: paciente.id,
+      pacienteId:         paciente.id,
       queixa_principal:   evolucao.queixa_principal,
-      anotacoes:          evolucao.anotacoes,
-      dentes_afetados:    allTeeth,
+      anotacoes:          anotacoesFinais,
+      dentes_afetados:    dentesConfirmados,
       dentes_observacoes: evolucao.dentes_observacoes,
       procedimentos:      evolucao.procedimentos,
       conduta:            evolucao.conduta,
       retorno_sugerido:   evolucao.retorno_sugerido,
+      alerta_novo:        evolucao.alerta_novo,
     });
     if (result.error) { toast.error(result.error); setIsSaving(false); return; }
     setSaved(true);
@@ -391,57 +408,93 @@ export function ConsultaClient({
                   />
                 </DraftPendingCard>
 
-                {/* Procedimentos (novo campo) */}
+                {/* Procedimentos (novo campo) — Fix #3: chips removíveis */}
                 {evolucao.procedimentos.length > 0 && (
                   <DraftPendingCard label="Procedimentos detectados">
                     <div className="flex flex-wrap gap-2">
                       {evolucao.procedimentos.map((p, i) => (
-                        <span key={i} className="text-xs px-3 py-1 rounded-lg bg-surface-alt border border-border text-text-primary">
-                          {p}
-                        </span>
+                        <div key={i} className="group flex items-center gap-1 text-xs px-3 py-1 rounded-lg bg-surface-alt border border-border text-text-primary">
+                          <span>{p}</span>
+                          <button
+                            onClick={() => setEvolucao({
+                              ...evolucao,
+                              procedimentos: evolucao.procedimentos.filter((_, idx) => idx !== i),
+                            })}
+                            title="Remover procedimento"
+                            className="ml-1 text-text-secondary hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
                       ))}
                     </div>
                   </DraftPendingCard>
                 )}
 
-                {/* Conduta (novo campo) */}
-                {evolucao.conduta && (
-                  <DraftPendingCard label="Conduta / Orientações">
-                    <textarea
-                      value={evolucao.conduta}
-                      onChange={e => setEvolucao({ ...evolucao, conduta: e.target.value })}
-                      className="w-full text-sm text-text-primary bg-transparent outline-none resize-none leading-relaxed"
-                      rows={2}
+                {/* Conduta — Fix #4: sempre visível para documentação obrigatória */}
+                <DraftPendingCard label="Conduta / Orientações">
+                  <textarea
+                    value={evolucao.conduta}
+                    onChange={e => setEvolucao({ ...evolucao, conduta: e.target.value })}
+                    placeholder="Orientações ao paciente, cuidados pós-operatórios, prescrições..."
+                    className="w-full text-sm text-text-primary bg-transparent outline-none resize-none leading-relaxed placeholder:text-text-secondary"
+                    rows={2}
+                  />
+                </DraftPendingCard>
+
+                {/* Alerta novo — Fix #1: exibir e informar dentista para atualizar cadastro */}
+                {evolucao.alerta_novo && (
+                  <DraftPendingCard label="⚠️ Novo alerta detectado">
+                    <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">{evolucao.alerta_novo}</p>
+                    <p className="text-xs text-text-secondary mt-1">
+                      Será registrado nas anotações da ficha. Atualize manualmente o cadastro do paciente se necessário.
+                    </p>
+                  </DraftPendingCard>
+                )}
+
+                {/* Retorno sugerido */}
+                {evolucao.retorno_sugerido && (
+                  <DraftPendingCard label="Retorno sugerido">
+                    <input
+                      value={evolucao.retorno_sugerido}
+                      onChange={e => setEvolucao({ ...evolucao, retorno_sugerido: e.target.value })}
+                      className="w-full text-sm font-semibold text-text-primary bg-transparent outline-none border-b border-border focus:border-teal pb-1 transition-colors"
                     />
                   </DraftPendingCard>
                 )}
 
-                {/* Retorno sugerido (novo campo) */}
-                {evolucao.retorno_sugerido && (
-                  <DraftPendingCard label="Retorno sugerido">
-                    <p className="text-sm font-semibold text-text-primary">{evolucao.retorno_sugerido}</p>
-                  </DraftPendingCard>
-                )}
-
-                {/* Odontograma com amber AI-detected */}
-                <DraftPendingCard label={`Dentes afetados${evolucao.dentes_afetados.length > 0 ? ` — ${[...new Set([...confirmedTeeth, ...evolucao.dentes_afetados])].join(', ')}` : ''}`}>
+                {/* Odontograma — Fix #2: salva só confirmedTeeth; botão "Confirmar todos" */}
+                <DraftPendingCard label={
+                  confirmedTeeth.length > 0
+                    ? `Dentes confirmados — ${confirmedTeeth.join(', ')}`
+                    : evolucao.dentes_afetados.length > 0
+                      ? `Dentes detectados — ${evolucao.dentes_afetados.length} aguardando confirmação`
+                      : 'Dentes afetados'
+                }>
                   <MiniOdontograma
                     selected={confirmedTeeth}
                     aiDetected={evolucao.dentes_afetados.filter(t => !confirmedTeeth.includes(t))}
-                    onChange={(dentes) => {
-                      setConfirmedTeeth(dentes);
-                    }}
+                    onChange={setConfirmedTeeth}
                   />
+                  {/* Atalho para confirmar todos os dentes detectados */}
+                  {evolucao.dentes_afetados.filter(t => !confirmedTeeth.includes(t)).length > 0 && (
+                    <button
+                      onClick={() => setConfirmedTeeth([...new Set([...confirmedTeeth, ...evolucao.dentes_afetados])])}
+                      className="mt-3 text-[11px] text-teal font-semibold hover:opacity-75 transition-opacity"
+                    >
+                      ✓ Confirmar todos os dentes detectados
+                    </button>
+                  )}
                 </DraftPendingCard>
 
-                {/* Obs por dente — manter se há dentes */}
-                {evolucao.dentes_afetados.length > 0 && (
+                {/* Obs por dente — Fix #2: itera só confirmedTeeth */}
+                {confirmedTeeth.length > 0 && (
                   <div className="bg-surface rounded-2xl border border-border p-5">
                     <label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest block mb-3">
                       Observações por dente
                     </label>
                     <div className="space-y-2">
-                      {[...new Set([...confirmedTeeth, ...evolucao.dentes_afetados])].map(dente => (
+                      {confirmedTeeth.map(dente => (
                         <div key={dente} className="flex items-center gap-3">
                           <span className="font-mono text-xs font-bold text-teal w-8 shrink-0">{dente}</span>
                           <input

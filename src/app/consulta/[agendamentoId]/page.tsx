@@ -88,7 +88,9 @@ export default async function ConsultaPage({ params }: Props) {
     }
     if (histMed && !histMedSeen.has(histMed)) {
       histMedSeen.add(histMed);
-      alertasClinicos.push(`🏥 Histórico: ${histMed}`);
+      // Fix: truncar a 150 chars para não inflar o payload de props do servidor
+      const histMedResumido = histMed.length > 150 ? `${histMed.slice(0, 147)}...` : histMed;
+      alertasClinicos.push(`🏥 Histórico: ${histMedResumido}`);
     }
   }
 

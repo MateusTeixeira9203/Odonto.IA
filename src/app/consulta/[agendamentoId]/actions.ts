@@ -42,6 +42,7 @@ export async function salvarFichaConsulta(params: {
     ...(params.procedimentos !== undefined && { procedimentos: params.procedimentos }),
     ...(params.conduta !== undefined && { conduta: params.conduta }),
     ...(params.retorno_sugerido !== undefined && { retorno_sugerido: params.retorno_sugerido }),
+    ...(params.alerta_novo != null && { alerta_novo: params.alerta_novo }),
     status:              'concluida',
   });
 
@@ -85,57 +86,4 @@ export async function iniciarAtendimentoConsulta(agendamentoId: string): Promise
   return {};
 }
 
-export async function finalizarConsulta(params: {
-  agendamentoId:      string;
-  pacienteId:         string;
-  queixa_principal:   string;
-  anotacoes:          string;
-  dentes_afetados:    number[];
-  dentes_observacoes: Record<string, string>;
-  procedimentos?:     string[];
-  conduta?:           string;
-  retorno_sugerido?:  string | null;
-  // Mantidos por compatibilidade temporária com chamadas antigas do wizard removido:
-  resumo?:            string;
-  proximosPassos?:    string;
-  followUpData?:      string;
-}): Promise<{ error?: string }> {
-  const { supabase, user, clinicId, role } = await requireClinicContext();
-  if (role === 'secretaria') return { error: 'Sem permissão.' };
-
-  const { data: dentistaPerfil } = await supabase
-    .from('dentistas')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('clinica_id', clinicId)
-    .maybeSingle();
-
-  if (!dentistaPerfil) return { error: 'Perfil não encontrado.' };
-
-  const anotacoesFinais = params.anotacoes;
-
-  const { error: fichaError } = await supabase.from('fichas').insert({
-    clinica_id:         clinicId,
-    paciente_id:        params.pacienteId,
-    dentista_id:        dentistaPerfil.id,
-    queixa_principal:   params.queixa_principal,
-    anotacoes:          anotacoesFinais,
-    dentes_afetados:    params.dentes_afetados,
-    dentes_observacoes: params.dentes_observacoes,
-    ...(params.procedimentos !== undefined && { procedimentos: params.procedimentos }),
-    ...(params.conduta !== undefined && { conduta: params.conduta }),
-    ...(params.retorno_sugerido !== undefined && { retorno_sugerido: params.retorno_sugerido }),
-    status:             'concluida',
-  });
-
-  if (fichaError) return { error: fichaError.message };
-
-  await supabase
-    .from('agendamentos')
-    .update({ status: 'completed', updated_at: new Date().toISOString() })
-    .eq('id', params.agendamentoId)
-    .eq('clinica_id', clinicId);
-
-  revalidatePath('/dashboard/agendamentos');
-  return {};
-}
+// finalizarConsulta foi removida — fluxo de finalização usa salvarFichaConsulta diretamente.
