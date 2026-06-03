@@ -5,12 +5,17 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 
 export async function salvarFichaConsulta(params: {
-  agendamentoId: string;
-  pacienteId: string;
-  queixa_principal: string;
-  anotacoes: string;
-  dentes_afetados: number[];
+  agendamentoId:      string;
+  pacienteId:         string;
+  queixa_principal:   string;
+  anotacoes:          string;
+  dentes_afetados:    number[];
   dentes_observacoes: Record<string, string>;
+  // Novos campos opcionais:
+  procedimentos?:     string[];
+  conduta?:           string;
+  retorno_sugerido?:  string | null;
+  alerta_novo?:       string | null;
 }): Promise<{ error?: string }> {
   const { supabase, user, clinicId, role } = await requireClinicContext();
 
@@ -33,6 +38,10 @@ export async function salvarFichaConsulta(params: {
     anotacoes:           params.anotacoes,
     dentes_afetados:     params.dentes_afetados,
     dentes_observacoes:  params.dentes_observacoes,
+    // Novos campos:
+    ...(params.procedimentos !== undefined && { procedimentos: params.procedimentos }),
+    ...(params.conduta !== undefined && { conduta: params.conduta }),
+    ...(params.retorno_sugerido !== undefined && { retorno_sugerido: params.retorno_sugerido }),
     status:              'concluida',
   });
 
@@ -77,16 +86,19 @@ export async function iniciarAtendimentoConsulta(agendamentoId: string): Promise
 }
 
 export async function finalizarConsulta(params: {
-  agendamentoId: string;
-  pacienteId: string;
-  queixa_principal: string;
-  anotacoes: string;
-  dentes_afetados: number[];
+  agendamentoId:      string;
+  pacienteId:         string;
+  queixa_principal:   string;
+  anotacoes:          string;
+  dentes_afetados:    number[];
   dentes_observacoes: Record<string, string>;
-  resumo: string;
-  conduta: string;
-  proximosPassos: string;
-  followUpData: string;
+  procedimentos?:     string[];
+  conduta?:           string;
+  retorno_sugerido?:  string | null;
+  // Mantidos por compatibilidade temporária com chamadas antigas do wizard removido:
+  resumo?:            string;
+  proximosPassos?:    string;
+  followUpData?:      string;
 }): Promise<{ error?: string }> {
   const { supabase, user, clinicId, role } = await requireClinicContext();
   if (role === 'secretaria') return { error: 'Sem permissão.' };
@@ -100,22 +112,19 @@ export async function finalizarConsulta(params: {
 
   if (!dentistaPerfil) return { error: 'Perfil não encontrado.' };
 
-  const anotacoesCompletas = [
-    params.anotacoes,
-    params.resumo       ? `\n\n📋 Resumo: ${params.resumo}` : '',
-    params.conduta      ? `\n💊 Conduta: ${params.conduta}` : '',
-    params.proximosPassos ? `\n➡️ Próximos passos: ${params.proximosPassos}` : '',
-    params.followUpData ? `\n📅 Retorno: ${params.followUpData}` : '',
-  ].filter(Boolean).join('');
+  const anotacoesFinais = params.anotacoes;
 
   const { error: fichaError } = await supabase.from('fichas').insert({
     clinica_id:         clinicId,
     paciente_id:        params.pacienteId,
     dentista_id:        dentistaPerfil.id,
     queixa_principal:   params.queixa_principal,
-    anotacoes:          anotacoesCompletas,
+    anotacoes:          anotacoesFinais,
     dentes_afetados:    params.dentes_afetados,
     dentes_observacoes: params.dentes_observacoes,
+    ...(params.procedimentos !== undefined && { procedimentos: params.procedimentos }),
+    ...(params.conduta !== undefined && { conduta: params.conduta }),
+    ...(params.retorno_sugerido !== undefined && { retorno_sugerido: params.retorno_sugerido }),
     status:             'concluida',
   });
 

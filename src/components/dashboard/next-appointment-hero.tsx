@@ -1,9 +1,10 @@
 import Link from 'next/link';
 import { format, parseISO, differenceInMinutes } from 'date-fns';
 import { Clock, AlertCircle, FileText, ArrowRight } from 'lucide-react';
+import { motion } from 'motion/react';
 import { ConsultaCtaButton } from './consulta-cta-button';
 
-type HeroState = 'empty' | 'concluded' | 'active' | 'imminent' | 'approaching' | 'distant';
+type HeroState = 'empty' | 'concluded' | 'active' | 'critical' | 'near' | 'imminent' | 'approaching' | 'distant';
 type FilledState = Exclude<HeroState, 'empty' | 'concluded'>;
 
 interface NextAppointmentHeroProps {
@@ -29,7 +30,9 @@ function toTitleCase(name: string): string {
 
 function getHeroState(status: string, minutesUntil: number): FilledState {
   if (status === 'in_progress' || status === 'checked_in') return 'active';
-  if (minutesUntil < 30) return 'imminent';
+  if (minutesUntil <= 5)  return 'critical';
+  if (minutesUntil < 10)  return 'near';
+  if (minutesUntil < 30)  return 'imminent';
   if (minutesUntil < 120) return 'approaching';
   return 'distant';
 }
@@ -43,16 +46,20 @@ function fmtMins(mins: number): string {
 }
 
 const STATE_LABEL: Record<FilledState, string> = {
-  active: 'EM ATENDIMENTO',
-  imminent: 'COMEÇA EM BREVE',
-  approaching: 'EM BREVE',
-  distant: 'PRÓXIMO ATENDIMENTO',
+  active:      'EM ATENDIMENTO',
+  critical:    'INICIAR AGORA',
+  near:        'COMEÇA EM BREVE',
+  imminent:    'EM BREVE',
+  approaching: 'PRÓXIMO',
+  distant:     'PRÓXIMO ATENDIMENTO',
 };
 
 // ── Countdown Ring ─────────────────────────────────────────────────────────────
 function CountdownRing({ mins, state }: { mins: number; state: FilledState }) {
   const isActive = state === 'active';
-  const useAmber = state === 'approaching';
+  const isCritical = state === 'critical';
+  const isNear = state === 'near';
+  const useAmber = state === 'approaching' || isNear;
   const isImminent = state === 'imminent';
 
   const size = 132;
@@ -65,9 +72,16 @@ function CountdownRing({ mins, state }: { mins: number; state: FilledState }) {
   const fillPct = isActive ? 1 : 1 - clampedMins / 120;
   const dashOffset = circ * (1 - fillPct);
 
-  const ringColor = useAmber ? '#f59e0b' : '#2f9c85';
-  const trackColor = useAmber ? 'rgba(245,158,11,0.14)' : 'rgba(47,156,133,0.12)';
-  const ringOpacity = isActive ? 1 : isImminent ? 0.92 : useAmber ? 0.78 : 0.52;
+  const ringColor =
+    isCritical ? '#ef4444' :
+    isNear     ? '#f59e0b' :
+    useAmber   ? '#f59e0b' :
+    '#2f9c85';
+  const trackColor =
+    isCritical ? 'rgba(239,68,68,0.14)' :
+    useAmber   ? 'rgba(245,158,11,0.14)' :
+    'rgba(47,156,133,0.12)';
+  const ringOpacity = isActive ? 1 : isCritical ? 1 : isImminent ? 0.92 : useAmber ? 0.78 : 0.52;
 
   const centerNum = mins < 60 ? String(Math.max(0, mins)) : String(Math.floor(mins / 60));
   const centerUnit = mins < 60 ? 'min' : mins % 60 > 0 ? `h ${mins % 60}m` : 'h';
@@ -124,7 +138,7 @@ function CountdownRing({ mins, state }: { mins: number; state: FilledState }) {
                 className="font-mono font-bold leading-none tabular-nums"
                 style={{
                   fontSize: mins < 60 ? '2.25rem' : '1.875rem',
-                  color: useAmber ? '#f59e0b' : 'var(--color-text-primary)',
+                  color: isCritical ? '#ef4444' : useAmber ? '#f59e0b' : 'var(--color-text-primary)',
                 }}
               >
                 {centerNum}
@@ -132,7 +146,9 @@ function CountdownRing({ mins, state }: { mins: number; state: FilledState }) {
               <span
                 className="text-[10px] font-semibold mt-0.5"
                 style={{
-                  color: useAmber
+                  color: isCritical
+                    ? 'rgba(239,68,68,0.65)'
+                    : useAmber
                     ? 'rgba(245,158,11,0.65)'
                     : 'var(--color-text-secondary)',
                 }}
@@ -148,7 +164,11 @@ function CountdownRing({ mins, state }: { mins: number; state: FilledState }) {
       <p
         className="mt-2 text-[9px] font-bold uppercase tracking-[0.18em]"
         style={{
-          color: useAmber ? 'rgba(245,158,11,0.45)' : 'rgba(47,156,133,0.4)',
+          color: isCritical
+            ? 'rgba(239,68,68,0.55)'
+            : useAmber
+            ? 'rgba(245,158,11,0.45)'
+            : 'rgba(47,156,133,0.4)',
         }}
       >
         {isActive ? 'ao vivo' : 'restantes'}
@@ -248,13 +268,20 @@ export function NextAppointmentHero({ agendamento, now, allConcluded }: NextAppo
   const state = getHeroState(status, mins);
 
   const isActive = state === 'active';
+  const isCritical = state === 'critical';
+  const isNear = state === 'near';
   const isImminent = state === 'imminent';
   const isApproaching = state === 'approaching';
-  const showPulse = isActive || isImminent || isApproaching;
-  const useAmber = isApproaching;
+  const showPulse = isActive || isCritical || isNear || isImminent || isApproaching;
+  const useAmber = isApproaching || isNear;
+  const useRed = isCritical;
 
   const containerBorder = isActive
     ? 'border-teal/50'
+    : isCritical
+    ? 'border-red-500/50'
+    : isNear
+    ? 'border-amber-500/40'
     : isImminent
     ? 'border-teal/40'
     : useAmber
@@ -263,6 +290,10 @@ export function NextAppointmentHero({ agendamento, now, allConcluded }: NextAppo
 
   const containerShadow = isActive
     ? '0 0 0 4px rgba(47,156,133,0.10), 0 16px 48px -16px rgba(47,156,133,0.30)'
+    : isCritical
+    ? '0 0 0 4px rgba(239,68,68,0.12), 0 16px 48px -16px rgba(239,68,68,0.30)'
+    : isNear
+    ? '0 0 0 4px rgba(245,158,11,0.08), 0 16px 48px -16px rgba(245,158,11,0.20)'
     : isImminent
     ? '0 0 0 4px rgba(47,156,133,0.08), 0 16px 48px -16px rgba(47,156,133,0.25)'
     : useAmber
@@ -271,17 +302,29 @@ export function NextAppointmentHero({ agendamento, now, allConcluded }: NextAppo
 
   const accentBarGradient = isActive
     ? 'linear-gradient(90deg, #2f9c85 0%, #2f9c85 25%, rgba(47,156,133,0.55) 65%, transparent 100%)'
+    : isCritical
+    ? 'linear-gradient(90deg, #ef4444 0%, rgba(239,68,68,0.75) 55%, transparent 100%)'
+    : isNear
+    ? 'linear-gradient(90deg, #f59e0b 0%, rgba(245,158,11,0.65) 55%, transparent 100%)'
     : isImminent
     ? 'linear-gradient(90deg, #2f9c85 0%, rgba(47,156,133,0.75) 55%, transparent 100%)'
     : useAmber
     ? 'linear-gradient(90deg, #f59e0b 0%, rgba(245,158,11,0.5) 55%, transparent 100%)'
     : 'linear-gradient(90deg, #2f9c85 0%, rgba(47,156,133,0.35) 55%, transparent 100%)';
 
-  const dotColor = useAmber ? 'bg-amber-500' : 'bg-teal';
-  const labelColor = useAmber ? 'text-amber-600 dark:text-amber-400' : 'text-teal';
+  const dotColor = useRed ? 'bg-red-500' : useAmber ? 'bg-amber-500' : 'bg-teal';
+  const labelColor = useRed
+    ? 'text-red-500 dark:text-red-400'
+    : useAmber
+    ? 'text-amber-600 dark:text-amber-400'
+    : 'text-teal';
 
   const timeBadgeText = isActive
     ? 'Em andamento'
+    : isCritical
+    ? `Iniciar agora — ${fmtMins(mins)}`
+    : isNear
+    ? `Começa em ${fmtMins(mins)}`
     : isImminent
     ? `Começa em ${fmtMins(mins)}`
     : isApproaching
@@ -291,7 +334,9 @@ export function NextAppointmentHero({ agendamento, now, allConcluded }: NextAppo
   const timeBadgeClass =
     isActive || isImminent
       ? 'bg-teal/10 text-teal'
-      : useAmber
+      : isCritical
+      ? 'bg-red-500/10 text-red-600 dark:text-red-400'
+      : isNear || useAmber
       ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
       : 'bg-surface-alt text-text-secondary';
 
@@ -309,7 +354,7 @@ export function NextAppointmentHero({ agendamento, now, allConcluded }: NextAppo
     >
       {/* Accent top bar */}
       <div
-        className={isActive || isImminent ? 'h-[3px]' : 'h-[2px]'}
+        className={isActive || isCritical || isNear || isImminent ? 'h-[3px]' : 'h-[2px]'}
         style={{ background: accentBarGradient }}
       />
 
@@ -320,6 +365,8 @@ export function NextAppointmentHero({ agendamento, now, allConcluded }: NextAppo
           backgroundImage:
             isActive || isImminent
               ? 'radial-gradient(ellipse 100% 80% at 50% 120%, rgba(47,156,133,0.06) 0%, transparent 60%)'
+              : isCritical
+              ? 'radial-gradient(ellipse 100% 80% at 50% 120%, rgba(239,68,68,0.07) 0%, transparent 60%)'
               : useAmber
               ? 'radial-gradient(ellipse 100% 80% at 50% 120%, rgba(245,158,11,0.05) 0%, transparent 60%)'
               : 'radial-gradient(ellipse 100% 80% at 50% 120%, rgba(47,156,133,0.03) 0%, transparent 60%)',
@@ -400,7 +447,12 @@ export function NextAppointmentHero({ agendamento, now, allConcluded }: NextAppo
 
         {/* CTA side */}
         <div className="flex flex-col gap-3 shrink-0">
-          <ConsultaCtaButton />
+          <motion.div
+            animate={isCritical ? { scale: [1, 1.03, 1] } : {}}
+            transition={{ duration: 1.0, repeat: Infinity }}
+          >
+            <ConsultaCtaButton />
+          </motion.div>
           <Link
             href={`/dashboard/pacientes/${paciente.id}`}
             className="text-center text-xs font-semibold text-text-secondary hover:text-text-primary transition-colors"

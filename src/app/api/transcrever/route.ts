@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { createClient } from '@/lib/supabase/server';
 import { withRateLimit } from '@/lib/rate-limit';
+import { WHISPER_DENTAL_PROMPT } from '@/lib/odonto-dictionary';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY ?? '' });
 
@@ -38,9 +39,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       file: audioFile,
       model: 'whisper-1',
       language: 'pt',
-      prompt:
-        'Dentista descrevendo procedimentos: extração, restauração, canal, faceta, implante, ' +
-        'limpeza, clareamento, prótese, radiografia, siso, resina, porcelana, anamnese.',
+      prompt: WHISPER_DENTAL_PROMPT,
     });
 
     return NextResponse.json({ transcricao: transcription.text });
