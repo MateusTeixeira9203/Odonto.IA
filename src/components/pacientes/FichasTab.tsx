@@ -397,27 +397,6 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
     }));
   };
 
-  const handleToggleProcedimento = async (fichaId: string, key: string, current: string[]): Promise<void> => {
-    const supabase = createClient();
-    const newConcluidos = current.includes(key)
-      ? current.filter((k) => k !== key)
-      : [...current, key];
-
-    const { error } = await supabase
-      .from('fichas')
-      .update({ procedimentos_concluidos: newConcluidos })
-      .eq('id', fichaId)
-      .eq('clinica_id', clinicaId);
-
-    if (!error) {
-      setEvolutions((prev) =>
-        prev.map((e) =>
-          e.id === fichaId ? { ...e, procedimentosConcluidos: newConcluidos } : e
-        )
-      );
-    }
-  };
-
   const handleSave = async () => {
     setIsSaving(true);
     const isNovaFicha = !editingId;
@@ -1227,18 +1206,14 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                           const procKey = `${tn.tooth}_${i}`;
                           const done = evo.procedimentosConcluidos.includes(procKey);
                           return (
-                            <button
-                              key={i}
-                              onClick={() => void handleToggleProcedimento(evo.id, procKey, evo.procedimentosConcluidos)}
-                              className="flex items-center gap-2 text-left group/proc w-full"
-                            >
-                              <div className={`w-4 h-4 rounded border shrink-0 flex items-center justify-center transition-all ${done ? 'bg-emerald-500 border-emerald-500' : 'border-border group-hover/proc:border-teal'}`}>
+                            <div key={i} className="flex items-center gap-2">
+                              <div className={`w-4 h-4 rounded border shrink-0 flex items-center justify-center ${done ? 'bg-emerald-500 border-emerald-500' : 'border-border/60'}`}>
                                 {done && <Check className="w-2.5 h-2.5 text-white" />}
                               </div>
-                              <span className={`text-[11px] font-medium transition-all ${done ? 'line-through text-text-secondary' : 'text-text-primary group-hover/proc:text-teal'}`}>
+                              <span className={`text-[11px] font-medium ${done ? 'line-through text-text-secondary' : 'text-text-primary'}`}>
                                 {n}
                               </span>
-                            </button>
+                            </div>
                           );
                         })}
                       </div>
