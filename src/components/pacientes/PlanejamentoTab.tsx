@@ -24,7 +24,7 @@ import {
   Activity,
   Zap,
   Filter,
-  Users,
+
   AlertTriangle,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -115,7 +115,7 @@ function ProcCard({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           {proc.dente && (
-            <div className="text-[9px] font-bold text-teal uppercase tracking-wider mb-1">
+            <div className="text-[10px] font-bold text-teal uppercase tracking-wider mb-1">
               Dente {proc.dente}
               {TOOTH_NAMES[proc.dente] ? ` · ${TOOTH_NAMES[proc.dente]}` : ''}
             </div>
@@ -130,7 +130,7 @@ function ProcCard({
         <button
           onClick={onStatusCycle}
           disabled={updating}
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] font-bold uppercase tracking-wider transition-all disabled:opacity-50 ${st.className}`}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 ${st.className}`}
         >
           {proc.status === 'concluido' ? (
             <CheckCircle2 className="w-3 h-3" />
@@ -171,7 +171,6 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
   const [currentSlide, setCurrentSlide] = useState(0);
   const [slideDirection, setSlideDirection] = useState(1);
   const [overviewMode, setOverviewMode] = useState(false);
-  const [patientModeOpen, setPatientModeOpen] = useState(false);
 
   // Treatment Map
   const [selectedTooth, setSelectedTooth] = useState<number | null>(null);
@@ -208,15 +207,6 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
     return () => window.removeEventListener('keydown', handleKey);
   }, [isPresentationOpen, sections.length]);
 
-  // Patient mode keyboard close
-  useEffect(() => {
-    if (!patientModeOpen) return;
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setPatientModeOpen(false);
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [patientModeOpen]);
 
   const fetchData = useCallback(async () => {
     setLoadingData(true);
@@ -465,7 +455,7 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
     : 0;
 
   const totalBudget = budgetProcedures.reduce((acc, curr) => acc + curr.value, 0);
-  const totalSlides = sections.length + 1;
+  const totalSlides = sections.length + 2;
 
   // ── Tooth detail (selected tooth procedures) ──────────────────────────────
 
@@ -760,7 +750,7 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
       <div className="bg-surface rounded-3xl border border-border/60 shadow-sm p-8">
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
           <div className="flex-1">
-            <div className="text-[10px] font-bold text-teal uppercase tracking-[0.2em] mb-2">
+            <div className="text-xs font-bold text-teal uppercase tracking-[0.2em] mb-2">
               Plano Clínico
             </div>
             <input
@@ -813,7 +803,7 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
                 {intelligenceMessages.map((msg, i) => (
                   <div
                     key={i}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-bold ${
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-bold ${
                       msg.type === 'success'
                         ? 'bg-teal/8 text-teal border-teal/20'
                         : msg.type === 'warning'
@@ -842,15 +832,6 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
                 : <><Sparkles className="w-4 h-4 text-teal" /> Gerar com IA</>
               }
             </button>
-            {planProcs.length > 0 && (
-              <button
-                onClick={() => setPatientModeOpen(true)}
-                className="bg-surface border border-border text-text-primary px-5 py-3 rounded-2xl font-bold text-sm flex items-center gap-2 hover:bg-surface-alt transition-all"
-              >
-                <Users className="w-4 h-4 text-teal" />
-                Modo Paciente
-              </button>
-            )}
             <button
               onClick={() => { setCurrentSlide(0); setIsPresentationOpen(true); }}
               disabled={sections.length === 0}
@@ -877,16 +858,16 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
             className="w-full p-6 flex items-center justify-between hover:bg-surface-alt/20 transition-colors"
           >
             <div className="flex items-center gap-3">
-              <div className="text-[10px] font-bold text-text-secondary uppercase tracking-[0.2em]">
+              <div className="text-xs font-bold text-text-secondary uppercase tracking-[0.2em]">
                 Mapa do Tratamento
               </div>
-              <span className="px-2 py-0.5 rounded-full bg-teal/10 text-teal text-[10px] font-bold">
+              <span className="px-2 py-0.5 rounded-full bg-teal/10 text-teal text-xs font-bold">
                 {treatedTeeth.size} dente{treatedTeeth.size !== 1 ? 's' : ''}
               </span>
               {selectedTooth && (
                 <button
                   onClick={(e) => { e.stopPropagation(); setSelectedTooth(null); }}
-                  className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-teal/15 border border-teal/30 text-teal text-[10px] font-bold"
+                  className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-teal/15 border border-teal/30 text-teal text-xs font-bold"
                 >
                   <Filter className="w-2.5 h-2.5" />
                   D{selectedTooth}
@@ -913,7 +894,7 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
 
                   {/* Odontogram */}
                   <div>
-                    <p className="text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-4">
+                    <p className="text-xs font-bold text-text-secondary uppercase tracking-widest mb-4">
                       Clique em um dente para filtrar
                     </p>
                     <Odontograma
@@ -924,22 +905,9 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
                         setSelectedTooth(prev => prev === tooth ? null : tooth)
                       }
                       showCheckbox={false}
+                      compact
+                      hideFilters
                     />
-                    {/* Custom legend override */}
-                    <div className="flex items-center gap-4 mt-3 flex-wrap">
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full border border-border bg-surface-alt inline-block" />
-                        <span className="text-[8.5px] text-text-secondary">Sem tratamento</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: 'var(--color-teal-pale)', border: '1px solid color-mix(in srgb, var(--color-teal) 38%, var(--color-border))' }} />
-                        <span className="text-[8.5px] text-text-secondary">Planejado</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full bg-teal/60 border border-teal inline-block" />
-                        <span className="text-[8.5px] text-text-secondary">Concluído</span>
-                      </div>
-                    </div>
                   </div>
 
                   {/* Right panel: tooth detail or quadrant stats */}
@@ -954,7 +922,7 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
                         className="space-y-4"
                       >
                         <div>
-                          <div className="text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-1">
+                          <div className="text-xs font-bold text-text-secondary uppercase tracking-widest mb-1">
                             Dente selecionado
                           </div>
                           <div className="flex items-baseline gap-2">
@@ -968,7 +936,7 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
                             )}
                           </div>
                           {getQuadrantForTooth(selectedTooth) && (
-                            <span className="text-[10px] text-teal font-bold">
+                            <span className="text-xs text-teal font-bold">
                               {Q_LABELS[getQuadrantForTooth(selectedTooth)!]?.long}
                             </span>
                           )}
@@ -994,7 +962,7 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
                                   <button
                                     onClick={() => void updateProcStatus(proc.id, getNextStatus(proc.status))}
                                     disabled={updatingProcId === proc.id}
-                                    className={`shrink-0 flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[10px] font-bold transition-all disabled:opacity-50 ${st.className}`}
+                                    className={`shrink-0 flex items-center gap-1.5 px-2 py-1 rounded-lg border text-xs font-bold transition-all disabled:opacity-50 ${st.className}`}
                                   >
                                     {updatingProcId === proc.id
                                       ? <Loader2 className="w-3 h-3 animate-spin" />
@@ -1023,7 +991,7 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
                         transition={{ duration: 0.2 }}
                         className="space-y-4"
                       >
-                        <div className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">
+                        <div className="text-xs font-bold text-text-secondary uppercase tracking-widest">
                           Progresso por Quadrante
                         </div>
 
@@ -1042,12 +1010,12 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
                                     <div className="flex items-center gap-2">
                                       <span className="text-xs font-bold text-text-primary">{q.short}</span>
                                       {isComplete && (
-                                        <span className="text-[9px] font-bold text-teal bg-teal/10 px-1.5 py-0.5 rounded-full">
+                                        <span className="text-[10px] font-bold text-teal bg-teal/10 px-1.5 py-0.5 rounded-full">
                                           Concluído
                                         </span>
                                       )}
                                     </div>
-                                    <span className="text-[10px] font-mono text-text-secondary">
+                                    <span className="text-xs font-mono text-text-secondary">
                                       {q.done}/{q.total}
                                     </span>
                                   </div>
@@ -1067,7 +1035,7 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
 
                         {budgetExists && (
                           <div className="pt-4 border-t border-border/40 space-y-2">
-                            <div className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">
+                            <div className="text-xs font-bold text-text-secondary uppercase tracking-widest">
                               Investimento
                             </div>
                             <div className="flex items-baseline gap-2">
@@ -1078,7 +1046,7 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
                             </div>
                             <div className="flex items-center gap-2">
                               <div className="w-2 h-2 rounded-full bg-teal shrink-0" />
-                              <span className="text-[10px] text-text-secondary">
+                              <span className="text-xs text-text-secondary">
                                 {budgetProcedures.length} procedimento{budgetProcedures.length !== 1 ? 's' : ''} no orçamento
                               </span>
                             </div>
@@ -1102,14 +1070,14 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
             className="w-full p-6 flex items-center justify-between hover:bg-surface-alt/20 transition-colors"
           >
             <div className="flex items-center gap-3">
-              <div className="text-[10px] font-bold text-text-secondary uppercase tracking-[0.2em]">
+              <div className="text-xs font-bold text-text-secondary uppercase tracking-[0.2em]">
                 Jornada Clínica
               </div>
-              <span className="px-2 py-0.5 rounded-full bg-teal/10 text-teal text-[10px] font-bold">
+              <span className="px-2 py-0.5 rounded-full bg-teal/10 text-teal text-xs font-bold">
                 {timelineSessions.length} sess{timelineSessions.length !== 1 ? 'ões' : 'ão'}
               </span>
               {selectedTooth && (
-                <span className="text-[10px] text-text-secondary font-medium">
+                <span className="text-xs text-text-secondary font-medium">
                   · filtrando dente {selectedTooth}
                 </span>
               )}
@@ -1177,13 +1145,13 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
                                       : 'Sessão clínica'
                                     }
                                   </div>
-                                  <div className="text-[10px] text-text-secondary mt-0.5">
+                                  <div className="text-xs text-text-secondary mt-0.5">
                                     {sessionTotal} procedimento{sessionTotal !== 1 ? 's' : ''}
                                     {sessionDone > 0 && ` · ${sessionDone} concluído${sessionDone !== 1 ? 's' : ''}`}
                                   </div>
                                 </div>
                                 {sessionDone === sessionTotal && (
-                                  <span className="text-[9px] font-bold text-teal bg-teal/10 border border-teal/20 px-1.5 py-0.5 rounded-full">
+                                  <span className="text-[10px] font-bold text-teal bg-teal/10 border border-teal/20 px-1.5 py-0.5 rounded-full">
                                     Completa
                                   </span>
                                 )}
@@ -1244,7 +1212,7 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
                         <select
                           value={section.status}
                           onChange={(e) => updateSection(section.id, 'status', e.target.value as Section['status'])}
-                          className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg border cursor-pointer outline-none transition-all ${secSt.className}`}
+                          className={`text-xs font-bold uppercase tracking-wider px-2 py-1 rounded-lg border cursor-pointer outline-none transition-all ${secSt.className}`}
                           style={{ appearance: 'none' }}
                         >
                           <option value="pendente">Pendente</option>
@@ -1287,12 +1255,12 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
                 <div className="p-8 grid grid-cols-1 lg:grid-cols-2 gap-10">
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">Explicação para o Paciente</label>
+                      <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">Explicação para o Paciente</label>
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => void generateSectionWithAI(section.id)}
                           disabled={isGeneratingAI === section.id || !section.title}
-                          className="text-teal text-[10px] font-bold flex items-center gap-1 hover:text-teal-dark transition-colors disabled:opacity-50"
+                          className="text-teal text-xs font-bold flex items-center gap-1 hover:text-teal-dark transition-colors disabled:opacity-50"
                         >
                           {isGeneratingAI === section.id ? (
                             <Loader2 className="w-3 h-3 animate-spin" />
@@ -1314,7 +1282,7 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
 
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">Imagens Ilustrativas</label>
+                      <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">Imagens Ilustrativas</label>
                       <button
                         onClick={() => setIsImagePickerOpen(section.id)}
                         className="text-teal text-xs font-bold flex items-center gap-1 hover:text-teal-dark transition-colors"
@@ -1369,182 +1337,6 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
         </button>
       </div>
 
-      {/* ── PATIENT EXPLANATION MODE ── */}
-      <AnimatePresence>
-        {patientModeOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0, transition: { duration: 0.2 } }}
-            className="fixed inset-0 z-[200] flex flex-col"
-            style={{ background: '#f8f6f2' }}
-          >
-            {/* Top bar */}
-            <div className="flex items-center justify-between px-8 py-5 border-b border-black/8 bg-white/60 backdrop-blur-md shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-teal flex items-center justify-center">
-                  <Users className="w-4 h-4 text-white" />
-                </div>
-                <div>
-                  <p className="font-bold text-sm text-gray-900 leading-none">Modo Paciente</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{patientName}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setPatientModeOpen(false)}
-                className="p-2 rounded-xl bg-black/5 hover:bg-black/10 transition-colors text-gray-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto p-8">
-              <div className="max-w-2xl mx-auto">
-                <div className="text-center mb-10">
-                  <div className="text-xs font-bold text-teal uppercase tracking-[0.2em] mb-2">
-                    Seu Plano de Tratamento
-                  </div>
-                  <h1 className="text-3xl font-bold text-gray-900 mb-2">{patientName}</h1>
-                  <p className="text-gray-500 text-sm">
-                    {planProcs.length} procedimento{planProcs.length !== 1 ? 's' : ''} ·{' '}
-                    {concluidosCount} concluído{concluidosCount !== 1 ? 's' : ''}
-                  </p>
-
-                  {/* Progress circle */}
-                  <div className="mt-6 flex justify-center">
-                    <div className="relative w-24 h-24">
-                      <svg className="w-24 h-24 -rotate-90" viewBox="0 0 96 96">
-                        <circle cx="48" cy="48" r="40" fill="none" stroke="#e5e0d8" strokeWidth="8" />
-                        <circle
-                          cx="48" cy="48" r="40"
-                          fill="none"
-                          stroke="#2f9c85"
-                          strokeWidth="8"
-                          strokeLinecap="round"
-                          strokeDasharray={`${2 * Math.PI * 40}`}
-                          strokeDashoffset={`${2 * Math.PI * 40 * (1 - progressPercent / 100)}`}
-                          style={{ transition: 'stroke-dashoffset 0.6s ease' }}
-                        />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-xl font-bold text-gray-900">{progressPercent}%</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Procedures grouped by quadrant */}
-                {['Q1', 'Q2', 'Q3', 'Q4'].map(qKey => {
-                  const qProcs = planProcs.filter(p =>
-                    p.dente && Q_LABELS[qKey].teeth.includes(p.dente)
-                  );
-                  if (qProcs.length === 0) return null;
-                  return (
-                    <div key={qKey} className="mb-8">
-                      <div className="text-[10px] font-bold text-teal uppercase tracking-widest mb-3">
-                        {Q_LABELS[qKey].long}
-                      </div>
-                      <div className="space-y-2">
-                        {qProcs.map(proc => {
-                          const st = getProcStatus(proc.status);
-                          return (
-                            <div
-                              key={proc.id}
-                              className={`flex items-center gap-4 p-4 rounded-2xl border bg-white transition-all ${
-                                proc.status === 'concluido'
-                                  ? 'border-teal/20 opacity-70'
-                                  : 'border-black/8'
-                              }`}
-                            >
-                              <div className={`w-3 h-3 rounded-full shrink-0 ${st.dotClassName}`} />
-                              <div className="flex-1 min-w-0">
-                                <p className={`text-sm font-medium ${proc.status === 'concluido' ? 'line-through text-gray-400' : 'text-gray-900'}`}>
-                                  {proc.descricao}
-                                </p>
-                                {proc.dente && (
-                                  <p className="text-xs text-gray-400 mt-0.5">
-                                    Dente {proc.dente}{TOOTH_NAMES[proc.dente] ? ` — ${TOOTH_NAMES[proc.dente]}` : ''}
-                                  </p>
-                                )}
-                              </div>
-                              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border shrink-0 ${st.className}`}>
-                                {st.label}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {/* Procedures without a specific tooth */}
-                {(() => {
-                  const noToothProcs = planProcs.filter(p => !p.dente);
-                  if (noToothProcs.length === 0) return null;
-                  return (
-                    <div className="mb-8">
-                      <div className="text-[10px] font-bold text-teal uppercase tracking-widest mb-3">
-                        Procedimentos Gerais
-                      </div>
-                      <div className="space-y-2">
-                        {noToothProcs.map(proc => {
-                          const st = getProcStatus(proc.status);
-                          return (
-                            <div
-                              key={proc.id}
-                              className="flex items-center gap-4 p-4 rounded-2xl border bg-white border-black/8"
-                            >
-                              <div className={`w-3 h-3 rounded-full shrink-0 ${st.dotClassName}`} />
-                              <div className="flex-1">
-                                <p className="text-sm font-medium text-gray-900">{proc.descricao}</p>
-                              </div>
-                              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${st.className}`}>
-                                {st.label}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* Budget summary */}
-                {budgetExists && budgetProcedures.length > 0 && (
-                  <div className="mt-8 p-6 bg-white rounded-3xl border border-black/8">
-                    <div className="text-[10px] font-bold text-teal uppercase tracking-widest mb-4">
-                      Resumo do Investimento
-                    </div>
-                    <div className="space-y-2 mb-4">
-                      {budgetProcedures.map(bp => (
-                        <div key={bp.id} className="flex items-center justify-between py-2 border-b border-black/5 last:border-0">
-                          <span className="text-sm text-gray-600">{bp.name}</span>
-                          <span className="font-mono text-sm font-semibold text-gray-900">
-                            R$ {bp.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="flex items-center justify-between pt-2">
-                      <span className="font-bold text-sm text-gray-900">Total</span>
-                      <span className="font-mono text-xl font-bold text-teal">
-                        R$ {totalBudget.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="px-8 py-3 text-center shrink-0">
-              <p className="text-xs text-gray-400">Esc para fechar</p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* ── PRESENTATION ENGINE ── */}
       <AnimatePresence>
         {isPresentationOpen && (
@@ -1564,7 +1356,7 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
                 </div>
                 <div>
                   <p className="text-[11px] font-bold text-white/90 leading-none">{planningTitle}</p>
-                  <p className="text-[10px] text-white/35 mt-0.5">{patientName}</p>
+                  <p className="text-xs text-white/35 mt-0.5">{patientName}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -1596,7 +1388,7 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
                     className="absolute inset-0 overflow-y-auto p-8"
                   >
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 max-w-5xl mx-auto">
-                      {[...sections, null].map((sec, idx) => (
+                      {[null, ...sections, null].map((sec, idx) => (
                         <button
                           key={idx}
                           onClick={() => { setCurrentSlide(idx); setOverviewMode(false); }}
@@ -1604,14 +1396,14 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
                             currentSlide === idx ? 'border-teal bg-teal/10' : 'border-white/10 bg-white/4 hover:bg-white/8 hover:border-white/20'
                           }`}
                         >
-                          <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: '#2f9c85' }}>
-                            {idx < sections.length ? `${String(idx + 1).padStart(2, '0')}` : '★'}
+                          <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#2f9c85' }}>
+                            {idx === 0 ? '◎' : idx <= sections.length ? String(idx).padStart(2, '0') : '★'}
                           </p>
                           <p className="text-xs font-semibold text-white/90 leading-snug line-clamp-2">
-                            {sec ? (sec.title || 'Sem título') : 'Investimento'}
+                            {idx === 0 ? 'Progresso' : sec ? (sec.title || 'Sem título') : 'Investimento'}
                           </p>
                           {sec && sec.content && (
-                            <p className="text-[10px] text-white/40 mt-1.5 line-clamp-2 leading-relaxed">{sec.content}</p>
+                            <p className="text-xs text-white/40 mt-1.5 line-clamp-2 leading-relaxed">{sec.content}</p>
                           )}
                         </button>
                       ))}
@@ -1628,20 +1420,76 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
                       transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
                       className="absolute inset-0 flex flex-col items-center justify-center px-8 sm:px-16 py-10"
                     >
-                      {currentSlide < sections.length ? (
+                      {currentSlide === 0 ? (
+                        /* ── Slide 0: Progresso ── */
+                        <div className="w-full max-w-lg flex flex-col items-center text-center">
+                          <p className="text-xs font-bold uppercase tracking-[0.25em] mb-4" style={{ color: '#2f9c85' }}>
+                            Progresso do Tratamento
+                          </p>
+                          <h2 className="font-heading text-3xl sm:text-5xl text-white mb-2 leading-tight">
+                            {patientName}
+                          </h2>
+                          <p className="text-white/45 text-sm mb-10">
+                            {planProcs.length} procedimento{planProcs.length !== 1 ? 's' : ''} · {concluidosCount} concluído{concluidosCount !== 1 ? 's' : ''}
+                          </p>
+
+                          {/* Círculo de progresso */}
+                          <div className="relative w-32 h-32 mb-10">
+                            <svg className="w-32 h-32 -rotate-90" viewBox="0 0 128 128">
+                              <circle cx="64" cy="64" r="52" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="10" />
+                              <circle
+                                cx="64" cy="64" r="52"
+                                fill="none"
+                                stroke="#2f9c85"
+                                strokeWidth="10"
+                                strokeLinecap="round"
+                                strokeDasharray={`${2 * Math.PI * 52}`}
+                                strokeDashoffset={`${2 * Math.PI * 52 * (1 - progressPercent / 100)}`}
+                                style={{ transition: 'stroke-dashoffset 0.8s ease' }}
+                              />
+                            </svg>
+                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5">
+                              <span className="text-3xl font-bold text-white leading-none">{progressPercent}%</span>
+                              <span className="text-[10px] text-white/35 font-medium uppercase tracking-wider">concluído</span>
+                            </div>
+                          </div>
+
+                          {/* Breakdown por quadrante */}
+                          <div className="grid grid-cols-2 gap-3 w-full max-w-sm">
+                            {(['Q1', 'Q2', 'Q3', 'Q4'] as const).map(qKey => {
+                              const qProcs = planProcs.filter(p => p.dente && Q_LABELS[qKey].teeth.includes(p.dente));
+                              if (qProcs.length === 0) return null;
+                              const qDone = qProcs.filter(p => p.status === 'concluido').length;
+                              const pct = Math.round((qDone / qProcs.length) * 100);
+                              return (
+                                <div key={qKey} className="rounded-2xl p-4 text-left border border-white/8" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                                  <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: '#2f9c85' }}>
+                                    {Q_LABELS[qKey].short}
+                                  </p>
+                                  <p className="text-white text-sm font-semibold mb-2">{qDone}/{qProcs.length}</p>
+                                  <div className="h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.10)' }}>
+                                    <div className="h-full rounded-full" style={{ width: `${pct}%`, background: '#2f9c85', transition: 'width 0.6s ease' }} />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : currentSlide <= sections.length ? (
+                        /* ── Slides de conteúdo ── */
                         <div className="w-full max-w-3xl flex flex-col items-center text-center">
-                          <p className="text-[10px] font-bold uppercase tracking-[0.25em] mb-5" style={{ color: '#2f9c85' }}>
-                            {String(currentSlide + 1).padStart(2, '0')} / {String(sections.length).padStart(2, '0')}
+                          <p className="text-xs font-bold uppercase tracking-[0.25em] mb-5" style={{ color: '#2f9c85' }}>
+                            {String(currentSlide).padStart(2, '0')} / {String(sections.length).padStart(2, '0')}
                           </p>
                           <h2 className="font-heading text-3xl sm:text-5xl text-white mb-6 leading-tight">
-                            {sections[currentSlide].title || 'Sem título'}
+                            {sections[currentSlide - 1].title || 'Sem título'}
                           </h2>
                           <p className="text-base sm:text-xl text-white/65 leading-relaxed max-w-2xl">
-                            {sections[currentSlide].content || 'Sem conteúdo.'}
+                            {sections[currentSlide - 1].content || 'Sem conteúdo.'}
                           </p>
-                          {sections[currentSlide].imageIds.length > 0 && (
+                          {sections[currentSlide - 1].imageIds.length > 0 && (
                             <div className="mt-10 grid grid-cols-3 gap-3 w-full max-w-2xl">
-                              {sections[currentSlide].imageIds.map(imgId => {
+                              {sections[currentSlide - 1].imageIds.map(imgId => {
                                 const doc = documents.find(d => d.id === imgId);
                                 if (!doc) return null;
                                 return (
@@ -1654,8 +1502,9 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
                           )}
                         </div>
                       ) : (
+                        /* ── Slide final: Investimento ── */
                         <div className="w-full max-w-lg flex flex-col items-center text-center">
-                          <p className="text-[10px] font-bold uppercase tracking-[0.25em] mb-5" style={{ color: '#2f9c85' }}>
+                          <p className="text-xs font-bold uppercase tracking-[0.25em] mb-5" style={{ color: '#2f9c85' }}>
                             Resumo do Investimento
                           </p>
                           <h2 className="font-heading text-3xl sm:text-5xl text-white mb-10 leading-tight">
@@ -1721,7 +1570,7 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
             )}
 
             <div className="relative z-10 pb-3 flex justify-center">
-              <p className="text-[10px] text-white/20 font-mono">← → navegar · O visão geral · Esc fechar</p>
+              <p className="text-xs text-white/20 font-mono">← → navegar · O visão geral · Esc fechar</p>
             </div>
           </motion.div>
         )}
@@ -1780,7 +1629,7 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
                           </div>
                         )}
                         <div className="absolute bottom-0 left-0 right-0 p-2 bg-black/60 backdrop-blur-sm">
-                          <div className="text-[8px] font-bold text-white uppercase truncate">{doc.name}</div>
+                          <div className="text-[10px] font-bold text-white uppercase truncate">{doc.name}</div>
                         </div>
                       </div>
                     );

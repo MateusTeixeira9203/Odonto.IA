@@ -19,6 +19,7 @@ import {
   Lock,
   PenLine,
   ChevronDown,
+  Clock,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { DexLoader } from "@/components/ui/dex-loader";
@@ -79,6 +80,7 @@ const ARCH_LABELS: Record<number, string> = {
   [ARCH_COMPLETA]: 'Boca Toda',
 };
 
+
 interface Evolution {
   id: string;
   date: string;
@@ -88,6 +90,9 @@ interface Evolution {
   professional: string;
   files: string[];
   procedimentosConcluidos: string[];
+  procedimentos: string[];
+  conduta: string | null;
+  retornoSugerido: string | null;
   assinaturaUrl: string | null;
   assinadoEm: string | null;
   tratamentoId: string | null;
@@ -103,6 +108,9 @@ type FichaDB = {
   status: string;
   dentista?: { nome: string } | null;
   procedimentos_concluidos: string[];
+  procedimentos: string[] | null;
+  conduta: string | null;
+  retorno_sugerido: string | null;
   assinatura_url: string | null;
   assinado_em: string | null;
   tratamento_id: string | null;
@@ -139,6 +147,9 @@ const mapFichaToEvolution = (f: FichaDB): Evolution => ({
   professional: f.dentista?.nome ?? "Profissional",
   files: [],
   procedimentosConcluidos: f.procedimentos_concluidos ?? [],
+  procedimentos: f.procedimentos ?? [],
+  conduta: f.conduta || null,
+  retornoSugerido: f.retorno_sugerido ?? null,
   assinaturaUrl: f.assinatura_url ?? null,
   assinadoEm: f.assinado_em ?? null,
   tratamentoId: f.tratamento_id ?? null,
@@ -149,9 +160,10 @@ interface FichasTabProps {
   clinicaId: string;
   dentistaId: string;
   plano?: PlanoId;
+  canWrite?: boolean;
 }
 
-export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTabProps) {
+export function FichasTab({ patientId, clinicaId, dentistaId, plano, canWrite = true }: FichasTabProps) {
   const router = useRouter();
   const [evolutions, setEvolutions] = React.useState<Evolution[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -263,7 +275,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
       const supabase = createClient();
       const { data, error } = await supabase
         .from("fichas")
-        .select("id, created_at, queixa_principal, anotacoes, dentes_afetados, dentes_observacoes, status, procedimentos_concluidos, assinatura_url, assinado_em, tratamento_id, dentista:dentistas(nome)")
+        .select("id, created_at, queixa_principal, anotacoes, dentes_afetados, dentes_observacoes, status, procedimentos_concluidos, procedimentos, conduta, retorno_sugerido, assinatura_url, assinado_em, tratamento_id, dentista:dentistas(nome)")
         .eq("paciente_id", patientId)
         .eq("clinica_id", clinicaId)
         .order("created_at", { ascending: false });
@@ -820,7 +832,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="font-heading text-2xl text-text-primary">Histórico Clínico</h2>
-        {!isPanelOpen && (
+        {!isPanelOpen && canWrite && (
           <Button
             onClick={() => setIsPanelOpen(true)}
             className="bg-teal hover:bg-teal-lt text-white rounded-xl px-6 py-5 font-bold text-sm flex items-center gap-2 shadow-[0_0_15px_rgba(47,156,133,0.3)] transition-all active:scale-95"
@@ -942,7 +954,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                       {selectedTeeth.length > 0 && (
                         <div className="space-y-3">
                           {sharedTeeth.length > 0 && (
-                            <span className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">Individuais</span>
+                            <span className="text-xs font-bold text-text-secondary uppercase tracking-widest">Individuais</span>
                           )}
                           {selectedTeeth.map((tooth) => {
                             const tn = formData.teethNotes.find((t) => t.tooth === tooth);
@@ -955,7 +967,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                                 className="flex items-start gap-3"
                               >
                                 {tooth in ARCH_LABELS ? (
-                                  <div className="shrink-0 rounded-lg bg-teal text-white flex items-center justify-center font-mono text-[10px] font-bold shadow-sm mt-0.5 px-2 py-2 whitespace-nowrap">
+                                  <div className="shrink-0 rounded-lg bg-teal text-white flex items-center justify-center font-mono text-xs font-bold shadow-sm mt-0.5 px-2 py-2 whitespace-nowrap">
                                     {ARCH_LABELS[tooth]}
                                   </div>
                                 ) : (
@@ -974,7 +986,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                                         className="flex-1 bg-surface-alt border border-border rounded-xl px-4 py-2.5 text-sm font-medium text-text-primary outline-none focus:border-teal transition-colors"
                                       />
                                       {notes.length > 1 && (
-                                        <button type="button" onClick={() => removeToothNote(tooth, idx)} className="p-1.5 text-text-secondary hover:text-red-500 transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20">
+                                        <button type="button" onClick={() => removeToothNote(tooth, idx)} className="p-1.5 text-text-secondary hover:text-red-500 transition-colors rounded-lg hover:bg-surface-alt">
                                           <X className="w-3.5 h-3.5" />
                                         </button>
                                       )}
@@ -997,7 +1009,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                           {selectedTeeth.length > 0 && (
                             <div className="flex items-center gap-2">
                               <div className="flex-1 h-px bg-border/60" />
-                              <span className="text-[10px] font-bold text-text-secondary uppercase tracking-widest shrink-0">Grupo</span>
+                              <span className="text-xs font-bold text-text-secondary uppercase tracking-widest shrink-0">Grupo</span>
                               <div className="flex-1 h-px bg-border/60" />
                             </div>
                           )}
@@ -1029,7 +1041,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                                     className="flex-1 bg-surface-alt border border-teal/30 rounded-xl px-4 py-2.5 text-sm font-medium text-text-primary outline-none focus:border-teal transition-colors"
                                   />
                                   {sharedNotes.length > 1 && (
-                                    <button type="button" onClick={() => removeSharedNote(idx)} className="p-1.5 text-text-secondary hover:text-red-500 transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20">
+                                    <button type="button" onClick={() => removeSharedNote(idx)} className="p-1.5 text-text-secondary hover:text-red-500 transition-colors rounded-lg hover:bg-surface-alt">
                                       <X className="w-3.5 h-3.5" />
                                     </button>
                                   )}
@@ -1048,7 +1060,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-[0.15em] mb-2">
+                  <label className="block text-[11px] font-semibold text-text-secondary mb-2">
                     Anexos
                   </label>
                   <input
@@ -1118,21 +1130,24 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
               </div>
 
               {/* Odontograma */}
-              <div className="flex-[2] bg-surface-alt rounded-xl border border-border/60 p-4 md:p-6 flex flex-col">
+              <div
+                className="flex-[2] p-6 flex flex-col border-t lg:border-t-0 lg:border-l min-h-[480px]"
+                style={{ borderColor: 'var(--color-border)' }}
+              >
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-heading text-lg text-text-primary flex items-center">
                     Odontograma
                     <HelpTooltip content="Escolha o tipo de seleção e marque os dentes ou arcadas afetados." />
                   </h3>
                   {selectionMode === 'arch' && (
-                    <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
+                    <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-text-secondary">
                       <div className="w-2.5 h-2.5 rounded-sm bg-teal" /> Selecionado
                     </div>
                   )}
                 </div>
 
                 {/* Seletor de modo */}
-                <div className="flex gap-1 p-1 bg-surface-alt rounded-xl mb-6">
+                <div className="flex gap-1 p-1 rounded-xl mb-6" style={{ background: 'var(--color-bg)' }}>
                   {([
                     { id: 'single', label: 'Dente único' },
                     { id: 'multiple', label: 'Múltiplos' },
@@ -1152,49 +1167,63 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                   ))}
                 </div>
 
-                {selectionMode !== 'arch' ? (
-                  <div className="flex-1 flex flex-col justify-center">
-                    <Odontograma
-                      selectedTeeth={selectedTeeth}
-                      sharedTeeth={sharedTeeth}
-                      historicalTeeth={historicalTeeth}
-                      onToothToggle={toggleTooth}
-                      showCheckbox={selectionMode === 'multiple'}
-                    />
-                  </div>
-                ) : (
-                  <div className="flex-1 flex flex-col justify-center gap-3">
-                    <p className="text-xs text-text-secondary text-center mb-1">
-                      Selecione a área afetada pelo procedimento
-                    </p>
-                    {[
-                      { id: ARCH_SUPERIOR, label: 'Arcada Superior', sub: 'Dentes 11 a 28' },
-                      { id: ARCH_INFERIOR, label: 'Arcada Inferior', sub: 'Dentes 31 a 48' },
-                      { id: ARCH_COMPLETA, label: 'Boca Toda', sub: 'Todas as arcadas' },
-                    ].map(({ id, label, sub }) => (
-                      <button
-                        key={id}
-                        onClick={() => toggleArch(id)}
-                        className={`w-full px-4 py-3 rounded-xl text-sm font-semibold border-2 transition-all flex items-center justify-between ${
-                          selectedTeeth.includes(id)
-                            ? 'bg-teal border-teal text-white'
-                            : 'bg-surface-alt border-border text-text-primary hover:border-teal hover:text-teal'
-                        }`}
-                      >
-                        <span>{label}</span>
-                        <span className={`text-[10px] font-normal ${selectedTeeth.includes(id) ? 'text-white/70' : 'text-text-secondary'}`}>
-                          {sub}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {selectionMode === 'arch' && (
-                  <div className="mt-4 text-center text-xs text-text-secondary font-medium">
-                    Procedimentos em toda a arcada ou boca.
-                  </div>
-                )}
+                <AnimatePresence mode="wait" initial={false}>
+                  {selectionMode !== 'arch' ? (
+                    <motion.div
+                      key="odontogram"
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -6 }}
+                      transition={{ duration: 0.16 }}
+                      className="flex-1 flex flex-col justify-center"
+                    >
+                      <Odontograma
+                        selectedTeeth={selectedTeeth}
+                        sharedTeeth={sharedTeeth}
+                        historicalTeeth={editingId ? historicalTeeth : new Set<number>()}
+                        onToothToggle={toggleTooth}
+                        showCheckbox={selectionMode === 'multiple'}
+                        hideFilters
+                      />
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="arch"
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -6 }}
+                      transition={{ duration: 0.16 }}
+                      className="flex-1 flex flex-col justify-center gap-3"
+                    >
+                      <p className="text-xs text-text-secondary text-center mb-1">
+                        Selecione a área afetada pelo procedimento
+                      </p>
+                      {[
+                        { id: ARCH_SUPERIOR, label: 'Arcada Superior', sub: 'Dentes 11 a 28' },
+                        { id: ARCH_INFERIOR, label: 'Arcada Inferior', sub: 'Dentes 31 a 48' },
+                        { id: ARCH_COMPLETA, label: 'Boca Toda', sub: 'Todas as arcadas' },
+                      ].map(({ id, label, sub }) => (
+                        <button
+                          key={id}
+                          onClick={() => toggleArch(id)}
+                          className={`w-full px-4 py-3 rounded-xl text-sm font-semibold border-2 transition-all flex items-center justify-between ${
+                            selectedTeeth.includes(id)
+                              ? 'bg-teal border-teal text-white'
+                              : 'bg-surface-alt border-border text-text-primary hover:border-teal hover:text-teal'
+                          }`}
+                        >
+                          <span>{label}</span>
+                          <span className={`text-xs font-normal ${selectedTeeth.includes(id) ? 'text-white/70' : 'text-text-secondary'}`}>
+                            {sub}
+                          </span>
+                        </button>
+                      ))}
+                      <p className="text-center text-xs text-text-secondary font-medium mt-1">
+                        Procedimentos em toda a arcada ou boca.
+                      </p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
           </motion.div>
@@ -1368,6 +1397,46 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                       </DropdownMenu>
                     </div>
                   </div>
+
+                  {/* Procedimentos realizados — salvos pelo Modo Consulta */}
+                  {evo.procedimentos.length > 0 && (
+                    <div className="mb-4">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary/60 mb-2">Procedimentos realizados</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {evo.procedimentos.map((proc, i) => (
+                          <span
+                            key={i}
+                            className="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-medium border"
+                            style={{
+                              background: 'color-mix(in srgb, var(--color-teal) 8%, transparent)',
+                              color: 'var(--color-teal)',
+                              borderColor: 'color-mix(in srgb, var(--color-teal) 18%, var(--color-border))',
+                            }}
+                          >
+                            {proc}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Conduta clínica e retorno sugerido */}
+                  {(evo.conduta || evo.retornoSugerido) && (
+                    <div className="mb-4 space-y-2">
+                      {evo.conduta && (
+                        <div className="rounded-xl border border-border/50 px-3 py-2.5 bg-surface-alt/60">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary/60 mb-1">Conduta</p>
+                          <p className="text-xs text-text-secondary leading-relaxed">{evo.conduta}</p>
+                        </div>
+                      )}
+                      {evo.retornoSugerido && (
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border border-border/50 bg-surface-alt text-text-secondary">
+                          <Clock className="w-3 h-3" />
+                          Retorno em {evo.retornoSugerido}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {evo.observation && (
                     <p className="text-sm text-text-secondary leading-relaxed mb-4">
@@ -1673,7 +1742,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                   />
                   <div className="flex gap-2">
                     <div className="space-y-0.5">
-                      <label className="text-[10px] text-text-secondary font-bold uppercase tracking-wider">
+                      <label className="text-xs text-text-secondary font-bold uppercase tracking-wider">
                         Qtd
                       </label>
                       <input
@@ -1691,7 +1760,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
                       />
                     </div>
                     <div className="space-y-0.5 flex-1">
-                      <label className="text-[10px] text-text-secondary font-bold uppercase tracking-wider">
+                      <label className="text-xs text-text-secondary font-bold uppercase tracking-wider">
                         Valor (R$)
                       </label>
                       <input
