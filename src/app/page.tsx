@@ -7,6 +7,7 @@ import {
   Brain, ChevronDown, Menu, X,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 import ParticleNetwork from '@/components/ParticleNetwork';
 
@@ -14,7 +15,7 @@ import ParticleNetwork from '@/components/ParticleNetwork';
 const TEAL    = '#2f9c85';
 const TEAL_LT = '#5dbeb0';
 
-// ── Shared animation preset — fora do componente para não recriar por render ──
+// ── Shared animation preset ───────────────────────────────────────────────────
 const fadeIn = {
   initial:     { opacity: 0, y: 20 },
   whileInView: { opacity: 1, y: 0 },
@@ -25,7 +26,7 @@ const fadeIn = {
 // ── Hero rotating words ───────────────────────────────────────────────────────
 const WORDS = ['Inteligência.', 'Velocidade.', 'Qualidade.'];
 
-// ── Plans — todos com trial + CTA consistente ─────────────────────────────────
+// ── Plans ─────────────────────────────────────────────────────────────────────
 const PLANOS = [
   {
     id: 'SOLO', nome: 'Solo', preco: '167',
@@ -120,7 +121,6 @@ function DexCard() {
         boxShadow: `0 40px 100px -20px rgba(0,0,0,0.12), 0 0 60px -10px color-mix(in srgb, ${TEAL} 18%, transparent)`,
       }}
     >
-      {/* Header bar */}
       <div className="flex items-center justify-between px-5 py-3.5 border-b"
         style={{ borderColor: `color-mix(in srgb, ${TEAL} 12%, transparent)`, background: `color-mix(in srgb, ${TEAL} 4%, #fff)` }}>
         <div className="flex items-center gap-3">
@@ -138,7 +138,6 @@ function DexCard() {
         </div>
       </div>
 
-      {/* Waveform */}
       <div className="px-5 py-4 border-b" style={{ borderColor: `color-mix(in srgb, ${TEAL} 8%, transparent)` }}>
         <div className="flex items-end gap-[2.5px] h-10 mb-3">
           {bars.map((h, i) => (
@@ -154,7 +153,6 @@ function DexCard() {
         </p>
       </div>
 
-      {/* Processing steps */}
       <div className="px-5 py-3.5 space-y-2.5 border-b" style={{ borderColor: `color-mix(in srgb, ${TEAL} 8%, transparent)` }}>
         {steps.map((s, i) => (
           <div key={i} className="flex items-center gap-3">
@@ -170,7 +168,6 @@ function DexCard() {
         ))}
       </div>
 
-      {/* JSON output */}
       <div className="px-5 py-4">
         <div className="flex items-center justify-between mb-3">
           <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-400">
@@ -201,8 +198,10 @@ export default function LandingPage() {
   const [openFaq,    setOpenFaq]    = useState<number | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled,   setScrolled]   = useState(false);
+  const [mounted,    setMounted]    = useState(false);
 
-  // Parallax scoped à seção vantagens — não mais em relação ao scroll total
+  const { resolvedTheme } = useTheme();
+
   const vantagensRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress: vantagensScroll } = useScroll({
     target: vantagensRef,
@@ -210,25 +209,55 @@ export default function LandingPage() {
   });
   const yParallax = useTransform(vantagensScroll, [0, 1], [30, -30]);
 
-  // Rotating words
+  useEffect(() => { setMounted(true); }, []);
+
   useEffect(() => {
     const id = setInterval(() => setWordIndex(p => (p + 1) % WORDS.length), 3000);
     return () => clearInterval(id);
   }, []);
 
-  // Scroll lock com mobile menu aberto
   useEffect(() => {
     document.body.style.overflow = mobileOpen ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
   }, [mobileOpen]);
 
-  // Navbar scroll-aware: transparente no topo, opaca ao scrollar
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 50);
-    onScroll(); // estado inicial
+    onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  // ── Theme-aware tokens (safe: defaults to light until mounted) ────────────
+  const dark = mounted && resolvedTheme === 'dark';
+
+  const cardBg          = dark ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.55)';
+  const cardBorder      = dark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.07)';
+  const navBg           = scrolled ? (dark ? 'rgba(8,22,18,0.88)' : 'rgba(245,243,239,0.92)') : 'transparent';
+  const navBorderColor  = scrolled ? (dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)') : 'transparent';
+  const drawerBg        = dark ? 'rgba(8,22,18,0.97)'      : 'rgba(245,243,239,0.98)';
+  const drawerLinkColor = dark ? '#d1d5db'                  : '#374151';
+  const drawerBtnBorder = dark ? 'rgba(255,255,255,0.15)'  : 'rgba(0,0,0,0.1)';
+  const navLinkColor    = dark ? '#d1d5db'                  : '#6b7280';
+  const heroSecBg       = dark ? 'rgba(255,255,255,0.08)'  : 'rgba(255,255,255,0.5)';
+  const heroSecBorder   = dark ? 'rgba(255,255,255,0.18)'  : 'rgba(0,0,0,0.1)';
+  const heroSecColor    = dark ? '#e2e8f0'                  : '#6b7280';
+  const stripGapBg      = dark ? 'rgba(255,255,255,0.07)'  : 'rgba(0,0,0,0.06)';
+  const stripCellBg     = dark ? 'rgba(255,255,255,0.07)'  : 'rgba(255,255,255,0.5)';
+  const tableHeadBg     = dark ? 'rgba(0,0,0,0.30)'        : 'rgba(0,0,0,0.04)';
+  const tableHeadBorder = dark ? 'rgba(255,255,255,0.07)'  : 'rgba(0,0,0,0.06)';
+  const tableRowBorder  = dark ? 'rgba(255,255,255,0.06)'  : 'rgba(0,0,0,0.05)';
+  const tableRowAltBg   = dark ? 'rgba(255,255,255,0.04)'  : 'rgba(255,255,255,0.35)';
+  const afterColor      = dark ? '#f1f5f9'                  : '#0d0d0d';
+  const pricingCtaColor = dark ? '#e2e8f0'                  : '#374151';
+  const pricingCtaBorder= dark ? 'rgba(255,255,255,0.15)'  : 'rgba(0,0,0,0.1)';
+  const pricingBorderFn = (popular: boolean) => popular ? TEAL : (dark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)');
+  const faqBorder       = (open: boolean) => open
+    ? `color-mix(in srgb, ${TEAL} 30%, transparent)`
+    : (dark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.07)');
+  const faqBtnColor     = (open: boolean) => open ? TEAL : (dark ? '#f1f5f9' : '#0d0d0d');
+  const footerBg        = dark ? 'rgba(8,22,18,0.60)'      : 'rgba(245,243,239,0.75)';
+  const footerBorder    = dark ? 'rgba(255,255,255,0.07)'  : 'rgba(0,0,0,0.07)';
 
   const NAV_LINKS = [
     ['#funcionalidades', 'Funcionalidades'],
@@ -238,9 +267,7 @@ export default function LandingPage() {
   ] as const;
 
   return (
-    <div
-      className="min-h-screen selection:bg-teal/20 relative overflow-x-hidden"
-    >
+    <div className="min-h-screen selection:bg-teal/20 relative overflow-x-hidden">
       <ParticleNetwork />
 
       {/* Background blobs */}
@@ -252,31 +279,34 @@ export default function LandingPage() {
       <nav
         className="fixed top-0 w-full z-50 border-b transition-all duration-300"
         style={{
-          background:    scrolled ? 'rgba(245,243,239,0.92)' : 'transparent',
-          backdropFilter: scrolled ? 'blur(20px)' : 'none',
+          background:         navBg,
+          backdropFilter:     scrolled ? 'blur(20px)' : 'none',
           WebkitBackdropFilter: scrolled ? 'blur(20px)' : 'none',
-          borderColor:   scrolled ? 'rgba(0,0,0,0.06)' : 'transparent',
+          borderColor:        navBorderColor,
         }}
       >
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
 
-          {/* Logo */}
           <Link href="/" className="text-2xl font-[family-name:var(--font-dm-serif)] tracking-tight">
             Odonto<span className="italic text-teal">.IA</span>
           </Link>
 
-          {/* Desktop links */}
           <div className="hidden md:flex items-center gap-8">
             {NAV_LINKS.map(([href, label]) => (
-              <a key={href} href={href} className="text-sm font-medium text-gray-500 hover:text-teal transition-colors">
+              <a key={href} href={href}
+                className="text-sm font-medium hover:text-teal transition-colors"
+                style={{ color: navLinkColor }}
+              >
                 {label}
               </a>
             ))}
           </div>
 
-          {/* Desktop auth + CTA */}
           <div className="hidden md:flex items-center gap-4">
-            <Link href="/login" className="text-sm font-medium text-gray-500 hover:text-teal transition-colors px-3 py-1.5">
+            <Link href="/login"
+              className="text-sm font-medium hover:text-teal transition-colors px-3 py-1.5"
+              style={{ color: navLinkColor }}
+            >
               Entrar
             </Link>
             <Link
@@ -288,7 +318,6 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          {/* Mobile hamburger */}
           <button
             className="md:hidden p-2 rounded-lg transition-colors hover:bg-black/5"
             onClick={() => setMobileOpen(o => !o)}
@@ -310,7 +339,7 @@ export default function LandingPage() {
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.18 }}
             className="fixed inset-x-0 top-20 bottom-0 z-40 flex flex-col px-6 py-6 md:hidden"
-            style={{ background: 'rgba(245,243,239,0.98)', backdropFilter: 'blur(24px)' }}
+            style={{ background: drawerBg, backdropFilter: 'blur(24px)' }}
           >
             <div className="flex flex-col gap-0">
               {NAV_LINKS.map(([href, label]) => (
@@ -318,7 +347,8 @@ export default function LandingPage() {
                   key={href}
                   href={href}
                   onClick={() => setMobileOpen(false)}
-                  className="flex items-center py-4 text-lg font-medium text-gray-700 hover:text-teal border-b border-black/5 transition-colors"
+                  className="flex items-center py-4 text-lg font-medium hover:text-teal transition-colors"
+                  style={{ color: drawerLinkColor, borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'}` }}
                 >
                   {label}
                 </a>
@@ -328,8 +358,8 @@ export default function LandingPage() {
               <Link
                 href="/login"
                 onClick={() => setMobileOpen(false)}
-                className="w-full flex items-center justify-center py-3.5 rounded-xl border text-sm font-semibold text-gray-700 hover:text-teal hover:border-teal/40 transition-all"
-                style={{ borderColor: 'rgba(0,0,0,0.1)' }}
+                className="w-full flex items-center justify-center py-3.5 rounded-xl border text-sm font-semibold hover:text-teal hover:border-teal/40 transition-all"
+                style={{ borderColor: drawerBtnBorder, color: drawerLinkColor }}
               >
                 Entrar
               </Link>
@@ -353,7 +383,6 @@ export default function LandingPage() {
         <section className="relative px-6 pt-20 pb-16 md:pt-32 md:pb-24">
           <div className="max-w-7xl mx-auto text-center relative z-10">
 
-            {/* Badge */}
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -369,7 +398,6 @@ export default function LandingPage() {
               Sistema Clínico Inteligente · Documentação em Tempo Real
             </motion.div>
 
-            {/* Headline — sem height fixo, o invisible placeholder reserva o espaço */}
             <div className="text-5xl md:text-7xl lg:text-8xl font-[family-name:var(--font-dm-serif)] leading-[1.1] tracking-tight mb-8">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -391,7 +419,6 @@ export default function LandingPage() {
                       {WORDS[wordIndex]}
                     </motion.span>
                   </AnimatePresence>
-                  {/* Invisible placeholder — reserva espaço para a palavra mais longa */}
                   <span className="invisible whitespace-nowrap">{WORDS[0]}</span>
                 </span>
               </motion.div>
@@ -424,8 +451,8 @@ export default function LandingPage() {
               </Link>
               <a
                 href="#funcionalidades"
-                className="inline-flex items-center h-14 px-10 rounded-full text-lg font-medium border transition-all duration-200 hover:bg-white/80 hover:border-teal/30 hover:text-teal"
-                style={{ borderColor: 'rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.5)', color: '#6b7280' }}
+                className="inline-flex items-center h-14 px-10 rounded-full text-lg font-medium border transition-all duration-200 hover:border-teal/30 hover:text-teal"
+                style={{ borderColor: heroSecBorder, background: heroSecBg, color: heroSecColor }}
               >
                 Ver Funcionalidades
               </a>
@@ -451,7 +478,7 @@ export default function LandingPage() {
               viewport={{ once: true }}
               transition={{ duration: 0.5 }}
               className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-2xl overflow-hidden"
-              style={{ background: 'rgba(0,0,0,0.06)', boxShadow: `0 0 0 1px color-mix(in srgb, ${TEAL} 10%, transparent)` }}
+              style={{ background: stripGapBg, boxShadow: `0 0 0 1px color-mix(in srgb, ${TEAL} 10%, transparent)` }}
             >
               {[
                 { value: '< 30s',  label: 'Por ficha clínica' },
@@ -462,7 +489,7 @@ export default function LandingPage() {
                 <div
                   key={item.label}
                   className="flex flex-col items-center justify-center px-4 py-6 text-center"
-                  style={{ background: 'rgba(255,255,255,0.5)', backdropFilter: 'blur(8px)' }}
+                  style={{ background: stripCellBg, backdropFilter: 'blur(12px)' }}
                 >
                   <p
                     className="font-[family-name:var(--font-dm-serif)] text-2xl mb-1"
@@ -524,7 +551,7 @@ export default function LandingPage() {
                 >
                   <div
                     className="h-full rounded-2xl p-8 border group hover:shadow-xl transition-all duration-500 backdrop-blur-md"
-                    style={{ background: 'rgba(255,255,255,0.55)', borderColor: 'rgba(0,0,0,0.07)' }}
+                    style={{ background: cardBg, borderColor: cardBorder }}
                   >
                     <div className={cn('w-14 h-14 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500', feat.iconClass)}>
                       <feat.icon className="w-7 h-7" />
@@ -543,7 +570,6 @@ export default function LandingPage() {
           <div className="max-w-7xl mx-auto">
             <div className="grid lg:grid-cols-2 gap-16 items-center">
 
-              {/* Card — order-2 em mobile: texto aparece primeiro */}
               <motion.div
                 initial={{ opacity: 0, x: -30 }}
                 whileInView={{ opacity: 1, x: 0 }}
@@ -565,7 +591,6 @@ export default function LandingPage() {
                 <DexCard />
               </motion.div>
 
-              {/* Texto — order-1 em mobile: aparece antes do card */}
               <motion.div
                 initial={{ opacity: 0, x: 30 }}
                 whileInView={{ opacity: 1, x: 0 }}
@@ -617,7 +642,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ══════════════════════════════════════ ANTES / DEPOIS (social proof) */}
+        {/* ══════════════════════════════════════ ANTES / DEPOIS */}
         <section className="relative px-6 py-20 overflow-hidden">
           <div className="max-w-4xl mx-auto">
             <motion.div {...fadeIn} className="text-center mb-14">
@@ -635,12 +660,15 @@ export default function LandingPage() {
               viewport={{ once: true }}
               transition={{ duration: 0.5 }}
               className="rounded-2xl overflow-hidden border backdrop-blur-md"
-              style={{ borderColor: 'rgba(0,0,0,0.08)', boxShadow: `0 0 0 1px color-mix(in srgb, ${TEAL} 6%, transparent)`, background: 'rgba(255,255,255,0.55)' }}
+              style={{
+                borderColor: dark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)',
+                boxShadow: `0 0 0 1px color-mix(in srgb, ${TEAL} 6%, transparent)`,
+                background: cardBg,
+              }}
             >
-              {/* Table header */}
               <div
                 className="grid grid-cols-2 px-6 py-3 text-[10px] font-mono font-bold uppercase tracking-widest"
-                style={{ background: 'rgba(0,0,0,0.04)', borderBottom: '1px solid rgba(0,0,0,0.06)' }}
+                style={{ background: tableHeadBg, borderBottom: `1px solid ${tableHeadBorder}` }}
               >
                 <span className="text-gray-400">// antes</span>
                 <span style={{ color: TEAL }}>// com odonto.ia</span>
@@ -651,8 +679,8 @@ export default function LandingPage() {
                   key={i}
                   className="grid grid-cols-2 px-6 py-4 border-t"
                   style={{
-                    borderColor: 'rgba(0,0,0,0.05)',
-                    background: i % 2 === 0 ? 'rgba(255,255,255,0.35)' : 'transparent',
+                    borderColor: tableRowBorder,
+                    background: i % 2 === 0 ? tableRowAltBg : 'transparent',
                   }}
                 >
                   <p className="text-sm font-mono leading-relaxed pr-4 text-gray-400 line-through">
@@ -660,7 +688,7 @@ export default function LandingPage() {
                   </p>
                   <div className="flex items-start gap-2">
                     <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5 text-teal" />
-                    <p className="text-sm leading-relaxed" style={{ color: '#0d0d0d' }}>{row.after}</p>
+                    <p className="text-sm leading-relaxed" style={{ color: afterColor }}>{row.after}</p>
                   </div>
                 </div>
               ))}
@@ -705,8 +733,8 @@ export default function LandingPage() {
                   <div
                     className={cn('h-full rounded-2xl p-7 flex flex-col border backdrop-blur-md transition-all duration-300', plano.popular && 'shadow-xl')}
                     style={{
-                      background:   'rgba(255,255,255,0.65)',
-                      borderColor:  plano.popular ? TEAL : 'rgba(0,0,0,0.08)',
+                      background:   cardBg,
+                      borderColor:  pricingBorderFn(plano.popular),
                       boxShadow:    plano.popular
                         ? `0 0 0 2px ${TEAL}, 0 24px 60px -16px color-mix(in srgb, ${TEAL} 25%, transparent)`
                         : undefined,
@@ -730,7 +758,7 @@ export default function LandingPage() {
                       {plano.features.map(feat => (
                         <li key={feat} className="flex items-start gap-2.5">
                           <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-teal" />
-                          <span className="text-sm text-gray-600">{feat}</span>
+                          <span className="text-sm text-gray-500">{feat}</span>
                         </li>
                       ))}
                     </ul>
@@ -743,7 +771,7 @@ export default function LandingPage() {
                       )}
                       style={plano.popular
                         ? { background: `linear-gradient(135deg, ${TEAL}, ${TEAL_LT})`, boxShadow: `0 4px 16px color-mix(in srgb, ${TEAL} 35%, transparent)` }
-                        : { borderColor: 'rgba(0,0,0,0.1)', color: '#374151' }
+                        : { borderColor: pricingCtaBorder, color: pricingCtaColor }
                       }
                     >
                       {plano.cta}
@@ -775,15 +803,12 @@ export default function LandingPage() {
                 <div
                   key={i}
                   className="rounded-2xl overflow-hidden border backdrop-blur-md transition-colors duration-200"
-                  style={{
-                    background:  'rgba(255,255,255,0.55)',
-                    borderColor: openFaq === i ? `color-mix(in srgb, ${TEAL} 30%, transparent)` : 'rgba(0,0,0,0.07)',
-                  }}
+                  style={{ background: cardBg, borderColor: faqBorder(openFaq === i) }}
                 >
                   <button
                     onClick={() => setOpenFaq(openFaq === i ? null : i)}
                     className="w-full text-left px-6 py-4 flex items-center justify-between gap-4"
-                    style={{ color: openFaq === i ? TEAL : '#0d0d0d' }}
+                    style={{ color: faqBtnColor(openFaq === i) }}
                   >
                     <span className="font-semibold">{faq.q}</span>
                     <motion.div animate={{ rotate: openFaq === i ? 180 : 0 }} transition={{ duration: 0.2 }}>
@@ -857,7 +882,7 @@ export default function LandingPage() {
       {/* ── FOOTER ──────────────────────────────────────────────── */}
       <footer
         className="px-6 py-12 border-t relative z-10"
-        style={{ borderColor: 'rgba(0,0,0,0.07)', background: 'rgba(245,243,239,0.75)', backdropFilter: 'blur(16px)' }}
+        style={{ borderColor: footerBorder, background: footerBg, backdropFilter: 'blur(16px)' }}
       >
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
           <span className="text-2xl font-[family-name:var(--font-dm-serif)]">
