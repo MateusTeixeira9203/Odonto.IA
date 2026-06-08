@@ -740,6 +740,66 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
     }
   };
 
+  // ── Handlers de Tratamento ───────────────────────────────────────────────
+
+  const handleIniciarTratamento = async (): Promise<void> => {
+    setSalvandoTratamento(true);
+    setTratamentoError(null);
+    const result = await criarTratamento(
+      patientId,
+      novoTratNome.trim() || null,
+      Array.from(novoTratFichasSelecionadas)
+    );
+    if (result.error) {
+      setTratamentoError(result.error);
+      setSalvandoTratamento(false);
+      return;
+    }
+    const [ativo, historico] = await Promise.all([
+      buscarTratamentoAtivo(patientId),
+      buscarHistoricoTratamentos(patientId),
+    ]);
+    setTratamentoAtivo(ativo.tratamento);
+    setHistoricoTratamentos(historico.tratamentos);
+    await fetchFichas();
+    setModalIniciarOpen(false);
+    setNovoTratNome('');
+    setNovoTratFichasSelecionadas(new Set());
+    setSalvandoTratamento(false);
+  };
+
+  const handleEncerrarTratamento = async (): Promise<void> => {
+    if (!tratamentoAtivo) return;
+    setEncerrando(true);
+    const result = await encerrarTratamento(tratamentoAtivo.id, patientId);
+    if (result.error) {
+      setEncerrando(false);
+      return;
+    }
+    const [ativo, historico] = await Promise.all([
+      buscarTratamentoAtivo(patientId),
+      buscarHistoricoTratamentos(patientId),
+    ]);
+    setTratamentoAtivo(ativo.tratamento);
+    setHistoricoTratamentos(historico.tratamentos);
+    setConfirmarEncerramentoOpen(false);
+    setEncerrando(false);
+  };
+
+  const handleAdicionarFichasAoTratamento = async (): Promise<void> => {
+    if (!tratamentoAtivo) return;
+    setAdicionandoFichas(true);
+    await vincularFichasAoTratamento(
+      tratamentoAtivo.id,
+      Array.from(adicionarFichasSelecionadas),
+      patientId
+    );
+    await fetchFichas();
+    setModalAdicionarOpen(false);
+    setAdicionarFichasSelecionadas(new Set());
+    setAdicionandoFichas(false);
+  };
+
   if (isLoading) {
     return (
       <DexLoader className="p-20" />
