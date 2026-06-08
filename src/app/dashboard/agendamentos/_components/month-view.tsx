@@ -109,7 +109,7 @@ export function MonthView({
         transition={{ delay: 0.1 }}
         className="lg:col-span-1"
       >
-        <div className="bg-surface rounded-2xl border border-border shadow-sm p-6">
+        <div className="bg-surface rounded-3xl border border-border shadow-sm p-6">
           {/* Month navigation */}
           <div className="flex items-center justify-between mb-6">
             <h2 className="font-heading text-xl text-text-primary font-semibold capitalize">
@@ -174,12 +174,12 @@ export function MonthView({
 
         {/* Mini-resumo */}
         <div className="mt-6 grid grid-cols-2 gap-4">
-          <div className="bg-teal/10 rounded-2xl p-4 border border-teal/20">
+          <div className="bg-teal/10 rounded-3xl p-4 border border-teal/20">
             <div className="text-[10px] font-bold text-teal uppercase tracking-wider mb-1">Hoje</div>
             <div className="font-mono text-2xl font-medium text-teal">{todayCount}</div>
             <div className="text-xs text-teal mt-1">Consultas</div>
           </div>
-          <div className="bg-surface-alt rounded-2xl p-4 border border-border">
+          <div className="bg-surface-alt rounded-3xl p-4 border border-border">
             <div className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1">
               Selecionado
             </div>
@@ -196,7 +196,7 @@ export function MonthView({
         transition={{ delay: 0.2 }}
         className="lg:col-span-2"
       >
-        <div className="bg-surface rounded-2xl border border-border shadow-sm overflow-hidden flex flex-col h-full min-h-[500px]">
+        <div className="bg-surface rounded-3xl border border-border shadow-sm overflow-hidden flex flex-col h-full min-h-[500px]">
           {/* Header */}
           <div className="p-6 border-b border-border bg-surface-alt/40 flex items-center justify-between">
             <div>

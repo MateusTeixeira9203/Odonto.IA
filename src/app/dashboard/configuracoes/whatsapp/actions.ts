@@ -12,6 +12,13 @@ export interface BotConfigForm {
   reminder_enabled: boolean;
   reminder_hours: number;
   reminder_message: string;
+  // WhatsApp Business Cloud API (Meta Official)
+  waba_id?: string | null;
+  phone_number_id?: string | null;
+  access_token?: string | null;
+  webhook_verify_token?: string | null;
+  bot_ativo?: boolean | null;
+  dentistas_ativos_bot?: string[] | null;
 }
 
 export async function salvarBotConfig(form: BotConfigForm): Promise<{ ok: boolean; erro?: string }> {
@@ -52,4 +59,35 @@ export async function carregarBotConfig(): Promise<BotConfigForm | null> {
 
   if (!data) return null;
   return data as unknown as BotConfigForm;
+}
+
+export interface ConexaoOficialForm {
+  waba_id: string;
+  phone_number_id: string;
+  access_token: string;
+  webhook_verify_token: string;
+  bot_ativo: boolean;
+}
+
+export async function salvarConexaoOficial(form: ConexaoOficialForm): Promise<{ ok: boolean; erro?: string }> {
+  const { clinicId } = await requireRole(['admin', 'secretaria']);
+  const db = createServiceClient();
+
+  const { error } = await db
+    .from('bot_config')
+    .upsert(
+      {
+        clinica_id:           clinicId,
+        waba_id:              form.waba_id || null,
+        phone_number_id:      form.phone_number_id,
+        access_token:         form.access_token,
+        webhook_verify_token: form.webhook_verify_token,
+        bot_ativo:            form.bot_ativo,
+        updated_at:           new Date().toISOString(),
+      },
+      { onConflict: 'clinica_id' },
+    );
+
+  if (error) return { ok: false, erro: error.message };
+  return { ok: true };
 }

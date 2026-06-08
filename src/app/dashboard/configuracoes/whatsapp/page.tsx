@@ -3,29 +3,16 @@ import { createServiceClient } from '@/lib/supabase/service';
 import WhatsAppConfigClient from './_components/whatsapp-config-client';
 import type { BotConfigForm } from './actions';
 
-function normalizeStatus(raw: string): 'disconnected' | 'connecting' | 'connected' {
-  if (raw === 'connected' || raw === 'open') return 'connected';
-  if (raw === 'connecting') return 'connecting';
-  return 'disconnected';
-}
-
 export default async function WhatsAppConfigPage() {
   const { clinicId } = await requireRole(['admin', 'dentista']);
 
   const db = createServiceClient();
 
-  const [{ data: configRaw }, { data: instanciaRaw }] = await Promise.all([
-    db
-      .from('bot_config')
-      .select('*')
-      .eq('clinica_id', clinicId)
-      .maybeSingle(),
-    db
-      .from('instancias_whatsapp')
-      .select('instance_name, status, qrcode')
-      .eq('clinica_id', clinicId)
-      .maybeSingle(),
-  ]);
+  const { data: configRaw } = await db
+    .from('bot_config')
+    .select('*')
+    .eq('clinica_id', clinicId)
+    .maybeSingle();
 
   const defaultConfig: BotConfigForm = {
     whatsapp_number:           '',
@@ -43,15 +30,6 @@ export default async function WhatsAppConfigPage() {
   return (
     <WhatsAppConfigClient
       initialConfig={(configRaw as BotConfigForm | null) ?? defaultConfig}
-      initialInstance={
-        instanciaRaw
-          ? {
-              instance_name: instanciaRaw.instance_name as string,
-              status:        normalizeStatus((instanciaRaw.status as string) ?? 'inactive'),
-              qrcode:        (instanciaRaw.qrcode as string | null) ?? undefined,
-            }
-          : null
-      }
     />
   );
 }

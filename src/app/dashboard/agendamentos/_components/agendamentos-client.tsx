@@ -18,6 +18,7 @@ import {
   AlertTriangle,
   UserCheck,
   CalendarCheck,
+  Clock,
   X,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
@@ -174,19 +175,30 @@ export function AgendamentosClient({
     setAgendamentos(inicial);
   }, [inicial]);
 
-  // Multi-user: atualiza quando a janela recupera foco (throttle 30s)
+  // Multi-user: atualiza dados do mês quando a janela recupera foco (throttle 30s)
   useEffect(() => {
     let lastRefresh = Date.now();
-    const handler = () => {
+    const handler = async () => {
       const now = Date.now();
       if (now - lastRefresh > 30_000) {
         lastRefresh = now;
-        router.refresh();
+        const mes = parseISO(`${mesAtual}-01`);
+        const mesInicio = format(startOfMonth(mes), "yyyy-MM-dd'T'00:00:00");
+        const mesFim = format(endOfMonth(mes), "yyyy-MM-dd'T'23:59:59");
+        const supabase = createClient();
+        const { data } = await supabase
+          .from('agendamentos')
+          .select('id, clinica_id, paciente_id, dentista_id, data_hora, duracao_minutos, status, origem, observacoes, created_at, paciente:pacientes(id, nome, observacoes), dentista:dentistas!agendamentos_dentista_id_fkey(id, nome), criador:dentistas!agendamentos_created_by_fkey(id, nome)')
+          .eq('clinica_id', _clinicaId)
+          .gte('data_hora', mesInicio)
+          .lte('data_hora', mesFim)
+          .order('data_hora');
+        if (data) setAgendamentos(data as unknown as AgendamentoRow[]);
       }
     };
     window.addEventListener('focus', handler);
     return () => window.removeEventListener('focus', handler);
-  }, [router]);
+  }, [_clinicaId, mesAtual]);
 
   // Auto-abre o drawer e limpa ?novo=1 da URL sem reload nem flicker
   useEffect(() => {
@@ -450,7 +462,20 @@ export function AgendamentosClient({
             ? `${result.imported} evento${result.imported !== 1 ? 's' : ''} importado${result.imported !== 1 ? 's' : ''}! (${result.skipped} já existiam)`
             : `Nenhum evento novo. ${result.skipped} já importado${result.skipped !== 1 ? 's' : ''}.`,
         );
-        router.refresh();
+        if (result.imported > 0) {
+          const mes = parseISO(`${mesAtual}-01`);
+          const mesInicio = format(startOfMonth(mes), "yyyy-MM-dd'T'00:00:00");
+          const mesFim = format(endOfMonth(mes), "yyyy-MM-dd'T'23:59:59");
+          const supabase = createClient();
+          const { data } = await supabase
+            .from('agendamentos')
+            .select('id, clinica_id, paciente_id, dentista_id, data_hora, duracao_minutos, status, origem, observacoes, created_at, paciente:pacientes(id, nome, observacoes), dentista:dentistas!agendamentos_dentista_id_fkey(id, nome), criador:dentistas!agendamentos_created_by_fkey(id, nome)')
+            .eq('clinica_id', _clinicaId)
+            .gte('data_hora', mesInicio)
+            .lte('data_hora', mesFim)
+            .order('data_hora');
+          if (data) setAgendamentos(data as unknown as AgendamentoRow[]);
+        }
       }
     } catch {
       if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
@@ -508,7 +533,7 @@ export function AgendamentosClient({
         origem: 'manual',
         observacoes: observacoesCombinadas,
         created_at: new Date().toISOString(),
-        paciente: { id: novoForm.pacienteId, nome: novoForm.pacienteNome },
+        paciente: { id: novoForm.pacienteId, nome: novoForm.pacienteNome, observacoes: null },
         dentista: dentistaDoAgt ? { id: dentistaDoAgt.id, nome: dentistaDoAgt.nome } : null,
         criador: null,
       };
@@ -675,7 +700,7 @@ export function AgendamentosClient({
       origem: 'manual',
       observacoes: '[Encaixe]',
       created_at: new Date().toISOString(),
-      paciente: { id: encaixeForm.pacienteId, nome: encaixeForm.pacienteNome },
+      paciente: { id: encaixeForm.pacienteId, nome: encaixeForm.pacienteNome, observacoes: null },
       dentista: dentistaDoEnc,
       criador: null,
     };
@@ -791,7 +816,7 @@ export function AgendamentosClient({
             >
               <Stethoscope className="w-4 h-4" />
               Encaixe
-              <kbd className="hidden sm:flex font-mono text-[9px] bg-surface-alt rounded px-1 py-0.5 leading-none group-hover:bg-surface transition-colors border border-border/60">E</kbd>
+              <kbd className="hidden sm:flex font-mono text-[10px] bg-surface-alt rounded px-1 py-0.5 leading-none group-hover:bg-surface transition-colors border border-border/60">E</kbd>
             </button>
           )}
 
@@ -803,7 +828,7 @@ export function AgendamentosClient({
             >
               <Plus className="w-4 h-4" />
               Novo Agendamento
-              <kbd className="hidden sm:flex font-mono text-[9px] bg-white/15 rounded px-1 py-0.5 leading-none group-hover:bg-white/20 transition-colors">N</kbd>
+              <kbd className="hidden sm:flex font-mono text-[10px] bg-white/15 rounded px-1 py-0.5 leading-none group-hover:bg-white/20 transition-colors">N</kbd>
             </button>
           )}
         </div>
@@ -818,7 +843,7 @@ export function AgendamentosClient({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -6 }}
           transition={{ duration: 0.18 }}
-          className="bg-surface rounded-2xl border border-border shadow-sm overflow-hidden h-[440px] sm:h-[560px] lg:h-[680px]"
+          className="bg-surface rounded-3xl border border-border shadow-sm overflow-hidden h-[440px] sm:h-[560px] lg:h-[680px]"
         >
           <DayView
             agendamentos={agendamentosFiltrados}
@@ -843,7 +868,7 @@ export function AgendamentosClient({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -6 }}
           transition={{ duration: 0.18 }}
-          className="bg-surface rounded-2xl border border-border shadow-sm overflow-hidden h-[440px] sm:h-[560px] lg:h-[680px]"
+          className="bg-surface rounded-3xl border border-border shadow-sm overflow-hidden h-[440px] sm:h-[560px] lg:h-[680px]"
         >
           <WeekView
             agendamentos={agendamentosFiltrados}
@@ -904,7 +929,7 @@ export function AgendamentosClient({
         <SheetContent
           side="right"
           showCloseButton={false}
-          className="!w-full sm:!w-[480px] p-0 gap-0 flex flex-col bg-surface border-l border-border"
+          className="!w-full sm:!w-[560px] p-0 gap-0 flex flex-col bg-surface border-l border-border"
         >
           <SheetDescription className="sr-only">Preencha os dados para marcar uma nova consulta.</SheetDescription>
 
@@ -930,12 +955,12 @@ export function AgendamentosClient({
           </div>
 
           {/* Scrollable body */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-5">
+          <div className="flex-1 overflow-y-auto p-6 space-y-6">
 
             {/* Dentista — apenas secretária */}
             {isSecretaria && dentistas.length > 0 && (
               <div className="space-y-2">
-                <Label className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
+                <Label className="text-[10px] font-bold uppercase tracking-widest text-teal">
                   Dentista <span className="text-coral">*</span>
                 </Label>
                 <Select
@@ -964,23 +989,26 @@ export function AgendamentosClient({
 
             {/* Busca de paciente com autocomplete */}
             <div className="space-y-2 relative">
-              <Label htmlFor="patient-drawer" className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
+              <Label htmlFor="patient-drawer" className="text-[10px] font-bold uppercase tracking-[0.18em] text-text-secondary">
                 Paciente <span className="text-coral">*</span>
               </Label>
-              <Input
-                id="patient-drawer"
-                placeholder="Digite o nome do paciente..."
-                value={novoForm.pacienteSearch}
-                autoComplete="off"
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setNovoForm((f) => ({ ...f, pacienteSearch: v, pacienteId: '', pacienteNome: '' }));
-                  setShowSugestoes(true);
-                  void buscarPacientes(v);
-                }}
-                onBlur={() => setTimeout(() => setShowSugestoes(false), 150)}
-                className="rounded-xl bg-surface-alt border-border text-text-primary"
-              />
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary/40 pointer-events-none" />
+                <Input
+                  id="patient-drawer"
+                  placeholder="Buscar paciente pelo nome..."
+                  value={novoForm.pacienteSearch}
+                  autoComplete="off"
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setNovoForm((f) => ({ ...f, pacienteSearch: v, pacienteId: '', pacienteNome: '' }));
+                    setShowSugestoes(true);
+                    void buscarPacientes(v);
+                  }}
+                  onBlur={() => setTimeout(() => setShowSugestoes(false), 150)}
+                  className="rounded-xl bg-surface-alt border-border text-text-primary pl-10 focus:border-teal/40 transition-all"
+                />
+              </div>
               {showSugestoes && pacienteSugestoes.length > 0 && (
                 <div className="absolute z-50 w-full bg-surface border border-border rounded-xl shadow-lg mt-1 overflow-hidden">
                   {pacienteSugestoes.map((p) => (
@@ -1005,74 +1033,116 @@ export function AgendamentosClient({
                 </div>
               )}
               {novoForm.pacienteId && (
-                <div className="flex items-center gap-2 px-3 py-2 bg-teal/5 border border-teal/20 rounded-lg text-sm text-teal font-medium">
-                  <User className="w-4 h-4 shrink-0" />
-                  {novoForm.pacienteNome}
-                </div>
+                <motion.div
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-2.5 px-3 py-2.5 border border-teal/25 rounded-xl text-sm text-teal font-semibold"
+                  style={{ background: 'color-mix(in srgb, var(--color-teal) 8%, var(--color-surface-alt))' }}
+                >
+                  <div className="w-6 h-6 rounded-lg bg-teal/20 flex items-center justify-center shrink-0">
+                    <User className="w-3.5 h-3.5 text-teal" />
+                  </div>
+                  <span className="truncate">{novoForm.pacienteNome}</span>
+                  <CheckCircle2 className="w-3.5 h-3.5 ml-auto shrink-0 opacity-60" />
+                </motion.div>
               )}
+            </div>
+
+            {/* ── Quando ──────────────────────────────── */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-border/50" />
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-text-secondary/50 flex items-center gap-1.5">
+                <CalendarIcon className="w-3 h-3" />
+                Quando
+              </span>
+              <div className="flex-1 h-px bg-border/50" />
             </div>
 
             {/* Data + Hora */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="apt-date-drawer" className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
+                <Label htmlFor="apt-date-drawer" className="text-[10px] font-bold uppercase tracking-[0.18em] text-text-secondary">
                   Data
                 </Label>
-                <Input
-                  id="apt-date-drawer"
-                  type="date"
-                  value={novoForm.data}
-                  onChange={(e) => setNovoForm((f) => ({ ...f, data: e.target.value }))}
-                  className="rounded-xl bg-surface-alt border-border text-text-primary"
-                />
+                <div className="relative">
+                  <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-secondary/40 pointer-events-none" />
+                  <Input
+                    id="apt-date-drawer"
+                    type="date"
+                    value={novoForm.data}
+                    onChange={(e) => setNovoForm((f) => ({ ...f, data: e.target.value }))}
+                    className="rounded-xl bg-surface-alt border-border text-text-primary pl-9"
+                  />
+                </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="apt-time-drawer" className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
+                <Label htmlFor="apt-time-drawer" className="text-[10px] font-bold uppercase tracking-[0.18em] text-text-secondary">
                   Hora
                 </Label>
-                <Input
-                  id="apt-time-drawer"
-                  type="time"
-                  value={novoForm.hora}
-                  onChange={(e) => setNovoForm((f) => ({ ...f, hora: e.target.value }))}
-                  className="rounded-xl bg-surface-alt border-border text-text-primary"
-                />
+                <div className="relative">
+                  <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-secondary/40 pointer-events-none" />
+                  <Input
+                    id="apt-time-drawer"
+                    type="time"
+                    value={novoForm.hora}
+                    onChange={(e) => setNovoForm((f) => ({ ...f, hora: e.target.value }))}
+                    className="rounded-xl bg-surface-alt border-border text-text-primary pl-9"
+                  />
+                </div>
               </div>
             </div>
 
-            {/* Duração */}
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Duração</Label>
-              <Select
-                value={novoForm.duracao}
-                onValueChange={(v) => v && setNovoForm((f) => ({ ...f, duracao: v }))}
-              >
-                <SelectTrigger className="rounded-xl bg-surface-alt border-border text-text-primary">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-surface border-border">
-                  <SelectItem value="15">15 min</SelectItem>
-                  <SelectItem value="30">30 min</SelectItem>
-                  <SelectItem value="45">45 min</SelectItem>
-                  <SelectItem value="60">1 hora</SelectItem>
-                  <SelectItem value="90">1h 30min</SelectItem>
-                </SelectContent>
-              </Select>
+            {/* ── Duração ─────────────────────────────── */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-border/50" />
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-text-secondary/50 flex items-center gap-1.5">
+                <Clock className="w-3 h-3" />
+                Duração
+              </span>
+              <div className="flex-1 h-px bg-border/50" />
             </div>
 
-            {/* Observações */}
-            <div className="space-y-2">
-              <Label htmlFor="apt-notes-drawer" className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
-                Observações
-              </Label>
-              <textarea
-                id="apt-notes-drawer"
-                value={novoForm.observacoes}
-                onChange={(e) => setNovoForm((f) => ({ ...f, observacoes: e.target.value }))}
-                className="w-full bg-surface-alt border border-border rounded-xl p-3 text-sm min-h-[100px] focus:ring-2 focus:ring-teal/20 transition-all resize-none text-text-primary placeholder:text-text-secondary/50"
-                placeholder="Notas adicionais sobre a consulta..."
-              />
+            <div className="grid grid-cols-5 gap-2">
+              {[
+                { value: '15', label: '15', sub: 'min' },
+                { value: '30', label: '30', sub: 'min' },
+                { value: '45', label: '45', sub: 'min' },
+                { value: '60', label: '1h', sub: '' },
+                { value: '90', label: '1h', sub: '30m' },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setNovoForm((f) => ({ ...f, duracao: opt.value }))}
+                  className={`flex flex-col items-center justify-center py-3 rounded-2xl border-2 transition-all ${
+                    novoForm.duracao === opt.value
+                      ? 'bg-teal/10 border-teal text-teal shadow-[0_0_0_3px_rgba(47,156,133,0.12)]'
+                      : 'border-border text-text-secondary hover:border-teal/40 hover:text-teal bg-surface-alt'
+                  }`}
+                >
+                  <span className="text-sm font-extrabold leading-tight">{opt.label}</span>
+                  {opt.sub && <span className="text-[10px] font-semibold mt-0.5 opacity-60">{opt.sub}</span>}
+                </button>
+              ))}
             </div>
+
+            {/* ── Notas ───────────────────────────────── */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-border/50" />
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-text-secondary/50 flex items-center gap-1.5">
+                <PenLine className="w-3 h-3" />
+                Notas
+              </span>
+              <div className="flex-1 h-px bg-border/50" />
+            </div>
+
+            <textarea
+              id="apt-notes-drawer"
+              value={novoForm.observacoes}
+              onChange={(e) => setNovoForm((f) => ({ ...f, observacoes: e.target.value }))}
+              className="w-full bg-surface-alt border border-border rounded-2xl p-4 text-sm min-h-[88px] focus:ring-2 focus:ring-teal/15 focus:border-teal/30 transition-all resize-none text-text-primary placeholder:text-text-secondary/40"
+              placeholder="Procedimento, observações clínicas..."
+            />
 
             {/* Aviso de conflito */}
             {conflitoNovo && (
@@ -1084,36 +1154,57 @@ export function AgendamentosClient({
 
             {/* Resumo visual */}
             {novoForm.pacienteId && novoForm.data && novoForm.hora && (
-              <div className="rounded-xl border border-teal/20 bg-teal/5 p-3 space-y-1 text-sm">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-teal mb-2">Resumo</div>
-                <div className="text-text-primary font-medium truncate">{novoForm.pacienteNome}</div>
-                <div className="text-text-secondary font-mono text-xs">
-                  {novoForm.data.split('-').reverse().join('/')} às {novoForm.hora}
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="rounded-2xl border border-teal/30 p-4 space-y-3"
+                style={{ background: 'color-mix(in srgb, var(--color-teal) 7%, var(--color-surface-alt))' }}
+              >
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-teal" />
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-teal">Pronto para agendar</p>
                 </div>
-                <div className="text-text-secondary text-xs">{novoForm.duracao} min</div>
-              </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-teal/15 flex items-center justify-center shrink-0">
+                    <User className="w-4 h-4 text-teal" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-text-primary truncate">{novoForm.pacienteNome}</p>
+                    <p className="text-xs text-text-secondary font-mono mt-0.5">
+                      {novoForm.data.split('-').reverse().join('/')} · {novoForm.hora} ·{' '}
+                      {novoForm.duracao === '60' ? '1h' : novoForm.duracao === '90' ? '1h30' : `${novoForm.duracao}min`}
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
             )}
           </div>
 
           {/* Sticky footer */}
-          <div className="shrink-0 p-4 border-t border-border space-y-2 bg-surface">
+          <div className="shrink-0 px-6 py-5 border-t border-border space-y-3 bg-surface">
             {saveError && (
               <p className="text-xs text-red-500 bg-red-500/10 rounded-lg p-2">{saveError}</p>
             )}
             <Button
               onClick={() => void handleCriarAgendamento()}
               disabled={isSaving}
-              className="w-full bg-gradient-to-r from-teal to-teal-lt text-white rounded-xl shadow-[0_4px_16px_rgba(47,156,133,0.3)] hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0 transition-all"
+              className="w-full bg-gradient-to-r from-teal to-teal-lt text-white rounded-2xl py-3 font-bold shadow-[0_8px_32px_rgba(47,156,133,0.40)] hover:shadow-[0_12px_40px_rgba(47,156,133,0.50)] hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0 disabled:shadow-none transition-all"
             >
-              {isSaving ? 'Salvando...' : 'Salvar Agendamento'}
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Salvando...
+                </>
+              ) : (
+                'Salvar Agendamento'
+              )}
             </Button>
-            <Button
-              variant="outline"
+            <button
               onClick={() => { setIsNewModalOpen(false); resetForm(); }}
-              className="w-full rounded-xl border-border text-text-primary hover:bg-surface-alt"
+              className="w-full py-1.5 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
             >
               Cancelar
-            </Button>
+            </button>
           </div>
         </SheetContent>
       </Sheet>

@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Building, Clock, Stethoscope, Check, Plus, Loader2, Pencil, X, Users, UserCircle } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Building2, Clock, Stethoscope, Check, Plus, Loader2, Pencil, X, Users, UserCircle, LogOut, AlertTriangle } from 'lucide-react';
+import { getLabelContexto } from '@/lib/planos';
+import type { PlanoId } from '@/lib/planos';
 import { motion } from 'motion/react';
-import type { ConfiguracaoClinica, HorarioDisponivel, Procedimento } from '@/types/database';
+import type { ConfiguracaoClinica, HorarioDisponivel, Procedimento, DentistaRole } from '@/types/database';
 import { HelpTooltip } from '@/components/ui/help-tooltip';
+import { UsuariosClient } from '../usuarios/_components/usuarios-client';
 import {
   salvarClinica,
   salvarHorarios,
@@ -14,8 +16,12 @@ import {
   atualizarProcedimento,
   toggleProcedimento,
   criarProcedimento,
+  sairDaClinicaAction,
   type HorarioDia,
 } from '../actions';
+
+type UsuarioRow = { id: string; nome: string; email: string | null; role: DentistaRole; ativo: boolean; created_at: string };
+type ConvitePendente = { id: string; email: string; role: DentistaRole; expires_at: string; created_at: string };
 
 // Dias da semana (0 = Domingo, 6 = Sábado)
 const DIAS_SEMANA = [
@@ -28,29 +34,65 @@ const DIAS_SEMANA = [
   { label: 'Sábado', value: 6 },
 ];
 
-const ABAS = [
-  { id: 'perfil', label: 'Meu Perfil', icon: UserCircle },
-  { id: 'clinica', label: 'Clínica', icon: Building },
-  { id: 'horarios', label: 'Horários', icon: Clock },
-  { id: 'procedimentos', label: 'Procedimentos', icon: Stethoscope },
-] as const;
-
-type Aba = (typeof ABAS)[number]['id'];
+const ABAS_IDS = ['perfil', 'clinica', 'horarios', 'procedimentos', 'equipe'] as const;
+type Aba = (typeof ABAS_IDS)[number];
 
 interface Props {
-  dentista: { id: string; nome: string; cro: string | null; clinica: string };
+  plano?: PlanoId;
+  dentista: { id: string; nome: string; cro: string | null; role: DentistaRole; clinica: string };
   config: ConfiguracaoClinica | null;
   horarios: HorarioDisponivel[];
   procedimentos: Procedimento[];
   abaInicial?: string;
+  equipe?: {
+    usuarios: UsuarioRow[];
+    convitesPendentes: ConvitePendente[];
+    meuId: string;
+    meuRole: DentistaRole;
+    limiteDentistas: number;
+    convitesRestantes: number;
+  };
 }
 
-export function ConfiguracoesClient({ dentista, config, horarios, procedimentos: procedimentosIniciais, abaInicial }: Props) {
-  const pathname = usePathname();
+export function ConfiguracoesClient({ plano, dentista, config, horarios, procedimentos: procedimentosIniciais, abaInicial, equipe }: Props) {
+  const labelContexto = getLabelContexto(plano); // "Consultório" (SOLO) ou "Clínica" (CLINICA)
+  const isSolo = !plano || plano === 'SOLO' || (plano as string) === 'BASICO';
+
+  const ABAS = [
+    { id: 'perfil'        as const, label: 'Meu Perfil',      icon: UserCircle  },
+    { id: 'clinica'       as const, label: labelContexto,      icon: isSolo ? Stethoscope : Building2 },
+    { id: 'horarios'      as const, label: 'Horários',         icon: Clock       },
+    { id: 'procedimentos' as const, label: 'Procedimentos',    icon: Stethoscope },
+    { id: 'equipe'        as const, label: 'Equipe',           icon: Users       },
+  ];
+  const router = useRouter();
   const [abaAtiva, setAbaAtiva] = useState<Aba>((ABAS.some(a => a.id === abaInicial) ? abaInicial : 'clinica') as Aba);
   const [isPending, startTransition] = useTransition();
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // --- Sair da clínica ---
+  const [showSairDialog, setShowSairDialog] = useState(false);
+  const [isSaindo, setIsSaindo] = useState(false);
+  const [sairError, setSairError] = useState<string | null>(null);
+
+  const handleSairDaClinica = async () => {
+    setIsSaindo(true);
+    setSairError(null);
+    try {
+      const result = await sairDaClinicaAction();
+      if (result?.error) {
+        setSairError(result.error);
+        return;
+      }
+      // Se chegou aqui sem error, a action redirecionou via redirect()
+      router.refresh();
+    } catch {
+      // redirect() lança internamente — comportamento esperado
+    } finally {
+      setIsSaindo(false);
+    }
+  };
 
   // --- Aba Perfil ---
   const [perfilForm, setPerfilForm] = useState({
@@ -90,7 +132,7 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
       if (result.error) {
         setErrorMsg(result.error);
       } else {
-        setSuccessMsg('Configurações da clínica salvas com sucesso!');
+        setSuccessMsg(`Configurações do ${labelContexto.toLowerCase()} salvas com sucesso!`);
       }
     });
   };
@@ -220,9 +262,14 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
         animate={{ opacity: 1, y: 0 }}
         className="mb-8"
       >
-        <h1 className="font-heading font-bold text-3xl md:text-4xl text-text-primary mb-2">Configurações</h1>
+        {dentista.clinica && (
+          <span className="block text-[10px] font-bold uppercase tracking-[0.2em] font-mono text-text-secondary mb-1">
+            {dentista.clinica}
+          </span>
+        )}
+        <h1 className="font-heading font-bold text-3xl md:text-4xl text-text-primary mb-1">Configurações</h1>
         <p className="text-text-secondary text-sm font-medium">
-          Gerencie sua clínica, horários e catálogo de procedimentos.
+          Gerencie {labelContexto.toLowerCase()}, horários, equipe e catálogo de procedimentos.
         </p>
       </motion.header>
 
@@ -232,47 +279,41 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.1 }}
-          className="md:col-span-1 space-y-2"
+          className="md:col-span-1"
         >
-          <div id="dex-tour-procedimentos" className="space-y-2">
-          {ABAS.map(({ id, label, icon: Icon }) => {
-            const showBadge = id === 'perfil' && !dentista.cro;
-            return (
-              <button
-                key={id}
-                onClick={() => { setAbaAtiva(id); setSuccessMsg(null); setErrorMsg(null); }}
-                className={`relative w-full flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm transition-colors ${
-                  abaAtiva === id
-                    ? 'bg-teal/10 text-teal border border-teal/20'
-                    : 'hover:bg-surface-alt text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                {label}
-                {showBadge && (
-                  <span className="ml-auto flex items-center">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+          <div id="dex-tour-procedimentos" className="bg-surface rounded-3xl border border-border shadow-sm p-2 space-y-1">
+            {ABAS.map(({ id, label, icon: Icon }) => {
+              if (id === 'equipe' && !equipe) return null;
+              const showBadge = id === 'perfil' && !dentista.cro;
+              const isActive = abaAtiva === id;
+              return (
+                <button
+                  key={id}
+                  onClick={() => { setAbaAtiva(id); setSuccessMsg(null); setErrorMsg(null); }}
+                  className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl font-semibold text-sm transition-all ${
+                    isActive
+                      ? 'bg-teal/10 text-teal'
+                      : 'text-text-secondary hover:bg-surface-alt hover:text-text-primary'
+                  }`}
+                >
+                  <div className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                    isActive ? 'bg-teal/20' : 'bg-surface-alt'
+                  }`}>
+                    <Icon className="w-3.5 h-3.5" />
+                  </div>
+                  {label}
+                  {showBadge && (
+                    <span className="ml-auto flex items-center">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+                      </span>
                     </span>
-                  </span>
-                )}
-              </button>
-            );
-          })}
+                  )}
+                </button>
+              );
+            })}
           </div>
-          <Link
-            id="dex-tour-equipe"
-            href="/dashboard/configuracoes/usuarios"
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm transition-colors ${
-              pathname === '/dashboard/configuracoes/usuarios'
-                ? 'bg-teal/10 text-teal border border-teal/20'
-                : 'hover:bg-surface-alt text-text-secondary hover:text-text-primary'
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            Equipe
-          </Link>
         </motion.nav>
 
         {/* Conteúdo da aba */}
@@ -296,7 +337,7 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
 
           {/* === ABA: MEU PERFIL === */}
           {abaAtiva === 'perfil' && (
-            <div className="bg-surface p-6 rounded-2xl border border-border shadow-sm space-y-6">
+            <div className="bg-surface p-6 rounded-3xl border border-border shadow-sm space-y-6">
               <div>
                 <h2 className="font-heading font-bold text-2xl text-text-primary">Meu Perfil</h2>
                 <p className="text-sm text-text-secondary mt-1">
@@ -344,24 +385,47 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
                 <button
                   onClick={handleSalvarPerfil}
                   disabled={isPending || !perfilForm.nome.trim()}
-                  className="bg-teal hover:bg-teal-lt text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition-colors shadow-[0_0_15px_rgba(47,156,133,0.2)] disabled:opacity-50 flex items-center gap-2"
+                  className="bg-gradient-to-r from-teal to-teal-lt text-white px-6 py-2.5 rounded-2xl font-bold text-sm transition-all shadow-[0_6px_20px_rgba(47,156,133,0.35)] hover:-translate-y-0.5 hover:shadow-[0_10px_28px_rgba(47,156,133,0.45)] disabled:opacity-50 disabled:hover:translate-y-0 flex items-center gap-2"
                 >
                   {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                   {isPending ? 'Salvando...' : 'Salvar Perfil'}
                 </button>
               </div>
+
+              {/* Zona de risco */}
+              <div className="border-t border-border pt-6">
+                <p className="text-xs font-bold uppercase tracking-widest text-text-secondary mb-3">
+                  Zona de risco
+                </p>
+                <div className="flex items-center justify-between gap-4 p-4 rounded-xl border border-red-200 dark:border-red-900/40 bg-red-50/50 dark:bg-red-900/10">
+                  <div>
+                    <p className="text-sm font-semibold text-text-primary">Sair deste {labelContexto.toLowerCase()}</p>
+                    <p className="text-xs text-text-secondary mt-0.5">
+                      Você perderá acesso imediatamente. Seus dados clínicos serão preservados.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => { setSairError(null); setShowSairDialog(true); }}
+                    className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-red-600 border border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Sair
+                  </button>
+                </div>
+              </div>
             </div>
+
           )}
 
-          {/* === ABA: CLÍNICA === */}
+          {/* === ABA: CLÍNICA / CONSULTÓRIO === */}
           {abaAtiva === 'clinica' && (
-            <div className="bg-surface p-6 rounded-2xl border border-border shadow-sm space-y-6">
-              <h2 className="font-heading font-bold text-2xl text-text-primary">Dados da Clínica</h2>
+            <div className="bg-surface p-6 rounded-3xl border border-border shadow-sm space-y-6">
+              <h2 className="font-heading font-bold text-2xl text-text-primary">Dados do {labelContexto}</h2>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2 space-y-1.5">
                   <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
-                    Nome da Clínica
+                    Nome do {labelContexto}
                   </label>
                   <input
                     type="text"
@@ -434,7 +498,7 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
                 <div>
                   <div className="font-semibold text-sm text-text-primary">Aceita Convênio</div>
                   <div className="text-xs text-text-secondary">
-                    A clínica atende pacientes com plano odontológico.
+                    O {labelContexto.toLowerCase()} atende pacientes com plano odontológico.
                   </div>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
@@ -454,7 +518,7 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
                 <button
                   onClick={handleSalvarClinica}
                   disabled={isPending}
-                  className="bg-teal hover:bg-teal-lt text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition-colors shadow-[0_0_15px_rgba(47,156,133,0.2)] disabled:opacity-50 flex items-center gap-2"
+                  className="bg-gradient-to-r from-teal to-teal-lt text-white px-6 py-2.5 rounded-2xl font-bold text-sm transition-all shadow-[0_6px_20px_rgba(47,156,133,0.35)] hover:-translate-y-0.5 hover:shadow-[0_10px_28px_rgba(47,156,133,0.45)] disabled:opacity-50 disabled:hover:translate-y-0 flex items-center gap-2"
                 >
                   {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                   {isPending ? 'Salvando...' : 'Salvar Alterações'}
@@ -465,7 +529,7 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
 
           {/* === ABA: HORÁRIOS === */}
           {abaAtiva === 'horarios' && (
-            <div className="bg-surface p-6 rounded-2xl border border-border shadow-sm space-y-4">
+            <div className="bg-surface p-6 rounded-3xl border border-border shadow-sm space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="font-heading font-bold text-2xl text-text-primary">Horários de Atendimento</h2>
                 <span className="text-xs text-text-secondary font-medium">
@@ -543,7 +607,7 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
                 <button
                   onClick={handleSalvarHorarios}
                   disabled={isPending}
-                  className="bg-teal hover:bg-teal-lt text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition-colors shadow-[0_0_15px_rgba(47,156,133,0.2)] disabled:opacity-50 flex items-center gap-2"
+                  className="bg-gradient-to-r from-teal to-teal-lt text-white px-6 py-2.5 rounded-2xl font-bold text-sm transition-all shadow-[0_6px_20px_rgba(47,156,133,0.35)] hover:-translate-y-0.5 hover:shadow-[0_10px_28px_rgba(47,156,133,0.45)] disabled:opacity-50 disabled:hover:translate-y-0 flex items-center gap-2"
                 >
                   {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                   {isPending ? 'Salvando...' : 'Salvar Horários'}
@@ -552,10 +616,25 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
             </div>
           )}
 
+          {/* === ABA: EQUIPE === */}
+          {abaAtiva === 'equipe' && equipe && (
+            <div className="bg-surface p-6 rounded-3xl border border-border shadow-sm">
+              <UsuariosClient
+                usuarios={equipe.usuarios}
+                convitesPendentes={equipe.convitesPendentes}
+                meuId={equipe.meuId}
+                meuRole={equipe.meuRole}
+                limiteDentistas={equipe.limiteDentistas}
+                convitesRestantes={equipe.convitesRestantes}
+                asTab
+              />
+            </div>
+          )}
+
           {/* === ABA: PROCEDIMENTOS === */}
           {abaAtiva === 'procedimentos' && (
             <div className="space-y-4">
-              <div className="bg-surface p-6 rounded-2xl border border-border shadow-sm">
+              <div className="bg-surface p-6 rounded-3xl border border-border shadow-sm">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="font-heading font-bold text-2xl text-text-primary flex items-center">
                     Catálogo de Procedimentos
@@ -563,7 +642,7 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
                   </h2>
                   <button
                     onClick={() => setShowNovoProcedimento(true)}
-                    className="bg-teal text-white hover:bg-teal-lt px-4 py-2 rounded-xl font-semibold text-sm flex items-center gap-2 transition-colors"
+                    className="bg-gradient-to-r from-teal to-teal-lt text-white px-4 py-2 rounded-xl font-semibold text-sm flex items-center gap-2 transition-all shadow-[0_4px_14px_rgba(47,156,133,0.3)] hover:-translate-y-0.5"
                   >
                     <Plus className="w-4 h-4" /> Novo
                   </button>
@@ -767,6 +846,49 @@ export function ConfiguracoesClient({ dentista, config, horarios, procedimentos:
           )}
         </motion.div>
       </div>
+
+      {/* Dialog de confirmação — sair da clínica */}
+      {showSairDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-surface rounded-3xl border border-border shadow-2xl p-6 w-full max-w-sm space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-heading font-bold text-lg text-text-primary">Sair do {labelContexto.toLowerCase()}?</h3>
+                <p className="text-sm text-text-secondary mt-1">
+                  Você perderá acesso imediatamente. Esta ação não pode ser desfeita sem que um admin te convide novamente.
+                </p>
+              </div>
+            </div>
+
+            {sairError && (
+              <p className="text-sm text-red-600 bg-red-50 dark:bg-red-900/20 rounded-xl px-4 py-2.5">
+                {sairError}
+              </p>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowSairDialog(false)}
+                disabled={isSaindo}
+                className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold text-text-secondary hover:bg-surface-alt transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => void handleSairDaClinica()}
+                disabled={isSaindo}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isSaindo && <Loader2 className="w-4 h-4 animate-spin" />}
+                {isSaindo ? 'Saindo...' : 'Sim, sair'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

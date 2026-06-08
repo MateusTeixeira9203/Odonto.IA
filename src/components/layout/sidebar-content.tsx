@@ -8,16 +8,17 @@ import {
   Users,
   Settings,
   Calendar,
-  ChevronLeft,
-  ChevronRight,
+  ChevronsLeft,
   LogOut,
   User,
   Sun,
   Moon,
   Wallet,
+  FileText,
   Lock,
-  Search,
+  ChevronRight,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import type { PlanoId } from '@/lib/planos';
 import { temFeature } from '@/lib/planos';
 import { motion, AnimatePresence } from 'motion/react';
@@ -43,7 +44,30 @@ export interface SidebarProps {
   onOpenSearch?: () => void;
 }
 
-export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, activeClinicId, role, avatarUrl, plano, onOpenSearch }: SidebarProps) {
+type NavItem = {
+  href: string;
+  icon: LucideIcon;
+  label: string;
+  id: string;
+  visible: boolean;
+  locked: boolean;
+};
+
+type NavGroup = {
+  label: string;
+  items: NavItem[];
+};
+
+export function SidebarContent({
+  isExpanded,
+  onToggle,
+  nome,
+  clinicaNome,
+  activeClinicId,
+  role,
+  avatarUrl,
+  plano,
+}: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
@@ -64,15 +88,38 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, active
     return () => clearTimeout(timer);
   }, []);
 
-  const allNavItems = [
-    { href: '/dashboard',               icon: LayoutDashboard, label: 'Início',        id: 'dashboard-link',    visible: true,       locked: false },
-    { href: '/dashboard/pacientes',     icon: Users,           label: 'Pacientes',     id: 'pacientes-link',    visible: true,       locked: false },
-    { href: '/dashboard/agendamentos',  icon: Calendar,        label: 'Agenda',        id: 'agendamentos-link', visible: true,       locked: false },
-    { href: '/dashboard/financeiro',    icon: Wallet,          label: 'Financeiro',    id: 'financeiro-link',   visible: true,       locked: financeiroLocked },
-    { href: '/dashboard/configuracoes', icon: Settings,        label: 'Configurações', id: 'configuracoes-link',visible: showConfig, locked: false },
-  ];
+  const allNavGroups: NavGroup[] = [
+    {
+      label: 'ATENDIMENTO',
+      items: [
+        { href: '/dashboard',              icon: LayoutDashboard, label: 'Início',        id: 'dashboard-link',    visible: true,       locked: false },
+        { href: '/dashboard/pacientes',    icon: Users,           label: 'Pacientes',     id: 'pacientes-link',    visible: true,       locked: false },
+        { href: '/dashboard/agendamentos', icon: Calendar,        label: 'Agenda',        id: 'agendamentos-link', visible: true,       locked: false },
+      ],
+    },
+    {
+      label: 'GESTÃO',
+      items: [
+        { href: '/dashboard/financeiro',  icon: Wallet,    label: 'Financeiro', id: 'financeiro-link',  visible: true, locked: financeiroLocked },
+        { href: '/dashboard/orcamentos',  icon: FileText,  label: 'Orçamentos', id: 'orcamentos-link',  visible: true, locked: false },
+      ],
+    },
+    {
+      label: 'SISTEMA',
+      items: [
+        { href: '/dashboard/configuracoes',icon: Settings,        label: 'Configurações', id: 'configuracoes-link',visible: showConfig, locked: false },
+      ],
+    },
+  ]
+    .map((group) => ({ ...group, items: group.items.filter((i) => i.visible) }))
+    .filter((group) => group.items.length > 0);
 
-  const navItems = allNavItems.filter((item) => item.visible);
+  const avatarInitials = nome
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <motion.aside
@@ -80,23 +127,22 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, active
       animate={{ width: isExpanded ? 256 : 72 }}
       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
       id="sidebar"
-      className="bg-brand-charcoal border-r border-white/[0.04] flex flex-col h-screen sticky top-0 z-20 relative overflow-hidden"
+      className="bg-brand-charcoal border-r border-white/[0.05] flex flex-col h-screen sticky top-0 z-20 overflow-hidden"
     >
-      {/* Toggle Button */}
-      <button
-        onClick={onToggle}
-        title={isExpanded ? 'Recolher' : 'Expandir'}
-        className="absolute -right-3 top-9 w-6 h-6 bg-brand-charcoal border border-white/10 rounded-full flex items-center justify-center text-white/50 hover:text-white hover:border-teal/40 active:scale-90 transition-all z-30"
+      {/* ── Header: adapta entre row (expandido) e coluna (recolhido) ── */}
+      <div
+        className={`flex shrink-0 ${
+          isExpanded
+            ? 'flex-row items-center gap-3 px-5 pt-6 pb-5'
+            : 'flex-col items-center gap-2.5 pt-5 pb-4'
+        }`}
       >
-        {isExpanded ? <ChevronLeft className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-      </button>
-
-      {/* Logo */}
-      <div className={`flex items-center gap-3 px-5 pt-6 pb-5 ${!isExpanded && 'justify-center px-0'}`}>
         <OdontoIALogo className="w-6 h-6 text-teal shrink-0" />
+
         <AnimatePresence mode="wait">
           {isExpanded && (
             <motion.div
+              className="flex-1 min-w-0"
               initial={{ opacity: 0, x: -8 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -8 }}
@@ -105,112 +151,190 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, active
               <span className="font-bold text-[16px] tracking-[0.04em] text-white block leading-none whitespace-nowrap">
                 Odonto<span className="text-teal">.</span><span className="text-teal-lt font-semibold">IA</span>
               </span>
-              <span className="font-mono text-[9px] tracking-[0.18em] text-white/25 uppercase mt-1 block whitespace-nowrap">
+              <span className="font-mono text-[10px] tracking-[0.18em] text-white/20 uppercase mt-1 block whitespace-nowrap">
                 Inteligência
               </span>
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
 
-      {/* Clinic Switcher */}
-      <ClinicSwitcher
-        isExpanded={isExpanded}
-        activeClinicId={activeClinicId}
-        activeClinicNome={clinicaNome}
-      />
-
-      {/* Separator */}
-      <div className="mx-3 mb-3 border-t border-white/[0.05]" />
-
-      {/* Search / Command Palette trigger */}
-      <div className="px-2 mb-2">
+        {/* Toggle com borda premium */}
         <button
-          onClick={onOpenSearch}
-          title="Buscar (⌘K)"
-          className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all group w-full border border-white/[0.07] bg-white/[0.03] hover:bg-white/[0.07] hover:border-teal/20 ${!isExpanded && 'justify-center'}`}
+          onClick={onToggle}
+          title={isExpanded ? 'Recolher' : 'Expandir'}
+          className="w-10 h-10 rounded-xl border border-white/[0.12] bg-white/[0.04]
+            flex items-center justify-center text-white/55
+            hover:border-white/[0.25] hover:bg-white/[0.08] hover:text-white/85
+            active:scale-95 transition-all shrink-0"
         >
-          <Search className="w-3.5 h-3.5 text-white/35 group-hover:text-teal/70 shrink-0 transition-colors" />
-          <AnimatePresence mode="wait">
-            {isExpanded && (
-              <motion.div
-                initial={{ opacity: 0, width: 0 }}
-                animate={{ opacity: 1, width: 'auto' }}
-                exit={{ opacity: 0, width: 0 }}
-                transition={{ duration: 0.18 }}
-                className="flex items-center justify-between flex-1 overflow-hidden"
-              >
-                <span className="text-white/35 group-hover:text-white/60 transition-colors text-xs font-medium whitespace-nowrap">
-                  Buscar...
-                </span>
-                <span className="font-mono text-[9px] text-white/20 group-hover:text-teal/40 transition-colors whitespace-nowrap ml-2">
-                  ⌘K
-                </span>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <motion.div
+            animate={{ rotate: isExpanded ? 0 : 180 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+          >
+            <ChevronsLeft className="w-4 h-4" />
+          </motion.div>
         </button>
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 px-2 space-y-0.5">
-        {navItems.map((item) => {
-          const isActive = item.href === '/dashboard'
-            ? pathname === '/dashboard'
-            : pathname.startsWith(item.href);
-          return (
-            <Link
-              key={item.href}
-              id={item.id}
-              href={item.href}
-              title={!isExpanded ? item.label : undefined}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all group ${
-                isActive
-                  ? 'bg-teal/[0.10] text-teal border-l-2 border-teal'
-                  : item.locked
-                    ? 'text-white/25 hover:bg-white/[0.04] hover:text-white/40 border-l-2 border-transparent'
-                    : 'text-white/50 hover:bg-white/[0.06] hover:text-white/90 border-l-2 border-transparent'
-              } ${!isExpanded && 'justify-center'}`}
-            >
-              <item.icon className={`w-4 h-4 shrink-0 transition-colors ${
-                isActive ? 'text-teal' : item.locked ? 'text-white/20' : 'text-white/35 group-hover:text-white/70'
-              }`} />
-              <AnimatePresence mode="wait">
-                {isExpanded && (
-                  <motion.span
-                    initial={{ opacity: 0, width: 0 }}
-                    animate={{ opacity: 1, width: 'auto' }}
-                    exit={{ opacity: 0, width: 0 }}
-                    transition={{ duration: 0.18 }}
-                    className="whitespace-nowrap overflow-hidden flex items-center gap-1.5 flex-1"
+      {/* ── Separador plataforma → clínica ── */}
+      <div className="mx-4 mb-3 border-t border-white/[0.06] shrink-0" />
+
+      {/* ── Workspace da Clínica (visível apenas expandido) ── */}
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2, ease: 'easeInOut' }}
+            className="overflow-hidden shrink-0"
+          >
+            <ClinicSwitcher
+              isExpanded={isExpanded}
+              activeClinicId={activeClinicId}
+              activeClinicNome={clinicaNome}
+            />
+            <div className="mx-4 mt-1 mb-2 border-t border-white/[0.06]" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Navegação por grupos ── */}
+      <nav className="flex-1 px-2 pt-1 overflow-y-auto overflow-x-hidden scrollbar-hide">
+        {allNavGroups.map((group, gIdx) => (
+          <div key={group.label}>
+            {gIdx > 0 && (
+              <div className="mx-1 my-3 border-t border-white/[0.06]" />
+            )}
+
+            {/* Label do grupo */}
+            <AnimatePresence mode="wait">
+              {isExpanded && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                  className="px-3 mb-1.5"
+                >
+                  <span className="text-xs font-medium tracking-widest text-white/38 uppercase select-none">
+                    {group.label}
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Itens */}
+            <div className="space-y-0.5">
+              {group.items.map((item) => {
+                const isActive =
+                  item.href === '/dashboard'
+                    ? pathname === '/dashboard'
+                    : pathname.startsWith(item.href);
+
+                return (
+                  <Link
+                    key={item.href}
+                    id={item.id}
+                    href={item.href}
+                    title={!isExpanded ? item.label : undefined}
+                    className={`relative flex items-center gap-3 py-2 rounded-xl transition-all duration-150 group ${
+                      !isExpanded ? 'justify-center px-1' : 'px-2'
+                    } ${
+                      isActive
+                        ? 'bg-teal/10'
+                        : item.locked
+                          ? ''
+                          : 'hover:bg-white/[0.05]'
+                    }`}
                   >
-                    {item.label}
-                    {item.locked && <Lock className="w-3 h-3 text-teal/50 ml-auto shrink-0" />}
-                  </motion.span>
-                )}
-              </AnimatePresence>
-            </Link>
-          );
-        })}
+                    {/* Indicador ativo */}
+                    {isActive && (
+                      <motion.span
+                        layoutId="sidebar-active-pill"
+                        className="absolute left-0 inset-y-2 w-[3px] rounded-r-full bg-teal"
+                        transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                      />
+                    )}
+
+                    {/* Icon box */}
+                    <div
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                        isActive
+                          ? 'bg-teal/15'
+                          : item.locked
+                            ? 'bg-white/[0.04]'
+                            : 'bg-white/[0.07] group-hover:bg-white/[0.11]'
+                      }`}
+                    >
+                      <item.icon
+                        className={`transition-colors ${
+                          isActive
+                            ? 'text-teal'
+                            : item.locked
+                              ? 'text-white/20'
+                              : 'text-white/55 group-hover:text-white/85'
+                        }`}
+                        style={{ width: 20, height: 20 }}
+                      />
+                    </div>
+
+                    <AnimatePresence mode="wait">
+                      {isExpanded && (
+                        <motion.span
+                          initial={{ opacity: 0, width: 0 }}
+                          animate={{ opacity: 1, width: 'auto' }}
+                          exit={{ opacity: 0, width: 0 }}
+                          transition={{ duration: 0.18 }}
+                          className={`whitespace-nowrap overflow-hidden flex items-center gap-1.5 flex-1 text-[15px] font-medium transition-colors ${
+                            isActive
+                              ? 'text-teal'
+                              : item.locked
+                                ? 'text-white/20'
+                                : 'text-white/70 group-hover:text-white/92'
+                          }`}
+                        >
+                          {item.label}
+                          {item.locked && (
+                            <Lock className="w-3 h-3 text-teal/40 ml-auto shrink-0" />
+                          )}
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
-      {/* Footer */}
-      <div className="border-t border-white/[0.05] p-2 space-y-0.5">
-        {/* Notification Bell */}
+      {/* ── Separador nav → utilitários ── */}
+      <div className="mx-4 mt-1 border-t border-white/[0.06] shrink-0" />
+
+      {/* ── Utilitários ── */}
+      <div className="py-1 px-2 space-y-0.5 shrink-0">
         <NotificationBell isExpanded={isExpanded} />
 
-        {/* Theme Toggle */}
+        {/* Modo Escuro / Claro */}
         <button
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
           title={mounted ? (theme === 'dark' ? 'Modo Claro' : 'Modo Escuro') : 'Tema'}
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all group text-white/40 hover:bg-white/[0.06] hover:text-white/90 border-l-2 border-transparent w-full ${!isExpanded && 'justify-center'}`}
+          className={`flex items-center gap-3 py-2 rounded-xl transition-all group w-full hover:bg-white/[0.05] ${
+            !isExpanded ? 'justify-center px-1' : 'px-2'
+          }`}
         >
-          {mounted && (theme === 'dark' ? (
-            <Sun className="w-4 h-4 shrink-0 text-white/35 group-hover:text-white/70" />
-          ) : (
-            <Moon className="w-4 h-4 shrink-0 text-white/35 group-hover:text-white/70" />
-          ))}
-          {!mounted && <div className="w-4 h-4 shrink-0" />}
+          {/* Icon box */}
+          <div className="w-10 h-10 rounded-xl bg-white/[0.07] flex items-center justify-center shrink-0 group-hover:bg-white/[0.11] transition-colors">
+            {mounted && theme === 'dark' && (
+              <Sun style={{ width: 20, height: 20 }} className="text-white/55 group-hover:text-white/85 transition-colors" />
+            )}
+            {mounted && theme !== 'dark' && (
+              <Moon style={{ width: 20, height: 20 }} className="text-white/55 group-hover:text-white/85 transition-colors" />
+            )}
+            {!mounted && <div style={{ width: 20, height: 20 }} />}
+          </div>
+
           <AnimatePresence mode="wait">
             {isExpanded && (
               <motion.span
@@ -218,28 +342,47 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, active
                 animate={{ opacity: 1, width: 'auto' }}
                 exit={{ opacity: 0, width: 0 }}
                 transition={{ duration: 0.18 }}
-                className="whitespace-nowrap overflow-hidden"
+                className="whitespace-nowrap overflow-hidden flex-1 text-[15px] font-medium text-white/70 group-hover:text-white/92 transition-colors text-left"
               >
                 {mounted ? (theme === 'dark' ? 'Modo Claro' : 'Modo Escuro') : 'Tema'}
               </motion.span>
             )}
           </AnimatePresence>
-        </button>
 
-        {/* User Profile */}
+        </button>
+      </div>
+
+      {/* ── Separador utilitários → perfil ── */}
+      <div className="mx-4 border-t border-white/[0.06] shrink-0" />
+
+      {/* ── Perfil do Usuário ── */}
+      <div className="p-2 shrink-0">
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
             <button
               title={!isExpanded ? nome : undefined}
-              className={`mt-1 px-3 flex items-center gap-3 w-full hover:bg-white/[0.06] py-2 rounded-lg transition-colors cursor-pointer border-l-2 border-transparent ${!isExpanded && 'justify-center'}`}
+              className={`flex items-center gap-3 w-full hover:bg-white/[0.06] py-2.5 rounded-xl transition-colors cursor-pointer group ${
+                !isExpanded ? 'justify-center px-1' : 'px-2'
+              }`}
             >
-              <div className="w-7 h-7 rounded-full bg-teal flex items-center justify-center text-white font-bold text-[11px] shrink-0 overflow-hidden ring-2 ring-teal/25">
-                {avatarUrl ? (
-                  <Image src={avatarUrl} alt={nome} width={28} height={28} className="w-full h-full object-cover" />
-                ) : (
-                  nome.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
-                )}
+              {/* Avatar com indicador online */}
+              <div className="relative shrink-0">
+                <div className="w-9 h-9 rounded-full bg-teal flex items-center justify-center text-white font-bold text-[12px] overflow-hidden ring-2 ring-teal/20">
+                  {avatarUrl ? (
+                    <Image
+                      src={avatarUrl}
+                      alt={nome}
+                      width={36}
+                      height={36}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    avatarInitials
+                  )}
+                </div>
+                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-teal border-2 border-brand-charcoal" />
               </div>
+
               <AnimatePresence mode="wait">
                 {isExpanded && (
                   <motion.div
@@ -247,10 +390,28 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, active
                     animate={{ opacity: 1, width: 'auto' }}
                     exit={{ opacity: 0, width: 0 }}
                     transition={{ duration: 0.18 }}
-                    className="text-left overflow-hidden"
+                    className="text-left overflow-hidden flex-1 min-w-0"
                   >
-                    <div className="text-[12px] font-semibold text-white/80 whitespace-nowrap truncate max-w-[120px]">{nome}</div>
-                    <div className="text-[10px] text-white/30 font-mono whitespace-nowrap truncate max-w-[120px]">{clinicaNome}</div>
+                    <div className="text-[14px] font-semibold text-white/90 whitespace-nowrap truncate">
+                      {nome}
+                    </div>
+                    <div className="text-[11px] text-white/35 whitespace-nowrap truncate mt-0.5">
+                      {clinicaNome}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <AnimatePresence mode="wait">
+                {isExpanded && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="shrink-0"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5 text-white/20 group-hover:text-white/45 transition-colors" />
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -266,13 +427,13 @@ export function SidebarContent({ isExpanded, onToggle, nome, clinicaNome, active
               side="right"
             >
               <DropdownMenu.Item
-                className="flex items-center gap-2 px-3 py-2 text-sm text-white/50 hover:text-white hover:bg-white/[0.06] rounded-lg outline-none cursor-pointer transition-colors"
+                className="flex items-center gap-2 px-3 py-2 text-sm text-white/55 hover:text-white hover:bg-white/[0.06] rounded-lg outline-none cursor-pointer transition-colors"
                 onSelect={() => router.push('/dashboard/perfil')}
               >
                 <User className="w-4 h-4" />
                 Meu Perfil
               </DropdownMenu.Item>
-              <DropdownMenu.Separator className="h-px bg-white/[0.06] my-1" />
+              <DropdownMenu.Separator className="h-px bg-white/[0.07] my-1" />
               <DropdownMenu.Item
                 className="flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded-lg outline-none cursor-pointer transition-colors"
                 onSelect={() => { void handleLogout(); }}

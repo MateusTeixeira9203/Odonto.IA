@@ -29,10 +29,10 @@ export default async function ConsultaPage({ params }: Props) {
 
   if (!paciente) redirect('/dashboard/agendamentos');
 
-  const [{ data: fichas }, { data: orcamentos }, { data: planejamentoRaw }] = await Promise.all([
+  const [{ data: fichas }, { data: orcamentos }, { data: planejamentoRaw }, { data: procedimentosRaw }] = await Promise.all([
     supabase
       .from('fichas')
-      .select('created_at, queixa_principal, anotacoes, dentes_afetados, alergias, historico_medico, medicamentos_em_uso, historico_dental')
+      .select('created_at, queixa_principal, anotacoes, dentes_afetados, procedimentos, alergias, historico_medico, medicamentos_em_uso, historico_dental')
       .eq('paciente_id', paciente.id)
       .eq('clinica_id', clinicId)
       .order('created_at', { ascending: false })
@@ -54,6 +54,11 @@ export default async function ConsultaPage({ params }: Props) {
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
+    supabase
+      .from('procedimentos')
+      .select('nome')
+      .eq('clinica_id', clinicId)
+      .eq('ativo', true),
   ]);
 
   const hora = new Date(ag.data_hora as string).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -88,11 +93,12 @@ export default async function ConsultaPage({ params }: Props) {
     }
     if (histMed && !histMedSeen.has(histMed)) {
       histMedSeen.add(histMed);
-      // Fix: truncar a 150 chars para não inflar o payload de props do servidor
       const histMedResumido = histMed.length > 150 ? `${histMed.slice(0, 147)}...` : histMed;
       alertasClinicos.push(`🏥 Histórico: ${histMedResumido}`);
     }
   }
+
+  const procedimentosClinica = (procedimentosRaw ?? []).map(p => (p.nome as string));
 
   return (
     <ConsultaClient
@@ -106,7 +112,8 @@ export default async function ConsultaPage({ params }: Props) {
         data: new Date(f.created_at as string).toLocaleDateString('pt-BR'),
         queixa: (f.queixa_principal as string | null) ?? '',
         anotacoes: (f.anotacoes as string | null) ?? '',
-        dentes: (f.dentes_afetados as number[]) ?? [],
+        dentes: (f.dentes_afetados as number[] | null) ?? [],
+        procedimentos: (f.procedimentos as string[] | null) ?? [],
       }))}
       orcamentos={(orcamentos ?? []).map(o => ({
         total: (o.total as number) ?? 0,
@@ -115,6 +122,7 @@ export default async function ConsultaPage({ params }: Props) {
       }))}
       agendamentoStatus={(ag.status as string)}
       alertasClinicos={alertasClinicos}
+      procedimentosClinica={procedimentosClinica}
       planejamento={planejamentoRaw ? {
         id: (planejamentoRaw as {id: string}).id,
         titulo: (planejamentoRaw as {titulo: string}).titulo,

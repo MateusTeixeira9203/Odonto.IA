@@ -25,6 +25,9 @@ import {
   assumirConversa,
   finalizarConversa,
   enviarMensagemManual,
+  devolverParaBot,
+  confirmarPagamento,
+  recusarPagamento,
   type ConversaItem,
   type MensagemItem,
 } from '../actions';
@@ -66,6 +69,16 @@ function etapaLabel(etapa: string): string {
   };
   return mapa[etapa] ?? etapa;
 }
+
+const ESTADO_BADGE: Record<string, { label: string; cls: string }> = {
+  inicio:      { label: 'Iniciando',   cls: 'bg-surface-alt text-text-secondary' },
+  cadastro:    { label: 'Cadastro',    cls: 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400' },
+  agendamento: { label: 'Agendando',   cls: 'bg-teal/10 text-teal' },
+  orcamento:   { label: 'Orçamento',   cls: 'bg-surface-alt text-text-secondary' },
+  pagamento:   { label: '⚠️ Comprov.', cls: 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400' },
+  humano:      { label: 'Humano',      cls: 'bg-coral/10 text-coral' },
+  encerrado:   { label: 'Encerrado',   cls: 'bg-surface-alt text-text-secondary' },
+};
 
 // ─── Sub-componentes ──────────────────────────────────────────────────────────
 
@@ -121,7 +134,14 @@ function ConversaCard({
       </div>
       <div className="flex items-center justify-between mt-1">
         <BadgeStatus ativo={conversa.ativo} />
-        <span className="text-xs text-[--color-gray-md]">{etapaLabel(conversa.etapa)}</span>
+        {(() => {
+          const badge = ESTADO_BADGE[conversa.estado] ?? ESTADO_BADGE[conversa.etapa] ?? { label: conversa.etapa, cls: 'bg-surface-alt text-text-secondary' };
+          return (
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badge.cls}`}>
+              {badge.label}
+            </span>
+          );
+        })()}
       </div>
     </motion.button>
   );
@@ -235,6 +255,30 @@ export function WhatsAppClient({ initialConversas, clinicaId }: Props) {
     if (!conversaSelecionada) return;
     startTransition(async () => {
       await finalizarConversa(conversaSelecionada.id);
+      await refreshConversas();
+    });
+  };
+
+  const handleDevolverParaBot = () => {
+    if (!conversaSelecionada) return;
+    startTransition(async () => {
+      await devolverParaBot(conversaSelecionada.id);
+      await refreshConversas();
+    });
+  };
+
+  const handleConfirmarPagamento = () => {
+    if (!conversaSelecionada) return;
+    startTransition(async () => {
+      await confirmarPagamento(conversaSelecionada.id);
+      await refreshConversas();
+    });
+  };
+
+  const handleRecusarPagamento = () => {
+    if (!conversaSelecionada) return;
+    startTransition(async () => {
+      await recusarPagamento(conversaSelecionada.id);
       await refreshConversas();
     });
   };
@@ -408,7 +452,7 @@ export function WhatsAppClient({ initialConversas, clinicaId }: Props) {
               {/* Status + ações */}
               <div className="flex items-center gap-2 shrink-0">
                 <BadgeStatus ativo={conversaSelecionada.ativo} />
-                {conversaSelecionada.ativo ? (
+                {conversaSelecionada.ativo && conversaSelecionada.estado !== 'humano' ? (
                   <Button
                     size="sm"
                     variant="outline"
@@ -423,7 +467,7 @@ export function WhatsAppClient({ initialConversas, clinicaId }: Props) {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={handleFinalizar}
+                    onClick={handleDevolverParaBot}
                     disabled={isPending}
                     className="text-xs gap-1.5 border-teal/30 text-teal hover:bg-teal/5"
                   >
@@ -450,6 +494,31 @@ export function WhatsAppClient({ initialConversas, clinicaId }: Props) {
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* Painel de comprovante — quando estado === 'pagamento' */}
+            {conversaSelecionada.estado === 'pagamento' && (
+              <div className="mx-4 mt-3 rounded-xl border border-amber-200 dark:border-amber-800/40 bg-amber-50 dark:bg-amber-900/20 p-4 space-y-3">
+                <p className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wide">
+                  Comprovante aguardando verificação
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleConfirmarPagamento}
+                    disabled={isPending}
+                    className="flex-1 bg-teal text-white rounded-lg py-2 text-xs font-bold hover:bg-teal-lt transition-colors disabled:opacity-50"
+                  >
+                    Confirmar Pagamento
+                  </button>
+                  <button
+                    onClick={handleRecusarPagamento}
+                    disabled={isPending}
+                    className="flex-1 border border-border text-text-secondary rounded-lg py-2 text-xs font-semibold hover:bg-surface-alt transition-colors disabled:opacity-50"
+                  >
+                    Recusar
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Mensagens */}
             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">

@@ -46,6 +46,13 @@ interface PacientesTableProps {
 
 const PAGE_SIZE = 25;
 
+function formatPhoneDisplay(tel: string): string {
+  const d = tel.replace(/\D/g, '');
+  if (d.length === 11) return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+  return tel;
+}
+
 const AVATAR_COLORS = [
   'bg-teal',
   'bg-teal/70',
@@ -311,10 +318,9 @@ export function PacientesTable({
                       onClick={() =>
                         router.push(`/dashboard/pacientes/${paciente.id}`)
                       }
-                      className="group hover:bg-surface-alt/60 transition-colors cursor-pointer
-                                 border-l-2 border-transparent hover:border-l-teal/30"
+                      className="group hover:bg-surface-alt/60 transition-colors cursor-pointer border-l-2 border-transparent hover:border-l-teal/30"
                     >
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-5">
                         <div className="flex items-center gap-3">
                           <div
                             className={`w-10 h-10 rounded-xl flex items-center justify-center
@@ -324,37 +330,37 @@ export function PacientesTable({
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="font-semibold text-sm text-text-primary group-hover:text-teal transition-colors">
+                              <span className="font-semibold text-sm text-text-primary group-hover:text-teal transition-colors capitalize">
                                 {paciente.nome}
                               </span>
                               {paciente.followup_pendente && (
-                                <span className="inline-flex items-center text-[9px] font-bold uppercase tracking-wider bg-teal/10 text-teal px-1.5 py-0.5 rounded-full leading-none">
+                                <span className="inline-flex items-center text-[10px] font-bold uppercase tracking-wider bg-teal/10 text-teal px-1.5 py-0.5 rounded-full leading-none">
                                   follow-up
                                 </span>
                               )}
                             </div>
-                            <div className="font-mono text-[10px] text-text-secondary mt-0.5">
+                            <div className="font-mono text-xs text-text-secondary/50 mt-0.5">
                               {paciente.id.slice(0, 8).toUpperCase()}
                             </div>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 hidden lg:table-cell">
+                      <td className="px-6 py-5 hidden lg:table-cell">
                         <div className="space-y-1">
                           {paciente.telefone && (
-                            <div className="flex items-center gap-2 text-xs text-text-secondary">
+                            <div className="flex items-center gap-2 text-xs text-text-secondary max-w-[200px]">
                               <span className="w-5 h-5 rounded-md bg-surface-alt flex items-center justify-center shrink-0">
                                 <Phone className="w-3 h-3 text-teal" />
                               </span>
-                              {paciente.telefone}
+                              <span className="truncate">{formatPhoneDisplay(paciente.telefone)}</span>
                             </div>
                           )}
                           {paciente.email && (
-                            <div className="flex items-center gap-2 text-xs text-text-secondary">
+                            <div className="flex items-center gap-2 text-xs text-text-secondary max-w-[200px]">
                               <span className="w-5 h-5 rounded-md bg-surface-alt flex items-center justify-center shrink-0">
                                 <Mail className="w-3 h-3 text-teal" />
                               </span>
-                              {paciente.email}
+                              <span className="truncate">{paciente.email}</span>
                             </div>
                           )}
                           {!paciente.telefone && !paciente.email && (
@@ -362,7 +368,7 @@ export function PacientesTable({
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-5">
                         <div className="flex items-center gap-2 text-xs text-text-secondary font-mono">
                           <span className="w-5 h-5 rounded-md bg-surface-alt flex items-center justify-center shrink-0">
                             <Calendar className="w-3 h-3 text-teal" />
@@ -370,7 +376,7 @@ export function PacientesTable({
                           {dataCadastro}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-6 py-5 text-right">
                         <ChevronRight className="w-4 h-4 text-border group-hover:text-teal transition-colors ml-auto" />
                       </td>
                     </motion.tr>

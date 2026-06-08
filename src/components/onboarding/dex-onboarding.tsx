@@ -323,7 +323,7 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
     }
 
     // admin (owner)
-    const temEquipe = plano === 'BASICO' || plano === 'CLINICA';
+    const temEquipe = plano === 'CLINICA';
 
     return [
       {

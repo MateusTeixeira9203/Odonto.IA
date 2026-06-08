@@ -3,6 +3,7 @@
 import { requireClinicContext } from '@/server/auth/clinic';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
+import { inserirNotificacao } from '@/lib/notificacoes';
 
 export async function salvarFichaConsulta(params: {
   agendamentoId:      string;
@@ -56,6 +57,24 @@ export async function salvarFichaConsulta(params: {
     .update({ status: 'completed' })
     .eq('id', params.agendamentoId)
     .eq('clinica_id', clinicId);
+
+  // Busca nome do paciente para a notificação
+  const { data: paciente } = await supabase
+    .from('pacientes')
+    .select('nome')
+    .eq('id', params.pacienteId)
+    .maybeSingle<{ nome: string }>();
+
+  // Notifica a secretaria que a consulta foi finalizada
+  await inserirNotificacao(supabase, {
+    clinicaId:     clinicId,
+    paraRole:      'secretaria',
+    deDentistaId:  dentistaPerfil.id,
+    tipo:          'consulta_finalizada',
+    titulo:        `Consulta finalizada — ${paciente?.nome ?? 'Paciente'}`,
+    mensagem:      'A consulta foi encerrada pelo dentista.',
+    href:          '/dashboard/agendamentos',
+  });
 
   return {};
 }

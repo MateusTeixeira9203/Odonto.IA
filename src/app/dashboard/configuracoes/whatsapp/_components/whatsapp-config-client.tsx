@@ -8,55 +8,46 @@ import type { BotConfigForm } from "../actions";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
-export interface InstanciaWhatsAppProps {
-  instance_name: string;
-  status: "disconnected" | "connecting" | "connected";
-  qrcode?: string;
-  phone_number?: string;
-}
-
 interface WhatsAppConfigClientProps {
   initialConfig: BotConfigForm | null;
-  initialInstance: InstanciaWhatsAppProps | null;
 }
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 
 export default function WhatsAppConfigClient({
   initialConfig,
-  initialInstance,
 }: WhatsAppConfigClientProps) {
   return (
     <div className="max-w-4xl mx-auto p-6">
       {/* Cabeçalho */}
       <div className="mb-8">
-        <h1 className="text-3xl font-serif text-[--color-text-primary]">Bot WhatsApp</h1>
-        <p className="text-[--color-text-secondary] mt-2">
+        <h1 className="font-heading font-bold text-3xl md:text-4xl text-text-primary">Bot WhatsApp</h1>
+        <p className="text-text-secondary text-sm font-medium mt-1">
           Configure o atendimento automático da sua clínica via WhatsApp
         </p>
       </div>
 
       {/* Abas */}
       <Tabs defaultValue="conexao" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 h-14 p-1.5 bg-surface-alt rounded-2xl border border-[--color-border]">
+        <TabsList className="grid w-full grid-cols-2 h-14 p-1.5 bg-surface-alt rounded-2xl border border-border">
           <TabsTrigger
             value="conexao"
-            className="flex items-center justify-center gap-2 rounded-xl text-base font-medium h-11 text-[--color-text-secondary] data-[state=active]:bg-[--color-surface] data-[state=active]:text-[--color-teal] data-[state=active]:shadow-md data-[state=active]:border-b-2 data-[state=active]:border-b-[--color-teal] transition-all"
+            className="flex items-center justify-center gap-2 rounded-xl text-sm font-semibold h-11 text-text-secondary data-[state=active]:bg-surface data-[state=active]:text-teal data-[state=active]:shadow-md transition-all"
           >
-            <Wifi className="w-5 h-5" />
+            <Wifi className="w-4 h-4" />
             Conexão
           </TabsTrigger>
           <TabsTrigger
             value="config"
-            className="flex items-center justify-center gap-2 rounded-xl text-base font-medium h-11 text-[--color-text-secondary] data-[state=active]:bg-[--color-surface] data-[state=active]:text-[--color-teal] data-[state=active]:shadow-md data-[state=active]:border-b-2 data-[state=active]:border-b-[--color-teal] transition-all"
+            className="flex items-center justify-center gap-2 rounded-xl text-sm font-semibold h-11 text-text-secondary data-[state=active]:bg-surface data-[state=active]:text-teal data-[state=active]:shadow-md transition-all"
           >
-            <MessageCircle className="w-5 h-5" />
+            <MessageCircle className="w-4 h-4" />
             Configurações
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="conexao">
-          <AbaConexao initialInstance={initialInstance} />
+          <AbaConexao initialConfig={initialConfig} />
         </TabsContent>
 
         <TabsContent value="config">

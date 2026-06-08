@@ -198,7 +198,7 @@ export function NovaEvolucaoPanel({ onCancel, onSave, clinicaId, patientId }: No
         <div className="flex-[3] flex flex-col gap-6">
           <div className="flex items-center gap-4">
             <div className="flex-1">
-              <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-[0.15em] mb-2">
+              <label className="block text-xs font-bold text-text-secondary uppercase tracking-[0.15em] mb-2">
                 Tipo de Registro
               </label>
               <select
@@ -216,7 +216,7 @@ export function NovaEvolucaoPanel({ onCancel, onSave, clinicaId, patientId }: No
 
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-[0.15em]">
+              <label className="block text-xs font-bold text-text-secondary uppercase tracking-[0.15em]">
                 Observações Gerais
               </label>
               <button
@@ -253,7 +253,7 @@ export function NovaEvolucaoPanel({ onCancel, onSave, clinicaId, patientId }: No
                 animate={{ opacity: 1, y: 0 }}
                 className="space-y-4"
               >
-                <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-[0.15em]">
+                <label className="block text-xs font-bold text-text-secondary uppercase tracking-[0.15em]">
                   Observações por Dente
                 </label>
                 <div className="space-y-3">
@@ -343,7 +343,7 @@ export function NovaEvolucaoPanel({ onCancel, onSave, clinicaId, patientId }: No
         <div className="flex-[2] bg-surface rounded-xl border border-border p-5 flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-heading text-base text-text-primary">Odontograma</h3>
-            <div className="flex items-center gap-2.5 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
+            <div className="flex items-center gap-2.5 text-xs font-bold uppercase tracking-wider text-text-secondary">
               <span className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded-sm bg-teal inline-block" /> Selecionado
               </span>
@@ -352,7 +352,7 @@ export function NovaEvolucaoPanel({ onCancel, onSave, clinicaId, patientId }: No
 
           {/* Quadrant headers */}
           <div className="flex justify-center mb-1">
-            <div className="flex w-full max-w-xs sm:max-w-sm justify-between text-[9px] font-bold uppercase tracking-widest text-text-secondary px-1">
+            <div className="flex w-full max-w-xs sm:max-w-sm justify-between text-[10px] font-bold uppercase tracking-widest text-text-secondary px-1">
               <span>Dir.</span>
               <span>Esq.</span>
             </div>
@@ -372,7 +372,7 @@ export function NovaEvolucaoPanel({ onCancel, onSave, clinicaId, patientId }: No
                     <button
                       onClick={() => toggleTooth(tooth)}
                       title={`Dente ${tooth}`}
-                      className={`${toothWidth(tooth)} h-10 rounded-t-lg rounded-b-[3px] border flex items-center justify-center font-mono text-[10px] font-bold transition-all hover:scale-105 active:scale-95 ${
+                      className={`${toothWidth(tooth)} h-10 rounded-t-lg rounded-b-[3px] border flex items-center justify-center font-mono text-xs font-bold transition-all hover:scale-105 active:scale-95 ${
                         isSelected
                           ? 'bg-teal border-teal text-white -translate-y-1.5 shadow-[0_4px_12px_rgba(47,156,133,0.4)]'
                           : 'bg-surface-alt border-border text-text-secondary hover:border-teal/60 hover:text-teal hover:bg-teal/5'
@@ -403,7 +403,7 @@ export function NovaEvolucaoPanel({ onCancel, onSave, clinicaId, patientId }: No
                     <button
                       onClick={() => toggleTooth(tooth)}
                       title={`Dente ${tooth}`}
-                      className={`${toothWidth(tooth)} h-10 rounded-b-lg rounded-t-[3px] border flex items-center justify-center font-mono text-[10px] font-bold transition-all hover:scale-105 active:scale-95 ${
+                      className={`${toothWidth(tooth)} h-10 rounded-b-lg rounded-t-[3px] border flex items-center justify-center font-mono text-xs font-bold transition-all hover:scale-105 active:scale-95 ${
                         isSelected
                           ? 'bg-teal border-teal text-white translate-y-1.5 shadow-[0_-4px_12px_rgba(47,156,133,0.4)]'
                           : 'bg-surface-alt border-border text-text-secondary hover:border-teal/60 hover:text-teal hover:bg-teal/5'
@@ -419,7 +419,7 @@ export function NovaEvolucaoPanel({ onCancel, onSave, clinicaId, patientId }: No
 
           {/* Bottom quadrant labels */}
           <div className="flex justify-center mt-1 mb-3">
-            <div className="flex w-full max-w-xs sm:max-w-sm justify-between text-[9px] font-bold uppercase tracking-widest text-text-secondary px-1">
+            <div className="flex w-full max-w-xs sm:max-w-sm justify-between text-[10px] font-bold uppercase tracking-widest text-text-secondary px-1">
               <span>Dir.</span>
               <span>Esq.</span>
             </div>

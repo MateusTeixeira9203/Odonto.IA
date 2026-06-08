@@ -16,7 +16,7 @@ export type Pagamento = {
 
 export type OrcamentoComItens = {
   id: string;
-  status: 'rascunho' | 'enviado' | 'aprovado' | 'recusado';
+  status: 'rascunho' | 'enviado' | 'aprovado' | 'recusado' | 'pago';
   total: number | null;
   created_at: string;
   validade_dias: number;

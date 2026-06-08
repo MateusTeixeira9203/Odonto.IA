@@ -1,125 +1,81 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { useState, useCallback } from "react";
+import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Loader2, QrCode, RefreshCw } from "lucide-react";
-
-// ─── Tipos ────────────────────────────────────────────────────────────────────
-
-interface InstanciaWhatsApp {
-  instance_name: string;
-  /** status normalizado para este componente */
-  status: "disconnected" | "connecting" | "connected";
-  qrcode?: string;
-  phone_number?: string;
-}
-
-interface InstanceApiResponse {
-  status?: string;
-  qrcode?: string | null;
-  instanceName?: string;
-  error?: string;
-}
+import { Loader2, Copy, CheckCircle2, RefreshCw } from "lucide-react";
+import { salvarConexaoOficial } from "../actions";
 
 interface AbaConexaoProps {
-  initialInstance: InstanciaWhatsApp | null;
+  initialConfig?: {
+    waba_id?: string | null;
+    phone_number_id?: string | null;
+    access_token?: string | null;
+    webhook_verify_token?: string | null;
+    bot_ativo?: boolean | null;
+  } | null;
 }
 
-// ─── Normalização de status ───────────────────────────────────────────────────
-
-/** Mapeia valores da API para os 3 estados do componente. */
-function normalizeStatus(raw: string | undefined): "disconnected" | "connecting" | "connected" {
-  if (raw === "connected" || raw === "open") return "connected";
-  if (raw === "connecting") return "connecting";
-  return "disconnected";
+function gerarToken(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  return Array.from({ length: 32 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 }
 
-// ─── Componente ───────────────────────────────────────────────────────────────
+export function AbaConexao({ initialConfig }: AbaConexaoProps) {
+  const [wabaId, setWabaId]             = useState(initialConfig?.waba_id ?? '');
+  const [phoneNumberId, setPhoneNumberId] = useState(initialConfig?.phone_number_id ?? '');
+  const [accessToken, setAccessToken]   = useState(initialConfig?.access_token ?? '');
+  const [verifyToken, setVerifyToken]   = useState(initialConfig?.webhook_verify_token ?? '');
+  const [botAtivo, setBotAtivo]         = useState(initialConfig?.bot_ativo ?? false);
+  const [saving, setSaving]             = useState(false);
+  const [copied, setCopied]             = useState(false);
 
-export function AbaConexao({ initialInstance }: AbaConexaoProps) {
-  const [instance, setInstance] = useState<InstanciaWhatsApp | null>(initialInstance);
-  const [status, setStatus]     = useState<"disconnected" | "connecting" | "connected">(
-    normalizeStatus(initialInstance?.status),
-  );
-  const [qrCode, setQrCode]     = useState<string>(initialInstance?.qrcode ?? "");
-  const [loading, setLoading]   = useState(false);
+  const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/api/webhooks/whatsapp`;
 
-  // Polling enquanto conectando
-  useEffect(() => {
-    if (status !== "connecting") return;
+  const gerarVerifyToken = useCallback(() => {
+    setVerifyToken(gerarToken());
+  }, []);
 
-    const interval = setInterval(async () => {
-      try {
-        const res  = await fetch("/api/whatsapp/instance");
-        const data = await res.json() as InstanceApiResponse;
+  const copiarWebhook = useCallback(async () => {
+    await navigator.clipboard.writeText(webhookUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [webhookUrl]);
 
-        const next = normalizeStatus(data.status);
-        setStatus(next);
-        if (data.qrcode) setQrCode(data.qrcode);
-
-        if (next === "connected") {
-          clearInterval(interval);
-          toast.success("WhatsApp conectado com sucesso!");
-        }
-      } catch (err) {
-        console.error("[AbaConexao] erro no polling:", err);
-      }
-    }, 3_000);
-
-    return () => clearInterval(interval);
-  }, [status]);
-
-  const handleConnect = async () => {
-    setLoading(true);
-    try {
-      const res  = await fetch("/api/whatsapp/instance", { method: "POST" });
-      const data = await res.json() as InstanceApiResponse;
-
-      if (!res.ok) {
-        toast.error(data.error ?? "Erro ao criar instância");
-        return;
-      }
-
-      setInstance({ instance_name: data.instanceName ?? "", status: "connecting" });
-      setStatus("connecting");
-      setQrCode(data.qrcode ?? "");
-      toast.success("Instância criada! Escaneie o QR Code.");
-    } catch (err) {
-      console.error("[AbaConexao] erro ao conectar:", err);
-      toast.error("Erro ao conectar WhatsApp");
-    } finally {
-      setLoading(false);
+  const handleSalvar = async () => {
+    if (!phoneNumberId.trim()) {
+      toast.error('Phone Number ID é obrigatório');
+      return;
     }
-  };
-
-  const handleDisconnect = async () => {
-    if (
-      !confirm(
-        "Deseja desconectar o WhatsApp?\n\nOs pacientes não receberão atendimento automático até reconectar.",
-      )
-    ) return;
-
-    setLoading(true);
+    if (!accessToken.trim()) {
+      toast.error('Access Token é obrigatório');
+      return;
+    }
+    if (!verifyToken.trim()) {
+      toast.error('Gere um Webhook Verify Token antes de salvar');
+      return;
+    }
+    setSaving(true);
     try {
-      const res = await fetch("/api/whatsapp/instance", { method: "DELETE" });
-
-      if (!res.ok) {
-        toast.error("Erro ao desconectar");
-        return;
+      const result = await salvarConexaoOficial({
+        waba_id:              wabaId,
+        phone_number_id:      phoneNumberId,
+        access_token:         accessToken,
+        webhook_verify_token: verifyToken,
+        bot_ativo:            botAtivo,
+      });
+      if (result.ok) {
+        toast.success('Configuração salva com sucesso!');
+      } else {
+        toast.error(result.erro ?? 'Erro ao salvar');
       }
-
-      setInstance(null);
-      setStatus("disconnected");
-      setQrCode("");
-      toast.success("WhatsApp desconectado");
-    } catch (err) {
-      console.error("[AbaConexao] erro ao desconectar:", err);
-      toast.error("Erro ao desconectar WhatsApp");
+    } catch {
+      toast.error('Erro ao salvar configuração');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
@@ -127,92 +83,134 @@ export function AbaConexao({ initialInstance }: AbaConexaoProps) {
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-[--color-surface] rounded-3xl border border-[--color-border] p-8 space-y-8"
+      className="space-y-6"
     >
-      {/* Status e botão principal */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
+      {/* Info card */}
+      <div className="bg-surface rounded-3xl border border-border p-6 space-y-5">
         <div>
-          <h2 className="text-xl font-semibold mb-2 text-[--color-text-primary]">
-            Status da Conexão
-          </h2>
-          <StatusBadge status={status} />
-        </div>
-
-        {status === "disconnected" && (
-          <Button
-            onClick={handleConnect}
-            disabled={loading}
-            size="lg"
-            className="bg-[--color-teal] hover:bg-[--color-teal-dark] text-white text-base font-semibold px-6 py-5 rounded-2xl shadow-lg shadow-[--color-teal]/20"
-          >
-            {loading ? (
-              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-            ) : (
-              <QrCode className="w-5 h-5 mr-2" />
-            )}
-            Conectar WhatsApp
-          </Button>
-        )}
-
-        {status === "connected" && (
-          <Button
-            onClick={handleDisconnect}
-            disabled={loading}
-            size="lg"
-            variant="destructive"
-            className="text-lg px-8 py-6 rounded-2xl"
-          >
-            {loading && <Loader2 className="w-5 h-5 mr-2 animate-spin" />}
-            Desconectar
-          </Button>
-        )}
-      </div>
-
-      {/* QR Code */}
-      <AnimatePresence>
-        {status === "connecting" && qrCode && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            className="flex flex-col items-center py-8"
-          >
-            <div className="bg-white p-6 rounded-2xl shadow-xl">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={qrCode.startsWith("data:") ? qrCode : `data:image/png;base64,${qrCode}`}
-                alt="QR Code WhatsApp"
-                className="w-64 h-64"
-              />
-            </div>
-
-            <div className="mt-6 text-center max-w-md">
-              <p className="text-lg font-medium text-[--color-text-primary] mb-2">
-                Escaneie o QR Code
-              </p>
-              <p className="text-[--color-text-secondary]">
-                Abra o WhatsApp no celular que será usado como atendente da clínica,
-                vá em <strong>Configurações → Aparelhos conectados</strong> e escaneie este código.
-              </p>
-            </div>
-
-            <div className="mt-4 flex items-center gap-2 text-yellow-600 dark:text-yellow-400">
-              <RefreshCw className="w-4 h-4 animate-spin" />
-              <span className="text-sm">Aguardando conexão...</span>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Telefone conectado */}
-      {status === "connected" && instance?.phone_number && (
-        <div className="bg-[--color-teal-pale] dark:bg-[--color-teal]/20 rounded-2xl p-6">
-          <p className="text-[--color-text-secondary] mb-1">Número conectado:</p>
-          <p className="text-2xl font-mono font-semibold text-[--color-teal-dark]">
-            {instance.phone_number}
+          <h2 className="text-xl font-semibold text-text-primary mb-1">WhatsApp Business Cloud API</h2>
+          <p className="text-sm text-text-secondary">
+            Configure as credenciais do seu app Meta Business para conectar o número oficial.
           </p>
         </div>
-      )}
+
+        {/* WABA ID */}
+        <div className="space-y-1.5">
+          <Label className="text-sm font-medium text-text-primary">
+            WhatsApp Business Account ID
+          </Label>
+          <Input
+            value={wabaId}
+            onChange={(e) => setWabaId(e.target.value)}
+            className="rounded-xl bg-surface-alt border-border"
+            placeholder="123456789012345"
+          />
+        </div>
+
+        {/* Phone Number ID */}
+        <div className="space-y-1.5">
+          <Label className="text-sm font-medium text-text-primary">
+            Phone Number ID <span className="text-coral">*</span>
+          </Label>
+          <Input
+            value={phoneNumberId}
+            onChange={(e) => setPhoneNumberId(e.target.value)}
+            className="rounded-xl bg-surface-alt border-border"
+            placeholder="109876543210987"
+          />
+        </div>
+
+        {/* Access Token */}
+        <div className="space-y-1.5">
+          <Label className="text-sm font-medium text-text-primary">
+            Access Token <span className="text-coral">*</span>
+          </Label>
+          <Input
+            type="password"
+            value={accessToken}
+            onChange={(e) => setAccessToken(e.target.value)}
+            className="rounded-xl bg-surface-alt border-border"
+            placeholder="EAAxxxxx..."
+          />
+        </div>
+
+        {/* Verify Token */}
+        <div className="space-y-1.5">
+          <Label className="text-sm font-medium text-text-primary">
+            Webhook Verify Token <span className="text-coral">*</span>
+          </Label>
+          <div className="flex gap-2">
+            <Input
+              value={verifyToken}
+              readOnly
+              className="rounded-xl bg-surface-alt border-border flex-1 font-mono text-sm"
+              placeholder="Clique em Gerar..."
+            />
+            <button
+              onClick={gerarVerifyToken}
+              className="px-3 py-2 rounded-xl border border-border text-xs font-semibold text-text-secondary hover:bg-surface-alt transition-colors flex items-center gap-1.5"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Gerar
+            </button>
+          </div>
+          <p className="text-xs text-text-secondary">
+            Cole este token no painel Meta Developers → Webhooks → Verify Token
+          </p>
+        </div>
+
+        {/* Webhook URL */}
+        <div className="space-y-1.5">
+          <Label className="text-sm font-medium text-text-primary">URL do Webhook</Label>
+          <div className="flex gap-2 items-center">
+            <div className="flex-1 px-3 py-2.5 bg-surface-alt border border-border rounded-xl">
+              <p className="text-xs font-mono text-text-primary break-all">{webhookUrl}</p>
+            </div>
+            <button
+              onClick={() => void copiarWebhook()}
+              className="px-3 py-2 rounded-xl border border-border text-xs font-semibold text-text-secondary hover:bg-surface-alt transition-colors flex items-center gap-1.5 shrink-0"
+            >
+              {copied ? <CheckCircle2 className="w-3.5 h-3.5 text-teal" /> : <Copy className="w-3.5 h-3.5" />}
+              {copied ? 'Copiado!' : 'Copiar'}
+            </button>
+          </div>
+          <p className="text-xs text-text-secondary">
+            Cole esta URL no painel Meta Developers → Webhooks → Callback URL
+          </p>
+        </div>
+
+        {/* Bot ativo toggle */}
+        <div className="flex items-center justify-between pt-2 border-t border-border">
+          <div>
+            <p className="text-sm font-semibold text-text-primary">Bot Ativo</p>
+            <p className="text-xs text-text-secondary">Habilita respostas automáticas aos pacientes</p>
+          </div>
+          <button
+            role="switch"
+            aria-checked={botAtivo}
+            onClick={() => setBotAtivo((v) => !v)}
+            className={`relative inline-flex h-7 w-14 items-center rounded-full border-2 transition-colors duration-200 focus-visible:outline-none ${
+              botAtivo ? 'border-teal bg-teal' : 'border-border bg-surface-alt'
+            }`}
+          >
+            <span
+              className={`block h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${
+                botAtivo ? 'translate-x-[30px]' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
+      </div>
+
+      <Button
+        onClick={() => void handleSalvar()}
+        disabled={saving}
+        size="lg"
+        className="w-full bg-teal hover:bg-teal-lt text-white text-base font-semibold rounded-2xl py-6 shadow-lg shadow-teal/20 transition-all"
+      >
+        {saving ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : null}
+        Salvar Configuração
+      </Button>
     </motion.div>
   );
 }

@@ -97,7 +97,7 @@ export default function EsqueciSenhaPage(): React.JSX.Element {
           ) : (
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
               <div>
-                <label className="block text-[11px] font-bold text-text-secondary uppercase tracking-widest mb-2">
+                <label className="block text-sm font-medium text-text-secondary mb-2">
                   E-mail
                 </label>
                 <div className="relative">
@@ -113,7 +113,7 @@ export default function EsqueciSenhaPage(): React.JSX.Element {
                   />
                 </div>
                 {errors.email && (
-                  <p className="mt-1 text-xs text-red-500">{errors.email.message}</p>
+                  <p className="mt-1 text-xs text-coral">{errors.email.message}</p>
                 )}
               </div>
 

@@ -102,7 +102,7 @@ export function DayView({
             className="text-xs font-semibold text-teal hover:opacity-80 transition-colors px-3 py-1.5 rounded-lg bg-teal/5 hover:bg-teal/10 flex items-center gap-1.5"
           >
             Hoje
-            <kbd className="font-mono text-[9px] bg-teal/10 rounded px-1 py-0.5 leading-none text-teal/60">T</kbd>
+            <kbd className="font-mono text-[10px] bg-teal/10 rounded px-1 py-0.5 leading-none text-teal/60">T</kbd>
           </button>
         </div>
       </div>
@@ -183,14 +183,22 @@ export function DayView({
                           {format(parseISO(apt.data_hora), 'HH:mm')}
                         </span>
                         <span
-                          className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md"
+                          className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md"
                           style={{ background: `${text}20`, color: text }}
                         >
                           {statusLabel}
                         </span>
-                        <span className="text-[9px] font-mono ml-auto" style={{ color: text, opacity: 0.5 }}>
+                        <span className="text-[10px] font-mono ml-auto" style={{ color: text, opacity: 0.5 }}>
                           {apt.duracao_minutos}min
                         </span>
+                        {apt.paciente?.observacoes && (
+                          <span
+                            title="Paciente com alertas clínicos"
+                            className="text-[10px] font-bold text-amber-400 leading-none shrink-0"
+                          >
+                            ◆
+                          </span>
+                        )}
                       </div>
                       <p className="font-semibold text-sm truncate" style={{ color: text }}>
                         {apt.paciente?.nome ?? '—'}

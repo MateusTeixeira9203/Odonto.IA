@@ -1,13 +1,19 @@
 'use client';
 
-import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 import { Stethoscope } from 'lucide-react';
 
-export function ConsultaCtaButton() {
+interface ConsultaCtaButtonProps {
+  agendamentoId: string;
+}
+
+export function ConsultaCtaButton({ agendamentoId }: ConsultaCtaButtonProps) {
+  const router = useRouter();
+
   return (
     <button
-      onClick={() => toast.info('Modo consulta será implementado em breve')}
-      className="inline-flex items-center gap-3 px-8 py-4 rounded-2xl text-[15px] font-bold text-white transition-all hover:-translate-y-0.5 hover:scale-[1.01] active:scale-[0.98]"
+      onClick={() => router.push(`/consulta/${agendamentoId}`)}
+      className="btn-glow inline-flex items-center gap-3 px-8 py-4 rounded-2xl text-[15px] font-bold text-white transition-all hover:-translate-y-0.5 hover:scale-[1.01] active:scale-[0.98]"
       style={{
         background: 'linear-gradient(135deg, #2f9c85 0%, #258872 50%, #1d7a65 100%)',
         boxShadow:

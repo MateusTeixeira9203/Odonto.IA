@@ -1,4 +1,7 @@
 import { createServiceClient } from '@/lib/supabase/service';
+import { inserirNotificacao } from '@/lib/notificacoes';
+import { getResend } from '@/lib/email/resend';
+import { conviteEmailHtml } from '@/lib/email/templates/convite';
 
 export type CriarConviteInput = { email: string };
 
@@ -50,9 +53,9 @@ export async function criarConvite(
   // Verificar se email já pertence a membro ativo desta clínica
   const { data: userRow } = await db
     .from('users')
-    .select('id')
+    .select('id, active_clinica_id')
     .eq('email', email)
-    .maybeSingle();
+    .maybeSingle<{ id: string; active_clinica_id: string | null }>();
 
   if (userRow) {
     const { data: activeMembership } = await db
@@ -90,7 +93,51 @@ export async function criarConvite(
   }
 
   const base = process.env.NEXT_PUBLIC_SITE_URL ?? '';
-  return { ok: true, inviteId: convite.id, token, link: `${base}/convite/${token}` };
+  const inviteLink = `${base}/convite/${token}`;
+
+  // Envio de e-mail — falha silenciosa para não bloquear a criação do convite
+  try {
+    const { data: clinicaForEmail } = await db
+      .from('clinicas')
+      .select('nome')
+      .eq('id', ctx.clinicId)
+      .maybeSingle<{ nome: string }>();
+
+    await getResend().emails.send({
+      from: 'Odonto.IA <no-reply@dentia.app.br>',
+      to: email,
+      subject: `Convite para ${clinicaForEmail?.nome ?? 'clínica'} — Odonto.IA`,
+      html: conviteEmailHtml({
+        clinicaNome: clinicaForEmail?.nome ?? 'sua clínica',
+        link: inviteLink,
+      }),
+    });
+  } catch (err) {
+    console.error('[convite] email falhou:', err);
+  }
+
+  // Notificação in-app — só se o convidado já tem conta e tem uma clínica ativa
+  if (userRow?.active_clinica_id) {
+    const { data: clinicaData } = await db
+      .from('clinicas')
+      .select('nome')
+      .eq('id', ctx.clinicId)
+      .maybeSingle<{ nome: string }>();
+
+    const nomeDaClinica = clinicaData?.nome ?? 'uma clínica';
+
+    await inserirNotificacao(db, {
+      clinicaId:      userRow.active_clinica_id,
+      paraRole:       'dentista',
+      paraDentistaId: userRow.id,
+      tipo:           'convite_clinica',
+      titulo:         `Convite — ${nomeDaClinica}`,
+      mensagem:       `Você foi convidado para fazer parte da equipe. Clique para aceitar.`,
+      href:           inviteLink,
+    });
+  }
+
+  return { ok: true, inviteId: convite.id, token, link: inviteLink };
 }
 
 export async function cancelarConvite(
@@ -127,7 +174,7 @@ export async function renovarConvite(
   // Convites aceitos são terminais — reverter geraria token ativo para usuário já membro.
   const { data: convite } = await db
     .from('convites')
-    .select('id, status, expires_at')
+    .select('id, email, status, expires_at')
     .eq('id', inviteId)
     .eq('clinica_id', ctx.clinicId)
     .maybeSingle();
@@ -161,7 +208,30 @@ export async function renovarConvite(
   if (error) return { ok: false, error: error.message };
 
   const base = process.env.NEXT_PUBLIC_SITE_URL ?? '';
-  return { ok: true, link: `${base}/convite/${newToken}` };
+  const renewedLink = `${base}/convite/${newToken}`;
+
+  // Envio de e-mail — falha silenciosa para não bloquear a renovação
+  try {
+    const { data: clinicaForEmail } = await db
+      .from('clinicas')
+      .select('nome')
+      .eq('id', ctx.clinicId)
+      .maybeSingle<{ nome: string }>();
+
+    await getResend().emails.send({
+      from: 'Odonto.IA <no-reply@dentia.app.br>',
+      to: convite.email as string,
+      subject: `Convite renovado para ${clinicaForEmail?.nome ?? 'clínica'} — Odonto.IA`,
+      html: conviteEmailHtml({
+        clinicaNome: clinicaForEmail?.nome ?? 'sua clínica',
+        link: renewedLink,
+      }),
+    });
+  } catch (err) {
+    console.error('[convite] email falhou:', err);
+  }
+
+  return { ok: true, link: renewedLink };
 }
 
 export type InviteData = {
@@ -211,7 +281,7 @@ export async function aceitarConvite(
   token: string,
   userId: string,
   userEmail: string,
-): Promise<{ ok: boolean; clinicId?: string; error?: string }> {
+): Promise<{ ok: boolean; clinicId?: string; role?: string; error?: string }> {
   const db = createServiceClient();
 
   // 1. Validar token — pendente e dentro da validade
@@ -272,7 +342,7 @@ export async function aceitarConvite(
   ]);
 
   // 6. Membership canônica — depende de public.users existir (FK)
-  await db.from('clinica_usuarios').insert({
+  const { error: memberError } = await db.from('clinica_usuarios').insert({
     usuario_id: userId,
     clinica_id: clinicId,
     role,
@@ -280,11 +350,25 @@ export async function aceitarConvite(
     joined_at: new Date().toISOString(),
   });
 
-  // 7. Marcar convite como aceito
-  await db
+  if (memberError) {
+    // Não revertemos users (pode já existir em outra clínica), mas impedimos
+    // o aceite do convite para evitar estado inconsistente.
+    console.error('[aceitarConvite] falha ao criar membership:', memberError.message);
+    return { ok: false, error: 'Erro ao processar o convite. Tente novamente.' };
+  }
+
+  // 7. Marcar convite como aceito — só após membership criada com sucesso
+  const { error: updateError } = await db
     .from('convites')
     .update({ status: 'aceito', accepted_by: userId })
     .eq('id', convite.id as string);
 
-  return { ok: true, clinicId };
+  if (updateError) {
+    // Membership foi criada mas convite não marcado — não é crítico para o usuário,
+    // mas logamos para acompanhamento.
+    console.error('[aceitarConvite] falha ao marcar convite:', updateError.message);
+    // Continua: usuário entrou na clínica, só o status do convite ficou pendente
+  }
+
+  return { ok: true, clinicId, role };
 }

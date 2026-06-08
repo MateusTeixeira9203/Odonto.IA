@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import Groq from 'groq-sdk';
 import { createClient } from '@/lib/supabase/server';
 import { withRateLimit } from '@/lib/rate-limit';
-import { WHISPER_DENTAL_PROMPT } from '@/lib/odonto-dictionary';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY ?? '' });
+// Prompt de contexto odontológico — melhora reconhecimento de termos técnicos no Whisper
+const DENTAL_CONTEXT =
+  'dentista, endodontia, exodontia, raspagem supra e infragengival, ' +
+  'restauração com resina composta, amálgama, faceta de porcelana, ' +
+  'implante osseointegrado, enxerto ósseo, prótese total, prótese parcial removível, ' +
+  'coroa total, retentores intracanal, placa miorrelaxante, clareamento dental, ' +
+  'cárie, periodontia, gengivite, periodontite, bruxismo, oclusão, extração.';
 
-// Recebe o áudio diretamente como multipart/form-data e retorna a transcrição
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const rateLimitResponse = await withRateLimit(req, 'transcrever', 20, 60_000);
   if (rateLimitResponse) return rateLimitResponse;
@@ -18,8 +22,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
   }
 
-  if (!process.env.OPENAI_API_KEY) {
-    return NextResponse.json({ error: 'OPENAI_API_KEY não configurada.' }, { status: 500 });
+  if (!process.env.GROQ_API_KEY) {
+    return NextResponse.json({ error: 'GROQ_API_KEY não configurada.' }, { status: 500 });
   }
 
   let audioFile: File;
@@ -35,16 +39,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    const transcription = await openai.audio.transcriptions.create({
+    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+    const transcription = await groq.audio.transcriptions.create({
       file: audioFile,
-      model: 'whisper-1',
+      model: 'whisper-large-v3-turbo',
       language: 'pt',
-      prompt: WHISPER_DENTAL_PROMPT,
+      prompt: DENTAL_CONTEXT,
+      response_format: 'json',
     });
 
-    return NextResponse.json({ transcricao: transcription.text });
+    const transcricao = transcription.text?.trim() ?? '';
+    return NextResponse.json({ transcricao });
   } catch (err) {
-    console.error('Erro na transcrição:', err);
+    console.error('Erro na transcrição (Groq):', err);
     return NextResponse.json({ error: 'Erro ao transcrever o áudio.' }, { status: 500 });
   }
 }

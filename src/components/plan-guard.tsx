@@ -19,7 +19,7 @@ interface PlanGuardProps {
   blur?: boolean;
 }
 
-const PLANO_UPGRADE_ORDER: PlanoId[] = ['SOLO', 'BASICO', 'CLINICA'];
+const PLANO_UPGRADE_ORDER: PlanoId[] = ['SOLO', 'CLINICA'];
 
 function planoMaiorOuIgual(plano: PlanoId, required: PlanoId): boolean {
   return PLANO_UPGRADE_ORDER.indexOf(plano) >= PLANO_UPGRADE_ORDER.indexOf(required);

@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowLeft,
   Loader2,
-  Check, Edit2, Mic, MicOff, Bot, Play, X,
+  Check, Edit2, Mic, MicOff, Bot, Play, X, AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
@@ -25,6 +25,7 @@ interface Ficha {
   queixa: string;
   anotacoes: string;
   dentes: number[];
+  procedimentos: string[];
 }
 
 interface Orcamento {
@@ -51,6 +52,7 @@ interface ConsultaClientProps {
   orcamentos: Orcamento[];
   agendamentoStatus: string;
   alertasClinicos: string[];
+  procedimentosClinica: string[];
   planejamento: {
     id: string;
     titulo: string;
@@ -58,7 +60,44 @@ interface ConsultaClientProps {
   } | null;
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/** Normaliza string para comparação: minúsculas, sem acentos, sem pontuação */
+function normalizar(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9\s]/g, '')
+    .trim();
+}
+
+/**
+ * Verifica se um procedimento detectado pela IA existe no cadastro da clínica.
+ * Usa match por palavras-chave significativas (>3 chars) para lidar com variações de nome.
+ */
+function procedimentoCadastrado(aiProc: string, clinicaProcs: string[]): boolean {
+  if (clinicaProcs.length === 0) return true; // sem tabela cadastrada → não avisar
+  const normAI = normalizar(aiProc);
+  const palavrasAI = normAI.split(/\s+/).filter(w => w.length > 3);
+  return clinicaProcs.some(p => {
+    const normClinica = normalizar(p);
+    // Match direto ou por palavras-chave
+    if (normClinica === normAI) return true;
+    if (normClinica.includes(normAI) || normAI.includes(normClinica)) return true;
+    return palavrasAI.some(w => normClinica.includes(w));
+  });
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
+
+// Etapas do feedback progressivo do "Formatar com IA" — fora do componente para não recriar a cada render
+const FORMATAR_ETAPAS = [
+  { ms: 0,    label: 'Analisando queixa...' },
+  { ms: 1800, label: 'Identificando dentes...' },
+  { ms: 3800, label: 'Gerando conduta...' },
+  { ms: 6500, label: 'Finalizando ficha...' },
+] as const;
 
 export function ConsultaClient({
   agendamentoId,
@@ -71,11 +110,14 @@ export function ConsultaClient({
   orcamentos,
   agendamentoStatus,
   alertasClinicos,
+  procedimentosClinica,
   planejamento,
 }: ConsultaClientProps) {
   const router = useRouter();
   const [textoLivre, setTextoLivre] = useState('');
   const [isFormatando, setIsFormatando] = useState(false);
+  const [formatLabel, setFormatLabel] = useState('Organizar com DEX');
+  const formatTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const [evolucao, setEvolucao] = useState<EvolucaoFormatada | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -109,25 +151,46 @@ export function ConsultaClient({
         const fd = new FormData();
         fd.append('audio', blob, 'audio.webm');
         const res = await fetch('/api/transcrever', { method: 'POST', body: fd });
+        if (!res.ok) throw new Error(`Erro ${res.status}`);
         const data = await res.json() as { transcricao?: string };
         const texto = data.transcricao?.trim();
         if (texto) {
           setLiveTranscript(texto);
           setTextoLivre(prev => prev ? `${prev}\n${texto}` : texto);
         }
-      } catch { /* silencioso */ } finally { setIsTranscribing(false); }
+      } catch (err) {
+        console.error('[consulta] transcrever:', err);
+        toast.error('Não foi possível transcrever o áudio. Tente novamente.');
+      } finally { setIsTranscribing(false); }
     } else {
+      if (micStatus === 'error') {
+        toast.error('Microfone indisponível. Verifique as permissões do navegador e recarregue a página.');
+        return;
+      }
       setElapsedSeconds(0);
       setLiveTranscript('');
+      const started = await startRecording();
+      if (!started) {
+        toast.error('Não foi possível acessar o microfone. Verifique as permissões do navegador.');
+        return;
+      }
+      // Só inicia o timer após confirmar que a gravação começou
       timerRef.current = setInterval(() => setElapsedSeconds(s => s + 1), 1000);
-      await startRecording();
     }
   }, [micStatus, startRecording, stopRecording]);
 
   const handleFormatar = async () => {
     const texto = textoLivre.trim();
     if (!texto) return;
+
+    // Inicia feedback progressivo
     setIsFormatando(true);
+    setFormatLabel(FORMATAR_ETAPAS[0].label);
+    formatTimersRef.current.forEach(clearTimeout);
+    formatTimersRef.current = FORMATAR_ETAPAS.slice(1).map(({ ms, label }) =>
+      setTimeout(() => setFormatLabel(label), ms)
+    );
+
     try {
       const res = await fetch('/api/dex/formatar-evolucao', {
         method: 'POST',
@@ -137,11 +200,16 @@ export function ConsultaClient({
       const data = await res.json() as EvolucaoFormatada & { error?: string };
       if (!res.ok || data.error) throw new Error(data.error ?? 'Erro ao formatar');
       setEvolucao(data);
-      setConfirmedTeeth([]);  // todos dentes do draft começam como amber
+      // Auto-confirma dentes detectados pela IA — dentista pode desselecionar manualmente se necessário
+      setConfirmedTeeth(data.dentes_afetados);
     } catch (err) {
       console.error('[consulta] formatar-evolucao:', err);
+      toast.error('O Dex não conseguiu organizar as anotações. Tente novamente.');
     } finally {
+      formatTimersRef.current.forEach(clearTimeout);
+      formatTimersRef.current = [];
       setIsFormatando(false);
+      setFormatLabel('Organizar com DEX');
     }
   };
 
@@ -341,7 +409,7 @@ export function ConsultaClient({
                     style={{ background: '#2f9c85', color: '#fff', boxShadow: '0 2px 12px rgba(47,156,133,0.30)' }}
                   >
                     {isFormatando
-                      ? <><Loader2 className="w-4 h-4 animate-spin" /> Organizando...</>
+                      ? <><Loader2 className="w-4 h-4 animate-spin" /> {formatLabel}</>
                       : <><Bot className="w-4 h-4" /> Organizar com DEX</>
                     }
                   </button>
@@ -408,26 +476,57 @@ export function ConsultaClient({
                   />
                 </DraftPendingCard>
 
-                {/* Procedimentos (novo campo) — Fix #3: chips removíveis */}
+                {/* Procedimentos detectados — chips com aviso se não cadastrado na clínica */}
                 {evolucao.procedimentos.length > 0 && (
                   <DraftPendingCard label="Procedimentos detectados">
                     <div className="flex flex-wrap gap-2">
-                      {evolucao.procedimentos.map((p, i) => (
-                        <div key={i} className="group flex items-center gap-1 text-xs px-3 py-1 rounded-lg bg-surface-alt border border-border text-text-primary">
-                          <span>{p}</span>
-                          <button
-                            onClick={() => setEvolucao({
-                              ...evolucao,
-                              procedimentos: evolucao.procedimentos.filter((_, idx) => idx !== i),
-                            })}
-                            title="Remover procedimento"
-                            className="ml-1 text-text-secondary hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                      {evolucao.procedimentos.map((p, i) => {
+                        const cadastrado = procedimentoCadastrado(p, procedimentosClinica);
+                        return (
+                          <div
+                            key={i}
+                            className="group flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border"
+                            style={cadastrado ? {
+                              background: 'rgba(47,156,133,0.08)',
+                              borderColor: 'rgba(47,156,133,0.25)',
+                              color: 'var(--color-text-primary)',
+                            } : {
+                              background: 'rgba(245,158,11,0.08)',
+                              borderColor: 'rgba(245,158,11,0.35)',
+                              color: 'var(--color-text-primary)',
+                            }}
                           >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ))}
+                            {!cadastrado && (
+                              <AlertTriangle
+                                className="w-3 h-3 shrink-0"
+                                style={{ color: '#f59e0b' }}
+                              />
+                            )}
+                            <span>{p}</span>
+                            {!cadastrado && (
+                              <span className="text-[10px] font-semibold" style={{ color: '#f59e0b' }}>
+                                · não cadastrado
+                              </span>
+                            )}
+                            <button
+                              onClick={() => setEvolucao({
+                                ...evolucao,
+                                procedimentos: evolucao.procedimentos.filter((_, idx) => idx !== i),
+                              })}
+                              title="Remover procedimento"
+                              className="ml-0.5 text-text-secondary hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
+                    {evolucao.procedimentos.some(p => !procedimentoCadastrado(p, procedimentosClinica)) && (
+                      <p className="mt-2 text-[10px] text-amber-600 dark:text-amber-400 leading-relaxed">
+                        Procedimentos marcados com ⚠️ não foram encontrados no cadastro da clínica e não serão incluídos automaticamente no orçamento.
+                      </p>
+                    )}
                   </DraftPendingCard>
                 )}
 

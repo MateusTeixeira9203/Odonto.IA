@@ -15,7 +15,7 @@ export const BillingConfirmedSchema = z.object({
       metadata: z.object({
         userId: z.string().min(1),
         clinicId: z.string().min(1).optional(), // opcional: backward compat com checkouts antigos
-        plano: z.enum(['SOLO', 'BASICO', 'CLINICA']),
+        plano: z.enum(['SOLO', 'BASICO', 'CLINICA']), // BASICO mantido para backward compat com webhooks antigos
       }),
     }),
   }),

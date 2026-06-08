@@ -401,8 +401,8 @@ export async function criarReceita(
       paraRole:       'dentista',
       paraDentistaId: dentistaAlvoId,
       deDentistaId:   dentistaId,
-      tipo:           'sistema',
-      titulo:         `Nova entrada lançada — ${forma}`,
+      tipo:           'pagamento_confirmado',
+      titulo:         `Pagamento confirmado — ${forma}`,
       mensagem:       `A secretária registrou uma entrada de ${valor}${form.descricao ? ` (${form.descricao})` : ''} em seu nome.`,
       href:           '/dashboard/financeiro',
     });
@@ -624,3 +624,129 @@ export async function listarPagamentosPendentes(): Promise<PagamentoPendente[]> 
     created_at:     p.created_at,
   }));
 }
+
+// ─── Registrar Recebimento (secretária) ───────────────────────────────────────
+
+export type OrcamentoPendente = {
+  id: string;
+  total: number | null;
+  descricao_resumo: string;
+  valor_pendente: number;
+};
+
+export type BuscarOrcamentosPendentesResult = {
+  orcamentos: OrcamentoPendente[];
+  dentistaId: string | null;
+  dentistaNome: string | null;
+};
+
+export async function buscarOrcamentosPendentesPorPaciente(
+  pacienteId: string,
+): Promise<BuscarOrcamentosPendentesResult> {
+  const { supabase, clinicId } = await requireClinicContext();
+
+  const { data: paciente } = await supabase
+    .from('pacientes')
+    .select('dentista_id, dentista:dentistas(id, nome)')
+    .eq('id', pacienteId)
+    .eq('clinica_id', clinicId)
+    .maybeSingle();
+
+  const { data: orcamentosRaw } = await supabase
+    .from('orcamentos')
+    .select('id, total, itens:orcamento_itens(descricao), pagamentos(id, valor, status)')
+    .eq('clinica_id', clinicId)
+    .eq('paciente_id', pacienteId)
+    .eq('status', 'aprovado');
+
+  const orcamentos: OrcamentoPendente[] = ((orcamentosRaw ?? []) as unknown as Array<{
+    id: string;
+    total: number | null;
+    itens: { descricao: string | null }[];
+    pagamentos: { valor: number; status: string }[];
+  }>)
+    .map((o) => {
+      const totalPago = o.pagamentos
+        .filter((p) => p.status === 'pago')
+        .reduce((s, p) => s + p.valor, 0);
+      const valorPendente = Math.max(0, (o.total ?? 0) - totalPago);
+      const descricao =
+        o.itens
+          .map((i) => i.descricao)
+          .filter(Boolean)
+          .slice(0, 2)
+          .join(', ') || 'Orçamento aprovado';
+      return { id: o.id, total: o.total, descricao_resumo: descricao, valor_pendente: valorPendente };
+    })
+    .filter((o) => o.valor_pendente > 0);
+
+  const dentistaRaw = paciente?.dentista as unknown;
+  const dentista: { id: string; nome: string } | null = Array.isArray(dentistaRaw)
+    ? (dentistaRaw as { id: string; nome: string }[])[0] ?? null
+    : (dentistaRaw as { id: string; nome: string } | null | undefined) ?? null;
+
+  return { orcamentos, dentistaId: dentista?.id ?? null, dentistaNome: dentista?.nome ?? null };
+}
+
+export type FormaRecebimento = 'pix' | 'dinheiro' | 'transferencia' | 'cartao_credito' | 'cartao_debito' | 'boleto' | 'outro';
+
+export async function registrarRecebimento(dados: {
+  pacienteId: string;
+  orcamentoId: string;
+  valor: number;
+  formaPagamento: FormaRecebimento;
+  data: string;
+  dentistaId?: string;
+}): Promise<{ error?: string }> {
+  const { supabase, clinicId } = await requireClinicContext();
+
+  // Garante que o orçamento e o paciente pertencem a esta clínica
+  const { data: orc } = await supabase
+    .from('orcamentos')
+    .select('id')
+    .eq('id', dados.orcamentoId)
+    .eq('clinica_id', clinicId)
+    .maybeSingle();
+  if (!orc) return { error: 'Orçamento não encontrado.' };
+
+  const { data: pac } = await supabase
+    .from('pacientes')
+    .select('id')
+    .eq('id', dados.pacienteId)
+    .eq('clinica_id', clinicId)
+    .maybeSingle();
+  if (!pac) return { error: 'Paciente não encontrado.' };
+
+  const { error: pagError } = await supabase.from('pagamentos').insert({
+    clinica_id:      clinicId,
+    orcamento_id:    dados.orcamentoId,
+    paciente_id:     dados.pacienteId,
+    valor:           dados.valor,
+    status:          'pago',
+    forma_pagamento: dados.formaPagamento,
+    data_pagamento:  dados.data,
+  });
+
+  if (pagError) return { error: pagError.message };
+
+  const formaReceita: 'pix' | 'dinheiro' | 'transferencia' | 'outro' =
+    ['pix', 'dinheiro', 'transferencia'].includes(dados.formaPagamento)
+      ? (dados.formaPagamento as 'pix' | 'dinheiro' | 'transferencia')
+      : 'outro';
+
+  const { error: recError } = await supabase.from('receitas_manuais').insert({
+    clinica_id:  clinicId,
+    dentista_id: dados.dentistaId ?? null,
+    valor:       dados.valor,
+    forma:       formaReceita,
+    data:        dados.data,
+    descricao:   'Recebimento registrado pela secretária',
+  });
+
+  if (recError) return { error: recError.message };
+
+  revalidatePath('/dashboard/financeiro');
+  revalidatePath('/dashboard/orcamentos');
+  return {};
+}
+

@@ -64,12 +64,11 @@ export async function activateTrial(): Promise<{ error?: string }> {
 
 const PLANO_PRODUCT_IDS: Record<string, string> = {
   SOLO:    process.env.ABACATE_PAY_PRODUCT_SOLO ?? '',
-  BASICO:  process.env.ABACATE_PAY_PRODUCT_BASICO ?? '',
   CLINICA: process.env.ABACATE_PAY_PRODUCT_CLINICA ?? '',
 };
 
 export async function createCheckout(
-  planoId: 'SOLO' | 'BASICO' | 'CLINICA',
+  planoId: 'SOLO' | 'CLINICA',
 ): Promise<{ url?: string; error?: string }> {
   // clinicId é emitido no metadata para que o webhook resolva a clínica
   // de forma determinística (payment-time reference), independente de qual

@@ -1,34 +1,40 @@
 // Definições canônicas dos planos Odonto.IA.
 // Usadas tanto na UI (PlanGuard, Sidebar) quanto no backend (onboarding, validações).
+//
+// Dois planos:
+//   SOLO    — dentista autônomo ou consultório próprio. Features clínicas completas,
+//             sem multi-dentistas. Até 1 secretária.
+//   CLINICA — equipe multi-profissional, silos de privacidade, co-piloto e gestão avançada.
 
-export type PlanoId = 'SOLO' | 'BASICO' | 'CLINICA';
+export type PlanoId = 'SOLO' | 'CLINICA';
 
 export interface PlanoFeatures {
-  /** Bot com mensagens customizáveis (BASICO+) */
+  /** Bot com mensagens customizáveis */
   botCustomizavel: boolean;
-  /** Bot pode criar agendamentos automáticos via WhatsApp (BASICO+) */
+  /** Bot pode criar agendamentos automáticos via WhatsApp */
   botAgendamento: boolean;
-  /** Transcrição de voz por IA na ficha clínica (BASICO+) */
+  /** Transcrição de voz por IA na ficha clínica */
   transcricaoVoz: boolean;
-  /** Geração automática de orçamento por IA (BASICO+) */
+  /** Geração automática de orçamento por IA */
   orcamentoIA: boolean;
-  /** Aba de Planejamento com IA no perfil do paciente (BASICO+) */
+  /** Aba de Planejamento com IA no perfil do paciente */
   planejamentoIA: boolean;
-  /** Acesso ao módulo Financeiro com lançamento de despesas (BASICO+) */
+  /** Acesso ao módulo Financeiro com lançamento de despesas */
   financeiro: boolean;
-  /** Pode ter secretária na equipe (BASICO+) */
+  /** Pode ter secretária na equipe (ambos os planos, com limites diferentes) */
   equipe: boolean;
-  /** Multi-dentistas além do fundador (CLINICA) */
+  /** Multi-dentistas além do fundador (CLINICA only) */
   multiDentistas: boolean;
-  /** Silos de privacidade financeira entre dentistas (CLINICA) */
+  /** Silos de privacidade financeira entre dentistas (CLINICA only) */
   silosPrivacidade: boolean;
-  /** Dex Co-Piloto: briefing, simplificação, inteligência comercial, notificações inter-role (CLINICA) */
+  /** Dex Co-Piloto: briefing, simplificação, inteligência comercial (CLINICA only) */
   copiloto: boolean;
 }
 
 export interface PlanoConfig {
   id: PlanoId;
   label: string;
+  labelContexto: string; // "Consultório" (Solo) ou "Clínica" (Clínica)
   preco: number;
   /** Custo por dentista extra acima do limite base (null = sem extra) */
   precoPorDentistaExtra: number | null;
@@ -41,58 +47,41 @@ export const PLANOS: Record<PlanoId, PlanoConfig> = {
   SOLO: {
     id: 'SOLO',
     label: 'Solo',
-    preco: 167,
+    labelContexto: 'Consultório',
+    preco: 197,
     precoPorDentistaExtra: null,
     limiteDentistas: 1,
     features: {
-      botCustomizavel: false,
-      botAgendamento: false,
-      transcricaoVoz: false,
-      orcamentoIA: false,
-      planejamentoIA: false,
-      financeiro: false,
-      equipe: false,
-      multiDentistas: false,
+      botCustomizavel:  true,
+      botAgendamento:   true,
+      transcricaoVoz:   true,
+      orcamentoIA:      true,
+      planejamentoIA:   true,
+      financeiro:       true,
+      equipe:           true,   // 1 secretária permitida
+      multiDentistas:   false,
       silosPrivacidade: false,
-      copiloto: false,
-    },
-  },
-  BASICO: {
-    id: 'BASICO',
-    label: 'Básico',
-    preco: 247,
-    precoPorDentistaExtra: null,
-    limiteDentistas: 1,   // 1 dentista + 1 secretária (secretárias não contam)
-    features: {
-      botCustomizavel: true,
-      botAgendamento: true,
-      transcricaoVoz: true,
-      orcamentoIA: true,
-      planejamentoIA: true,
-      financeiro: false,
-      equipe: true,
-      multiDentistas: false,
-      silosPrivacidade: false,
-      copiloto: false,
+      copiloto:         false,
     },
   },
   CLINICA: {
     id: 'CLINICA',
     label: 'Clínica',
+    labelContexto: 'Clínica',
     preco: 397,
     precoPorDentistaExtra: 147,
-    limiteDentistas: 5,   // até 5 dentistas + 1 secretária; R$147 por dentista adicionado (a partir do 2º)
+    limiteDentistas: 5,
     features: {
-      botCustomizavel: true,
-      botAgendamento: true,
-      transcricaoVoz: true,
-      orcamentoIA: true,
-      planejamentoIA: true,
-      financeiro: true,
-      equipe: true,
-      multiDentistas: true,
+      botCustomizavel:  true,
+      botAgendamento:   true,
+      transcricaoVoz:   true,
+      orcamentoIA:      true,
+      planejamentoIA:   true,
+      financeiro:       true,
+      equipe:           true,
+      multiDentistas:   true,
       silosPrivacidade: true,
-      copiloto: true,
+      copiloto:         true,
     },
   },
 };
@@ -103,18 +92,29 @@ export function temFeature(
   feature: keyof PlanoFeatures,
 ): boolean {
   if (!plano) return false;
-  return PLANOS[plano]?.features[feature] ?? false;
+  // Backward compat: usuários no plano BASICO legado tratados como SOLO
+  const planoNormalizado = (plano as string) === 'BASICO' ? 'SOLO' : plano;
+  return PLANOS[planoNormalizado as PlanoId]?.features[feature] ?? false;
 }
 
 /** Retorna a config do plano, com fallback para SOLO. */
 export function getPlano(plano: PlanoId | null | undefined): PlanoConfig {
-  return PLANOS[plano ?? 'SOLO'];
+  // Backward compat: BASICO legado → SOLO
+  if (!plano || (plano as string) === 'BASICO') return PLANOS['SOLO'];
+  return PLANOS[plano] ?? PLANOS['SOLO'];
 }
 
 /**
  * Retorna o limite de dentistas correto baseado no plano.
- * Usado para sincronizar clinicas.limite_dentistas ao criar/upgradar.
  */
 export function limiteDentistasParaPlano(plano: PlanoId): number {
-  return PLANOS[plano].limiteDentistas;
+  return PLANOS[plano]?.limiteDentistas ?? 1;
+}
+
+/**
+ * Retorna o label de contexto correto para o plano do usuário.
+ * Solo → "Consultório" | Clínica → "Clínica"
+ */
+export function getLabelContexto(plano: PlanoId | null | undefined): string {
+  return getPlano(plano).labelContexto;
 }

@@ -7,7 +7,8 @@ export type RecorderStatus = "idle" | "recording" | "processing" | "done" | "err
 interface UseAudioRecorderReturn {
   status: RecorderStatus;
   timer: number;
-  startRecording: () => Promise<void>;
+  /** Inicia a gravação. Retorna true se iniciou com sucesso, false se falhou (ex: microfone negado). */
+  startRecording: () => Promise<boolean>;
   /** Para a gravação e retorna o Blob do áudio */
   stopRecording: () => Promise<Blob | null>;
 }
@@ -29,8 +30,8 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
     };
   }, []);
 
-  const startRecording = useCallback(async (): Promise<void> => {
-    if (status === "recording") return;
+  const startRecording = useCallback(async (): Promise<boolean> => {
+    if (status === "recording") return false;
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -87,8 +88,11 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
       timerIntervalRef.current = setInterval(() => {
         setTimer((prev) => prev + 1);
       }, 1000);
+
+      return true;
     } catch {
       setStatus("error");
+      return false;
     }
   }, [status]);
 

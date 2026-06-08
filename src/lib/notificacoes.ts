@@ -1,11 +1,19 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type TipoNotificacao =
-  | 'orcamento_gerado'
+  // Operacional — secretaria
   | 'orcamento_enviado'
   | 'follow_up'
   | 'briefing'
-  | 'sistema';
+  | 'sistema'
+  | 'consulta_finalizada'
+  | 'agendamento_criado'
+  // Operacional — dentista
+  | 'checkin_paciente'
+  | 'agendamento_cancelado'
+  | 'pagamento_confirmado'
+  // Cross-clínica
+  | 'convite_clinica';
 
 export interface NotificacaoPayload {
   clinicaId: string;

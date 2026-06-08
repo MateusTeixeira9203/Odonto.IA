@@ -174,7 +174,7 @@ export function WeekView({
                         {format(parseISO(apt.data_hora), 'HH:mm')} · {apt.paciente?.nome?.split(' ')[0] ?? '—'}
                       </p>
                       {height > 32 && apt.observacoes && (
-                        <p className="text-[9px] truncate mt-0.5 opacity-70" style={{ color: text }}>
+                        <p className="text-[10px] truncate mt-0.5 opacity-70" style={{ color: text }}>
                           {apt.observacoes}
                         </p>
                       )}

@@ -20,5 +20,12 @@ export async function aceitarConviteAction(
     return { error: result.error };
   }
 
+  // Dentistas convidados (agregados) vão para a tela de boas-vindas,
+  // onde serão informados sobre a taxa de agregado.
+  // Admins e secretárias seguem direto para o dashboard.
+  if (result.role === 'dentista') {
+    redirect(`/bem-vindo-agregado?clinica=${result.clinicId}`);
+  }
+
   redirect('/dashboard');
 }

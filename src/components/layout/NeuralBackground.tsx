@@ -33,24 +33,24 @@ export function NeuralBackground({ opacity = 1 }: { opacity?: number }) {
   if (nodes.length === 0) return <div className="absolute inset-0 bg-bg -z-10" />;
 
   return (
-    <div
-      className="absolute inset-0 overflow-hidden pointer-events-none -z-10 bg-bg"
-      style={opacity !== 1 ? { opacity } : undefined}
-    >
+    <div className="absolute inset-0 overflow-hidden pointer-events-none -z-10 bg-bg">
+      {/* bg-bg is always 100% — opacity only dims the decorative layer */}
+      <div className="absolute inset-0" style={opacity !== 1 ? { opacity } : undefined}>
       <style>{`
         @keyframes neural-fade {
-          0%, 100% { opacity: 0.05; }
-          50%       { opacity: 0.5;  }
+          0%, 100% { opacity: 0.15; }
+          50%       { opacity: 0.75; }
         }
         @keyframes neural-pulse {
-          0%, 100% { opacity: 0.2; }
-          50%      { opacity: 0.8; }
+          0%, 100% { opacity: 0.4; }
+          50%      { opacity: 1.0; }
         }
       `}</style>
 
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-teal/5 via-bg/80 to-bg" />
+      {/* Glow radial — mais visível em light e dark */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-teal/15 via-bg/60 to-bg" />
 
-      <svg className="absolute inset-0 w-full h-full opacity-30">
+      <svg className="absolute inset-0 w-full h-full opacity-60">
         {nodes.map((node, i) => {
           const connections = [
             nodes[(i + 1) % nodes.length],
@@ -67,21 +67,21 @@ export function NeuralBackground({ opacity = 1 }: { opacity?: number }) {
                   x2={`${target.x}%`}
                   y2={`${target.y}%`}
                   stroke="var(--color-teal)"
-                  strokeWidth="0.5"
+                  strokeWidth="0.8"
                   style={{
                     animation: `neural-fade ${node.lineDurations[j]}s ${node.lineDelays[j]}s infinite ease-in-out`,
-                    opacity: 0.05,
+                    opacity: 0.15,
                   }}
                 />
               ))}
               <circle
                 cx={`${node.x}%`}
                 cy={`${node.y}%`}
-                r="1.5"
+                r="2"
                 fill="var(--color-teal)"
                 style={{
                   animation: `neural-pulse ${node.duration}s ${node.delay}s infinite ease-in-out`,
-                  opacity: 0.2,
+                  opacity: 0.4,
                 }}
               />
             </g>
@@ -89,7 +89,9 @@ export function NeuralBackground({ opacity = 1 }: { opacity?: number }) {
         })}
       </svg>
 
-      <div className="absolute inset-0 bg-neural-pattern opacity-50 mix-blend-multiply" />
+      {/* Dot grid — multiply no light (escurece teal no fundo claro), screen no dark (clareia no fundo escuro) */}
+      <div className="absolute inset-0 bg-neural-pattern opacity-60 mix-blend-multiply dark:mix-blend-screen dark:opacity-40" />
+      </div>{/* /decorative layer */}
     </div>
   );
 }

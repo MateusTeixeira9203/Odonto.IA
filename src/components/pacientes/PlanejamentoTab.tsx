@@ -24,7 +24,6 @@ import {
   Activity,
   Zap,
   Filter,
-
   AlertTriangle,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';

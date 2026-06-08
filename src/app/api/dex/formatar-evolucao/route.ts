@@ -55,8 +55,8 @@ Retorne SOMENTE um JSON válido, sem markdown, com exatamente esta estrutura:
   "queixa_principal": "título objetivo do procedimento principal (ex: Endodontia dente 26, Restauração dentes 14 e 15)",
   "anotacoes": "evolução clínica completa e organizada em linguagem técnica — procedimento realizado, técnica usada, intercorrências, observações relevantes. 2-4 frases.",
   "dentes_afetados": [lista de números FDI mencionados como inteiros — ex: [26, 36]],
-  "dentes_observacoes": {"número": "observação específica deste dente"},
-  "procedimentos": ["lista dos procedimentos realizados — ex: Tratamento endodôntico, Radiografia periapical"],
+  "dentes_observacoes": {"número": "procedimento 1 neste dente\nprocedimento 2 neste dente\nprocedimento 3 neste dente"},
+  "procedimentos": ["lista resumida dos procedimentos realizados — ex: Tratamento endodôntico, Radiografia periapical"],
   "conduta": "orientações ao paciente, cuidados pós-procedimento, prescrições mencionadas. String vazia se não mencionado.",
   "retorno_sugerido": "prazo de retorno se mencionado (ex: 7 dias, 1 mês) ou null",
   "alerta_novo": "se o dentista mencionar nova alergia ou medicamento novo do paciente, registrar aqui. null se nenhum"
@@ -65,20 +65,30 @@ Retorne SOMENTE um JSON válido, sem markdown, com exatamente esta estrutura:
 Regras críticas:
 - dentes_afetados: array de inteiros FDI válidos (11-48), nunca strings
 - Se nenhum dente mencionado: [] e {}
-- procedimentos: array de strings, mínimo 1 item baseado no relato
+- dentes_observacoes: se mais de um procedimento no mesmo dente, separar por \\n — cada linha vira um item independente marcável pelo dentista
+- procedimentos: array de strings resumidas, mínimo 1 item baseado no relato
 - conduta: string vazia "" se não houver orientações mencionadas
 - retorno_sugerido: null se não mencionado
 - alerta_novo: null se não mencionado
 - Não repetir nome do paciente nas anotações
 - Português brasileiro, linguagem técnica mas clara`;
 
-    const callStart = Date.now();
     const result = await generateStructured<EvolucaoFormatada>({ prompt, feature: 'formatar-evolucao' });
 
     const parsed = result.data;
+    // Validação FDI estrita por quadrante:
+    //   Permanentes: quadrantes 1–4, dentes 1–8  → 11–18, 21–28, 31–38, 41–48
+    //   Decíduos:    quadrantes 5–8, dentes 1–5  → 51–55, 61–65, 71–75, 81–85
+    const isValidFDI = (d: number): boolean => {
+      const q = Math.floor(d / 10); // quadrante (1–8)
+      const t = d % 10;             // número do dente dentro do quadrante
+      if (q >= 1 && q <= 4) return t >= 1 && t <= 8; // permanentes
+      if (q >= 5 && q <= 8) return t >= 1 && t <= 5; // decíduos
+      return false;
+    };
     parsed.dentes_afetados = (parsed.dentes_afetados ?? [])
       .map((d) => Number(d))
-      .filter((d) => !isNaN(d) && d >= 11 && d <= 99);
+      .filter((d) => !isNaN(d) && isValidFDI(d));
     parsed.dentes_observacoes = parsed.dentes_observacoes ?? {};
     parsed.procedimentos = Array.isArray(parsed.procedimentos)
       ? (parsed.procedimentos as unknown[]).filter((p): p is string => typeof p === 'string')

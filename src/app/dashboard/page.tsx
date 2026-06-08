@@ -29,14 +29,11 @@ async function SecretaryDashboardServer({
   endOfWeekDate.setDate(endOfWeekDate.getDate() + 7);
   const endOfWeekStr = endOfWeekDate.toISOString().split('T')[0];
 
-  const limiteOrcamento = new Date(now.getTime() - 5 * 86_400_000).toISOString();
-
   const [
     { data: agendamentosRaw },
     { data: dentistasRaw },
     { data: orcamentosRaw },
     { data: pagamentosVencendoRaw },
-    { data: orcamentosParadosRaw },
     { data: pagamentosVencidosRaw },
     { data: followupsRaw },
   ] = await Promise.all([
@@ -71,15 +68,6 @@ async function SecretaryDashboardServer({
       .not('data_vencimento', 'is', null)
       .gte('data_vencimento', todayStr)
       .lte('data_vencimento', endOfWeekStr),
-    // Orçamentos enviados parados há > 5 dias
-    supabase
-      .from('orcamentos')
-      .select('id, created_at, total, paciente:pacientes(id, nome)')
-      .eq('clinica_id', clinicaId)
-      .eq('status', 'enviado')
-      .lt('created_at', limiteOrcamento)
-      .order('created_at', { ascending: true })
-      .limit(8),
     // Pagamentos vencidos (data_vencimento < hoje)
     supabase
       .from('pagamentos')
@@ -130,22 +118,7 @@ async function SecretaryDashboardServer({
 
   function calcPrioridade(tipo: PendenciaItem['tipo'], dias = 0): PendenciaItem['prioridade'] {
     if (tipo === 'pagamento_vencido') return dias > 3 ? 'high' : 'medium';
-    if (tipo === 'orcamento_parado') return dias > 14 ? 'medium' : 'low';
     return 'low';
-  }
-
-  for (const orc of (orcamentosParadosRaw ?? []) as unknown as Array<{ id: string; created_at: string; total: number | null; paciente: { id: string; nome: string } | null }>) {
-    if (!orc.paciente) continue;
-    const dias = Math.floor((now.getTime() - new Date(orc.created_at).getTime()) / 86_400_000);
-    pendencias.push({
-      tipo: 'orcamento_parado',
-      prioridade: calcPrioridade('orcamento_parado', dias),
-      pacienteId: orc.paciente.id,
-      pacienteNome: orc.paciente.nome,
-      descricao: `Orçamento aguardando há ${dias} dia${dias !== 1 ? 's' : ''}`,
-      href: '/dashboard/orcamentos',
-      diasAtrasado: dias,
-    });
   }
 
   for (const pg of (pagamentosVencidosRaw ?? []) as unknown as Array<{ id: string; valor: number; data_vencimento: string; paciente: { id: string; nome: string } | null }>) {

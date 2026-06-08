@@ -38,10 +38,10 @@ function MetricCard({ label, value, context, highlight }: MetricCardProps) {
       </div>
 
       {/* Label */}
-      <p className="text-sm font-semibold text-text-primary leading-snug mb-1">{label}</p>
+      <p className="text-sm font-semibold text-text-primary leading-snug mb-2">{label}</p>
 
       {/* Context */}
-      <p className={`text-xs ${active ? 'text-teal' : 'text-text-secondary'}`}>{context}</p>
+      <p className={`text-xs tracking-wide ${active ? 'text-teal' : 'text-text-secondary'}`}>{context}</p>
     </div>
   );
 }

@@ -14,7 +14,7 @@ export type FormaPagamento =
   | "boleto"
   | "outro";
 
-export type StatusOrcamento = "rascunho" | "enviado" | "aprovado" | "recusado";
+export type StatusOrcamento = "rascunho" | "enviado" | "aprovado" | "recusado" | "pago";
 
 export async function atualizarStatusOrcamento(
   orcamentoId: string,
@@ -301,7 +301,7 @@ export async function registrarPagamento(dados: {
       paraRole:       'dentista',
       paraDentistaId: dados.dentistaId,
       deDentistaId:   dentistaPerfil.id,
-      tipo:           'briefing',
+      tipo:           'pagamento_confirmado',
       titulo:         `Pagamento recebido — ${pacNome}`,
       mensagem:       `Secretária registrou ${valorFmt} (${dados.formaPagamento.replace(/_/g, ' ')}) do paciente ${pacNome}.`,
       href:           '/dashboard/orcamentos',
@@ -425,7 +425,7 @@ export async function registrarPagamentoRapido(dados: {
       paraRole:       'dentista',
       paraDentistaId: dados.dentistaId,
       deDentistaId:   dentistaPerfil.id,
-      tipo:           'briefing',
+      tipo:           'pagamento_confirmado',
       titulo:         `Pagamento recebido — ${pacNome}`,
       mensagem:       `Secretária registrou ${valorFmt} (${dados.formaPagamento.replace(/_/g, ' ')}) de ${pacNome}. Orçamento aprovado.`,
       href:           '/dashboard/orcamentos',

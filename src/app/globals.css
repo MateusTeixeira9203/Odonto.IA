@@ -51,6 +51,10 @@
   --color-coral: #e57373;
   --color-coral-pale: #fce8e8;
 
+  /* Warning — alertas, avisos, estados de atenção */
+  --color-warning: #f59e0b;
+  --color-warning-pale: #fef3c7;
+
   /* Aliases canônicos da identidade visual */
   --color-brand-offwhite: #f5f3ef;
   --color-brand-charcoal: #0d0d0d;
@@ -58,11 +62,11 @@
 
   --color-bg: #f4f4f6;
   --color-surface: #ffffff;
-  --color-surface-alt: #ebebed;
-  --color-border: #e2e2e5;
+  --color-surface-alt: #e4e4e8;
+  --color-border: #d4d4d8;
   --color-text-primary: #09090b;
   --color-text-secondary: #71717a;
-  --color-text-muted: #d9d9d9;
+  --color-text-muted: #b4b4b8;
 
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -111,6 +115,10 @@
   /* Coral mais claro em dark mode */
   --color-coral: #ef9a9a;
   --color-coral-pale: #3d1f1f;
+
+  /* Warning mais brilhante em dark mode */
+  --color-warning: #fbbf24;
+  --color-warning-pale: #451a03;
 
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
@@ -170,7 +178,7 @@
   --color-text-secondary: var(--color-text-secondary);
   --color-text-muted: var(--color-text-muted);
 
-  --font-heading: var(--font-geist);
+  --font-heading: var(--font-dm-serif);
   --font-sans: var(--font-outfit);
   --font-mono: var(--font-dm-mono);
 }
@@ -184,6 +192,10 @@
   }
   html {
     @apply font-sans;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   }
 }
 
@@ -264,7 +276,7 @@
 /* ── Padrão neural (landing page / planos) ─────────────────── */
 @layer utilities {
   .bg-neural-pattern {
-    background-image: radial-gradient(circle at 2px 2px, rgba(47, 156, 133, 0.15) 1px, transparent 0);
+    background-image: radial-gradient(circle at 2px 2px, rgba(47, 156, 133, 0.50) 1px, transparent 0);
     background-size: 32px 32px;
   }
 }
@@ -308,14 +320,25 @@
   background-color: rgba(15, 15, 15, 0.75);
 }
 
+/* ── Glass sutil para hero cards (mantém legibilidade) ──────── */
+.hero-glass {
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  background-color: rgba(255, 255, 255, 0.92);
+}
+
+.dark .hero-glass {
+  background-color: rgba(17, 17, 18, 0.90);
+}
+
 /* ── Blobs decorativos das páginas públicas ─────────────────── */
 .blob-shape {
-  background-color: var(--color-teal-pale);
+  background-color: var(--color-teal);
   border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
   animation: blob-morph 18s ease-in-out infinite, blob-float 20s ease-in-out infinite;
   filter: blur(150px);
   position: fixed;
-  z-index: -1;
+  z-index: 0;
   pointer-events: none;
 }
 

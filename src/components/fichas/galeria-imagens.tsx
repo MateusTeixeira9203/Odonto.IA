@@ -155,11 +155,11 @@ export function GaleriaImagens({
 
               {/* Metadados */}
               <div className="p-3">
-                <div className="text-[10px] font-bold text-teal uppercase tracking-wider mb-1 truncate">
+                <div className="text-xs font-bold text-teal uppercase tracking-wider mb-1 truncate">
                   {doc.nome}
                 </div>
                 {doc.date && (
-                  <div className="text-[9px] font-medium text-text-secondary truncate">
+                  <div className="text-[10px] font-medium text-text-secondary truncate">
                     {doc.date}
                   </div>
                 )}

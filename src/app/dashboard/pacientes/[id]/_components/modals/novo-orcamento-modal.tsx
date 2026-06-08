@@ -57,7 +57,7 @@ export function NovoOrcamentoModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="rounded-3xl bg-surface border-border p-0 overflow-hidden gap-0"
-        style={{ width: '58vw', maxWidth: 'none', maxHeight: '82vh', left: '55%' }}
+        style={{ width: '78vw', maxWidth: 'none', maxHeight: '90vh', left: '50%' }}
         showCloseButton={false}
       >
         {/* Banner teal */}
@@ -82,7 +82,7 @@ export function NovoOrcamentoModal({
 
         {/* ── Etapa 1: seleção de ficha (coluna única) ── */}
         {etapaNovoOrc === 'selecionar' && (
-          <div className="flex-1 overflow-y-auto p-6 space-y-3" style={{ height: 'calc(82vh - 92px)' }}>
+          <div className="flex-1 overflow-y-auto p-6 space-y-3" style={{ height: 'calc(90vh - 92px)' }}>
             {fichasParaOrc.map((ficha) => {
               const denteCount = (ficha.dentes_afetados ?? []).length;
               const dataFormatada = format(parseISO(ficha.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
@@ -120,12 +120,14 @@ export function NovoOrcamentoModal({
 
         {/* ── Etapa 2: edição de itens (duas colunas) ── */}
         {etapaNovoOrc === 'itens' && (
-          <div className="flex" style={{ height: 'calc(82vh - 92px)', minHeight: 0 }}>
+          <div className="flex" style={{ height: 'calc(90vh - 92px)', minHeight: 0 }}>
 
             {/* Coluna esquerda — itens */}
             <div className="flex-1 min-w-0 overflow-y-auto p-6 space-y-4">
               {novoOrcItens.map((item, idx) => (
-                <div key={idx} className="bg-surface-alt rounded-2xl border border-border p-4 space-y-3">
+                <div key={idx} className={`bg-surface-alt rounded-2xl border p-4 space-y-3 transition-all duration-200 ${
+                  item.preco > 0 ? 'border-l-2 border-l-teal/50 border-t-border border-r-border border-b-border' : 'border-border'
+                }`}>
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-[10px] text-text-secondary uppercase tracking-widest">
                       Procedimento {idx + 1}
@@ -175,7 +177,7 @@ export function NovoOrcamentoModal({
                     className="rounded-xl bg-surface border-border text-text-primary"
                   />
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-[80px_1fr] gap-3">
                     <div className="space-y-1">
                       <Label className="text-xs text-text-secondary">Qtd</Label>
                       <Input
@@ -198,6 +200,15 @@ export function NovoOrcamentoModal({
                       />
                     </div>
                   </div>
+
+                  {/* Subtotal do item */}
+                  {item.preco > 0 && (
+                    <div className="flex justify-end pt-1 border-t border-border/40">
+                      <span className="text-xs font-mono font-semibold text-teal">
+                        = R$ {(item.quantidade * item.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  )}
                 </div>
               ))}
 
@@ -218,13 +229,11 @@ export function NovoOrcamentoModal({
                 </p>
 
                 <div className="rounded-2xl p-4 space-y-2 border border-teal/15" style={{ background: 'rgba(47,156,133,0.07)' }}>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold text-text-primary">Total</span>
-                    <span className="font-mono text-2xl font-bold text-teal">
-                      R$ {novoOrcTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-text-secondary font-mono text-right">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-teal/70">Total</p>
+                  <p className="font-mono text-3xl font-bold text-teal leading-none">
+                    R$ {novoOrcTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-[10px] text-text-secondary font-mono">
                     {novoOrcItens.filter(i => i.descricao.trim()).length} item(s)
                   </p>
                 </div>

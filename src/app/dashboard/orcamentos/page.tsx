@@ -27,7 +27,7 @@ export type PagamentoRow = {
 export type OrcamentoRow = {
   id: string;
   created_at: string;
-  status: 'rascunho' | 'enviado' | 'aprovado' | 'recusado';
+  status: 'rascunho' | 'enviado' | 'aprovado' | 'recusado' | 'pago';
   total: number | null;
   desconto: number;
   validade_dias: number;
@@ -101,7 +101,7 @@ export default async function OrcamentosPage() {
 
   // Solo: dentista cria orçamentos manualmente. BASICO/CLINICA: cria via perfil do paciente.
   // Secretária sempre pode criar orçamentos independente do plano.
-  const canEdit = !isUserOverride && (dentista.plano === 'SOLO' || dentista.role === 'secretaria');
+  const canEdit = !isUserOverride && dentista.plano === 'SOLO';
 
   return (
     <PageTransition>

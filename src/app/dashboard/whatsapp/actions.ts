@@ -9,6 +9,7 @@ export interface ConversaItem {
   id: string;
   telefone: string;
   etapa: string;
+  estado: string;
   ativo: boolean;
   ultimo_contato: string;
   paciente: { id: string; nome: string } | null;
@@ -28,7 +29,7 @@ export async function listarConversas(): Promise<ConversaItem[]> {
 
   const { data } = await db
     .from('conversas_bot')
-    .select('id, telefone, etapa, ativo, ultimo_contato, paciente:pacientes(id, nome)')
+    .select('id, telefone, etapa, estado, ativo, ultimo_contato, paciente:pacientes(id, nome)')
     .eq('clinica_id', clinicId)
     .order('ultimo_contato', { ascending: false })
     .limit(60);
@@ -105,4 +106,62 @@ export async function enviarMensagemManual(
     const msg = err instanceof Error ? err.message : String(err);
     return { ok: true, aviso: `Salvo, mas falha no envio WhatsApp: ${msg}` };
   }
+}
+
+export async function devolverParaBot(conversaId: string): Promise<{ ok: boolean }> {
+  const { clinicId } = await requireRole(['admin', 'secretaria']);
+  const db = createServiceClient();
+
+  const { error } = await db
+    .from('conversas_bot')
+    .update({ ativo: true, estado: 'inicio', etapa: 'inicio', dados_coleta: {}, contexto: {} })
+    .eq('id', conversaId)
+    .eq('clinica_id', clinicId);
+
+  return { ok: !error };
+}
+
+export async function confirmarPagamento(conversaId: string): Promise<{ ok: boolean }> {
+  const { clinicId } = await requireRole(['admin', 'secretaria']);
+  const db = createServiceClient();
+
+  // Busca o paciente vinculado à conversa para atualizar o pagamento mais recente pendente
+  const { data: conversa } = await db
+    .from('conversas_bot')
+    .select('paciente_id')
+    .eq('id', conversaId)
+    .eq('clinica_id', clinicId)
+    .maybeSingle();
+
+  if (conversa?.paciente_id) {
+    await db
+      .from('pagamentos')
+      .update({ status: 'pago', verificado_automaticamente: false })
+      .eq('clinica_id', clinicId)
+      .eq('paciente_id', conversa.paciente_id)
+      .eq('status', 'pendente')
+      .order('created_at', { ascending: false })
+      .limit(1);
+  }
+
+  const { error } = await db
+    .from('conversas_bot')
+    .update({ estado: 'encerrado' })
+    .eq('id', conversaId)
+    .eq('clinica_id', clinicId);
+
+  return { ok: !error };
+}
+
+export async function recusarPagamento(conversaId: string): Promise<{ ok: boolean }> {
+  const { clinicId } = await requireRole(['admin', 'secretaria']);
+  const db = createServiceClient();
+
+  const { error } = await db
+    .from('conversas_bot')
+    .update({ estado: 'humano' })
+    .eq('id', conversaId)
+    .eq('clinica_id', clinicId);
+
+  return { ok: !error };
 }

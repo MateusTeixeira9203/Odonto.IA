@@ -16,6 +16,9 @@ interface CreatePacienteInput {
   observacoes: string | null;
   avatar_url?: string | null;
   dentistaId?: string | null;
+  responsavel_nome?: string | null;
+  responsavel_telefone?: string | null;
+  responsavel_parentesco?: string | null;
 }
 
 export async function createPaciente(
@@ -59,8 +62,11 @@ export async function createPaciente(
     endereco:        data.endereco,
     cidade:          data.cidade,
     estado:          data.estado,
-    observacoes:     data.observacoes,
-    avatar_url:      data.avatar_url,
+    observacoes:             data.observacoes,
+    avatar_url:              data.avatar_url,
+    responsavel_nome:        data.responsavel_nome ?? null,
+    responsavel_telefone:    data.responsavel_telefone ?? null,
+    responsavel_parentesco:  data.responsavel_parentesco ?? null,
   });
 
   if (error) {

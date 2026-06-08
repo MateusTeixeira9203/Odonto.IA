@@ -1,165 +1,398 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import dynamic from 'next/dynamic';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'motion/react';
 import {
-  Mic,
-  ShieldCheck,
-  MessageSquare,
-  ArrowRight,
-  CheckCircle2,
-  Sparkles,
-  Zap,
-  Lock,
-  Phone,
-  ChevronDown,
+  Mic, ShieldCheck, ArrowRight, CheckCircle2, Sparkles,
+  Brain, ChevronDown, Menu, X,
 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import Image from 'next/image';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import ParticleNetwork from '@/components/ParticleNetwork';
 
-// Lazy-load canvas — doesn't block initial paint, no SSR needed
-const ParticleNetwork = dynamic(() => import('@/components/ParticleNetwork'), {
-  ssr: false,
-  loading: () => null,
-});
+// ── Brand tokens ──────────────────────────────────────────────────────────────
+const TEAL    = '#2f9c85';
+const TEAL_LT = '#5dbeb0';
 
-const words = ['Inteligência.', 'Velocidade.', 'Qualidade.'];
+// ── Shared animation preset — fora do componente para não recriar por render ──
+const fadeIn = {
+  initial:     { opacity: 0, y: 20 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport:    { once: true },
+  transition:  { duration: 0.6 },
+} as const;
 
-const faqs = [
+// ── Hero rotating words ───────────────────────────────────────────────────────
+const WORDS = ['Inteligência.', 'Velocidade.', 'Qualidade.'];
+
+// ── Plans — todos com trial + CTA consistente ─────────────────────────────────
+const PLANOS = [
   {
-    question: 'Como funciona o orçamento por voz?',
-    answer:
-      'Durante a consulta, você ativa o assistente e descreve os procedimentos. A nossa IA processa a fala, identifica os códigos de serviço e gera um PDF profissional com valores e condições de pagamento, pronto para ser enviado ao paciente.',
+    id: 'SOLO', nome: 'Solo', preco: '167',
+    desc: 'Para o dentista autônomo que quer eliminar burocracia e focar no paciente.',
+    features: [
+      '1 Dentista',
+      'Modo Consulta completo',
+      'Orçamentos por voz',
+      'Agenda inteligente',
+      'Dex briefing diário',
+      '7 dias grátis para testar',
+    ],
+    popular: false, cta: '7 dias grátis',
   },
   {
-    question: 'Meus dados estão seguros?',
-    answer:
-      'Sim. Utilizamos criptografia de nível bancário e silos de dados isolados. Se você compartilha consultório, seus dados financeiros são inacessíveis para outros profissionais, garantindo total privacidade.',
+    id: 'BASICO', nome: 'Básico', preco: '247',
+    desc: 'Dentista e secretária em sincronia, com IA no centro do atendimento.',
+    features: [
+      '1 Dentista + 1 Secretária',
+      'Tudo do Solo',
+      'Notificações em tempo real',
+      'Relatórios financeiros',
+      'Check-in com 1 clique',
+      '7 dias grátis para testar',
+    ],
+    popular: true, cta: '7 dias grátis',
   },
   {
-    question: 'Preciso de treinamento para usar?',
-    answer:
-      'O Odonto.IA foi desenhado para ser intuitivo. Se você sabe usar o WhatsApp, você sabe usar o Odonto.IA. A interface é minimalista e foca no que realmente importa para o seu dia a dia.',
+    id: 'CLINICA', nome: 'Clínica', preco: '397',
+    desc: 'Para clínicas com múltiplos dentistas e gestão avançada.',
+    features: [
+      'Até 5 dentistas',
+      'Tudo do Básico',
+      '+ R$ 147 por dentista extra',
+      'Silos de privacidade total',
+      '7 dias grátis para testar',
+    ],
+    popular: false, cta: '7 dias grátis',
   },
 ];
 
-const btnPrimary = cn(
-  'inline-flex items-center justify-center font-medium transition-all duration-300',
-  'bg-teal hover:bg-teal-lt text-white rounded-full btn-glow',
-);
+// ── FAQs ──────────────────────────────────────────────────────────────────────
+const FAQS = [
+  {
+    q: 'Como funciona o Modo Consulta?',
+    a: 'Durante o atendimento, você ativa a gravação e fala livremente. O Dex transcreve, identifica dentes e procedimentos, e estrutura a ficha clínica automaticamente. Você revisa e salva em menos de 30 segundos.',
+  },
+  {
+    q: 'Como funciona o orçamento por voz?',
+    a: 'Descreva os procedimentos durante a consulta. A IA processa a fala, identifica os serviços e gera um PDF profissional com valores e condições de pagamento, pronto para ser enviado ao paciente via WhatsApp.',
+  },
+  {
+    q: 'Meus dados estão seguros?',
+    a: 'Sim. Utilizamos criptografia de nível bancário e silos de dados isolados. Se você compartilha consultório, seus dados financeiros são completamente inacessíveis para outros profissionais.',
+  },
+  {
+    q: 'Preciso de treinamento para usar?',
+    a: 'Não. O Odonto.IA foi desenhado para ser intuitivo. Se você sabe usar o WhatsApp, você sabe usar o Odonto.IA. A adoção acontece em minutos, não em dias.',
+  },
+];
 
-const btnOutline = cn(
-  'inline-flex items-center justify-center font-medium transition-all duration-300',
-  'border border-border hover:bg-surface-alt rounded-full bg-bg/50 backdrop-blur-sm text-text-primary',
-);
+// ── Antes / Depois ────────────────────────────────────────────────────────────
+const ANTES_DEPOIS = [
+  { before: '20–30 min de ficha por paciente',            after: 'Ficha estruturada automaticamente em < 30s' },
+  { before: 'Planejamento no Word ou no papel',           after: 'Planejamento visual gerado pelo Dex' },
+  { before: 'Orçamento explicado verbalmente',            after: 'PDF profissional + envio via WhatsApp' },
+  { before: 'Confirmação de agenda por ligação',          after: 'Confirmação automática, sem esforço' },
+  { before: 'Secretária e dentista via WhatsApp pessoal', after: 'Equipe sincronizada em tempo real no sistema' },
+];
 
-// Shared easing — ease-out-quart feels snappy on scroll, smooth on entrance
-const ease = [0.22, 1, 0.36, 1] as const;
-
-export default function LandingPage() {
-  const [wordIndex, setWordIndex] = useState(0);
-  const [openFaq, setOpenFaq] = useState<number | null>(null);
-  const { scrollYProgress } = useScroll();
-  const yParallax = useTransform(scrollYProgress, [0, 1], [0, -80]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setWordIndex(prev => (prev + 1) % words.length);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const fadeUp = {
-    initial: { opacity: 0, y: 24 },
-    whileInView: { opacity: 1, y: 0 },
-    viewport: { once: true, margin: '-60px' },
-    transition: { duration: 0.6, ease },
-  };
+// ── DexCard — mockup decorativo ───────────────────────────────────────────────
+function DexCard() {
+  const bars  = [3, 5, 8, 12, 9, 6, 14, 10, 7, 5, 11, 8, 13, 6, 4, 10];
+  const steps = [
+    { done: true,  label: 'Queixa principal identificada' },
+    { done: true,  label: 'Dente 16 mapeado — região oclusal' },
+    { done: false, label: 'Estruturando ficha clínica...' },
+  ];
+  const fields = [
+    { k: 'queixa',  v: 'Sensibilidade dental — #16' },
+    { k: 'dentes',  v: '#16, região oclusal (FDI)' },
+    { k: 'conduta', v: 'Avaliação periapical + vitalidade' },
+  ];
 
   return (
-    <div className="min-h-screen bg-bg selection:bg-teal/20 relative overflow-hidden">
-      <ParticleNetwork />
+    <div
+      aria-hidden="true"
+      className="rounded-[2rem] overflow-hidden w-full"
+      style={{
+        background: '#ffffff',
+        border: `1px solid color-mix(in srgb, ${TEAL} 20%, transparent)`,
+        boxShadow: `0 40px 100px -20px rgba(0,0,0,0.12), 0 0 60px -10px color-mix(in srgb, ${TEAL} 18%, transparent)`,
+      }}
+    >
+      {/* Header bar */}
+      <div className="flex items-center justify-between px-5 py-3.5 border-b"
+        style={{ borderColor: `color-mix(in srgb, ${TEAL} 12%, transparent)`, background: `color-mix(in srgb, ${TEAL} 4%, #fff)` }}>
+        <div className="flex items-center gap-3">
+          <div className="flex gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-red-400/60" />
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-400/60" />
+            <span className="w-2.5 h-2.5 rounded-full bg-green-400/60" />
+          </div>
+          <span className="text-xs font-mono font-bold" style={{ color: TEAL }}>◆ Dex</span>
+          <span className="text-xs font-mono text-gray-400">— modo-consulta</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full animate-pulse bg-red-400" />
+          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-red-400">ao vivo</span>
+        </div>
+      </div>
 
-      {/* Decorative blobs */}
-      <div className="blob-shape top-[-10%] left-[-10%] w-[40vw] h-[40vw] opacity-60" />
-      <div className="blob-shape top-[40%] right-[-10%] w-[35vw] h-[35vw] opacity-50" style={{ animationDelay: '-5s' }} />
-      <div className="blob-shape bottom-[-10%] left-[20%] w-[45vw] h-[45vw] opacity-60" style={{ animationDelay: '-10s' }} />
+      {/* Waveform */}
+      <div className="px-5 py-4 border-b" style={{ borderColor: `color-mix(in srgb, ${TEAL} 8%, transparent)` }}>
+        <div className="flex items-end gap-[2.5px] h-10 mb-3">
+          {bars.map((h, i) => (
+            <motion.div key={i} className="flex-1 rounded-full"
+              style={{ background: `linear-gradient(to top, ${TEAL}, ${TEAL_LT})`, opacity: 0.35 + (i % 5) * 0.1 }}
+              animate={{ height: [`${h * 2}px`, `${h * 2.8}px`, `${h * 1.8}px`, `${h * 2.4}px`, `${h * 2}px`] }}
+              transition={{ duration: 1.8 + (i % 4) * 0.3, repeat: Infinity, ease: 'easeInOut', delay: i * 0.04 }}
+            />
+          ))}
+        </div>
+        <p className="text-xs font-mono italic text-gray-400">
+          &ldquo;...sensibilidade ao morder, piora com gelado, há três dias...&rdquo;
+        </p>
+      </div>
 
-      {/* Navbar */}
-      <nav className="fixed top-0 w-full z-50 bg-bg/60 backdrop-blur-xl border-b border-border/40">
-        <div className="max-w-7xl mx-auto px-6 h-20 grid grid-cols-2 md:grid-cols-3 items-center">
-          <div className="flex items-center gap-2 justify-self-start">
-            <span className="text-2xl font-heading font-medium tracking-tight text-text-primary">
-              Dent<span className="italic text-teal">IA</span>
+      {/* Processing steps */}
+      <div className="px-5 py-3.5 space-y-2.5 border-b" style={{ borderColor: `color-mix(in srgb, ${TEAL} 8%, transparent)` }}>
+        {steps.map((s, i) => (
+          <div key={i} className="flex items-center gap-3">
+            {s.done
+              ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" style={{ color: TEAL }} />
+              : <div className="w-3.5 h-3.5 rounded-full border-2 animate-spin shrink-0"
+                  style={{ borderColor: TEAL, borderTopColor: 'transparent' }} />
+            }
+            <span className="text-xs font-mono" style={{ color: s.done ? '#0d0d0d' : '#9ca3af' }}>
+              {s.done ? '✓ ' : '⟳ '}{s.label}
             </span>
           </div>
+        ))}
+      </div>
 
-          <div className="hidden md:flex items-center gap-8 justify-self-center">
-            {(['#funcionalidades', '#vantagens', '#faq'] as const).map((href, i) => (
-              <a
-                key={i}
-                href={href}
-                className="text-sm font-medium text-text-secondary hover:text-teal transition-colors"
-              >
-                {['Funcionalidades', 'Vantagens', 'FAQ'][i]}
+      {/* JSON output */}
+      <div className="px-5 py-4">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-400">
+            ficha_clinica.json
+          </span>
+          <span className="font-mono text-xs font-bold" style={{ color: TEAL }}>28s ↗</span>
+        </div>
+        <div className="rounded-xl p-3 space-y-1.5 font-mono text-xs"
+          style={{ background: 'rgba(0,0,0,0.04)', border: `1px solid color-mix(in srgb, ${TEAL} 10%, transparent)` }}>
+          <p className="text-gray-400">{`{`}</p>
+          {fields.map(f => (
+            <p key={f.k} className="pl-3">
+              <span style={{ color: TEAL_LT }}>&ldquo;{f.k}&rdquo;</span>
+              <span className="text-gray-400">: </span>
+              <span style={{ color: '#b45309' }}>&ldquo;{f.v}&rdquo;</span>
+            </p>
+          ))}
+          <p className="text-gray-400">{`}`}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+export default function LandingPage() {
+  const [wordIndex,  setWordIndex]  = useState(0);
+  const [openFaq,    setOpenFaq]    = useState<number | null>(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [scrolled,   setScrolled]   = useState(false);
+
+  // Parallax scoped à seção vantagens — não mais em relação ao scroll total
+  const vantagensRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress: vantagensScroll } = useScroll({
+    target: vantagensRef,
+    offset: ['start end', 'end start'],
+  });
+  const yParallax = useTransform(vantagensScroll, [0, 1], [30, -30]);
+
+  // Rotating words
+  useEffect(() => {
+    const id = setInterval(() => setWordIndex(p => (p + 1) % WORDS.length), 3000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Scroll lock com mobile menu aberto
+  useEffect(() => {
+    document.body.style.overflow = mobileOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [mobileOpen]);
+
+  // Navbar scroll-aware: transparente no topo, opaca ao scrollar
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 50);
+    onScroll(); // estado inicial
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  const NAV_LINKS = [
+    ['#funcionalidades', 'Funcionalidades'],
+    ['#vantagens',       'Vantagens'],
+    ['#precos',          'Preços'],
+    ['#faq',             'FAQ'],
+  ] as const;
+
+  return (
+    <div
+      className="min-h-screen selection:bg-teal/20 relative overflow-x-hidden"
+    >
+      <ParticleNetwork />
+
+      {/* Background blobs */}
+      <div className="blob-shape top-[-10%] left-[-10%] w-[40vw] h-[40vw] opacity-60" />
+      <div className="blob-shape top-[40%] right-[-10%] w-[35vw] h-[35vw] opacity-50" style={{ animationDelay: '-5s' }} />
+      <div className="blob-shape bottom-[-5%] left-[20%] w-[45vw] h-[45vw] opacity-55" style={{ animationDelay: '-10s' }} />
+
+      {/* ── NAV ─────────────────────────────────────────────────── */}
+      <nav
+        className="fixed top-0 w-full z-50 border-b transition-all duration-300"
+        style={{
+          background:    scrolled ? 'rgba(245,243,239,0.92)' : 'transparent',
+          backdropFilter: scrolled ? 'blur(20px)' : 'none',
+          WebkitBackdropFilter: scrolled ? 'blur(20px)' : 'none',
+          borderColor:   scrolled ? 'rgba(0,0,0,0.06)' : 'transparent',
+        }}
+      >
+        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+
+          {/* Logo */}
+          <Link href="/" className="text-2xl font-[family-name:var(--font-dm-serif)] tracking-tight">
+            Odonto<span className="italic text-teal">.IA</span>
+          </Link>
+
+          {/* Desktop links */}
+          <div className="hidden md:flex items-center gap-8">
+            {NAV_LINKS.map(([href, label]) => (
+              <a key={href} href={href} className="text-sm font-medium text-gray-500 hover:text-teal transition-colors">
+                {label}
               </a>
             ))}
           </div>
 
-          <div className="flex items-center gap-4 justify-self-end">
-            <Link
-              href="/login"
-              className="hidden lg:inline-flex items-center justify-center text-sm font-medium text-text-secondary hover:text-teal transition-colors px-3 py-1.5 rounded-lg hover:bg-surface-alt"
-            >
+          {/* Desktop auth + CTA */}
+          <div className="hidden md:flex items-center gap-4">
+            <Link href="/login" className="text-sm font-medium text-gray-500 hover:text-teal transition-colors px-3 py-1.5">
               Entrar
             </Link>
-            <Link href="/planos" className={cn(btnPrimary, 'px-6 py-2 text-sm')}>
-              Começar Agora
+            <Link
+              href="/cadastro?plano=CLINICA"
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-semibold text-white btn-glow transition-all duration-200 hover:-translate-y-px hover:brightness-110"
+              style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_LT})` }}
+            >
+              Começar agora
             </Link>
           </div>
+
+          {/* Mobile hamburger */}
+          <button
+            className="md:hidden p-2 rounded-lg transition-colors hover:bg-black/5"
+            onClick={() => setMobileOpen(o => !o)}
+            aria-label={mobileOpen ? 'Fechar menu' : 'Abrir menu'}
+          >
+            <motion.div animate={{ rotate: mobileOpen ? 90 : 0 }} transition={{ duration: 0.2 }}>
+              {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </motion.div>
+          </button>
         </div>
       </nav>
 
-      <main className="pt-32 relative z-10">
-        {/* ── Hero ── */}
-        <section className="relative px-6 py-20 md:py-32">
+      {/* ── MOBILE DRAWER ───────────────────────────────────────── */}
+      <AnimatePresence>
+        {mobileOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.18 }}
+            className="fixed inset-x-0 top-20 bottom-0 z-40 flex flex-col px-6 py-6 md:hidden"
+            style={{ background: 'rgba(245,243,239,0.98)', backdropFilter: 'blur(24px)' }}
+          >
+            <div className="flex flex-col gap-0">
+              {NAV_LINKS.map(([href, label]) => (
+                <a
+                  key={href}
+                  href={href}
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center py-4 text-lg font-medium text-gray-700 hover:text-teal border-b border-black/5 transition-colors"
+                >
+                  {label}
+                </a>
+              ))}
+            </div>
+            <div className="mt-auto flex flex-col gap-3 pt-6">
+              <Link
+                href="/login"
+                onClick={() => setMobileOpen(false)}
+                className="w-full flex items-center justify-center py-3.5 rounded-xl border text-sm font-semibold text-gray-700 hover:text-teal hover:border-teal/40 transition-all"
+                style={{ borderColor: 'rgba(0,0,0,0.1)' }}
+              >
+                Entrar
+              </Link>
+              <Link
+                href="/cadastro?plano=CLINICA"
+                onClick={() => setMobileOpen(false)}
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-semibold text-white btn-glow"
+                style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_LT})` }}
+              >
+                Começar 7 Dias Grátis
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <main className="pt-20 relative z-10">
+
+        {/* ══════════════════════════════════════ HERO */}
+        <section className="relative px-6 pt-20 pb-16 md:pt-32 md:pb-24">
           <div className="max-w-7xl mx-auto text-center relative z-10">
+
+            {/* Badge */}
             <motion.div
-              initial={{ opacity: 0, scale: 0.92 }}
+              initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5, ease }}
-              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-teal/10 text-teal text-xs font-semibold mb-8 border border-teal/20 backdrop-blur-sm"
+              transition={{ duration: 0.5 }}
+              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold mb-8 border"
+              style={{
+                background:  `color-mix(in srgb, ${TEAL} 8%, transparent)`,
+                borderColor: `color-mix(in srgb, ${TEAL} 22%, transparent)`,
+                color: TEAL,
+              }}
             >
               <Sparkles className="w-3.5 h-3.5" />
-              A Nova Era da Gestão Odontológica
+              Sistema Clínico Inteligente · Documentação em Tempo Real
             </motion.div>
 
-            <div className="text-5xl md:text-7xl lg:text-8xl font-heading font-medium leading-[1.1] tracking-tight mb-8 h-[3.3em] md:h-[2.2em]">
+            {/* Headline — sem height fixo, o invisible placeholder reserva o espaço */}
+            <div className="text-5xl md:text-7xl lg:text-8xl font-[family-name:var(--font-dm-serif)] leading-[1.1] tracking-tight mb-8">
               <motion.div
-                initial={{ opacity: 0, y: 24 }}
+                initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.65, ease }}
+                transition={{ duration: 0.6 }}
               >
                 A Odontologia na <br />
-                <span className="text-teal italic">Era da </span>
-                <span className="inline-block relative text-teal italic">
+                <span className="italic text-teal">Era da </span>
+                <span className="inline-block relative italic text-teal">
                   <AnimatePresence mode="wait">
                     <motion.span
-                      key={words[wordIndex]}
-                      initial={{ opacity: 0, y: 18 }}
+                      key={WORDS[wordIndex]}
+                      initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -18 }}
-                      transition={{ duration: 0.38, ease }}
-                      className="absolute left-0"
+                      exit={{ opacity: 0, y: -20 }}
+                      transition={{ duration: 0.5 }}
+                      className="absolute left-0 whitespace-nowrap"
                     >
-                      {words[wordIndex]}
+                      {WORDS[wordIndex]}
                     </motion.span>
                   </AnimatePresence>
-                  <span className="invisible">{words[0]}</span>
+                  {/* Invisible placeholder — reserva espaço para a palavra mais longa */}
+                  <span className="invisible whitespace-nowrap">{WORDS[0]}</span>
                 </span>
               </motion.div>
             </div>
@@ -167,295 +400,479 @@ export default function LandingPage() {
             <motion.p
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.18, ease }}
-              className="max-w-3xl mx-auto text-lg md:text-xl text-text-secondary mb-12 leading-relaxed text-balance"
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="max-w-3xl mx-auto text-lg md:text-xl text-gray-500 mb-12 leading-relaxed"
             >
-              Otimize o seu atendimento, maximize o seu tempo. <br className="hidden md:block" />
-              Do atendimento ao orçamento em segundos. A ferramenta que transforma a sua voz em gestão.
+              Você fala. O Dex transcreve, estrutura a ficha clínica e prepara o orçamento.
+              <br className="hidden md:block" />
+              Do atendimento ao planejamento em segundos — sem digitar nada.
             </motion.p>
 
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3, ease }}
+              transition={{ duration: 0.6, delay: 0.3 }}
               className="flex flex-col sm:flex-row items-center justify-center gap-4"
             >
-              <Link href="/planos" className={cn(btnPrimary, 'h-14 px-10 text-lg group')}>
-                Começar Agora
-                <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              <Link
+                href="/cadastro?plano=CLINICA"
+                className="group inline-flex items-center gap-2 h-14 px-10 rounded-full text-lg font-semibold text-white btn-glow transition-all duration-200 hover:-translate-y-0.5 hover:brightness-110"
+                style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_LT})` }}
+              >
+                Começar 7 Dias Grátis
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Link>
-              <a href="#funcionalidades" className={cn(btnOutline, 'h-14 px-10 text-lg')}>
+              <a
+                href="#funcionalidades"
+                className="inline-flex items-center h-14 px-10 rounded-full text-lg font-medium border transition-all duration-200 hover:bg-white/80 hover:border-teal/30 hover:text-teal"
+                style={{ borderColor: 'rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.5)', color: '#6b7280' }}
+              >
                 Ver Funcionalidades
               </a>
+            </motion.div>
+
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5 }}
+              className="mt-5 text-xs font-mono text-gray-400"
+            >
+              sem cartão de crédito · cancele quando quiser · LGPD compliant
+            </motion.p>
+          </div>
+        </section>
+
+        {/* ══════════════════════════════════════ STATS STRIP */}
+        <section className="px-6 pb-20">
+          <div className="max-w-4xl mx-auto">
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+              className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-2xl overflow-hidden"
+              style={{ background: 'rgba(0,0,0,0.06)', boxShadow: `0 0 0 1px color-mix(in srgb, ${TEAL} 10%, transparent)` }}
+            >
+              {[
+                { value: '< 30s',  label: 'Por ficha clínica' },
+                { value: '0',      label: 'Digitação durante a consulta' },
+                { value: '100%',   label: 'Dados seus, sempre' },
+                { value: 'LGPD',   label: 'Compliance nativo' },
+              ].map(item => (
+                <div
+                  key={item.label}
+                  className="flex flex-col items-center justify-center px-4 py-6 text-center"
+                  style={{ background: 'rgba(255,255,255,0.5)', backdropFilter: 'blur(8px)' }}
+                >
+                  <p
+                    className="font-[family-name:var(--font-dm-serif)] text-2xl mb-1"
+                    style={{
+                      background:           `linear-gradient(135deg, ${TEAL}, ${TEAL_LT})`,
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor:  'transparent',
+                      backgroundClip:       'text',
+                    }}
+                  >
+                    {item.value}
+                  </p>
+                  <p className="text-xs text-gray-500 font-mono leading-snug">{item.label}</p>
+                </div>
+              ))}
             </motion.div>
           </div>
         </section>
 
-        {/* ── Features ── */}
+        {/* ══════════════════════════════════════ FEATURES */}
         <section id="funcionalidades" className="px-6 py-24 relative">
-          <div className="absolute inset-0 bg-surface-alt/30 backdrop-blur-md -z-10" />
           <div className="max-w-7xl mx-auto">
-            <motion.div {...fadeUp} className="text-center mb-20">
-              <h2 className="text-3xl md:text-5xl font-heading mb-6 text-text-primary">
+            <motion.div {...fadeIn} className="text-center mb-20">
+              <h2 className="text-3xl md:text-5xl font-[family-name:var(--font-dm-serif)] mb-6">
                 O Poder da <span className="italic text-teal">IA</span> no seu Consultório
               </h2>
-              <p className="text-text-secondary max-w-xl mx-auto">Tecnologia de ponta desenhada para a rotina real do dentista.</p>
+              <p className="text-gray-500 max-w-xl mx-auto">
+                Tecnologia de ponta desenhada para a rotina real do dentista.
+              </p>
             </motion.div>
 
             <div className="grid md:grid-cols-3 gap-8">
               {[
                 {
-                  title: 'DEX — O seu Concierge',
-                  description:
-                    'Um assistente que reconhece o dono. Consulte a sua agenda e o lucro do dia diretamente no WhatsApp.',
-                  icon: MessageSquare,
-                  color: 'bg-teal/10 text-teal',
+                  title: 'Modo Consulta — IA em Tempo Real',
+                  description: 'Fale livremente com o paciente. O Dex transcreve, identifica dentes e procedimentos, e estrutura a ficha clínica automaticamente em menos de 30 segundos.',
+                  icon: Brain,
+                  iconClass: 'bg-teal/10 text-teal',
                 },
                 {
                   title: 'Orçamentos por Voz',
-                  description:
-                    'Grave os procedimentos durante a consulta. A nossa IA gera o orçamento e envia o PDF profissional instantaneamente.',
+                  description: 'Descreva os procedimentos durante a consulta. A IA gera o orçamento e envia o PDF profissional via WhatsApp instantaneamente.',
                   icon: Mic,
-                  color: 'bg-teal/10 text-teal',
+                  iconClass: 'bg-teal/10 text-teal',
                 },
                 {
                   title: 'Privacidade em Silos',
-                  description:
-                    'Perfeito para consultórios partilhados. Dados financeiros isolados e protegidos por dentista.',
+                  description: 'Perfeito para consultórios compartilhados. Fichas e dados financeiros isolados por dentista — nenhum profissional acessa os dados do outro.',
                   icon: ShieldCheck,
-                  color: 'bg-teal-pale text-teal-dark',
+                  iconClass: 'bg-orange-500/10 text-orange-500',
                 },
-              ].map((feature, i) => (
+              ].map((feat, i) => (
                 <motion.div
                   key={i}
-                  initial={{ opacity: 0, y: 28 }}
+                  initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: '-40px' }}
-                  transition={{ duration: 0.55, delay: i * 0.1, ease }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5, delay: i * 0.1 }}
                 >
-                  <Card className="h-full border-none shadow-sm hover:shadow-xl transition-all duration-500 group bg-surface/60 backdrop-blur-xl">
-                    <CardContent className="p-8">
-                      <div className={`w-14 h-14 rounded-2xl ${feature.color} flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500`}>
-                        <feature.icon className="w-7 h-7" />
-                      </div>
-                      <h3 className="text-xl font-heading mb-4 text-text-primary">{feature.title}</h3>
-                      <p className="text-text-secondary leading-relaxed">{feature.description}</p>
-                    </CardContent>
-                  </Card>
+                  <div
+                    className="h-full rounded-2xl p-8 border group hover:shadow-xl transition-all duration-500 backdrop-blur-md"
+                    style={{ background: 'rgba(255,255,255,0.55)', borderColor: 'rgba(0,0,0,0.07)' }}
+                  >
+                    <div className={cn('w-14 h-14 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500', feat.iconClass)}>
+                      <feat.icon className="w-7 h-7" />
+                    </div>
+                    <h3 className="text-xl font-[family-name:var(--font-dm-serif)] mb-4">{feat.title}</h3>
+                    <p className="text-gray-500 leading-relaxed">{feat.description}</p>
+                  </div>
                 </motion.div>
               ))}
             </div>
           </div>
         </section>
 
-        {/* ── Vantagens ── */}
-        <section id="vantagens" className="px-6 py-24">
+        {/* ══════════════════════════════════════ VANTAGENS */}
+        <section id="vantagens" ref={vantagensRef} className="px-6 py-24">
           <div className="max-w-7xl mx-auto">
             <div className="grid lg:grid-cols-2 gap-16 items-center">
+
+              {/* Card — order-2 em mobile: texto aparece primeiro */}
               <motion.div
-                initial={{ opacity: 0, x: -32 }}
+                initial={{ opacity: 0, x: -30 }}
                 whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true, margin: '-80px' }}
-                transition={{ duration: 0.65, ease }}
-                className="relative"
-                style={{ y: yParallax, willChange: 'transform' }}
+                viewport={{ once: true }}
+                className="relative order-2 lg:order-1"
+                style={{ y: yParallax }}
               >
-                <div className="aspect-square rounded-3xl bg-gradient-to-br from-teal/20 to-teal-lt/20 overflow-hidden relative backdrop-blur-md">
-                  <Image
-                    src="https://images.unsplash.com/photo-1606811841689-23dfddce3e95?q=80&w=800&auto=format&fit=crop"
-                    alt="Dentista usando tecnologia"
-                    fill
-                    className="object-cover mix-blend-overlay opacity-80"
-                    referrerPolicy="no-referrer"
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="bg-surface/80 backdrop-blur-xl p-8 rounded-3xl shadow-2xl border border-border/20 max-w-[80%]">
-                      <div className="flex items-center gap-4 mb-4">
-                        <div className="w-12 h-12 rounded-full bg-teal/10 flex items-center justify-center">
-                          <Zap className="text-teal w-6 h-6" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-mono text-teal font-bold">LUCRO DO DIA</p>
-                          <p className="text-2xl font-mono font-bold text-text-primary">R$ 4.250,00</p>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="h-2 w-full bg-surface-alt rounded-full overflow-hidden">
-                          <div className="h-full bg-teal w-[85%]" />
-                        </div>
-                        <p className="text-xs text-text-secondary font-medium">85% da meta mensal atingida</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <motion.div
+                  animate={{ y: [0, -6, 0] }}
+                  transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
+                  className="absolute -top-4 -right-3 z-20 px-3 py-2 rounded-xl text-xs font-mono font-semibold text-white"
+                  style={{
+                    background: `linear-gradient(135deg, ${TEAL}, ${TEAL_LT})`,
+                    boxShadow: `0 8px 24px color-mix(in srgb, ${TEAL} 45%, transparent)`,
+                  }}
+                >
+                  ✓ Ficha estruturada em 28s
+                </motion.div>
+                <DexCard />
               </motion.div>
 
+              {/* Texto — order-1 em mobile: aparece antes do card */}
               <motion.div
-                initial={{ opacity: 0, x: 32 }}
+                initial={{ opacity: 0, x: 30 }}
                 whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true, margin: '-80px' }}
-                transition={{ duration: 0.65, ease }}
+                viewport={{ once: true }}
+                className="order-1 lg:order-2"
               >
-                <Badge variant="outline" className="mb-6 border-teal/30 text-teal px-4 py-1 rounded-full backdrop-blur-sm bg-teal/5">
+                <div
+                  className="inline-flex items-center px-4 py-1.5 rounded-full border text-sm font-medium mb-6"
+                  style={{
+                    borderColor: `color-mix(in srgb, ${TEAL} 25%, transparent)`,
+                    background:  `color-mix(in srgb, ${TEAL} 6%, transparent)`,
+                    color: TEAL,
+                  }}
+                >
                   A Nova Era
-                </Badge>
-                <h2 className="text-4xl md:text-5xl font-heading mb-8 leading-tight text-text-primary">
-                  Transforme o seu consultório numa{' '}
+                </div>
+
+                <h2 className="text-4xl md:text-5xl font-[family-name:var(--font-dm-serif)] mb-8 leading-tight">
+                  Transforme seu consultório numa{' '}
                   <span className="italic text-teal">empresa de alta performance.</span>
                 </h2>
 
                 <div className="space-y-8">
                   {[
-                    {
-                      title: 'Eliminação da Burocracia',
-                      desc: 'Chega de preencher fichas intermináveis. Fale, e a IA organiza tudo para você.',
-                    },
-                    {
-                      title: 'Aumento na Aprovação',
-                      desc: 'Orçamentos profissionais enviados em segundos aumentam a percepção de valor e a taxa de fechamento.',
-                    },
-                    {
-                      title: 'Organização Automática',
-                      desc: 'Fluxo de caixa e agenda sincronizados sem que você precise tocar num teclado.',
-                    },
+                    { title: 'Eliminação da Burocracia',      desc: 'Chega de preencher fichas intermináveis. Fale, e a IA organiza tudo em segundos. Zero digitação durante a consulta.' },
+                    { title: 'Planejamentos que Convertem',   desc: 'Apresentações visuais do plano de tratamento aumentam a percepção de valor e a taxa de fechamento dos orçamentos.' },
+                    { title: 'Equipe em Sincronia',           desc: 'Secretária e dentista conectados em tempo real. Agenda, check-in e cancelamentos sem WhatsApp de trabalho.' },
                   ].map((item, i) => (
-                    <motion.div
-                      key={i}
-                      initial={{ opacity: 0, x: 16 }}
-                      whileInView={{ opacity: 1, x: 0 }}
-                      viewport={{ once: true }}
-                      transition={{ duration: 0.45, delay: i * 0.1, ease }}
-                      className="flex gap-4"
-                    >
-                      <div className="mt-1 shrink-0">
-                        <CheckCircle2 className="w-6 h-6 text-teal" />
-                      </div>
+                    <div key={i} className="flex gap-4">
+                      <CheckCircle2 className="w-6 h-6 text-teal mt-1 shrink-0" />
                       <div>
-                        <h4 className="text-lg font-semibold mb-1 text-text-primary">{item.title}</h4>
-                        <p className="text-text-secondary">{item.desc}</p>
+                        <h4 className="text-lg font-semibold mb-1">{item.title}</h4>
+                        <p className="text-gray-500">{item.desc}</p>
                       </div>
-                    </motion.div>
+                    </div>
                   ))}
                 </div>
 
-                <Link href="/planos" className={cn(btnPrimary, 'mt-12 h-14 px-10 text-lg')}>
-                  Quero Modernizar meu Consultório
+                <Link
+                  href="/cadastro?plano=CLINICA"
+                  className="mt-12 inline-flex items-center gap-2 h-14 px-10 rounded-full text-lg font-semibold text-white btn-glow transition-all duration-200 hover:-translate-y-0.5 hover:brightness-110"
+                  style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_LT})` }}
+                >
+                  Começar agora
+                  <ArrowRight className="w-5 h-5" />
                 </Link>
               </motion.div>
             </div>
           </div>
         </section>
 
-        {/* ── FAQ ── */}
-        <section id="faq" className="px-6 py-24 relative">
-          <div className="absolute inset-0 bg-surface-alt/20 backdrop-blur-md -z-10" />
-          <div className="max-w-3xl mx-auto">
-            <motion.div {...fadeUp} className="text-center mb-16">
-              <h2 className="text-3xl md:text-4xl font-heading mb-4 text-text-primary">Dúvidas Frequentes</h2>
-              <p className="text-text-secondary">Tudo o que você precisa saber sobre o Odonto.IA.</p>
+        {/* ══════════════════════════════════════ ANTES / DEPOIS (social proof) */}
+        <section className="relative px-6 py-20 overflow-hidden">
+          <div className="max-w-4xl mx-auto">
+            <motion.div {...fadeIn} className="text-center mb-14">
+              <p className="text-xs font-mono font-bold uppercase tracking-[0.22em] mb-3" style={{ color: TEAL }}>
+                // a mudança real
+              </p>
+              <h2 className="text-3xl md:text-5xl font-[family-name:var(--font-dm-serif)] leading-tight">
+                O que muda no <span className="italic text-teal">seu dia.</span>
+              </h2>
             </motion.div>
 
-            <motion.div {...fadeUp}>
-              <div className="bg-surface/50 backdrop-blur-xl rounded-2xl p-6 shadow-xl border border-border/50 space-y-1">
-                {faqs.map((faq, i) => (
-                  <div key={i} className="border-b border-border/40 last:border-b-0">
-                    <button
-                      onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                      className="w-full text-left py-4 flex items-center justify-between gap-4 font-semibold hover:text-teal transition-colors text-text-primary"
-                    >
-                      <span>{faq.question}</span>
-                      <motion.div
-                        animate={{ rotate: openFaq === i ? 180 : 0 }}
-                        transition={{ duration: 0.22, ease }}
-                      >
-                        <ChevronDown
-                          className={cn('w-4 h-4 shrink-0', openFaq === i ? 'text-teal' : 'text-text-secondary')}
-                        />
-                      </motion.div>
-                    </button>
-
-                    <AnimatePresence initial={false}>
-                      {openFaq === i && (
-                        <motion.div
-                          key="answer"
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.28, ease }}
-                          className="overflow-hidden"
-                        >
-                          <p className="pb-4 text-text-secondary leading-relaxed">{faq.answer}</p>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                ))}
+            <motion.div
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+              className="rounded-2xl overflow-hidden border backdrop-blur-md"
+              style={{ borderColor: 'rgba(0,0,0,0.08)', boxShadow: `0 0 0 1px color-mix(in srgb, ${TEAL} 6%, transparent)`, background: 'rgba(255,255,255,0.55)' }}
+            >
+              {/* Table header */}
+              <div
+                className="grid grid-cols-2 px-6 py-3 text-[10px] font-mono font-bold uppercase tracking-widest"
+                style={{ background: 'rgba(0,0,0,0.04)', borderBottom: '1px solid rgba(0,0,0,0.06)' }}
+              >
+                <span className="text-gray-400">// antes</span>
+                <span style={{ color: TEAL }}>// com odonto.ia</span>
               </div>
+
+              {ANTES_DEPOIS.map((row, i) => (
+                <div
+                  key={i}
+                  className="grid grid-cols-2 px-6 py-4 border-t"
+                  style={{
+                    borderColor: 'rgba(0,0,0,0.05)',
+                    background: i % 2 === 0 ? 'rgba(255,255,255,0.35)' : 'transparent',
+                  }}
+                >
+                  <p className="text-sm font-mono leading-relaxed pr-4 text-gray-400 line-through">
+                    {row.before}
+                  </p>
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5 text-teal" />
+                    <p className="text-sm leading-relaxed" style={{ color: '#0d0d0d' }}>{row.after}</p>
+                  </div>
+                </div>
+              ))}
             </motion.div>
           </div>
         </section>
 
-        {/* ── CTA Final ── */}
-        <section className="px-6 py-24">
-          <motion.div {...fadeUp} className="max-w-5xl mx-auto">
-            <div
-              className="rounded-3xl p-12 md:p-20 text-center text-white relative overflow-hidden"
-              style={{
-                background: 'linear-gradient(135deg, #2f9c85 0%, #1e7060 100%)',
-                boxShadow: '0 20px 60px -20px rgba(47,156,133,0.5)',
-              }}
-            >
-              <div className="relative z-10">
-                <h2 className="text-4xl md:text-6xl font-heading mb-8">
-                  Pronto para elevar o nível do seu atendimento?
-                </h2>
-                <p className="text-white/90 text-lg md:text-xl mb-12 max-w-2xl mx-auto">
-                  Junte-se aos dentistas que já estão economizando horas de burocracia semanal com a nossa inteligência.
-                </p>
-                <Link
-                  href="/cadastro"
-                  className="inline-flex items-center justify-center h-16 px-12 rounded-full text-xl font-medium bg-white text-teal hover:bg-bg transition-all duration-300 shadow-xl hover:scale-105"
+        {/* ══════════════════════════════════════ PREÇOS */}
+        <section id="precos" className="px-6 py-24 relative">
+          <div className="max-w-5xl mx-auto">
+            <motion.div {...fadeIn} className="text-center mb-16">
+              <h2 className="text-3xl md:text-5xl font-[family-name:var(--font-dm-serif)] mb-4">
+                Preços <span className="italic text-teal">sem surpresa</span>
+              </h2>
+              <p className="text-gray-500">
+                Sem taxa de setup. Sem contratos. Todos os planos incluem{' '}
+                <strong className="text-teal">7 dias de teste gratuito.</strong>
+              </p>
+            </motion.div>
+
+            <div className="grid md:grid-cols-3 gap-6 items-stretch">
+              {PLANOS.map((plano, i) => (
+                <motion.div
+                  key={plano.id}
+                  initial={{ opacity: 0, y: 24 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.45, delay: i * 0.1 }}
+                  className="relative"
                 >
-                  Começar Teste Grátis
-                </Link>
-                <p className="mt-6 text-sm text-white/70">Sem cartão de crédito. 7 dias grátis no Plano Clínica.</p>
-              </div>
+                  {plano.popular && (
+                    <div
+                      className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-10 text-xs font-bold text-white px-4 py-1.5 rounded-full whitespace-nowrap"
+                      style={{
+                        background: `linear-gradient(135deg, ${TEAL}, ${TEAL_LT})`,
+                        boxShadow:  `0 4px 12px color-mix(in srgb, ${TEAL} 40%, transparent)`,
+                      }}
+                    >
+                      ★ Mais popular
+                    </div>
+                  )}
+                  <div
+                    className={cn('h-full rounded-2xl p-7 flex flex-col border backdrop-blur-md transition-all duration-300', plano.popular && 'shadow-xl')}
+                    style={{
+                      background:   'rgba(255,255,255,0.65)',
+                      borderColor:  plano.popular ? TEAL : 'rgba(0,0,0,0.08)',
+                      boxShadow:    plano.popular
+                        ? `0 0 0 2px ${TEAL}, 0 24px 60px -16px color-mix(in srgb, ${TEAL} 25%, transparent)`
+                        : undefined,
+                      paddingTop: plano.popular ? '2.25rem' : undefined,
+                    }}
+                  >
+                    <div className="mb-6">
+                      <p className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400 mb-3">
+                        {plano.nome}
+                      </p>
+                      <div className="flex items-end gap-1.5 mb-3">
+                        <span className="font-[family-name:var(--font-dm-serif)] text-5xl">
+                          R${plano.preco}
+                        </span>
+                        <span className="text-sm text-gray-400 mb-1.5">/mês</span>
+                      </div>
+                      <p className="text-sm text-gray-500 leading-relaxed">{plano.desc}</p>
+                    </div>
 
-              <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
-              <div className="absolute bottom-0 left-0 w-64 h-64 bg-teal-lt/20 rounded-full translate-y-1/2 -translate-x-1/2 blur-3xl" />
-            </div>
-          </motion.div>
-        </section>
-      </main>
+                    <ul className="space-y-3 mb-8 flex-1">
+                      {plano.features.map(feat => (
+                        <li key={feat} className="flex items-start gap-2.5">
+                          <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-teal" />
+                          <span className="text-sm text-gray-600">{feat}</span>
+                        </li>
+                      ))}
+                    </ul>
 
-      {/* Footer */}
-      <footer className="px-6 py-12 border-t border-border/40 bg-bg/80 backdrop-blur-md relative z-10">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-8">
-            <div className="flex flex-col items-center md:items-start gap-4">
-              <span className="text-2xl font-heading font-medium text-text-primary">
-                Dent<span className="italic text-teal">IA</span>
-              </span>
-              <p className="text-sm text-text-secondary">© 2024 Odonto.IA. Todos os direitos reservados.</p>
-            </div>
-
-            <div className="flex gap-8">
-              {['Termos', 'Privacidade', 'Contato'].map(label => (
-                <a key={label} href="#" className="text-sm text-text-secondary hover:text-teal transition-colors">
-                  {label}
-                </a>
+                    <Link
+                      href={`/cadastro?plano=${plano.id}`}
+                      className={cn(
+                        'w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5',
+                        plano.popular ? 'text-white' : 'border hover:border-teal/60 hover:text-teal'
+                      )}
+                      style={plano.popular
+                        ? { background: `linear-gradient(135deg, ${TEAL}, ${TEAL_LT})`, boxShadow: `0 4px 16px color-mix(in srgb, ${TEAL} 35%, transparent)` }
+                        : { borderColor: 'rgba(0,0,0,0.1)', color: '#374151' }
+                      }
+                    >
+                      {plano.cta}
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+                </motion.div>
               ))}
             </div>
 
-            <div className="flex gap-4">
-              <button className="p-2 rounded-full hover:text-teal hover:bg-surface-alt transition-colors text-text-secondary">
-                <Phone className="w-5 h-5" />
-              </button>
-              <button className="p-2 rounded-full hover:text-teal hover:bg-surface-alt transition-colors text-text-secondary">
-                <Lock className="w-5 h-5" />
-              </button>
-            </div>
+            <p className="text-center text-xs font-mono text-gray-400 mt-6">
+              dentistas adicionais no plano clínica: R$ 147/mês por dentista
+            </p>
           </div>
+        </section>
+
+        {/* ══════════════════════════════════════ FAQ */}
+        <section id="faq" className="px-6 py-24 relative">
+          <div className="max-w-3xl mx-auto">
+            <motion.div {...fadeIn} className="text-center mb-16">
+              <h2 className="text-3xl md:text-4xl font-[family-name:var(--font-dm-serif)] mb-4">
+                Dúvidas Frequentes
+              </h2>
+              <p className="text-gray-500">Tudo o que você precisa saber sobre o Odonto.IA.</p>
+            </motion.div>
+
+            <motion.div {...fadeIn} className="space-y-3">
+              {FAQS.map((faq, i) => (
+                <div
+                  key={i}
+                  className="rounded-2xl overflow-hidden border backdrop-blur-md transition-colors duration-200"
+                  style={{
+                    background:  'rgba(255,255,255,0.55)',
+                    borderColor: openFaq === i ? `color-mix(in srgb, ${TEAL} 30%, transparent)` : 'rgba(0,0,0,0.07)',
+                  }}
+                >
+                  <button
+                    onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                    className="w-full text-left px-6 py-4 flex items-center justify-between gap-4"
+                    style={{ color: openFaq === i ? TEAL : '#0d0d0d' }}
+                  >
+                    <span className="font-semibold">{faq.q}</span>
+                    <motion.div animate={{ rotate: openFaq === i ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                      <ChevronDown className="w-4 h-4 shrink-0" style={{ color: openFaq === i ? TEAL : '#9ca3af' }} />
+                    </motion.div>
+                  </button>
+                  <AnimatePresence initial={false}>
+                    {openFaq === i && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.25 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="mx-6 mb-4 border-t" style={{ borderColor: `color-mix(in srgb, ${TEAL} 12%, transparent)` }} />
+                        <p className="px-6 pb-5 text-sm text-gray-500 leading-relaxed">{faq.a}</p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              ))}
+            </motion.div>
+          </div>
+        </section>
+
+        {/* ══════════════════════════════════════ CTA FINAL */}
+        <section className="px-6 py-24">
+          <motion.div {...fadeIn} className="max-w-5xl mx-auto">
+            <div
+              className="relative rounded-[3rem] p-12 md:p-20 text-center text-white overflow-hidden"
+              style={{
+                background: `linear-gradient(135deg, #1a5c50 0%, ${TEAL} 50%, #1e7060 100%)`,
+                boxShadow:  `0 32px 80px -20px color-mix(in srgb, ${TEAL} 50%, transparent)`,
+              }}
+            >
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{ backgroundImage: 'radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)', backgroundSize: '28px 28px' }}
+              />
+              <div className="absolute top-0 left-1/4 w-64 h-64 rounded-full blur-3xl" style={{ background: 'rgba(255,255,255,0.1)' }} />
+              <div className="absolute bottom-0 right-1/4 w-64 h-64 rounded-full blur-3xl" style={{ background: 'rgba(0,0,0,0.2)' }} />
+
+              <div className="relative z-10">
+                <h2 className="text-4xl md:text-6xl font-[family-name:var(--font-dm-serif)] mb-8">
+                  Pronto para elevar o nível do seu atendimento?
+                </h2>
+                <p className="text-white/80 text-lg md:text-xl mb-12 max-w-2xl mx-auto">
+                  Cada minuto que você passa documentando é um minuto longe do paciente.
+                  <br className="hidden md:block" />
+                  O Odonto.IA resolve isso.
+                </p>
+                <Link
+                  href="/cadastro?plano=CLINICA"
+                  className="inline-flex items-center gap-2 h-16 px-12 rounded-full text-xl font-semibold transition-all duration-300 hover:scale-105"
+                  style={{ background: '#ffffff', color: TEAL, boxShadow: '0 8px 32px rgba(0,0,0,0.25)' }}
+                >
+                  Começar 7 Dias Grátis
+                  <ArrowRight className="w-5 h-5" />
+                </Link>
+                <p className="mt-6 text-sm text-white/60 font-mono">
+                  Sem cartão de crédito. Cancele quando quiser.
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        </section>
+
+      </main>
+
+      {/* ── FOOTER ──────────────────────────────────────────────── */}
+      <footer
+        className="px-6 py-12 border-t relative z-10"
+        style={{ borderColor: 'rgba(0,0,0,0.07)', background: 'rgba(245,243,239,0.75)', backdropFilter: 'blur(16px)' }}
+      >
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
+          <span className="text-2xl font-[family-name:var(--font-dm-serif)]">
+            Odonto<span className="italic text-teal">.IA</span>
+          </span>
+          <div className="flex gap-8">
+            {['Termos', 'Privacidade', 'Contato'].map(label => (
+              <a key={label} href="#" className="text-sm text-gray-500 hover:text-teal transition-colors">
+                {label}
+              </a>
+            ))}
+          </div>
+          <p className="text-sm text-gray-400">
+            © {new Date().getFullYear()} Odonto.IA. Todos os direitos reservados.
+          </p>
         </div>
       </footer>
     </div>

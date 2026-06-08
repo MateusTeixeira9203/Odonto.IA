@@ -72,10 +72,10 @@ const STATUS_MAP: Record<
   string,
   { label: string; icon: React.ElementType; color: string; bg: string }
 > = {
-  aprovado: { label: 'Aprovado', icon: CheckCircle2, color: 'text-teal', bg: 'bg-teal/10' },
-  enviado:  { label: 'Enviado',  icon: Clock,     color: 'text-text-secondary', bg: 'bg-surface-alt' },
-  rascunho: { label: 'Rascunho', icon: FileText,  color: 'text-text-secondary', bg: 'bg-surface-alt' },
-  recusado: { label: 'Recusado', icon: XCircle,   color: 'text-coral',          bg: 'bg-coral/10' },
+  aprovado: { label: 'Aprovado', icon: CheckCircle2, color: 'text-teal',           bg: 'bg-teal/10' },
+  enviado:  { label: 'Enviado',  icon: Clock,        color: 'text-warning',        bg: 'bg-warning/10' },
+  rascunho: { label: 'Rascunho', icon: FileText,     color: 'text-text-secondary', bg: 'bg-surface-alt' },
+  recusado: { label: 'Recusado', icon: XCircle,      color: 'text-coral',          bg: 'bg-coral/10' },
 };
 
 const formatCurrency = (value: number | null) =>
@@ -697,12 +697,12 @@ export function OrcamentosClient({
       >
         {!isSecretaria && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-surface p-5 rounded-2xl border border-border shadow-sm flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-teal/10 text-teal flex items-center justify-center">
+            <div className="bg-surface p-5 rounded-3xl border border-border shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
+              <div className="w-12 h-12 rounded-xl bg-teal/10 text-teal flex items-center justify-center shrink-0">
                 <CheckCircle2 className="w-6 h-6" />
               </div>
               <div>
-                <div className="text-[10px] font-bold text-text-secondary uppercase tracking-[0.15em] mb-1">
+                <div className="text-xs font-semibold text-text-secondary mb-1">
                   Aprovados (Mês)
                 </div>
                 <div className="font-mono text-2xl font-semibold text-text-primary">
@@ -711,12 +711,12 @@ export function OrcamentosClient({
               </div>
             </div>
 
-            <div className="bg-surface p-5 rounded-2xl border border-border shadow-sm flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-surface-alt text-text-secondary flex items-center justify-center">
+            <div className="bg-surface p-5 rounded-3xl border border-border shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
+              <div className="w-12 h-12 rounded-xl bg-surface-alt text-text-secondary flex items-center justify-center shrink-0">
                 <Clock className="w-6 h-6" />
               </div>
               <div>
-                <div className="text-[10px] font-bold text-text-secondary uppercase tracking-[0.15em] mb-1">
+                <div className="text-xs font-semibold text-text-secondary mb-1">
                   Aguardando
                 </div>
                 <div className="font-mono text-2xl font-semibold text-text-primary">
@@ -725,13 +725,16 @@ export function OrcamentosClient({
               </div>
             </div>
 
-            <div className="p-5 rounded-2xl shadow-lg flex items-center gap-4 text-white backdrop-blur-md"
-              style={{ background: 'rgba(13,13,13,0.92)', border: '1px solid rgba(47,156,133,0.25)' }}>
-              <div className="w-12 h-12 rounded-full bg-teal/15 text-teal flex items-center justify-center">
+            <div className="p-5 rounded-3xl shadow-lg flex items-center gap-4 text-white hover:shadow-xl transition-shadow"
+              style={{
+                background: 'color-mix(in srgb, var(--color-brand-charcoal) 92%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--color-teal) 25%, transparent)',
+              }}>
+              <div className="w-12 h-12 rounded-xl bg-teal/15 text-teal flex items-center justify-center shrink-0">
                 <CircleDollarSign className="w-6 h-6" />
               </div>
               <div>
-                <div className="text-[10px] font-bold text-white/40 uppercase tracking-[0.15em] mb-1">
+                <div className="text-xs font-semibold mb-1" style={{ color: 'rgba(255,255,255,0.45)' }}>
                   Taxa de Conversão
                 </div>
                 <div className="font-mono text-2xl font-semibold text-white">{taxaConversao}%</div>
@@ -746,7 +749,7 @@ export function OrcamentosClient({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="bg-surface rounded-2xl border border-border shadow-sm overflow-hidden"
+        className="bg-surface rounded-3xl border border-border shadow-sm overflow-hidden"
       >
         {/* Barra de busca e filtros */}
         <div className="p-4 border-b border-border flex flex-col sm:flex-row gap-3 items-center bg-surface-alt/30">
@@ -801,19 +804,19 @@ export function OrcamentosClient({
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-border bg-surface-alt/50">
-                <th className="px-6 py-4 text-[10px] font-bold text-text-secondary uppercase tracking-[0.15em]">
+                <th className="px-6 py-4 text-xs font-bold text-text-secondary uppercase tracking-[0.15em]">
                   ID / Data
                 </th>
-                <th className="px-6 py-4 text-[10px] font-bold text-text-secondary uppercase tracking-[0.15em]">
+                <th className="px-6 py-4 text-xs font-bold text-text-secondary uppercase tracking-[0.15em]">
                   Paciente
                 </th>
-                <th className="px-6 py-4 text-[10px] font-bold text-text-secondary uppercase tracking-[0.15em]">
+                <th className="px-6 py-4 text-xs font-bold text-text-secondary uppercase tracking-[0.15em]">
                   Dentista
                 </th>
-                <th className="px-6 py-4 text-[10px] font-bold text-text-secondary uppercase tracking-[0.15em]">
+                <th className="px-6 py-4 text-xs font-bold text-text-secondary uppercase tracking-[0.15em]">
                   Valor Total
                 </th>
-                <th className="px-6 py-4 text-[10px] font-bold text-text-secondary uppercase tracking-[0.15em]">
+                <th className="px-6 py-4 text-xs font-bold text-text-secondary uppercase tracking-[0.15em]">
                   Status
                 </th>
                 <th className="px-6 py-4 text-right" />
@@ -857,13 +860,13 @@ export function OrcamentosClient({
                           {o.id.slice(0, 8).toUpperCase()}
                         </div>
                         {isNovo && (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-teal/15 text-teal text-[9px] font-bold uppercase tracking-wider">
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-teal/15 text-teal text-[10px] font-bold uppercase tracking-wider">
                             <span className="w-1.5 h-1.5 rounded-full bg-teal animate-pulse" />
                             Novo
                           </span>
                         )}
                       </div>
-                      <div className="text-[10px] text-text-secondary mt-1">
+                      <div className="text-xs text-text-secondary mt-1">
                         {format(parseISO(o.created_at), "dd 'de' MMM 'de' yyyy", { locale: ptBR })}
                       </div>
                     </td>
@@ -871,6 +874,11 @@ export function OrcamentosClient({
                       <div className="font-semibold text-sm text-text-primary group-hover:text-teal transition-colors">
                         {o.paciente?.nome ?? '—'}
                       </div>
+                      {o.dentista?.nome && (
+                        <div className="text-xs text-text-secondary mt-0.5">
+                          {o.dentista.nome}
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm text-text-secondary">
@@ -884,7 +892,7 @@ export function OrcamentosClient({
                     </td>
                     <td className="px-6 py-4">
                       <div
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${s.bg} ${s.color}`}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider ${s.bg} ${s.color}`}
                       >
                         <Icon className="w-3 h-3" />
                         {s.label}
@@ -938,7 +946,7 @@ export function OrcamentosClient({
                         <h2 className="font-heading text-xl text-white leading-tight truncate">
                           {selected.paciente?.nome ?? '—'}
                         </h2>
-                        <span className="shrink-0 text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md bg-white/20 text-white">
+                        <span className="shrink-0 text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md bg-white/20 text-white">
                           {STATUS_MAP[selected.status]?.label ?? selected.status}
                         </span>
                       </div>
@@ -992,7 +1000,7 @@ export function OrcamentosClient({
                 {/* Ações rápidas da secretária */}
                 {isSecretaria && selected.status !== 'aprovado' && (
                   <div className="bg-surface-alt/40 border border-border rounded-2xl p-5 space-y-3">
-                    <label className="font-mono text-[10px] text-text-secondary uppercase tracking-widest block">
+                    <label className="font-mono text-xs text-text-secondary uppercase tracking-widest block">
                       Ações Rápidas
                     </label>
                     <div className="grid grid-cols-1 gap-2">
@@ -1053,7 +1061,7 @@ export function OrcamentosClient({
                 {/* Alterar status (apenas dentista/admin) */}
                 {!isSecretaria && (
                 <div>
-                  <label className="font-mono text-[10px] text-text-secondary uppercase tracking-widest mb-2 block">
+                  <label className="font-mono text-xs text-text-secondary uppercase tracking-widest mb-2 block">
                     Status do Orçamento
                   </label>
                   <div className="flex flex-wrap gap-2">
@@ -1062,7 +1070,7 @@ export function OrcamentosClient({
                         key={s}
                         disabled={isSaving}
                         onClick={() => void handleStatusChange(selected.id, s)}
-                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all disabled:opacity-50 ${
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 ${
                           selected.status === s
                             ? `${STATUS_MAP[s].bg} ${STATUS_MAP[s].color} ring-2 ring-current ring-offset-1`
                             : 'bg-surface-alt text-text-secondary hover:bg-surface-alt'
@@ -1089,7 +1097,7 @@ export function OrcamentosClient({
                     <div className="bg-teal/10 rounded-2xl p-5 border border-teal/20 space-y-3">
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <div className="text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-1">
+                          <div className="text-xs font-bold text-text-secondary uppercase tracking-widest mb-1">
                             Valor Total
                           </div>
                           <div className="font-mono text-3xl font-bold text-teal">
@@ -1102,7 +1110,7 @@ export function OrcamentosClient({
                           )}
                         </div>
                         {quitado && (
-                          <span className="shrink-0 text-[10px] font-bold uppercase px-2.5 py-1 rounded-full bg-teal text-white tracking-wider">
+                          <span className="shrink-0 text-xs font-bold uppercase px-2.5 py-1 rounded-full bg-teal text-white tracking-wider">
                             Quitado
                           </span>
                         )}
@@ -1119,7 +1127,7 @@ export function OrcamentosClient({
                           </div>
                           <div className="grid grid-cols-2 gap-3 border-t border-teal/20 pt-2">
                             <div>
-                              <div className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-0.5">
+                              <div className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-0.5">
                                 Pago
                               </div>
                               <div className="font-mono text-lg font-bold text-teal">
@@ -1127,7 +1135,7 @@ export function OrcamentosClient({
                               </div>
                             </div>
                             <div>
-                              <div className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-0.5">
+                              <div className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-0.5">
                                 {quitado ? 'Saldo' : 'Falta Pagar'}
                               </div>
                               <div
@@ -1157,7 +1165,7 @@ export function OrcamentosClient({
 
                 {/* Itens do orçamento */}
                 <div>
-                  <label className="font-mono text-[10px] text-text-secondary uppercase tracking-widest mb-3 block">
+                  <label className="font-mono text-xs text-text-secondary uppercase tracking-widest mb-3 block">
                     Procedimentos
                   </label>
                   {editMode ? (
@@ -1188,7 +1196,7 @@ export function OrcamentosClient({
                           </div>
                           <div className="flex gap-2">
                             <div className="space-y-1 w-20">
-                              <label className="text-[10px] text-text-secondary">Qtd</label>
+                              <label className="text-xs text-text-secondary">Qtd</label>
                               <Input
                                 type="number"
                                 min="1"
@@ -1206,7 +1214,7 @@ export function OrcamentosClient({
                               />
                             </div>
                             <div className="space-y-1 flex-1">
-                              <label className="text-[10px] text-text-secondary">
+                              <label className="text-xs text-text-secondary">
                                 Preço unit. (R$)
                               </label>
                               <Input
@@ -1290,7 +1298,7 @@ export function OrcamentosClient({
                 {/* Pagamentos registrados */}
                 {selected.pagamentos.length > 0 && (
                   <div>
-                    <label className="font-mono text-[10px] text-text-secondary uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <label className="font-mono text-xs text-text-secondary uppercase tracking-widest mb-3 flex items-center gap-2">
                       <CreditCard className="w-3 h-3" /> Parcelas
                     </label>
                     <div className="space-y-2">
@@ -1309,7 +1317,7 @@ export function OrcamentosClient({
                               <div className="font-mono text-sm font-semibold text-text-primary">
                                 {formatCurrency(pag.valor)}
                               </div>
-                              <div className="text-[10px] text-text-secondary mt-0.5 flex items-center gap-2 flex-wrap">
+                              <div className="text-xs text-text-secondary mt-0.5 flex items-center gap-2 flex-wrap">
                                 {pag.forma_pagamento && (
                                   <span className="uppercase">{pag.forma_pagamento.replace(/_/g, ' ')}</span>
                                 )}
@@ -1329,7 +1337,7 @@ export function OrcamentosClient({
                               </div>
                             </div>
                             <span
-                              className={`shrink-0 text-[10px] font-bold uppercase px-2 py-0.5 rounded-md ${
+                              className={`shrink-0 text-xs font-bold uppercase px-2 py-0.5 rounded-md ${
                                 pag.status === 'pago'
                                   ? 'bg-teal/10 text-teal'
                                   : isVencido
@@ -1353,14 +1361,14 @@ export function OrcamentosClient({
                   return (
                 <div className="bg-surface-alt/40 border border-border rounded-2xl p-5 space-y-4">
                   <div className="flex items-center justify-between">
-                    <label className="font-mono text-[10px] text-text-secondary uppercase tracking-widest flex items-center gap-2">
+                    <label className="font-mono text-xs text-text-secondary uppercase tracking-widest flex items-center gap-2">
                       <CreditCard className="w-3 h-3" /> Registrar Pagamento
                     </label>
                     {restante > 0 && (
                       <button
                         type="button"
                         onClick={() => setPagForm(f => ({ ...f, valor: restante.toFixed(2) }))}
-                        className="text-[10px] font-bold text-teal hover:text-teal-lt transition-colors uppercase tracking-wider"
+                        className="text-xs font-bold text-teal hover:text-teal-lt transition-colors uppercase tracking-wider"
                       >
                         Preencher restante
                       </button>
@@ -1642,7 +1650,7 @@ export function OrcamentosClient({
               {/* Seletor de dentista — apenas para secretária */}
               {isSecretaria && dentistas.length > 1 && (
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">
+                  <Label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
                     Dentista <span className="text-coral">*</span>
                   </Label>
                   <Select value={novoOrcDentistaId} onValueChange={(v) => v && setNovoOrcDentistaId(v)}>
@@ -1660,7 +1668,7 @@ export function OrcamentosClient({
 
               {/* Busca de paciente */}
               <div className="space-y-2 relative">
-                <Label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">
+                <Label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
                   Paciente <span className="text-coral">*</span>
                 </Label>
                 <Input
@@ -1706,7 +1714,7 @@ export function OrcamentosClient({
               {/* ── Checklist de procedimentos da ficha ── */}
               {novoOrcPacienteId && (
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest block">
+                  <Label className="text-xs font-bold text-text-secondary uppercase tracking-widest block">
                     Procedimentos Pendentes na Ficha
                   </Label>
                   {fichaProcsLoading ? (
@@ -1744,8 +1752,8 @@ export function OrcamentosClient({
                                 {proc.descricao}
                               </p>
                               <div className="flex items-center gap-2 mt-0.5">
-                                <span className="font-mono text-[10px] font-bold text-teal">D{proc.tooth}</span>
-                                <span className="text-[10px] text-text-secondary">{date}</span>
+                                <span className="font-mono text-xs font-bold text-teal">D{proc.tooth}</span>
+                                <span className="text-xs text-text-secondary">{date}</span>
                               </div>
                             </div>
                           </button>
@@ -1758,14 +1766,14 @@ export function OrcamentosClient({
 
               {/* ── Itens do orçamento ── */}
               <div className="space-y-3">
-                <Label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest block">
+                <Label className="text-xs font-bold text-text-secondary uppercase tracking-widest block">
                   Itens do Orçamento
                 </Label>
 
                 {novoOrcItens.map((item, idx) => (
                   <div key={idx} className="bg-surface-alt rounded-2xl border border-border p-4 space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="font-mono text-[10px] text-text-secondary uppercase tracking-widest">
+                      <span className="font-mono text-xs text-text-secondary uppercase tracking-widest">
                         {item.fichaKey ? 'Da ficha' : `Item ${idx + 1}`}
                       </span>
                       {novoOrcItens.length > 1 && (
@@ -1896,7 +1904,7 @@ export function OrcamentosClient({
 
                 {/* Desconto */}
                 <div className="space-y-3">
-                  <Label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest block">
+                  <Label className="text-xs font-bold text-text-secondary uppercase tracking-widest block">
                     Desconto
                   </Label>
 
@@ -1957,7 +1965,7 @@ export function OrcamentosClient({
                       {formatCurrency(novoOrcTotal)}
                     </span>
                   </div>
-                  <p className="text-[10px] text-text-secondary text-right font-mono">
+                  <p className="text-xs text-text-secondary text-right font-mono">
                     {novoOrcItens.filter(i => i.descricao || i.preco).length} item(s)
                   </p>
                 </div>

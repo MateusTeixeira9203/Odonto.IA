@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, parseISO, addMonths, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -10,6 +11,7 @@ import {
   Plus, Trash2, Loader2, CircleDollarSign, UserRound,
   Eye, EyeOff, Clock, ArrowDownLeft, ArrowUpRight,
   CreditCard, AlertCircle, ExternalLink, Download,
+  X, CheckCircle2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,15 +20,15 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  Sheet, SheetContent, SheetHeader, SheetTitle,
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose, SheetDescription,
 } from '@/components/ui/sheet';
 import { toast } from 'sonner';
 import type {
   Despesa, SaldoMes, NovaDespesaForm, ChartPoint,
   ReceitaManual, NovaReceitaForm, HoraClinicaResult,
-  PagamentoPago, PagamentoPendente,
+  PagamentoPago, PagamentoPendente, OrcamentoPendente, FormaRecebimento,
 } from '../actions';
-import { criarDespesa, excluirDespesa, criarReceita, excluirReceita, exportarFinanceiroCsv } from '../actions';
+import { criarDespesa, excluirDespesa, criarReceita, excluirReceita, exportarFinanceiroCsv, buscarOrcamentosPendentesPorPaciente, registrarRecebimento } from '../actions';
 import { downloadCsv } from '@/lib/export/csv';
 import { GanhosDespesasChart } from '../../_components/ganhos-despesas-chart';
 import type { DentistaRole } from '@/types/database';
@@ -124,9 +126,85 @@ export function FinanceiroClient({
   const [saldo,    setSaldo]    = useState<SaldoMes>(saldoInicial);
   const pagamentosPagos     = pagamentosPagosIniciais;
   const pagamentosPendentes = pagamentosPendentesIniciais;
+  const isSecretaria = role === 'secretaria';
   const [isPrivacy, setIsPrivacy] = useState(false);
   const [sheetMode, setSheetMode] = useState<SheetMode>(null);
   const [isExporting, setIsExporting] = useState(false);
+
+  // ── Estado: Registrar Recebimento (secretária) ──────────────────────────────
+  const [isRecebimentoOpen, setIsRecebimentoOpen]     = useState(false);
+  const [recPacienteSearch, setRecPacienteSearch]     = useState('');
+  const [recPacienteId, setRecPacienteId]             = useState('');
+  const [recPacienteNome, setRecPacienteNome]         = useState('');
+  const [recSugestoes, setRecSugestoes]               = useState<{ id: string; nome: string }[]>([]);
+  const [recShowSugestoes, setRecShowSugestoes]       = useState(false);
+  const [recDentistaNome, setRecDentistaNome]         = useState('');
+  const [recDentistaId, setRecDentistaId]             = useState('');
+  const [recOrcamentos, setRecOrcamentos]             = useState<OrcamentoPendente[]>([]);
+  const [recOrcamentoId, setRecOrcamentoId]           = useState('');
+  const [recValor, setRecValor]                       = useState('');
+  const [recForma, setRecForma]                       = useState<FormaRecebimento>('pix');
+  const [recData, setRecData]                         = useState(() => new Date().toISOString().split('T')[0]);
+  const [recLoading, setRecLoading]                   = useState(false);
+  const [recBuscando, setRecBuscando]                 = useState(false);
+  const [recError, setRecError]                       = useState<string | null>(null);
+  const supabaseClient = useMemo(() => createClient(), []);
+
+  const buscarPacientesRec = useCallback(async (nome: string) => {
+    if (nome.length < 2) { setRecSugestoes([]); return; }
+    const { data } = await supabaseClient
+      .from('pacientes')
+      .select('id, nome')
+      .ilike('nome', `%${nome}%`)
+      .limit(6);
+    setRecSugestoes(data ?? []);
+  }, [supabaseClient]);
+
+  const aoSelecionarPaciente = async (id: string, nome: string) => {
+    setRecPacienteId(id);
+    setRecPacienteNome(nome);
+    setRecShowSugestoes(false);
+    setRecBuscando(true);
+    setRecOrcamentos([]);
+    setRecOrcamentoId('');
+    setRecValor('');
+    const result = await buscarOrcamentosPendentesPorPaciente(id);
+    setRecDentistaNome(result.dentistaNome ?? '');
+    setRecDentistaId(result.dentistaId ?? '');
+    setRecOrcamentos(result.orcamentos);
+    if (result.orcamentos.length === 1) {
+      setRecOrcamentoId(result.orcamentos[0].id);
+      setRecValor(String(result.orcamentos[0].valor_pendente));
+    }
+    setRecBuscando(false);
+  };
+
+  const handleRegistrarRecebimento = async () => {
+    if (!recPacienteId) { setRecError('Selecione o paciente.'); return; }
+    if (!recOrcamentoId) { setRecError('Selecione o orçamento.'); return; }
+    const valorNum = parseFloat(recValor.replace(',', '.'));
+    if (!valorNum || valorNum <= 0) { setRecError('Informe um valor válido.'); return; }
+    setRecError(null);
+    setRecLoading(true);
+    const result = await registrarRecebimento({
+      pacienteId:     recPacienteId,
+      orcamentoId:    recOrcamentoId,
+      valor:          valorNum,
+      formaPagamento: recForma,
+      data:           recData,
+      dentistaId:     recDentistaId || undefined,
+    });
+    if (result.error) {
+      setRecError(result.error);
+    } else {
+      setIsRecebimentoOpen(false);
+      setRecPacienteSearch(''); setRecPacienteId(''); setRecPacienteNome('');
+      setRecOrcamentos([]); setRecOrcamentoId(''); setRecValor('');
+      router.refresh();
+      toast.success('Recebimento registrado!');
+    }
+    setRecLoading(false);
+  };
 
   async function handleExportCsv() {
     setIsExporting(true);
@@ -297,7 +375,7 @@ export function FinanceiroClient({
       {/* ── Cabeçalho ──────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-teal/10 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-teal/10 flex items-center justify-center">
             <Wallet className="w-5 h-5 text-teal" />
           </div>
           <div>
@@ -309,6 +387,16 @@ export function FinanceiroClient({
         </div>
 
         <div className="flex items-center gap-3">
+          {isSecretaria && (
+            <button
+              onClick={() => setIsRecebimentoOpen(true)}
+              className="bg-gradient-to-r from-teal to-teal-lt text-white px-4 py-2 rounded-xl font-semibold text-sm flex items-center gap-2 shadow-[0_4px_16px_rgba(47,156,133,0.35)] hover:-translate-y-0.5 transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              Registrar Recebimento
+            </button>
+          )}
+
           <button
             onClick={() => setIsPrivacy(v => !v)}
             title={isPrivacy ? 'Mostrar valores' : 'Ocultar valores'}
@@ -376,7 +464,7 @@ export function FinanceiroClient({
               {/* ── Zona 1: Hero — Custo por Hora ──────────────────────────── */}
               <div
                 className="rounded-3xl border border-teal/25 bg-gradient-to-br from-teal/8 via-surface to-surface p-8 mb-6 relative overflow-hidden"
-                style={{ boxShadow: '0 10px 40px -12px rgba(47,156,133,0.18)' }}
+                style={{ boxShadow: '0 10px 40px -12px color-mix(in srgb, var(--color-teal) 18%, transparent)' }}
               >
                 {/* Decoração de fundo */}
                 <div className="absolute right-6 top-6 w-24 h-24 rounded-full bg-teal/5 blur-2xl pointer-events-none" />
@@ -579,11 +667,11 @@ export function FinanceiroClient({
 
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${badgeCss}`}>
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full shrink-0 ${badgeCss}`}>
                               {badge}
                             </span>
                             {subInfo && (
-                              <span className={`font-mono text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-md font-bold ${
+                              <span className={`font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-md font-bold ${
                                 subInfo === 'fixo'
                                   ? 'bg-teal/10 text-teal'
                                   : subInfo === 'orçamento'
@@ -596,7 +684,7 @@ export function FinanceiroClient({
                           </div>
                           <div className="flex items-center gap-2 mt-0.5">
                             <span className="text-sm text-text-primary font-medium truncate">{label}</span>
-                            <span className="font-mono text-[10px] text-text-secondary shrink-0">
+                            <span className="font-mono text-xs text-text-secondary shrink-0">
                               {format(parseISO(l.data), 'dd/MM')}
                             </span>
                           </div>
@@ -667,7 +755,7 @@ export function FinanceiroClient({
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                             vencido ? 'bg-coral/10 text-coral' : 'bg-surface-alt text-text-secondary'
                           }`}>
                             {vencido ? 'Vencido' : 'Pendente'}
@@ -676,7 +764,7 @@ export function FinanceiroClient({
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className="text-sm text-text-primary font-medium truncate">{p.paciente_nome}</span>
                           {p.data_vencimento && (
-                            <span className={`font-mono text-[10px] shrink-0 ${vencido ? 'text-coral' : 'text-text-secondary'}`}>
+                            <span className={`font-mono text-xs shrink-0 ${vencido ? 'text-coral' : 'text-text-secondary'}`}>
                               vence {format(parseISO(p.data_vencimento), 'dd/MM')}
                             </span>
                           )}
@@ -870,6 +958,194 @@ export function FinanceiroClient({
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* ── Modal: Registrar Recebimento (secretária) ─────────────────────── */}
+      <Sheet open={isRecebimentoOpen} onOpenChange={(open) => { if (!open) setRecError(null); setIsRecebimentoOpen(open); }}>
+        <SheetContent side="right" showCloseButton={false} className="!w-full sm:!w-[520px] p-0 gap-0 flex flex-col bg-surface border-l border-border">
+          <SheetDescription className="sr-only">Registrar recebimento de pagamento vinculado a orçamento.</SheetDescription>
+
+          {/* Header */}
+          <div className="relative px-6 pt-6 pb-5 shrink-0" style={{ background: 'linear-gradient(135deg, #2f9c85 0%, #1a7a65 100%)' }}>
+            <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent pointer-events-none" />
+            <div className="relative flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/15">
+                  <CircleDollarSign className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <SheetTitle className="font-heading font-semibold text-xl text-white leading-tight">Registrar Recebimento</SheetTitle>
+                  <p className="text-white/70 text-xs mt-0.5">Vincule o pagamento ao paciente e orçamento.</p>
+                </div>
+              </div>
+              <SheetClose render={<button className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors" />}>
+                <X className="w-4 h-4 text-white" />
+              </SheetClose>
+            </div>
+          </div>
+
+          {/* Body */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-5">
+
+            {/* Busca paciente */}
+            <div className="space-y-2 relative">
+              <Label className="text-[10px] font-bold uppercase tracking-[0.18em] text-text-secondary">
+                Paciente <span className="text-coral">*</span>
+              </Label>
+              <div className="relative">
+                <UserRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary/40 pointer-events-none" />
+                <Input
+                  placeholder="Buscar pelo nome..."
+                  value={recPacienteSearch}
+                  autoComplete="off"
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setRecPacienteSearch(v);
+                    setRecPacienteId('');
+                    setRecPacienteNome('');
+                    setRecShowSugestoes(true);
+                    void buscarPacientesRec(v);
+                  }}
+                  onBlur={() => setTimeout(() => setRecShowSugestoes(false), 150)}
+                  className="rounded-xl bg-surface-alt border-border text-text-primary pl-10"
+                />
+              </div>
+              {recShowSugestoes && recSugestoes.length > 0 && (
+                <div className="absolute z-50 w-full bg-surface border border-border rounded-xl shadow-lg overflow-hidden">
+                  {recSugestoes.map((p) => (
+                    <button key={p.id} type="button"
+                      onClick={() => { setRecPacienteSearch(p.nome); void aoSelecionarPaciente(p.id, p.nome); }}
+                      className="w-full px-4 py-2.5 text-sm text-left hover:bg-surface-alt transition-colors text-text-primary"
+                    >
+                      {p.nome}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {recPacienteId && (
+                <div
+                  className="flex items-center gap-2.5 px-3 py-2.5 border border-teal/25 rounded-xl text-sm text-teal font-semibold"
+                  style={{ background: 'color-mix(in srgb, var(--color-teal) 8%, var(--color-surface-alt))' }}
+                >
+                  <UserRound className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">{recPacienteNome}</span>
+                  {recDentistaNome && (
+                    <span className="ml-auto text-xs text-text-secondary font-normal shrink-0">{recDentistaNome}</span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Orçamentos pendentes */}
+            {recPacienteId && (
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold uppercase tracking-[0.18em] text-text-secondary">
+                  Orçamento <span className="text-coral">*</span>
+                </Label>
+                {recBuscando ? (
+                  <div className="flex items-center gap-2 text-sm text-text-secondary py-3">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Buscando orçamentos...
+                  </div>
+                ) : recOrcamentos.length === 0 ? (
+                  <div className="px-4 py-3 bg-surface-alt rounded-xl border border-border text-sm text-text-secondary">
+                    Nenhum orçamento aprovado com saldo pendente.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {recOrcamentos.map((o) => (
+                      <button
+                        key={o.id}
+                        type="button"
+                        onClick={() => { setRecOrcamentoId(o.id); setRecValor(String(o.valor_pendente)); }}
+                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all text-left ${
+                          recOrcamentoId === o.id
+                            ? 'border-teal bg-teal/8 text-teal'
+                            : 'border-border bg-surface-alt text-text-primary hover:border-teal/40'
+                        }`}
+                      >
+                        <div>
+                          <p className="text-sm font-semibold">{o.descricao_resumo}</p>
+                          <p className="text-xs text-text-secondary mt-0.5">
+                            Pendente: R$ {o.valor_pendente.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                        {recOrcamentoId === o.id && <CheckCircle2 className="w-4 h-4 text-teal shrink-0" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Valor + Data + Forma */}
+            {recOrcamentoId && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-bold uppercase tracking-[0.18em] text-text-secondary">
+                      Valor (R$) <span className="text-coral">*</span>
+                    </Label>
+                    <Input
+                      type="number" step="0.01" min="0.01"
+                      value={recValor}
+                      onChange={(e) => setRecValor(e.target.value)}
+                      className="rounded-xl bg-surface-alt border-border text-text-primary font-mono"
+                      placeholder="0,00"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-bold uppercase tracking-[0.18em] text-text-secondary">Data</Label>
+                    <Input
+                      type="date" value={recData}
+                      onChange={(e) => setRecData(e.target.value)}
+                      className="rounded-xl bg-surface-alt border-border text-text-primary"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold uppercase tracking-[0.18em] text-text-secondary">Forma de Pagamento</Label>
+                  <Select value={recForma} onValueChange={(v) => setRecForma(v as FormaRecebimento)}>
+                    <SelectTrigger className="rounded-xl bg-surface-alt border-border text-text-primary">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-surface border-border">
+                      <SelectItem value="pix">PIX</SelectItem>
+                      <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                      <SelectItem value="transferencia">Transferência</SelectItem>
+                      <SelectItem value="cartao_credito">Cartão Crédito</SelectItem>
+                      <SelectItem value="cartao_debito">Cartão Débito</SelectItem>
+                      <SelectItem value="boleto">Boleto</SelectItem>
+                      <SelectItem value="outro">Outro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="shrink-0 px-6 py-5 border-t border-border space-y-3 bg-surface">
+            {recError && (
+              <p className="text-xs text-red-500 bg-red-500/10 rounded-lg px-3 py-2">{recError}</p>
+            )}
+            <Button
+              onClick={() => void handleRegistrarRecebimento()}
+              disabled={recLoading || !recOrcamentoId}
+              className="w-full bg-gradient-to-r from-teal to-teal-lt text-white rounded-2xl py-3 font-bold shadow-[0_8px_32px_rgba(47,156,133,0.40)] hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0 transition-all"
+            >
+              {recLoading
+                ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Registrando...</>
+                : 'Confirmar Recebimento'
+              }
+            </Button>
+            <button
+              onClick={() => setIsRecebimentoOpen(false)}
+              className="w-full py-1.5 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
+            >
+              Cancelar
+            </button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </motion.div>
   );
 }
@@ -920,12 +1196,12 @@ function IntelCard({
       : 'text-coral';
 
   return (
-    <div className="bg-surface rounded-2xl border border-border p-4">
-      <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-text-secondary mb-2">{label}</p>
+    <div className="bg-surface rounded-3xl border border-border p-4 hover:shadow-sm transition-shadow">
+      <p className="text-xs font-semibold text-text-secondary mb-2">{label}</p>
       <p className={`font-mono text-xl font-bold tabular-nums ${valueColor}`}>
         {isPrivacy ? '•••' : value}
       </p>
-      <p className="text-[10px] text-text-secondary mt-1">{sub}</p>
+      <p className="text-xs text-text-secondary mt-1">{sub}</p>
     </div>
   );
 }
@@ -949,7 +1225,7 @@ function MiniKpi({
     : Math.abs(valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
-    <div className={`px-4 py-3 rounded-2xl border min-w-[120px] ${
+    <div className={`px-4 py-3 rounded-3xl border min-w-[120px] ${
       destaque
         ? isNeg
           ? 'bg-coral/5 border-coral/20'
@@ -958,7 +1234,7 @@ function MiniKpi({
     }`}>
       <div className={`flex items-center gap-1.5 mb-1 ${isTeal ? 'text-teal' : 'text-coral'}`}>
         {icon}
-        <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-text-secondary">{label}</span>
+        <span className="text-xs font-semibold text-text-secondary">{label}</span>
       </div>
       <div className={`font-mono text-base font-semibold tabular-nums ${
         destaque ? (isNeg ? 'text-coral' : 'text-teal') : 'text-text-primary'

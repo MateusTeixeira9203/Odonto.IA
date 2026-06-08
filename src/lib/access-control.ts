@@ -11,15 +11,15 @@ import type { PlanoId } from '@/lib/planos';
  *
  * Regras:
  * - Plano SOLO: o admin/dentista gerencia tudo sozinho → pode ver.
- * - Plano BASICO ou CLINICA: a secretária é responsável pelo bot → só ela vê.
+ * - Plano CLINICA: a secretária é responsável pelo bot → só ela vê.
  */
 export function canViewWhatsApp(
   role: DentistaRole,
   plan: PlanoId | null | undefined,
 ): boolean {
-  if (plan === 'SOLO') {
+  if (!plan || plan === 'SOLO' || (plan as string) === 'BASICO') {
     return role === 'admin' || role === 'dentista';
   }
-  // BASICO / CLINICA: apenas secretária
+  // CLINICA: apenas secretária
   return role === 'secretaria';
 }

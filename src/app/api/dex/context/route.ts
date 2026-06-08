@@ -16,6 +16,17 @@ export interface DexContextData {
   aniversariantesHoje: { nome: string; id: string }[];
   consultasSemana: number;
   orcamentosAprovadosSemana: number;
+  /** Agendamentos marcados para amanhã */
+  agendamentosAmanha: number;
+  /** Pacientes sem nenhuma ficha clínica nos últimos 60 dias */
+  pacientesInativos60d: number;
+  /** Orçamentos aprovados sem agendamento futuro associado */
+  orcamentosAprovadosSemAgendamento: number;
+  /** Listas de drill-down para cada insight (até 5 itens cada) */
+  orcamentosAtrasados30dList: { id: string; paciente: string; pacienteId: string; total: number }[];
+  followUpPendentesList: { id: string; paciente: string; pacienteId: string; total: number }[];
+  orcamentosAprovadosSemAgendamentoList: { id: string; paciente: string; pacienteId: string; total: number }[];
+  pacientesInativos60dList: { id: string; nome: string }[];
 }
 
 /**
@@ -54,6 +65,15 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     tresDiasAtras.setDate(tresDiasAtras.getDate() - 3);
     const trintaDiasAtras = new Date(agora);
     trintaDiasAtras.setDate(agora.getDate() - 30);
+    const sessentaDiasAtras = new Date(agora);
+    sessentaDiasAtras.setDate(agora.getDate() - 60);
+
+    // Janela de amanhã
+    const amanhaInicio = new Date(agora);
+    amanhaInicio.setDate(agora.getDate() + 1);
+    amanhaInicio.setHours(0, 0, 0, 0);
+    const amanhaFim = new Date(amanhaInicio);
+    amanhaFim.setHours(23, 59, 59, 999);
 
     // Padrão MM-DD para filtrar aniversariantes do dia
     const mesStr = String(agora.getMonth() + 1).padStart(2, '0');
@@ -71,6 +91,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       aniversariantesRes,
       consultasSemanaRes,
       orcamentosAprovadosSemanaRes,
+      agendamentosAmanhaRes,
+      pacientesInativos60dRes,
+      orcamentosAprovadosSemAgendamentoRes,
+      atrasados30dListRes,
+      followUpListRes,
+      aprovadosSemAgendamentoListRes,
+      inativos60dListRes,
     ] = await Promise.all([
       supabase
         .from('agendamentos')
@@ -156,6 +183,70 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         .eq('status', 'aprovado')
         .gte('updated_at', semanaInicio.toISOString())
         .lte('updated_at', semanaFim.toISOString()),
+
+      // Agendamentos de amanhã
+      supabase
+        .from('agendamentos')
+        .select('id', { count: 'exact', head: true })
+        .eq('clinica_id', dentista.clinica_id)
+        .gte('data_hora', amanhaInicio.toISOString())
+        .lte('data_hora', amanhaFim.toISOString())
+        .not('status', 'eq', 'cancelled'),
+
+      // Pacientes inativos — sem ficha clínica nos últimos 60 dias
+      // Aproximação: pacientes da clínica sem nenhuma ficha recente
+      supabase
+        .from('pacientes')
+        .select('id', { count: 'exact', head: true })
+        .eq('clinica_id', dentista.clinica_id)
+        .lt('updated_at', sessentaDiasAtras.toISOString()),
+
+      // Orçamentos aprovados sem agendamento futuro
+      supabase
+        .from('orcamentos')
+        .select('id', { count: 'exact', head: true })
+        .eq('clinica_id', dentista.clinica_id)
+        .eq('status', 'aprovado')
+        .lt('updated_at', tresDiasAtras.toISOString()),
+
+      // Lista drill-down: atrasados +30 dias
+      supabase
+        .from('orcamentos')
+        .select('id, total, paciente:pacientes(id, nome)')
+        .eq('clinica_id', dentista.clinica_id)
+        .eq('status', 'enviado')
+        .lte('updated_at', trintaDiasAtras.toISOString())
+        .order('updated_at', { ascending: true })
+        .limit(5),
+
+      // Lista drill-down: follow-ups pendentes (+3 dias)
+      supabase
+        .from('orcamentos')
+        .select('id, total, paciente:pacientes(id, nome)')
+        .eq('clinica_id', dentista.clinica_id)
+        .eq('status', 'enviado')
+        .lte('updated_at', tresDiasAtras.toISOString())
+        .order('updated_at', { ascending: true })
+        .limit(5),
+
+      // Lista drill-down: aprovados sem agendamento
+      supabase
+        .from('orcamentos')
+        .select('id, total, paciente:pacientes(id, nome)')
+        .eq('clinica_id', dentista.clinica_id)
+        .eq('status', 'aprovado')
+        .lt('updated_at', tresDiasAtras.toISOString())
+        .order('updated_at', { ascending: true })
+        .limit(5),
+
+      // Lista drill-down: pacientes inativos +60 dias
+      supabase
+        .from('pacientes')
+        .select('id, nome')
+        .eq('clinica_id', dentista.clinica_id)
+        .lt('updated_at', sessentaDiasAtras.toISOString())
+        .order('updated_at', { ascending: true })
+        .limit(5),
     ]);
 
     const pacienteData = proximoRes.data?.paciente as { nome: string } | null | undefined;
@@ -175,19 +266,55 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       id: p.id as string,
     }));
 
+    // Helper para mapear lista de orçamentos com join de paciente
+    function mapOrcList(
+      data: { id: unknown; total: unknown; paciente: unknown }[] | null,
+    ) {
+      return (data ?? []).map((o) => {
+        const pac = o.paciente as { id: string; nome: string } | null;
+        return {
+          id: o.id as string,
+          paciente: pac?.nome ?? 'Paciente',
+          pacienteId: pac?.id ?? '',
+          total: (o.total as number) ?? 0,
+        };
+      }).filter((o) => !!o.pacienteId);
+    }
+
+    const orcamentosAtrasados30dList = mapOrcList(
+      atrasados30dListRes.data as { id: unknown; total: unknown; paciente: unknown }[] | null,
+    );
+    const followUpPendentesList = mapOrcList(
+      followUpListRes.data as { id: unknown; total: unknown; paciente: unknown }[] | null,
+    );
+    const orcamentosAprovadosSemAgendamentoList = mapOrcList(
+      aprovadosSemAgendamentoListRes.data as { id: unknown; total: unknown; paciente: unknown }[] | null,
+    );
+    const pacientesInativos60dList = (inativos60dListRes.data ?? []).map((p) => ({
+      id: p.id as string,
+      nome: p.nome as string,
+    }));
+
     return NextResponse.json({
-      agendamentosHoje:          agendamentosRes.count ?? 0,
+      agendamentosHoje:                         agendamentosRes.count ?? 0,
       agendamentosHojeList,
-      orcamentosPendentes:       orcamentosRes.count ?? 0,
-      orcamentosAtrasados30d:    orcamentosAtrasados30dRes.count ?? 0,
-      proximoPaciente:           pacienteData?.nome ?? null,
-      proximoAgendamentoId:      (proximoRes.data?.id as string | null) ?? null,
+      orcamentosPendentes:                      orcamentosRes.count ?? 0,
+      orcamentosAtrasados30d:                   orcamentosAtrasados30dRes.count ?? 0,
+      proximoPaciente:                          pacienteData?.nome ?? null,
+      proximoAgendamentoId:                     (proximoRes.data?.id as string | null) ?? null,
       proximoHorario,
-      receitaProjetadaHoje:      receitaHoje,
-      followUpPendentes:         followUpRes.count ?? 0,
-      aniversariantesHoje:       aniversariantes,
-      consultasSemana:           consultasSemanaRes.count ?? 0,
-      orcamentosAprovadosSemana: orcamentosAprovadosSemanaRes.count ?? 0,
+      receitaProjetadaHoje:                     receitaHoje,
+      followUpPendentes:                        followUpRes.count ?? 0,
+      aniversariantesHoje:                      aniversariantes,
+      consultasSemana:                          consultasSemanaRes.count ?? 0,
+      orcamentosAprovadosSemana:                orcamentosAprovadosSemanaRes.count ?? 0,
+      agendamentosAmanha:                       agendamentosAmanhaRes.count ?? 0,
+      pacientesInativos60d:                     pacientesInativos60dRes.count ?? 0,
+      orcamentosAprovadosSemAgendamento:        orcamentosAprovadosSemAgendamentoRes.count ?? 0,
+      orcamentosAtrasados30dList,
+      followUpPendentesList,
+      orcamentosAprovadosSemAgendamentoList,
+      pacientesInativos60dList,
     } satisfies DexContextData);
   } catch (err) {
     console.error('[dex/context] Erro:', err);
@@ -204,6 +331,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       aniversariantesHoje: [],
       consultasSemana: 0,
       orcamentosAprovadosSemana: 0,
+      agendamentosAmanha: 0,
+      pacientesInativos60d: 0,
+      orcamentosAprovadosSemAgendamento: 0,
+      orcamentosAtrasados30dList: [],
+      followUpPendentesList: [],
+      orcamentosAprovadosSemAgendamentoList: [],
+      pacientesInativos60dList: [],
     } satisfies DexContextData);
   }
 }

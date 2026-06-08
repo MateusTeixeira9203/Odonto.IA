@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter, usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Bot, Send, ArrowLeft, Stethoscope, AlertTriangle, Clock, TrendingUp, CalendarDays, DollarSign, ChevronRight } from 'lucide-react';
+import { X, Bot, ArrowLeft, Stethoscope, AlertTriangle, AlertCircle, Mail, CalendarX, UserMinus, TrendingUp, CalendarDays, DollarSign, ChevronRight } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import type { DentistaRole } from '@/types/database';
 import type { PlanoId } from '@/lib/planos';
 import type { DexContextData } from '@/app/api/dex/context/route';
@@ -13,30 +14,22 @@ import type { DexConsultationContext } from '@/app/api/dex/consultation-context/
 
 const userOnboardingKey = (id: string) => `dex_onboarding_v1_${id}`;
 
-interface GeminiMessage {
-  role: 'user' | 'model';
-  parts: Array<{ text: string }>;
-}
-
-interface ChatMsg {
-  role: 'user' | 'dex';
-  text: string;
-}
-
 interface DexWidgetProps {
   role: DentistaRole;
   plano?: PlanoId;
   nome: string;
   dentistaId: string;
+  hideTrigger?: boolean;
 }
 
-export function DexWidget({ nome, dentistaId }: DexWidgetProps) {
+export function DexWidget({ nome, dentistaId, hideTrigger }: DexWidgetProps) {
   const router = useRouter();
   const pathname = usePathname();
 
   // ── UI state ─────────────────────────────────────────────────────────────────
   const [isOpen, setIsOpen]           = useState(false);
-  const [panelView, setPanelView]     = useState<'home' | 'chat'>('home');
+  const [panelView, setPanelView]     = useState<'home' | 'insight'>('home');
+  const [activeInsight, setActiveInsight] = useState<InsightItem | null>(null);
   const [isDark, setIsDark]           = useState(false);
   const [mounted, setMounted]         = useState(false);
 
@@ -49,17 +42,8 @@ export function DexWidget({ nome, dentistaId }: DexWidgetProps) {
   const [patientCtxPreload, setPatientCtxPreload]   = useState<DexPatientContext | null>(null);
   const [patientHasAlert, setPatientHasAlert]       = useState(false);
   const [consultaCtx, setConsultaCtx]               = useState<DexConsultationContext | null>(null);
-  const [briefingLoading, setBriefingLoading]       = useState(false);
   // Controla se os alertas de follow-up já foram vistos nesta sessão
   const [followUpSeen, setFollowUpSeen]             = useState(false);
-
-  // ── Chat ─────────────────────────────────────────────────────────────────────
-  const [chatInput, setChatInput]   = useState('');
-  const [chatMessages, setChatMessages] = useState<ChatMsg[]>([]);
-  const [isReplying, setIsReplying] = useState(false);
-  const geminiHistory               = useRef<GeminiMessage[]>([]);
-  const inputRef                    = useRef<HTMLInputElement>(null);
-  const chatEndRef                  = useRef<HTMLDivElement>(null);
 
   const patientId      = pathname?.match(/^\/dashboard\/pacientes\/([^/]+)$/)?.[1] ?? null;
   const consultaId     = pathname?.match(/^\/consulta\/([^/]+)/)?.[1] ?? null;
@@ -74,6 +58,22 @@ export function DexWidget({ nome, dentistaId }: DexWidgetProps) {
     const obs = new MutationObserver(() => setIsDark(el.classList.contains('dark')));
     obs.observe(el, { attributes: true, attributeFilter: ['class'] });
     return () => obs.disconnect();
+  }, []);
+
+  // Listener externo — dock pode abrir/fechar via evento
+  useEffect(() => {
+    const handler = () => {
+      setIsOpen(prev => {
+        const opening = !prev;
+        if (opening) {
+          setPatientHasAlert(false);
+          setFollowUpSeen(true);
+        }
+        return opening;
+      });
+    };
+    window.addEventListener('dex-toggle', handler);
+    return () => window.removeEventListener('dex-toggle', handler);
   }, []);
 
   // Onboarding gate
@@ -133,113 +133,32 @@ export function DexWidget({ nome, dentistaId }: DexWidgetProps) {
       .catch(() => {});
   }, [consultaId, onboardingDone]);
 
-  // Auto-scroll no chat
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatMessages, isReplying]);
-
-  // Foca input ao entrar no chat
-  useEffect(() => {
-    if (panelView === 'chat') setTimeout(() => inputRef.current?.focus(), 200);
-  }, [panelView]);
-
   const handleClose = useCallback(() => {
     setIsOpen(false);
     setPanelView('home');
+    setActiveInsight(null);
   }, []);
 
-  const buildPatientCtxString = useCallback((): string | null => {
-    // Consulta ativa tem prioridade — contexto mais rico
-    if (consultaCtx) {
-      const p = consultaCtx.paciente;
-      const fichas = p.fichasRecentes.length > 0
-        ? p.fichasRecentes.map((f, i) => `${i + 1}. ${f.data}: ${f.queixa ?? 'sem queixa'}`).join('; ')
-        : 'Nenhuma ficha.';
-      const orcs = p.orcamentosAbertos.length > 0
-        ? p.orcamentosAbertos.map((o) => `R$ ${o.total.toFixed(2)} (${o.status})`).join(', ')
-        : null;
-      const plano = p.planejamentoAtivo
-        ? `Planejamento: ${p.planejamentoAtivo.titulo} (${p.planejamentoAtivo.etapas.length} etapas).`
-        : '';
-      const obs = consultaCtx.observacoesAgendamento ? ` Obs: ${consultaCtx.observacoesAgendamento}.` : '';
-      return `EM CONSULTA ATIVA com ${p.nome} (${p.idadeStr}) — horário ${consultaCtx.hora}.${obs} Fichas: ${fichas}.${orcs ? ` Orçamentos: ${orcs}.` : ''} ${plano}`.trim();
+  const handleNavigate = useCallback((href: string) => {
+    handleClose();
+    router.push(href);
+  }, [handleClose, router]);
+
+  const handleInsightClick = useCallback((insight: InsightItem) => {
+    if (insight.items.length > 0) {
+      setActiveInsight(insight);
+      setPanelView('insight');
+    } else {
+      handleClose();
+      router.push(insight.href);
     }
-
-    if (!patientCtxPreload) return null;
-    const p = patientCtxPreload;
-    const fichas = p.fichasRecentes.length > 0
-      ? p.fichasRecentes.map((f, i) => `${i + 1}. ${f.data}: ${f.queixa ?? 'sem queixa'}`).join('; ')
-      : 'Nenhuma ficha.';
-    const orcs = p.orcamentosAbertos.length > 0
-      ? p.orcamentosAbertos.map((o) => `R$ ${o.total.toFixed(2)} (${o.status})`).join(', ')
-      : null;
-    return `Paciente: ${p.nome} (${p.idadeStr}). Fichas: ${fichas}.${orcs ? ` Orçamentos: ${orcs}.` : ''}`;
-  }, [consultaCtx, patientCtxPreload]);
-
-  const sendMessage = useCallback(async (text: string) => {
-    if (!text.trim() || isReplying) return;
-    setChatInput('');
-    setPanelView('chat');
-
-    const userMsg: ChatMsg = { role: 'user', text };
-    setChatMessages((prev) => [...prev, userMsg]);
-    setIsReplying(true);
-
-    const historyToSend = geminiHistory.current.slice(-10);
-    geminiHistory.current = [...geminiHistory.current, { role: 'user', parts: [{ text }] }];
-
-    try {
-      const res = await fetch('/api/dex/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: text,
-          history: historyToSend,
-          patientContext: buildPatientCtxString(),
-        }),
-      });
-      const data = (await res.json()) as { reply?: string; error?: string };
-      if (!res.ok || data.error) {
-        const errMsg = data.error ?? `Erro ${res.status}`;
-        setChatMessages((prev) => [...prev, { role: 'dex', text: `Erro: ${errMsg}` }]);
-      } else {
-        const reply = data.reply ?? 'Não consegui gerar uma resposta. Tente novamente.';
-        geminiHistory.current = [...geminiHistory.current, { role: 'model', parts: [{ text: reply }] }];
-        setChatMessages((prev) => [...prev, { role: 'dex', text: reply }]);
-      }
-    } catch {
-      setChatMessages((prev) => [...prev, { role: 'dex', text: 'Erro de conexão. Tente novamente.' }]);
-    } finally {
-      setIsReplying(false);
-    }
-  }, [isReplying, buildPatientCtxString]);
-
-  const handleBriefing = useCallback(async () => {
-    if (!barCtx?.proximoAgendamentoId || briefingLoading) return;
-    setBriefingLoading(true);
-    setPanelView('chat');
-    setChatMessages((prev) => [...prev, { role: 'user', text: 'Gera o briefing do próximo paciente.' }]);
-    setIsReplying(true);
-    try {
-      const res = await fetch(`/api/dex/briefing?agendamentoId=${barCtx.proximoAgendamentoId}`);
-      const data = (await res.json()) as { briefing?: string; error?: string };
-      const reply = data.briefing ?? 'Não foi possível gerar o briefing.';
-      setChatMessages((prev) => [...prev, { role: 'dex', text: reply }]);
-    } catch {
-      setChatMessages((prev) => [...prev, { role: 'dex', text: 'Erro ao gerar briefing.' }]);
-    } finally {
-      setIsReplying(false);
-      setBriefingLoading(false);
-    }
-  }, [barCtx, briefingLoading]);
+  }, [handleClose, router]);
 
   // ── Cores derivadas do tema ──────────────────────────────────────────────────
   const bg        = isDark ? '#0d0f0e' : '#ffffff';
   const textMain  = isDark ? 'rgba(255,255,255,0.92)' : '#0d1a18';
   const textMuted = isDark ? 'rgba(255,255,255,0.38)' : '#5a7a74';
   const rowBg     = isDark ? 'rgba(255,255,255,0.04)' : '#f5faf9';
-  const inputBg   = isDark ? 'rgba(255,255,255,0.06)' : '#f0faf8';
-  const inputBorder = isDark ? 'rgba(47,156,133,0.25)' : '#b8ddd8';
 
   const firstName = nome.split(' ')[0];
 
@@ -285,7 +204,20 @@ export function DexWidget({ nome, dentistaId }: DexWidgetProps) {
                 transition={{ type: 'spring', damping: 26, stiffness: 300 }}
               >
                 <AnimatePresence mode="wait">
-                  {panelView === 'home' ? (
+                  {panelView === 'insight' && activeInsight ? (
+                    <InsightView
+                      key="insight"
+                      insight={activeInsight}
+                      onBack={() => setPanelView('home')}
+                      onClose={handleClose}
+                      onNavigate={handleNavigate}
+                      isDark={isDark}
+                      bg={bg}
+                      textMain={textMain}
+                      textMuted={textMuted}
+                      rowBg={rowBg}
+                    />
+                  ) : (
                     <HomeView
                       key="home"
                       ctx={barCtx}
@@ -295,40 +227,13 @@ export function DexWidget({ nome, dentistaId }: DexWidgetProps) {
                       patientCtx={patientCtxPreload}
                       isConsultaPage={isConsultaPage}
                       consultaCtx={consultaCtx}
-                      briefingLoading={briefingLoading}
-                      chatInput={chatInput}
-                      onChatInputChange={setChatInput}
-                      onSend={sendMessage}
-                      onBriefing={handleBriefing}
-                      onStartConsulta={() => { handleClose(); router.push(`/consulta/${barCtx?.proximoAgendamentoId}`); }}
-                      onViewFollowUps={() => { handleClose(); router.push('/dashboard/orcamentos'); }}
+                      onInsightClick={handleInsightClick}
                       onClose={handleClose}
                       isDark={isDark}
                       bg={bg}
                       textMain={textMain}
                       textMuted={textMuted}
                       rowBg={rowBg}
-                      inputBg={inputBg}
-                      inputBorder={inputBorder}
-                      inputRef={inputRef}
-                    />
-                  ) : (
-                    <ChatView
-                      key="chat"
-                      messages={chatMessages}
-                      isReplying={isReplying}
-                      chatInput={chatInput}
-                      inputRef={inputRef}
-                      chatEndRef={chatEndRef}
-                      onChatInputChange={setChatInput}
-                      onSend={sendMessage}
-                      onBack={() => setPanelView('home')}
-                      onClose={handleClose}
-                      isDark={isDark}
-                      textMain={textMain}
-                      textMuted={textMuted}
-                      inputBg={inputBg}
-                      inputBorder={inputBorder}
                     />
                   )}
                 </AnimatePresence>
@@ -339,9 +244,9 @@ export function DexWidget({ nome, dentistaId }: DexWidgetProps) {
         document.body,
       )}
 
-      {/* ── FAB circular ─────────────────────────────────────────────────────── */}
+      {/* ── FAB circular — oculto quando dock assume o trigger ── */}
       <AnimatePresence>
-        {onboardingDone && (
+        {onboardingDone && !hideTrigger && (
           <motion.div
             className="fixed bottom-7 right-7 z-40"
             initial={{ opacity: 0, scale: 0.6, y: 16 }}
@@ -420,6 +325,272 @@ export function DexWidget({ nome, dentistaId }: DexWidgetProps) {
 
 // ── Home View ─────────────────────────────────────────────────────────────────
 
+// ── Insights proativos ────────────────────────────────────────────────────────
+
+interface InsightDetailItem {
+  id: string;
+  label: string;
+  sublabel: string;
+  href: string;
+}
+
+interface InsightItem {
+  id: string;
+  Icon: LucideIcon;
+  label: string;
+  sublabel: string;
+  accent: 'red' | 'amber' | 'teal' | 'blue';
+  href: string;
+  items: InsightDetailItem[];
+}
+
+function gerarInsights(ctx: DexContextData): InsightItem[] {
+  const items: InsightItem[] = [];
+
+  if (ctx.orcamentosAtrasados30d > 0) {
+    items.push({
+      id: 'atrasados30',
+      Icon: AlertCircle,
+      label: `${ctx.orcamentosAtrasados30d} orçamento${ctx.orcamentosAtrasados30d > 1 ? 's' : ''} sem resposta há +30 dias`,
+      sublabel: 'Risco de perder o tratamento',
+      accent: 'red',
+      href: '/dashboard/orcamentos',
+      items: (ctx.orcamentosAtrasados30dList ?? []).map((o) => ({
+        id: o.id,
+        label: o.paciente,
+        sublabel: `R$ ${o.total.toLocaleString('pt-BR')} · aguardando`,
+        href: `/dashboard/pacientes/${o.pacienteId}`,
+      })),
+    });
+  }
+
+  if (ctx.followUpPendentes > 0) {
+    items.push({
+      id: 'followup',
+      Icon: Mail,
+      label: `${ctx.followUpPendentes} orçamento${ctx.followUpPendentes > 1 ? 's' : ''} aguardando retorno`,
+      sublabel: 'Enviado há +3 dias sem resposta',
+      accent: 'amber',
+      href: '/dashboard/orcamentos',
+      items: (ctx.followUpPendentesList ?? []).map((o) => ({
+        id: o.id,
+        label: o.paciente,
+        sublabel: `R$ ${o.total.toLocaleString('pt-BR')} · enviado`,
+        href: `/dashboard/pacientes/${o.pacienteId}`,
+      })),
+    });
+  }
+
+  if (ctx.orcamentosAprovadosSemAgendamento > 0) {
+    items.push({
+      id: 'aprov_sem_agenda',
+      Icon: CalendarX,
+      label: `${ctx.orcamentosAprovadosSemAgendamento} tratamento${ctx.orcamentosAprovadosSemAgendamento > 1 ? 's' : ''} aprovado${ctx.orcamentosAprovadosSemAgendamento > 1 ? 's' : ''} sem agendar`,
+      sublabel: 'Paciente disse sim — falta marcar',
+      accent: 'amber',
+      href: '/dashboard/orcamentos',
+      items: (ctx.orcamentosAprovadosSemAgendamentoList ?? []).map((o) => ({
+        id: o.id,
+        label: o.paciente,
+        sublabel: `R$ ${o.total.toLocaleString('pt-BR')} · aprovado`,
+        href: `/dashboard/pacientes/${o.pacienteId}`,
+      })),
+    });
+  }
+
+  if (ctx.pacientesInativos60d > 0) {
+    const n = Math.min(ctx.pacientesInativos60d, 99);
+    items.push({
+      id: 'inativos',
+      Icon: UserMinus,
+      label: `${n}+ paciente${n > 1 ? 's' : ''} sem consulta há +60 dias`,
+      sublabel: 'Momento ideal para reativar',
+      accent: 'blue',
+      href: '/dashboard/pacientes',
+      items: (ctx.pacientesInativos60dList ?? []).map((p) => ({
+        id: p.id,
+        label: p.nome,
+        sublabel: 'Sem consulta há +60 dias',
+        href: `/dashboard/pacientes/${p.id}`,
+      })),
+    });
+  }
+
+  if (ctx.agendamentosAmanha > 0) {
+    items.push({
+      id: 'amanha',
+      Icon: CalendarDays,
+      label: `Amanhã: ${ctx.agendamentosAmanha} consulta${ctx.agendamentosAmanha > 1 ? 's' : ''} agendada${ctx.agendamentosAmanha > 1 ? 's' : ''}`,
+      sublabel: 'Revise os briefings antes de começar',
+      accent: 'teal',
+      href: '/dashboard/agendamentos',
+      items: [],
+    });
+  }
+
+  if (ctx.orcamentosAprovadosSemana > 0 && items.length < 3) {
+    items.push({
+      id: 'aprovados_semana',
+      Icon: TrendingUp,
+      label: `${ctx.orcamentosAprovadosSemana} orçamento${ctx.orcamentosAprovadosSemana > 1 ? 's' : ''} aprovado${ctx.orcamentosAprovadosSemana > 1 ? 's' : ''} esta semana`,
+      sublabel: 'Bom ritmo de conversão',
+      accent: 'teal',
+      href: '/dashboard/orcamentos',
+      items: [],
+    });
+  }
+
+  return items.slice(0, 4);
+}
+
+const INSIGHT_COLORS: Record<InsightItem['accent'], { bg: string; border: string; icon: string }> = {
+  red:   { bg: 'rgba(239,68,68,0.07)',   border: 'rgba(239,68,68,0.20)',   icon: '#ef4444' },
+  amber: { bg: 'rgba(251,191,36,0.08)',  border: 'rgba(251,191,36,0.25)',  icon: '#f59e0b' },
+  teal:  { bg: 'rgba(47,156,133,0.08)',  border: 'rgba(47,156,133,0.22)',  icon: '#2f9c85' },
+  blue:  { bg: 'rgba(59,130,246,0.07)',  border: 'rgba(59,130,246,0.20)',  icon: '#3b82f6' },
+};
+
+// ── Insight View (drill-down) ─────────────────────────────────────────────────
+
+interface InsightViewProps {
+  insight: InsightItem;
+  onBack: () => void;
+  onClose: () => void;
+  onNavigate: (href: string) => void;
+  isDark: boolean;
+  bg: string;
+  textMain: string;
+  textMuted: string;
+  rowBg: string;
+}
+
+function InsightView({
+  insight, onBack, onClose, onNavigate,
+  isDark, bg, textMain, textMuted, rowBg,
+}: InsightViewProps) {
+  const colors   = INSIGHT_COLORS[insight.accent];
+  const divider  = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(47,156,133,0.12)';
+  const pageName = insight.href.includes('pacientes') ? 'Pacientes' : 'Orçamentos';
+
+  return (
+    <motion.div
+      className="flex flex-col h-full"
+      initial={{ opacity: 0, x: 18 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 18 }}
+      transition={{ duration: 0.2 }}
+    >
+      {/* Header */}
+      <div className="px-5 pt-4 pb-3 shrink-0">
+        <div className="flex items-center justify-between">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1.5 text-xs font-semibold transition-colors hover:opacity-70"
+            style={{ color: '#2f9c85' }}
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Voltar
+          </button>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+            style={{ color: textMuted }}
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="mt-3 h-px" style={{ background: divider }} />
+      </div>
+
+      {/* Content */}
+      <div
+        className="flex-1 overflow-y-auto px-5 pb-5 space-y-3"
+        style={{
+          scrollbarWidth: 'thin',
+          scrollbarColor: isDark ? 'rgba(255,255,255,0.08) transparent' : 'rgba(47,156,133,0.12) transparent',
+        }}
+      >
+        {/* Badge do insight */}
+        {(() => {
+          const Icon = insight.Icon;
+          return (
+            <div
+              className="rounded-2xl px-4 py-3.5 flex items-center gap-3"
+              style={{ background: colors.bg, border: `1px solid ${colors.border}` }}
+            >
+              <div
+                className="w-9 h-9 rounded-full shrink-0 flex items-center justify-center"
+                style={{ background: colors.border }}
+              >
+                <Icon className="w-4.5 h-4.5" style={{ color: colors.icon }} />
+              </div>
+              <div>
+                <p className="text-sm font-bold leading-snug" style={{ color: textMain }}>{insight.label}</p>
+                <p className="text-[11px] mt-0.5" style={{ color: textMuted }}>{insight.sublabel}</p>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Lista de pacientes */}
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2 px-0.5 mb-1">
+            <div className="h-px flex-1" style={{ background: divider }} />
+            <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: textMuted }}>
+              Pacientes envolvidos
+            </span>
+            <div className="h-px flex-1" style={{ background: divider }} />
+          </div>
+
+          {insight.items.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => onNavigate(item.href)}
+              className="w-full rounded-xl px-3.5 py-3 flex items-center gap-3 transition-all hover:brightness-105 text-left group"
+              style={{ background: rowBg, border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : '#e8f0ef'}` }}
+            >
+              {/* Avatar inicial */}
+              <div
+                className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-xs font-bold text-white"
+                style={{ background: 'linear-gradient(135deg, #2f9c85, #1a7a65)' }}
+              >
+                {item.label.charAt(0).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold truncate" style={{ color: textMain }}>{item.label}</p>
+                <p className="text-[10px] mt-0.5" style={{ color: textMuted }}>{item.sublabel}</p>
+              </div>
+              <ChevronRight
+                className="w-3.5 h-3.5 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity"
+                style={{ color: colors.icon }}
+              />
+            </button>
+          ))}
+        </div>
+
+        {/* Botão "Ver todos" */}
+        <button
+          onClick={() => onNavigate(insight.href)}
+          className="w-full py-3 rounded-xl text-xs font-bold transition-all hover:brightness-105 flex items-center justify-center gap-1.5"
+          style={{ background: colors.bg, border: `1.5px solid ${colors.border}`, color: colors.icon }}
+        >
+          Ver todos em {pageName}
+          <ChevronRight className="w-3 h-3" />
+        </button>
+
+        {/* Aviso se lista está truncada */}
+        {insight.items.length >= 5 && (
+          <p className="text-center text-[10px]" style={{ color: textMuted }}>
+            Mostrando os 5 mais antigos · veja todos em {pageName}
+          </p>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+// ── Status labels ─────────────────────────────────────────────────────────────
+
 const STATUS_LABEL: Record<string, string> = {
   scheduled:   'Agendado',
   confirmed:   'Confirmado',
@@ -447,30 +618,20 @@ interface HomeViewProps {
   patientCtx: DexPatientContext | null;
   isConsultaPage: boolean;
   consultaCtx: DexConsultationContext | null;
-  briefingLoading: boolean;
-  chatInput: string;
-  onChatInputChange: (v: string) => void;
-  onSend: (text: string) => void;
-  onBriefing: () => void;
-  onStartConsulta: () => void;
-  onViewFollowUps: () => void;
+  onInsightClick: (insight: InsightItem) => void;
   onClose: () => void;
   isDark: boolean;
   bg: string;
   textMain: string;
   textMuted: string;
   rowBg: string;
-  inputBg: string;
-  inputBorder: string;
-  inputRef: React.RefObject<HTMLInputElement | null>;
 }
 
 function HomeView({
   ctx, firstName, isPatientPage, patientHasAlert, patientCtx,
   isConsultaPage, consultaCtx,
-  briefingLoading, chatInput, onChatInputChange, onSend, onBriefing,
-  onStartConsulta, onViewFollowUps, onClose,
-  isDark, bg, textMain, textMuted, rowBg, inputBg, inputBorder, inputRef,
+  onInsightClick, onClose,
+  isDark, bg, textMain, textMuted, rowBg,
 }: HomeViewProps) {
   const hora = new Date().getHours();
   const saudacao = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite';
@@ -519,53 +680,13 @@ function HomeView({
       </div>
 
       {/* ── Conteúdo scrollável ─────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-5 pb-4 space-y-4">
-
-        {/* Próximo paciente */}
-        {ctx?.proximoPaciente ? (
-          <div className="rounded-2xl p-4 relative overflow-hidden"
-            style={{ background: 'linear-gradient(135deg, #2f9c85 0%, #1a7a65 100%)' }}>
-            <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent pointer-events-none" />
-            <div className="relative">
-              <div className="flex items-center gap-1.5 mb-1">
-                <Clock className="w-3 h-3 text-white/70" />
-                <span className="text-[11px] font-mono text-white/70 tracking-wider">{ctx.proximoHorario ?? '—'}</span>
-                <span className="text-[10px] text-white/50 ml-auto uppercase tracking-wider">próximo</span>
-              </div>
-              <div className="text-white font-bold text-lg leading-tight mb-3">{ctx.proximoPaciente}</div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={onBriefing}
-                  disabled={briefingLoading}
-                  className="flex-1 py-1.5 text-xs font-semibold rounded-xl transition-all hover:opacity-90 disabled:opacity-60"
-                  style={{ background: 'rgba(255,255,255,0.18)', color: '#fff', border: '1px solid rgba(255,255,255,0.25)' }}
-                >
-                  {briefingLoading ? 'Gerando...' : 'Briefing'}
-                </button>
-                <button
-                  onClick={onStartConsulta}
-                  className="flex-1 py-1.5 text-xs font-bold rounded-xl flex items-center justify-center gap-1 transition-all hover:opacity-90"
-                  style={{ background: 'rgba(255,255,255,0.95)', color: '#1a7a65' }}
-                >
-                  <Stethoscope className="w-3 h-3" />
-                  Iniciar consulta
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : ctx ? (
-          <div className="rounded-2xl p-5 flex flex-col items-center gap-2 text-center"
-            style={{ background: rowBg, border: `1px solid ${divider}` }}>
-            <div className="w-9 h-9 rounded-full flex items-center justify-center"
-              style={{ background: isDark ? 'rgba(47,156,133,0.15)' : 'rgba(47,156,133,0.08)' }}>
-              <CalendarDays className="w-4 h-4" style={{ color: '#2f9c85' }} />
-            </div>
-            <p className="text-sm font-semibold" style={{ color: textMain }}>Agenda livre hoje</p>
-            <p className="text-[11px]" style={{ color: textMuted }}>Bom momento para retornar pacientes com orçamentos em aberto</p>
-          </div>
-        ) : (
-          <div className="rounded-2xl animate-pulse" style={{ background: rowBg, height: 108 }} />
-        )}
+      <div
+        className="flex-1 overflow-y-auto px-5 pb-4 space-y-4"
+        style={{
+          scrollbarWidth: 'thin',
+          scrollbarColor: isDark ? 'rgba(255,255,255,0.08) transparent' : 'rgba(47,156,133,0.12) transparent',
+        }}
+      >
 
         {/* Skeletons enquanto ctx carrega */}
         {!ctx && (
@@ -689,191 +810,55 @@ function HomeView({
           </div>
         )}
 
-        {/* Follow-up pendente — seção própria */}
-        {(ctx?.followUpPendentes ?? 0) > 0 && (
-          <button
-            onClick={onViewFollowUps}
-            className="w-full rounded-xl px-4 py-3 flex items-center gap-3 transition-all hover:brightness-105 text-left"
-            style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.20)' }}
-          >
-            <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
-              style={{ background: 'rgba(239,68,68,0.12)' }}>
-              <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-red-500">
-                {ctx!.followUpPendentes} orçamento{ctx!.followUpPendentes !== 1 ? 's' : ''} aguardando retorno
-              </p>
-              <p className="text-[11px] mt-0.5" style={{ color: textMuted }}>Enviados há +3 dias sem resposta</p>
-            </div>
-            <ChevronRight className="w-4 h-4 shrink-0 text-red-400 opacity-50" />
-          </button>
-        )}
-
-      </div>
-
-      {/* ── Input de chat ────────────────────────────────────────────────────── */}
-      <div className="px-5 pb-5 pt-2 shrink-0">
-        <div
-          className="flex items-center gap-2 rounded-xl px-3.5 py-3 cursor-text"
-          style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
-          onClick={() => inputRef.current?.focus()}
-        >
-          <input
-            ref={inputRef}
-            type="text"
-            value={chatInput}
-            onChange={(e) => onChatInputChange(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSend(chatInput); } }}
-            placeholder="Perguntar ao DEX..."
-            className="flex-1 bg-transparent text-sm outline-none placeholder:opacity-50"
-            style={{ color: textMain }}
-          />
-          <button
-            onClick={() => onSend(chatInput)}
-            disabled={!chatInput.trim()}
-            className="p-1 rounded-lg transition-colors disabled:opacity-30"
-            style={{ color: '#2f9c85' }}
-          >
-            <Send className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
-// ── Chat View ─────────────────────────────────────────────────────────────────
-
-interface ChatViewProps {
-  messages: ChatMsg[];
-  isReplying: boolean;
-  chatInput: string;
-  inputRef: React.RefObject<HTMLInputElement | null>;
-  chatEndRef: React.RefObject<HTMLDivElement | null>;
-  onChatInputChange: (v: string) => void;
-  onSend: (text: string) => void;
-  onBack: () => void;
-  onClose: () => void;
-  isDark: boolean;
-  textMain: string;
-  textMuted: string;
-  inputBg: string;
-  inputBorder: string;
-}
-
-function ChatView({
-  messages, isReplying, chatInput, inputRef, chatEndRef,
-  onChatInputChange, onSend, onBack, onClose, isDark, textMain, textMuted, inputBg, inputBorder,
-}: ChatViewProps) {
-  return (
-    <motion.div
-      className="flex flex-col h-full"
-      initial={{ opacity: 0, x: 16 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 16 }}
-      transition={{ duration: 0.2 }}
-    >
-      {/* Header */}
-      <div className="px-5 pt-4 pb-3 shrink-0">
-        <div className="flex items-center justify-between">
-          <button onClick={onBack} className="flex items-center gap-1.5 text-xs font-semibold transition-colors hover:opacity-70" style={{ color: '#2f9c85' }}>
-            <ArrowLeft className="w-3.5 h-3.5" />
-            Voltar
-          </button>
-          <span className="text-xs font-mono uppercase tracking-widest" style={{ color: textMuted }}>Chat DEX</span>
-          <button onClick={onClose} className="p-1.5 rounded-lg transition-colors hover:bg-black/5 dark:hover:bg-white/5" style={{ color: textMuted }}>
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-        <div className="mt-3 h-px" style={{ background: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(47,156,133,0.12)' }} />
-      </div>
-
-      {/* Mensagens */}
-      <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3">
-        {messages.length === 0 && (
-          <div className="flex flex-col items-center gap-2 py-10 text-center">
-            <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'rgba(47,156,133,0.10)' }}>
-              <Bot className="w-5 h-5" style={{ color: '#2f9c85' }} />
-            </div>
-            <p className="text-sm font-semibold" style={{ color: textMuted }}>DEX está pronto</p>
-            <p className="text-[11px]" style={{ color: textMuted }}>Pergunte sobre agenda, pacientes, receita ou orçamentos.</p>
-          </div>
-        )}
-
-        {messages.map((msg, i) => (
-          <div key={i} className={`flex items-end gap-2.5 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-            {msg.role === 'dex' && (
-              <div className="w-6 h-6 rounded-full shrink-0 flex items-center justify-center mb-0.5" style={{ background: 'linear-gradient(135deg, #2f9c85, #1a7a65)' }}>
-                <Bot className="w-3 h-3 text-white" />
+        {/* ── Radar Dex — insights proativos ─────────────────────────────────── */}
+        {ctx && (() => {
+          const insights = gerarInsights(ctx);
+          if (insights.length === 0) return null;
+          return (
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 mb-0.5">
+                <div className="h-px flex-1" style={{ background: divider }} />
+                <span className="text-[10px] font-bold uppercase tracking-widest px-1" style={{ color: textMuted }}>
+                  Radar Dex
+                </span>
+                <div className="h-px flex-1" style={{ background: divider }} />
               </div>
-            )}
-            <div
-              className="max-w-[78%] text-sm leading-relaxed whitespace-pre-wrap px-3.5 py-2.5"
-              style={msg.role === 'user' ? {
-                background: isDark ? 'rgba(47,156,133,0.18)' : 'rgba(47,156,133,0.10)',
-                color: isDark ? '#5dbeb0' : '#1a7a65',
-                borderRadius: '1rem 1rem 0.25rem 1rem',
-              } : {
-                background: isDark ? 'rgba(255,255,255,0.05)' : '#f0f4f3',
-                color: textMain,
-                border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : '#e8f0ef'}`,
-                borderRadius: '1rem 1rem 1rem 0.25rem',
-              }}
-            >
-              {msg.text}
-            </div>
-          </div>
-        ))}
 
-        {isReplying && (
-          <div className="flex items-start gap-3">
-            <div className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #2f9c85, #1a7a65)' }}>
-              <Bot className="w-3.5 h-3.5 text-white" />
+              {insights.map((insight) => {
+                const colors = INSIGHT_COLORS[insight.accent];
+                const Icon = insight.Icon;
+                return (
+                  <button
+                    key={insight.id}
+                    onClick={() => onInsightClick(insight)}
+                    className="w-full rounded-xl px-3.5 py-3 flex items-center gap-3 transition-all hover:brightness-105 active:scale-[0.985] text-left"
+                    style={{ background: colors.bg, border: `1px solid ${colors.border}` }}
+                  >
+                    <div
+                      className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center"
+                      style={{ background: colors.border }}
+                    >
+                      <Icon className="w-3.5 h-3.5" style={{ color: colors.icon }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold leading-snug" style={{ color: textMain }}>
+                        {insight.label}
+                      </p>
+                      <p className="text-[10px] mt-0.5 truncate" style={{ color: textMuted }}>
+                        {insight.sublabel}
+                      </p>
+                    </div>
+                    <ChevronRight className="w-3.5 h-3.5 shrink-0" style={{ color: colors.icon, opacity: insight.items.length > 0 ? 0.7 : 0.35 }} />
+                  </button>
+                );
+              })}
             </div>
-            <div className="flex items-center gap-1 pt-1.5">
-              {[0, 1, 2].map((i) => (
-                <motion.span
-                  key={i}
-                  className="w-1.5 h-1.5 rounded-full"
-                  style={{ background: '#2f9c85' }}
-                  animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1, 0.8] }}
-                  transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
-                />
-              ))}
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
-        <div ref={chatEndRef} />
       </div>
 
-      {/* Input */}
-      <div className="px-5 pb-5 pt-2 shrink-0">
-        <div
-          className="flex items-center gap-2 rounded-xl px-3.5 py-3"
-          style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
-        >
-          <input
-            ref={inputRef}
-            type="text"
-            value={chatInput}
-            onChange={(e) => onChatInputChange(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSend(chatInput); } }}
-            placeholder="Continue a conversa..."
-            className="flex-1 bg-transparent text-sm outline-none"
-            style={{ color: isDark ? 'rgba(255,255,255,0.85)' : textMain }}
-          />
-          <button
-            onClick={() => onSend(chatInput)}
-            disabled={!chatInput.trim() || isReplying}
-            className="p-1 rounded-lg transition-colors disabled:opacity-30"
-            style={{ color: '#2f9c85' }}
-          >
-            <Send className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
     </motion.div>
   );
 }
+

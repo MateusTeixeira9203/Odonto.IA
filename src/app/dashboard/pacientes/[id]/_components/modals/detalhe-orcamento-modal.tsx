@@ -5,11 +5,12 @@ import { createClient } from '@/lib/supabase/client';
 import {
   Edit2, Trash2, CircleDollarSign, Plus, CheckCircle2,
   XCircle, Loader2, CreditCard, Clock, Banknote, Smartphone,
-  Receipt, ArrowUpRight, User,
+  Receipt, ArrowUpRight, User, Send, BadgeCheck,
 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
+import type { LucideIcon } from 'lucide-react';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -21,6 +22,47 @@ import { ptBR } from 'date-fns/locale';
 import type { StatusOrcamento, FormaPagamento } from '@/app/dashboard/orcamentos/actions';
 import { STATUS_ORCAMENTO } from '@/lib/constants/orcamento-status';
 import type { OrcamentoComItens, OrcEditItem } from '../types';
+
+// ─── status options ───────────────────────────────────────────────────────────
+
+type StatusOption = {
+  value: StatusOrcamento;
+  label: string;
+  icon: LucideIcon;
+  active: string;
+  inactive: string;
+};
+
+const STATUS_OPTIONS: StatusOption[] = [
+  {
+    value: 'enviado',
+    label: 'Enviado',
+    icon: Send,
+    active: 'bg-yellow-500/10 border-yellow-500/40 text-yellow-600 dark:text-yellow-400',
+    inactive: 'border-border text-text-secondary hover:border-yellow-400/30 hover:text-yellow-600',
+  },
+  {
+    value: 'aprovado',
+    label: 'Aprovado',
+    icon: CheckCircle2,
+    active: 'bg-teal/10 border-teal/40 text-teal',
+    inactive: 'border-border text-text-secondary hover:border-teal/30 hover:text-teal',
+  },
+  {
+    value: 'recusado',
+    label: 'Recusado',
+    icon: XCircle,
+    active: 'bg-red-500/10 border-red-400/40 text-red-500',
+    inactive: 'border-border text-text-secondary hover:border-red-400/30 hover:text-red-500',
+  },
+  {
+    value: 'pago',
+    label: 'Pago',
+    icon: BadgeCheck,
+    active: 'bg-emerald-500/10 border-emerald-500/40 text-emerald-600 dark:text-emerald-400',
+    inactive: 'border-border text-text-secondary hover:border-emerald-400/30 hover:text-emerald-600',
+  },
+];
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -137,7 +179,7 @@ export function DetalheOrcamentoModal({
     <Dialog open={!!detalheOrcId} onOpenChange={open => { if (!open) onClose(); }}>
       <DialogContent
         className="rounded-3xl bg-surface border-border p-0 overflow-hidden gap-0"
-        style={{ width: '58vw', maxWidth: 'none', maxHeight: '85vh', left: '55%' }}
+        style={{ width: '78vw', maxWidth: 'none', maxHeight: '90vh', left: '50%' }}
         showCloseButton={false}
       >
         {detalheOrc && (
@@ -162,7 +204,7 @@ export function DetalheOrcamentoModal({
                       <DialogTitle className="font-heading font-semibold text-xl text-white leading-tight">
                         {justApproved ? 'Orçamento Aprovado!' : 'Orçamento'}
                       </DialogTitle>
-                      <span className="text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md bg-white/20 text-white">
+                      <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md bg-white/20 text-white">
                         {STATUS_ORCAMENTO[detalheOrc.status]?.label ?? detalheOrc.status}
                       </span>
                     </div>
@@ -176,11 +218,11 @@ export function DetalheOrcamentoModal({
                 {detalheOrc.pagamentos.length > 0 && (
                   <div className="flex flex-col items-end gap-1 shrink-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-white/60 font-mono">
+                      <span className="text-xs text-white/60 font-mono">
                         {pctPago.toFixed(0)}% pago
                       </span>
                       {quitado && (
-                        <span className="text-[9px] font-bold uppercase tracking-wider bg-white/20 text-white px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] font-bold uppercase tracking-wider bg-white/20 text-white px-2 py-0.5 rounded-full">
                           Quitado
                         </span>
                       )}
@@ -197,7 +239,7 @@ export function DetalheOrcamentoModal({
             </div>
 
             {/* ── Body: two columns ───────────────────────────────────── */}
-            <div className="flex" style={{ height: 'calc(85vh - 96px)', minHeight: 0 }}>
+            <div className="flex" style={{ height: 'calc(90vh - 96px)', minHeight: 0 }}>
 
               {/* ── Left column ───────────────────────────────────────── */}
               <div className="flex-1 min-w-0 overflow-y-auto p-6 space-y-6">
@@ -247,36 +289,37 @@ export function DetalheOrcamentoModal({
                   </div>
                 )}
 
-                {/* Status selector (avançado) */}
+                {/* Status selector — pills */}
                 <div className="space-y-2">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-teal">Status</p>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1">
-                      <Select
-                        value={detalheOrc.status}
-                        disabled={isChangingStatus}
-                        onValueChange={v => v && handleStatusChangeSafe(detalheOrc.id, v as StatusOrcamento)}
-                      >
-                        <SelectTrigger className="rounded-xl bg-surface-alt border-border text-text-primary disabled:opacity-60">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-surface border-border">
-                          <SelectItem value="rascunho">Rascunho</SelectItem>
-                          <SelectItem value="enviado">Enviado</SelectItem>
-                          <SelectItem value="aprovado">Aprovado</SelectItem>
-                          <SelectItem value="recusado">Recusado</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold uppercase tracking-widest text-teal">Status</p>
                     {!orcEditMode && (
                       <button
                         onClick={onOpenEditOrc}
-                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border text-text-secondary hover:bg-surface-alt hover:text-text-primary text-xs font-medium transition-colors"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border text-text-secondary hover:bg-surface-alt hover:text-text-primary text-xs font-medium transition-colors"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
                         Editar
                       </button>
                     )}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {STATUS_OPTIONS.map(opt => {
+                      const isActive = detalheOrc.status === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          onClick={() => handleStatusChangeSafe(detalheOrc.id, opt.value)}
+                          disabled={isChangingStatus}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all disabled:opacity-50 ${
+                            isActive ? opt.active : opt.inactive
+                          }`}
+                        >
+                          <opt.icon className="w-3.5 h-3.5" />
+                          {opt.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -297,7 +340,7 @@ export function DetalheOrcamentoModal({
 
                 {/* Procedimentos */}
                 <div className="space-y-2">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-teal">
+                  <p className="text-xs font-bold uppercase tracking-widest text-teal">
                     Procedimentos
                     <span className="ml-2 text-text-secondary font-normal normal-case">({detalheOrc.itens.length})</span>
                   </p>
@@ -322,7 +365,7 @@ export function DetalheOrcamentoModal({
                           </div>
                           <div className="flex gap-2">
                             <div className="space-y-1 w-20">
-                              <label className="text-[10px] text-text-secondary">Qtd</label>
+                              <label className="text-xs text-text-secondary">Qtd</label>
                               <Input
                                 type="number" min="1" value={item.quantidade}
                                 onChange={e => setOrcEditItens(prev => prev.map((it, i) => i === idx ? { ...it, quantidade: parseInt(e.target.value) || 1 } : it))}
@@ -330,7 +373,7 @@ export function DetalheOrcamentoModal({
                               />
                             </div>
                             <div className="space-y-1 flex-1">
-                              <label className="text-[10px] text-text-secondary">Preço unitário (R$)</label>
+                              <label className="text-xs text-text-secondary">Preço unitário (R$)</label>
                               <Input
                                 type="number" min="0" step="0.01" value={item.preco_unitario}
                                 onChange={e => setOrcEditItens(prev => prev.map((it, i) => i === idx ? { ...it, preco_unitario: parseFloat(e.target.value) || 0 } : it))}
@@ -358,7 +401,7 @@ export function DetalheOrcamentoModal({
                               key={item.id}
                               className="flex items-center gap-3 px-4 py-3 border-b border-border/60 last:border-b-0 hover:bg-surface-alt/40 transition-colors"
                             >
-                              <span className="w-6 h-6 rounded-lg bg-teal/10 text-teal text-[10px] font-bold flex items-center justify-center shrink-0">
+                              <span className="w-6 h-6 rounded-lg bg-teal/10 text-teal text-xs font-bold flex items-center justify-center shrink-0">
                                 {idx + 1}
                               </span>
                               <div className="flex-1 min-w-0">
@@ -392,8 +435,8 @@ export function DetalheOrcamentoModal({
                 {detalheOrc.pagamentos.length > 0 && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-teal">Pagamentos</p>
-                      <div className="flex items-center gap-3 text-[10px] font-mono text-text-secondary">
+                      <p className="text-xs font-bold uppercase tracking-widest text-teal">Pagamentos</p>
+                      <div className="flex items-center gap-3 text-xs font-mono text-text-secondary">
                         <span className="text-teal font-semibold">R$ {fmt(totalPago)} pago</span>
                         {totalPendente > 0 && (
                           <span className="text-yellow-600">R$ {fmt(totalPendente)} pendente</span>
@@ -446,18 +489,18 @@ export function DetalheOrcamentoModal({
                 {/* Atividade deste orçamento */}
                 {activityLogs.length > 0 && (
                   <div className="space-y-2">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary/50">Atividade</p>
+                    <p className="text-xs font-bold uppercase tracking-widest text-text-secondary/50">Atividade</p>
                     <div className="space-y-0">
                       {activityLogs.map(log => (
                         <div key={log.id} className="flex items-center gap-2 py-1.5 border-b border-border/30 last:border-0">
-                          <div className="w-1.5 h-1.5 rounded-full bg-border shrink-0" />
+                          <div className="w-1.5 h-1.5 rounded-full bg-teal/40 shrink-0" />
                           <p className="text-xs flex-1 min-w-0">
                             <span className="font-medium text-text-primary">{ACTION_LABEL[log.action] ?? log.action}</span>
                             {log.actor_nome && (
                               <span className="ml-1 text-text-secondary/60">por {log.actor_nome.split(' ')[0]}</span>
                             )}
                           </p>
-                          <span className="font-mono text-[10px] text-text-secondary shrink-0">
+                          <span className="font-mono text-xs text-text-secondary shrink-0">
                             {format(parseISO(log.created_at), 'dd/MM HH:mm', { locale: ptBR })}
                           </span>
                         </div>
@@ -473,7 +516,7 @@ export function DetalheOrcamentoModal({
 
                   {/* Total hero card */}
                   <div className="rounded-2xl p-5 border border-teal/15 space-y-3" style={{ background: 'rgba(47,156,133,0.07)' }}>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-teal">
+                    <p className="text-xs font-bold uppercase tracking-widest text-teal">
                       {orcEditMode ? 'Novo total' : 'Total do tratamento'}
                     </p>
                     <p className="font-mono text-3xl font-bold text-teal leading-none">
@@ -486,7 +529,7 @@ export function DetalheOrcamentoModal({
                     {/* Payment progress bar */}
                     {!orcEditMode && detalheOrc.pagamentos.length > 0 && (
                       <div className="space-y-1.5">
-                        <div className="flex justify-between text-[10px] text-text-secondary">
+                        <div className="flex justify-between text-xs text-text-secondary">
                           <span>Pago</span>
                           <span className="font-mono">{pctPago.toFixed(0)}%</span>
                         </div>
@@ -496,7 +539,7 @@ export function DetalheOrcamentoModal({
                             style={{ width: `${pctPago}%` }}
                           />
                         </div>
-                        <div className="flex justify-between text-[10px] font-mono text-text-secondary">
+                        <div className="flex justify-between text-xs font-mono text-text-secondary">
                           <span className="text-teal">R$ {fmt(totalPago)}</span>
                           {totalPendente > 0 && <span className="text-yellow-600">R$ {fmt(totalPendente)} pend.</span>}
                         </div>
@@ -507,7 +550,7 @@ export function DetalheOrcamentoModal({
                   {/* Registrar pagamento */}
                   {!orcEditMode && (
                     <div className="space-y-3">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-teal flex items-center gap-1.5">
+                      <p className="text-xs font-bold uppercase tracking-widest text-teal flex items-center gap-1.5">
                         <ArrowUpRight className="w-3 h-3" />
                         Registrar Pagamento
                       </p>

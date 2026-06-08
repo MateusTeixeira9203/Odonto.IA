@@ -14,17 +14,15 @@ const ESPECIALIDADES = [
   "Outro",
 ] as const;
 
-export type PlanoClinica = "SOLO" | "BASICO" | "CLINICA";
+export type PlanoClinica = "SOLO" | "CLINICA";
 
 export interface OnboardingInput {
   plano: PlanoClinica;
   nome: string;
   cro: string;
   especialidade: (typeof ESPECIALIDADES)[number];
-  nomeConsultorio?: string;
-  telefone: string;
-  cidade: string;
-  estado: string;
+  /** Nome do consultório — obrigatório para todos os planos */
+  nomeConsultorio: string;
 }
 
 // Extrai o código estruturado do erro lançado pela RPC.
@@ -47,20 +45,15 @@ export async function completeOnboarding(
 ): Promise<{ success: boolean; error?: string }> {
   const { supabase, user } = await requireUser();
 
-  const nomeClinica =
-    data.plano === "CLINICA" && data.nomeConsultorio?.trim()
-      ? data.nomeConsultorio.trim()
-      : `Consultório de ${data.nome.trim()}`;
-
   const { error } = await supabase.rpc("complete_onboarding", {
     p_plano:         data.plano,
-    p_nome_clinica:  nomeClinica,
+    p_nome_clinica:  data.nomeConsultorio.trim(),
     p_nome_usuario:  data.nome.trim(),
     p_cro:           data.cro?.trim() || null,
     p_especialidade: data.especialidade,
-    p_telefone:      data.telefone?.trim() || null,
-    p_cidade:        data.cidade?.trim() || null,
-    p_estado:        data.estado?.trim() || null,
+    p_telefone:      null,
+    p_cidade:        null,
+    p_estado:        null,
     p_email:         user.email ?? null,
   });
 

@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { FloatingDock } from "@/components/layout/floating-dock";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { MobileDrawer } from "@/components/layout/mobile-drawer";
 import { DexWidget } from "@/components/layout/dex-widget";
-import { DexOnboarding } from "@/components/onboarding/dex-onboarding";
-import { NeuralBackground } from "@/components/layout/NeuralBackground";
+import { DexWelcome } from "@/components/onboarding/dex-welcome";
+import ParticleNetwork from "@/components/ParticleNetwork";
 import { CommandPalette } from "@/components/command-palette/command-palette";
+import { useSessionGuard } from "@/hooks/use-session-guard";
 import type { DentistaRole } from "@/types/database";
 import type { PlanoId } from "@/lib/planos";
 
@@ -23,9 +25,14 @@ interface DashboardShellProps {
 }
 
 export function DashboardShell({ children, nome, clinicaNome, activeClinicId, role, avatarUrl, plano, dentistaId }: DashboardShellProps) {
+  const router = useRouter();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [hasMountedPalette, setHasMountedPalette] = useState(false);
+
+  useSessionGuard({
+    onExpired: () => router.push('/login?reason=session_expired'),
+  });
 
   // P2 — warm-up do cliente Supabase no idle para primeira busca instantânea
   useEffect(() => {
@@ -63,18 +70,59 @@ export function DashboardShell({ children, nome, clinicaNome, activeClinicId, ro
   }, [isCommandPaletteOpen, openCommandPalette, closeCommandPalette]);
 
   return (
-    <div className="relative min-h-screen bg-bg overflow-x-hidden">
-      <NeuralBackground opacity={0.15} />
+    <div className="relative min-h-screen overflow-x-hidden">
+      {/* Canvas de partículas — position: fixed, cobre o viewport inteiro uniformemente */}
+      <ParticleNetwork />
+
+      {/* Gradiente radial fixo — glow teal sutil ao centro */}
+      <div
+        className="fixed inset-0 pointer-events-none -z-10"
+        style={{ background: 'radial-gradient(ellipse at 50% 30%, rgba(47,156,133,0.12) 0%, transparent 65%)' }}
+      />
+
+      {/* Depth Layer — blobs com teal real para contraste visível */}
+      <div
+        style={{
+          position: 'absolute',
+          width: 600,
+          height: 600,
+          top: '-15%',
+          right: '-10%',
+          backgroundColor: 'rgba(47, 156, 133, 0.28)',
+          borderRadius: '40% 60% 70% 30% / 40% 50% 60% 50%',
+          filter: 'blur(120px)',
+          animation: 'blob-morph 18s ease-in-out infinite, blob-float 20s ease-in-out infinite',
+          pointerEvents: 'none',
+          zIndex: -1,
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          width: 500,
+          height: 500,
+          bottom: '5%',
+          left: '-8%',
+          backgroundColor: 'rgba(47, 156, 133, 0.20)',
+          borderRadius: '40% 60% 70% 30% / 40% 50% 60% 50%',
+          filter: 'blur(120px)',
+          animation: 'blob-morph 18s ease-in-out infinite, blob-float 20s ease-in-out infinite',
+          animationDelay: '-8s',
+          pointerEvents: 'none',
+          zIndex: -1,
+        }}
+      />
 
       <MobileHeader onOpenDrawer={() => setIsDrawerOpen(true)} />
 
-      <main className="w-full flex flex-col min-h-screen overflow-y-auto pt-14 md:pt-0 pb-28">
+      <main className="relative z-[1] w-full flex flex-col min-h-screen overflow-y-auto pt-14 md:pt-0 pb-28">
         {children}
       </main>
 
       <FloatingDock
         nome={nome}
         clinicaNome={clinicaNome}
+        activeClinicId={activeClinicId}
         role={role}
         avatarUrl={avatarUrl}
         plano={plano}
@@ -90,10 +138,16 @@ export function DashboardShell({ children, nome, clinicaNome, activeClinicId, ro
         plano={plano}
       />
 
-      <DexOnboarding nome={nome} dentistaId={dentistaId} role={role} plano={plano} />
+      <DexWelcome nome={nome.split(' ')[0]} dentistaId={dentistaId} />
 
       {role !== 'secretaria' && (
-        <DexWidget role={role} plano={plano} nome={nome} dentistaId={dentistaId} />
+        <DexWidget
+          nome={nome}
+          dentistaId={dentistaId}
+          role={role}
+          plano={plano}
+          hideTrigger
+        />
       )}
 
       {hasMountedPalette && (

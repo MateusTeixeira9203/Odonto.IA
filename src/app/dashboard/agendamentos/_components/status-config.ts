@@ -19,7 +19,7 @@ export const STATUS_CONFIG: Record<AgendamentoStatus, StatusConfig> = {
     dot: 'bg-amber-400',
     dotPulse: false,
     label: 'Agendado',
-    timeline: { bg: 'rgba(245,158,11,0.07)', border: 'rgba(245,158,11,0.22)', text: '#92400e' },
+    timeline: { bg: 'rgba(245,158,11,0.10)', border: 'rgba(245,158,11,0.28)', text: '#d97706' },
   },
   confirmed: {
     bg: 'bg-teal-pale',
@@ -37,7 +37,7 @@ export const STATUS_CONFIG: Record<AgendamentoStatus, StatusConfig> = {
     dot: 'bg-blue-500',
     dotPulse: false,
     label: 'Na Recepção',
-    timeline: { bg: 'rgba(59,130,246,0.08)', border: 'rgba(59,130,246,0.28)', text: '#1d4ed8' },
+    timeline: { bg: 'rgba(59,130,246,0.08)', border: 'rgba(59,130,246,0.28)', text: '#3b82f6' },
   },
   in_progress: {
     bg: 'bg-purple-50 dark:bg-purple-900/20',
@@ -46,7 +46,7 @@ export const STATUS_CONFIG: Record<AgendamentoStatus, StatusConfig> = {
     dot: 'bg-purple-500',
     dotPulse: true,
     label: 'Em Atendimento',
-    timeline: { bg: 'rgba(168,85,247,0.12)', border: 'rgba(168,85,247,0.32)', text: '#6d28d9' },
+    timeline: { bg: 'rgba(168,85,247,0.12)', border: 'rgba(168,85,247,0.32)', text: '#a855f7' },
   },
   completed: {
     bg: 'bg-surface-alt',
@@ -73,6 +73,6 @@ export const STATUS_CONFIG: Record<AgendamentoStatus, StatusConfig> = {
     dot: 'bg-red-500',
     dotPulse: false,
     label: 'Faltou',
-    timeline: { bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.22)', text: '#dc2626' },
+    timeline: { bg: 'rgba(239,68,68,0.10)', border: 'rgba(239,68,68,0.28)', text: '#ef4444' },
   },
 };

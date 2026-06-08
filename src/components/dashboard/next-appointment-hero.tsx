@@ -1,10 +1,12 @@
+'use client';
+
 import Link from 'next/link';
 import { format, parseISO, differenceInMinutes } from 'date-fns';
 import { Clock, AlertCircle, FileText, ArrowRight } from 'lucide-react';
 import { motion } from 'motion/react';
 import { ConsultaCtaButton } from './consulta-cta-button';
 
-type HeroState = 'empty' | 'concluded' | 'active' | 'critical' | 'near' | 'imminent' | 'approaching' | 'distant';
+type HeroState = 'empty' | 'concluded' | 'active' | 'waiting' | 'critical' | 'near' | 'imminent' | 'approaching' | 'distant';
 type FilledState = Exclude<HeroState, 'empty' | 'concluded'>;
 
 interface NextAppointmentHeroProps {
@@ -29,7 +31,8 @@ function toTitleCase(name: string): string {
 }
 
 function getHeroState(status: string, minutesUntil: number): FilledState {
-  if (status === 'in_progress' || status === 'checked_in') return 'active';
+  if (status === 'in_progress') return 'active';
+  if (status === 'checked_in')  return 'waiting';
   if (minutesUntil <= 5)  return 'critical';
   if (minutesUntil < 10)  return 'near';
   if (minutesUntil < 30)  return 'imminent';
@@ -47,6 +50,7 @@ function fmtMins(mins: number): string {
 
 const STATE_LABEL: Record<FilledState, string> = {
   active:      'EM ATENDIMENTO',
+  waiting:     'PACIENTE CHEGOU',
   critical:    'INICIAR AGORA',
   near:        'COMEÇA EM BREVE',
   imminent:    'EM BREVE',
@@ -57,6 +61,7 @@ const STATE_LABEL: Record<FilledState, string> = {
 // ── Countdown Ring ─────────────────────────────────────────────────────────────
 function CountdownRing({ mins, state }: { mins: number; state: FilledState }) {
   const isActive = state === 'active';
+  const isWaiting = state === 'waiting';
   const isCritical = state === 'critical';
   const isNear = state === 'near';
   const useAmber = state === 'approaching' || isNear;
@@ -69,7 +74,7 @@ function CountdownRing({ mins, state }: { mins: number; state: FilledState }) {
 
   // Fill: 0 min → 100%, 120+ min → 0%
   const clampedMins = Math.max(0, Math.min(120, mins));
-  const fillPct = isActive ? 1 : 1 - clampedMins / 120;
+  const fillPct = isActive || isWaiting ? 1 : 1 - clampedMins / 120;
   const dashOffset = circ * (1 - fillPct);
 
   const ringColor =
@@ -125,12 +130,21 @@ function CountdownRing({ mins, state }: { mins: number; state: FilledState }) {
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           {isActive ? (
             <span
-              className="text-[9px] font-bold uppercase tracking-[0.2em] text-center leading-[1.5]"
+              className="text-[10px] font-bold uppercase tracking-[0.2em] text-center leading-[1.5]"
               style={{ color: ringColor }}
             >
               EM
               <br />
               CURSO
+            </span>
+          ) : isWaiting ? (
+            <span
+              className="text-[10px] font-bold uppercase tracking-[0.2em] text-center leading-[1.5]"
+              style={{ color: ringColor }}
+            >
+              AGUARD
+              <br />
+              ANDO
             </span>
           ) : (
             <>
@@ -144,7 +158,7 @@ function CountdownRing({ mins, state }: { mins: number; state: FilledState }) {
                 {centerNum}
               </span>
               <span
-                className="text-[10px] font-semibold mt-0.5"
+                className="text-xs font-semibold mt-0.5"
                 style={{
                   color: isCritical
                     ? 'rgba(239,68,68,0.65)'
@@ -162,7 +176,7 @@ function CountdownRing({ mins, state }: { mins: number; state: FilledState }) {
 
       {/* Label below */}
       <p
-        className="mt-2 text-[9px] font-bold uppercase tracking-[0.18em]"
+        className="mt-2 text-[10px] font-bold uppercase tracking-[0.18em]"
         style={{
           color: isCritical
             ? 'rgba(239,68,68,0.55)'
@@ -171,7 +185,7 @@ function CountdownRing({ mins, state }: { mins: number; state: FilledState }) {
             : 'rgba(47,156,133,0.4)',
         }}
       >
-        {isActive ? 'ao vivo' : 'restantes'}
+        {isActive ? 'ao vivo' : isWaiting ? 'aguardando' : 'restantes'}
       </p>
     </div>
   );
@@ -185,7 +199,7 @@ export function NextAppointmentHero({ agendamento, now, allConcluded }: NextAppo
 
     const containerBorder = concluded ? 'border-teal/25' : 'border-border';
     const containerShadow = concluded
-      ? '0 0 0 4px rgba(47,156,133,0.06), 0 16px 48px -16px rgba(47,156,133,0.18)'
+      ? '0 16px 48px -16px rgba(47,156,133,0.18)'
       : '0 16px 48px -16px rgba(0,0,0,0.06)';
     const accentGradient = concluded
       ? 'linear-gradient(90deg, #2f9c85 0%, rgba(47,156,133,0.35) 55%, transparent 100%)'
@@ -198,9 +212,8 @@ export function NextAppointmentHero({ agendamento, now, allConcluded }: NextAppo
       >
         <div className="h-[2px]" style={{ background: accentGradient }} />
         <div
-          className="p-8 md:p-12"
+          className="hero-glass p-8 md:p-12"
           style={{
-            backgroundColor: 'var(--color-surface)',
             backgroundImage: concluded
               ? 'radial-gradient(ellipse 100% 80% at 50% 120%, rgba(47,156,133,0.05) 0%, transparent 60%)'
               : 'none',
@@ -210,7 +223,7 @@ export function NextAppointmentHero({ agendamento, now, allConcluded }: NextAppo
             {/* Content */}
             <div className="flex-1 min-w-0">
               <p
-                className={`text-[10px] font-bold uppercase tracking-[0.25em] mb-4 ${
+                className={`text-xs font-bold uppercase tracking-[0.25em] mb-4 ${
                   concluded ? 'text-teal/60' : 'text-text-secondary/40'
                 }`}
               >
@@ -235,7 +248,7 @@ export function NextAppointmentHero({ agendamento, now, allConcluded }: NextAppo
             <div className="flex flex-col gap-3 shrink-0">
               <Link
                 href="/dashboard/agendamentos"
-                className="inline-flex items-center justify-center gap-2.5 px-8 py-4 rounded-2xl text-[15px] font-bold text-white transition-all hover:-translate-y-0.5 active:scale-[0.98]"
+                className="btn-glow inline-flex items-center justify-center gap-2.5 px-8 py-4 rounded-2xl text-[15px] font-bold text-white transition-all hover:-translate-y-0.5 active:scale-[0.98]"
                 style={{
                   background: 'linear-gradient(135deg, #2f9c85 0%, #1d7a65 100%)',
                   boxShadow:
@@ -268,11 +281,12 @@ export function NextAppointmentHero({ agendamento, now, allConcluded }: NextAppo
   const state = getHeroState(status, mins);
 
   const isActive = state === 'active';
+  const isWaiting = state === 'waiting';
   const isCritical = state === 'critical';
   const isNear = state === 'near';
   const isImminent = state === 'imminent';
   const isApproaching = state === 'approaching';
-  const showPulse = isActive || isCritical || isNear || isImminent || isApproaching;
+  const showPulse = isActive || isWaiting || isCritical || isNear || isImminent || isApproaching;
   const useAmber = isApproaching || isNear;
   const useRed = isCritical;
 
@@ -289,16 +303,16 @@ export function NextAppointmentHero({ agendamento, now, allConcluded }: NextAppo
     : 'border-teal/[0.18]';
 
   const containerShadow = isActive
-    ? '0 0 0 4px rgba(47,156,133,0.10), 0 16px 48px -16px rgba(47,156,133,0.30)'
+    ? '0 16px 48px -16px rgba(47,156,133,0.30)'
     : isCritical
-    ? '0 0 0 4px rgba(239,68,68,0.12), 0 16px 48px -16px rgba(239,68,68,0.30)'
+    ? '0 16px 48px -16px rgba(239,68,68,0.30)'
     : isNear
-    ? '0 0 0 4px rgba(245,158,11,0.08), 0 16px 48px -16px rgba(245,158,11,0.20)'
+    ? '0 16px 48px -16px rgba(245,158,11,0.20)'
     : isImminent
-    ? '0 0 0 4px rgba(47,156,133,0.08), 0 16px 48px -16px rgba(47,156,133,0.25)'
+    ? '0 16px 48px -16px rgba(47,156,133,0.25)'
     : useAmber
-    ? '0 0 0 4px rgba(245,158,11,0.04), 0 16px 48px -16px rgba(245,158,11,0.12)'
-    : '0 0 0 4px rgba(47,156,133,0.04), 0 16px 48px -16px rgba(47,156,133,0.14)';
+    ? '0 16px 48px -16px rgba(245,158,11,0.12)'
+    : '0 16px 48px -16px rgba(47,156,133,0.14)';
 
   const accentBarGradient = isActive
     ? 'linear-gradient(90deg, #2f9c85 0%, #2f9c85 25%, rgba(47,156,133,0.55) 65%, transparent 100%)'
@@ -321,6 +335,8 @@ export function NextAppointmentHero({ agendamento, now, allConcluded }: NextAppo
 
   const timeBadgeText = isActive
     ? 'Em andamento'
+    : isWaiting
+    ? 'Paciente aguardando'
     : isCritical
     ? `Iniciar agora — ${fmtMins(mins)}`
     : isNear
@@ -333,6 +349,8 @@ export function NextAppointmentHero({ agendamento, now, allConcluded }: NextAppo
 
   const timeBadgeClass =
     isActive || isImminent
+      ? 'bg-teal/10 text-teal'
+      : isWaiting
       ? 'bg-teal/10 text-teal'
       : isCritical
       ? 'bg-red-500/10 text-red-600 dark:text-red-400'
@@ -359,9 +377,8 @@ export function NextAppointmentHero({ agendamento, now, allConcluded }: NextAppo
       />
 
       <div
-        className="p-8 md:p-12 flex flex-col md:flex-row md:items-center gap-8"
+        className="hero-glass p-8 md:p-12 flex flex-col md:flex-row md:items-center gap-8"
         style={{
-          backgroundColor: 'var(--color-surface)',
           backgroundImage:
             isActive || isImminent
               ? 'radial-gradient(ellipse 100% 80% at 50% 120%, rgba(47,156,133,0.06) 0%, transparent 60%)'
@@ -376,7 +393,7 @@ export function NextAppointmentHero({ agendamento, now, allConcluded }: NextAppo
         <div className="flex-1 min-w-0">
           {/* State label with pulse dot */}
           <div
-            className={`text-[10px] font-bold uppercase tracking-[0.2em] mb-4 flex items-center gap-2 ${labelColor}`}
+            className={`text-xs font-bold uppercase tracking-[0.2em] mb-4 flex items-center gap-2 ${labelColor}`}
           >
             <span className="relative flex h-2 w-2">
               {showPulse && (
@@ -451,7 +468,7 @@ export function NextAppointmentHero({ agendamento, now, allConcluded }: NextAppo
             animate={isCritical ? { scale: [1, 1.03, 1] } : {}}
             transition={{ duration: 1.0, repeat: Infinity }}
           >
-            <ConsultaCtaButton />
+            <ConsultaCtaButton agendamentoId={agendamento.id} />
           </motion.div>
           <Link
             href={`/dashboard/pacientes/${paciente.id}`}

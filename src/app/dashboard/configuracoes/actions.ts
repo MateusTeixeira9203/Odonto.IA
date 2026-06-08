@@ -3,6 +3,8 @@
 import { requireClinicContext } from "@/server/auth/clinic";
 import { requirePermission } from "@/server/authorization/guards";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { sairDaClinica } from "@/server/services/team";
 
 export async function salvarPerfil(data: {
   nome: string;
@@ -191,4 +193,23 @@ export async function criarProcedimento(
   }
 
   return {};
+}
+
+export async function sairDaClinicaAction(): Promise<{ error?: string }> {
+  const { user, clinicId, role } = await requireClinicContext();
+
+  const result = await sairDaClinica({ userId: user.id, clinicId, role });
+
+  if (!result.ok) {
+    return { error: result.error };
+  }
+
+  if (result.hasOtherClinic) {
+    // Tem outra clínica ativa — revalida e volta ao dashboard (clinic-switcher cuida do resto)
+    revalidatePath('/dashboard');
+    redirect('/dashboard');
+  }
+
+  // Sem outra clínica — vai ao onboarding para criar ou aguardar um convite
+  redirect('/onboarding');
 }

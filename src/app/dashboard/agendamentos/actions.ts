@@ -9,6 +9,9 @@ import {
   deleteGoogleCalendarEvent,
   importGoogleCalendarEvents,
 } from "@/lib/calendar/google-provider";
+import { inserirNotificacao } from "@/lib/notificacoes";
+import { format, parseISO } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 export type StatusAgendamento =
   | 'scheduled'
@@ -93,13 +96,14 @@ export async function criarAgendamento(dados: {
 
   if (error) return { error: error.message };
 
-  try {
-    const { data: pacienteData } = await supabase
-      .from("pacientes")
-      .select("nome")
-      .eq("id", dados.pacienteId)
-      .maybeSingle<{ nome: string }>();
+  // Busca nome do paciente uma vez — usada no GCal e na notificação
+  const { data: pacienteData } = await supabase
+    .from("pacientes")
+    .select("nome")
+    .eq("id", dados.pacienteId)
+    .maybeSingle<{ nome: string }>();
 
+  try {
     let dentistaNome = dentistaPerfil.nome;
     if (dados.dentistaId && dados.dentistaId !== dentistaPerfil.id) {
       const { data: dentistaData } = await supabase
@@ -126,6 +130,23 @@ export async function criarAgendamento(dados: {
     }
   } catch (err) {
     console.error("[criarAgendamento] Google Calendar sync falhou:", err);
+  }
+
+  // Notifica o dentista quando a secretaria cria um agendamento para ele
+  if (role === 'secretaria' && dados.dentistaId) {
+    const horaFormatada = format(parseISO(dados.dataHora), "HH:mm", { locale: ptBR });
+    const dataFormatada = format(parseISO(dados.dataHora), "dd/MM", { locale: ptBR });
+    const nomePaciente  = pacienteData?.nome ?? 'Paciente';
+
+    await inserirNotificacao(supabase, {
+      clinicaId:      clinicId,
+      paraRole:       'dentista',
+      paraDentistaId: dados.dentistaId,
+      tipo:           'agendamento_criado',
+      titulo:         `Novo agendamento — ${horaFormatada} de ${dataFormatada}`,
+      mensagem:       `${nomePaciente} foi agendado pela secretaria.`,
+      href:           '/dashboard/agendamentos',
+    });
   }
 
   revalidatePath("/dashboard/agendamentos");
@@ -311,10 +332,15 @@ export async function fazerCheckIn(id: string): Promise<{ error?: string }> {
 
   const { data: ag } = await supabase
     .from('agendamentos')
-    .select('status')
+    .select('status, dentista_id, data_hora, paciente:pacientes(nome)')
     .eq('id', id)
     .eq('clinica_id', clinicId)
-    .maybeSingle<{ status: string }>();
+    .maybeSingle<{
+      status: string;
+      dentista_id: string;
+      data_hora: string;
+      paciente: { nome: string } | null;
+    }>();
 
   if (!ag) return { error: 'Agendamento não encontrado.' };
   if (!['scheduled', 'confirmed'].includes(ag.status)) {
@@ -328,6 +354,19 @@ export async function fazerCheckIn(id: string): Promise<{ error?: string }> {
     .eq('clinica_id', clinicId);
 
   if (error) return { error: error.message };
+
+  // Notifica o dentista que o paciente chegou
+  const horaFormatada = format(parseISO(ag.data_hora), "HH:mm", { locale: ptBR });
+  await inserirNotificacao(supabase, {
+    clinicaId:      clinicId,
+    paraRole:       'dentista',
+    paraDentistaId: ag.dentista_id,
+    tipo:           'checkin_paciente',
+    titulo:         `${ag.paciente?.nome ?? 'Paciente'} chegou`,
+    mensagem:       `Consulta das ${horaFormatada} — paciente na recepção.`,
+    href:           '/dashboard/agendamentos',
+  });
+
   revalidatePath('/dashboard/agendamentos');
   return {};
 }
@@ -385,14 +424,20 @@ export async function cancelarComMotivo(
   id: string,
   motivo: string | null,
 ): Promise<{ error?: string }> {
-  const { supabase, clinicId } = await requireClinicContext();
+  const { supabase, clinicId, role } = await requireClinicContext();
 
   const { data: ag } = await supabase
     .from('agendamentos')
-    .select('google_event_id, dentista_id, observacoes')
+    .select('google_event_id, dentista_id, data_hora, observacoes, paciente:pacientes(nome)')
     .eq('id', id)
     .eq('clinica_id', clinicId)
-    .maybeSingle<{ google_event_id: string | null; dentista_id: string; observacoes: string | null }>();
+    .maybeSingle<{
+      google_event_id: string | null;
+      dentista_id: string;
+      data_hora: string;
+      observacoes: string | null;
+      paciente: { nome: string } | null;
+    }>();
 
   const novasObs = motivo
     ? `[Cancelado: ${motivo}]${ag?.observacoes ? `\n${ag.observacoes}` : ''}`
@@ -413,6 +458,22 @@ export async function cancelarComMotivo(
     } catch (err) {
       console.error('[cancelarComMotivo] GCal sync falhou:', err);
     }
+  }
+
+  // Notifica o dentista quando a secretaria cancela (dentista já sabe se cancelou ele mesmo)
+  if (role === 'secretaria' && ag?.dentista_id) {
+    const horaFormatada = format(parseISO(ag.data_hora), "HH:mm 'de' dd/MM", { locale: ptBR });
+    await inserirNotificacao(supabase, {
+      clinicaId:      clinicId,
+      paraRole:       'dentista',
+      paraDentistaId: ag.dentista_id,
+      tipo:           'agendamento_cancelado',
+      titulo:         `Consulta cancelada — ${ag.paciente?.nome ?? 'Paciente'}`,
+      mensagem:       motivo
+        ? `Consulta das ${horaFormatada} cancelada. Motivo: ${motivo}`
+        : `Consulta das ${horaFormatada} foi cancelada.`,
+      href:           '/dashboard/agendamentos',
+    });
   }
 
   revalidatePath('/dashboard/agendamentos');

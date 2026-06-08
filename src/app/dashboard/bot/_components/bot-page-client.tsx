@@ -106,7 +106,7 @@ function ChatBubble({ text, side = 'left', time }: { text: string; side?: 'left'
             {i < arr.length - 1 && <br />}
           </span>
         ))}
-        {time && <span className="block text-right text-[8px] text-gray-400 mt-0.5">{time}</span>}
+        {time && <span className="block text-right text-[10px] text-gray-400 mt-0.5">{time}</span>}
       </div>
     </div>
   );
@@ -126,7 +126,7 @@ function WaDivider({ label }: { label: string }) {
   return (
     <>
       <div className="h-px bg-[#ccc]/40 my-2.5" />
-      <p className="text-[8px] text-center text-[#999] mb-1.5 font-semibold tracking-widest uppercase">{label}</p>
+      <p className="text-[10px] text-center text-[#999] mb-1.5 font-semibold tracking-widest uppercase">{label}</p>
     </>
   );
 }
@@ -158,7 +158,7 @@ function PhonePreview({
     if (tab === 'saudacoes') {
       return (
         <>
-          <p className="text-[8px] text-center text-[#999] mb-1.5 mt-0.5 font-semibold tracking-widest uppercase">Paciente novo</p>
+          <p className="text-[10px] text-center text-[#999] mb-1.5 mt-0.5 font-semibold tracking-widest uppercase">Paciente novo</p>
           <ChatBubble text="oi" side="right" time="14:00" />
           <ChatBubble text={parsePreview(mensagens.msg_novo_paciente, assistente, clinicaNome)} time="14:00" />
           <WaDivider label="Paciente retornando" />
@@ -169,7 +169,7 @@ function PhonePreview({
     }
     return (
       <>
-        <p className="text-[8px] text-center text-[#999] mb-1.5 mt-0.5 font-semibold tracking-widest uppercase">Confirmação</p>
+        <p className="text-[10px] text-center text-[#999] mb-1.5 mt-0.5 font-semibold tracking-widest uppercase">Confirmação</p>
         <ChatBubble text={parsePreview(mensagens.msg_confirmacao, assistente, clinicaNome)} time="14:10" />
         <WaDivider label="Sem horários" />
         <ChatBubble text={parsePreview(mensagens.msg_sem_horario, assistente, clinicaNome)} time="14:11" />
@@ -190,9 +190,9 @@ function PhonePreview({
       >
         {/* Status bar */}
         <div className="bg-[#111] px-4 pt-2 pb-1 flex items-center justify-between">
-          <span className="text-white/70 text-[8px] font-medium">9:41</span>
+          <span className="text-white/70 text-[10px] font-medium">9:41</span>
           <div className="w-14 h-3 bg-black rounded-full" />
-          <span className="text-white/70 text-[8px]">100%</span>
+          <span className="text-white/70 text-[10px]">100%</span>
         </div>
         {/* WA header */}
         <div className="bg-[#075e54] px-3 py-2 flex items-center gap-2">
@@ -201,7 +201,7 @@ function PhonePreview({
           </div>
           <div className="min-w-0">
             <p className="text-white text-[11px] font-bold leading-tight truncate">{clinicaNome || 'Minha Clínica'}</p>
-            <p className="text-[#b2dfdb] text-[9px] leading-tight">{assistente} · online</p>
+            <p className="text-[#b2dfdb] text-[10px] leading-tight">{assistente} · online</p>
           </div>
         </div>
         {/* Chat area */}
@@ -224,14 +224,14 @@ function PhonePreview({
         {/* Input bar */}
         <div className="bg-[#f0f0f0] px-2 py-1.5 flex items-center gap-1.5">
           <div className="flex-1 bg-white rounded-full px-2.5 py-1">
-            <span className="text-[9px] text-gray-400">Mensagem</span>
+            <span className="text-[10px] text-gray-400">Mensagem</span>
           </div>
           <div className="w-7 h-7 rounded-full bg-[#25d366] flex items-center justify-center shrink-0">
             <span className="text-white text-[11px] leading-none">↑</span>
           </div>
         </div>
       </div>
-      <p className="mt-2.5 text-[9px] text-text-secondary text-center max-w-52 leading-relaxed">
+      <p className="mt-2.5 text-[10px] text-text-secondary text-center max-w-52 leading-relaxed">
         Prévia com dados de exemplo — as mensagens reais usam os dados do paciente.
       </p>
     </div>

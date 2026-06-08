@@ -52,10 +52,11 @@ export async function renovarConviteAction(
 export async function criarSecretariaAction(
   nome: string,
   email: string,
+  senha: string,
   telefone?: string,
-): Promise<{ ok: boolean; error?: string; senhaTemporaria?: string }> {
+): Promise<{ ok: boolean; error?: string }> {
   const { clinicId, user, role } = await requireRole(['admin']);
-  const result = await criarSecretaria(ctx(clinicId, user.id, role), { nome, email, telefone });
+  const result = await criarSecretaria(ctx(clinicId, user.id, role), { nome, email, senha, telefone });
   if (result.ok) revalidatePath('/dashboard/configuracoes/usuarios');
   return result;
 }

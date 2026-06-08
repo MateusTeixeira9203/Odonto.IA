@@ -151,7 +151,7 @@ export default function RedefinirSenhaPage(): React.JSX.Element {
                 <Link
                   href="/esqueci-senha"
                   className="w-full bg-teal hover:bg-teal-dark text-white py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors"
-                  style={{ boxShadow: "0 10px 30px -10px rgba(47, 156, 133, 0.4)" }}
+                  style={{ boxShadow: "0 10px 30px -10px color-mix(in srgb, var(--color-teal) 40%, transparent)" }}
                 >
                   Solicitar novo link
                 </Link>
@@ -197,7 +197,7 @@ export default function RedefinirSenhaPage(): React.JSX.Element {
                 className="space-y-5"
               >
                 <div>
-                  <label className="block font-mono text-xs text-text-secondary uppercase tracking-widest mb-1.5">
+                  <label className="block text-sm font-medium text-text-secondary mb-1.5">
                     Nova Senha
                   </label>
                   <div className="relative">
@@ -217,12 +217,12 @@ export default function RedefinirSenhaPage(): React.JSX.Element {
                     </button>
                   </div>
                   {errors.password && (
-                    <p className="mt-1 text-xs text-red-500">{errors.password.message}</p>
+                    <p className="mt-1 text-xs text-coral">{errors.password.message}</p>
                   )}
                 </div>
 
                 <div>
-                  <label className="block font-mono text-xs text-text-secondary uppercase tracking-widest mb-1.5">
+                  <label className="block text-sm font-medium text-text-secondary mb-1.5">
                     Confirmar Senha
                   </label>
                   <div className="relative">
@@ -242,7 +242,7 @@ export default function RedefinirSenhaPage(): React.JSX.Element {
                     </button>
                   </div>
                   {errors.confirmPassword && (
-                    <p className="mt-1 text-xs text-red-500">{errors.confirmPassword.message}</p>
+                    <p className="mt-1 text-xs text-coral">{errors.confirmPassword.message}</p>
                   )}
                 </div>
 
@@ -250,7 +250,7 @@ export default function RedefinirSenhaPage(): React.JSX.Element {
                   type="submit"
                   disabled={isLoading}
                   className="bg-teal text-white rounded-xl font-bold py-3.5 w-full hover:bg-teal-dark transition-all disabled:opacity-60 flex items-center justify-center gap-2"
-                  style={{ boxShadow: "0 10px 30px -10px rgba(47, 156, 133, 0.4)" }}
+                  style={{ boxShadow: "0 10px 30px -10px color-mix(in srgb, var(--color-teal) 40%, transparent)" }}
                 >
                   {isLoading ? (
                     <>

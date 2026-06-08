@@ -10,11 +10,13 @@ function gerarSenhaTemporaria(): string {
 export type CriarSecretariaInput = {
   nome: string;
   email: string;
+  /** Senha definida pelo admin — mínimo 8 caracteres */
+  senha: string;
   telefone?: string;
 };
 
 export type CriarSecretariaResult =
-  | { ok: true; senhaTemporaria: string }
+  | { ok: true }
   | { ok: false; error: string };
 
 /**
@@ -34,7 +36,12 @@ export async function criarSecretaria(
     return { ok: false, error: 'Apenas administradores podem criar secretárias.' };
   }
 
-  const { nome, email, telefone } = input;
+  const { nome, email, senha, telefone } = input;
+
+  if (!senha || senha.length < 8) {
+    return { ok: false, error: 'A senha deve ter no mínimo 8 caracteres.' };
+  }
+
   const db = createServiceClient();
 
   // Pré-check: email já tem membership ativa nesta clínica?
@@ -60,12 +67,10 @@ export async function criarSecretaria(
     }
   }
 
-  const senhaTemporaria = gerarSenhaTemporaria();
-
   // PASSO 1 — criar auth user (externo ao Postgres, sem transação)
   const { data: authData, error: authError } = await db.auth.admin.createUser({
     email,
-    password: senhaTemporaria,
+    password: senha,
     email_confirm: true,
     user_metadata: { nome },
   });
@@ -121,7 +126,75 @@ export async function criarSecretaria(
     return { ok: false, error: 'Erro ao provisionar secretária. Tente novamente.' };
   }
 
-  return { ok: true, senhaTemporaria };
+  return { ok: true };
+}
+
+/**
+ * Permite que o próprio usuário saia de uma clínica.
+ * Protege o último admin — não permite auto-remoção nesse caso.
+ * Retorna hasOtherClinic para o caller redirecionar corretamente.
+ */
+export async function sairDaClinica(
+  ctx: { userId: string; clinicId: string; role: string },
+): Promise<{ ok: boolean; error?: string; hasOtherClinic?: boolean }> {
+  const db = createServiceClient();
+
+  // Admin: verificar se há pelo menos outro admin ativo
+  if (ctx.role === 'admin') {
+    const { count } = await db
+      .from('clinica_usuarios')
+      .select('id', { count: 'exact', head: true })
+      .eq('clinica_id', ctx.clinicId)
+      .eq('role', 'admin')
+      .eq('status', 'ativo');
+
+    if ((count ?? 0) <= 1) {
+      return {
+        ok: false,
+        error: 'Você é o único administrador. Transfira o papel de admin a outro membro antes de sair.',
+      };
+    }
+  }
+
+  const now = new Date().toISOString();
+
+  await Promise.all([
+    db.from('clinica_usuarios')
+      .update({ status: 'removido', removed_at: now })
+      .eq('usuario_id', ctx.userId)
+      .eq('clinica_id', ctx.clinicId),
+    db.from('dentistas')
+      .update({ ativo: false })
+      .eq('user_id', ctx.userId)
+      .eq('clinica_id', ctx.clinicId),
+  ]);
+
+  // Verifica se o usuário tem outra clínica ativa para redirecionar
+  const { data: outraClinica } = await db
+    .from('clinica_usuarios')
+    .select('clinica_id')
+    .eq('usuario_id', ctx.userId)
+    .eq('status', 'ativo')
+    .neq('clinica_id', ctx.clinicId)
+    .limit(1)
+    .maybeSingle<{ clinica_id: string }>();
+
+  if (outraClinica) {
+    // Atualiza active_clinica_id para a outra clínica
+    await db
+      .from('users')
+      .update({ active_clinica_id: outraClinica.clinica_id })
+      .eq('id', ctx.userId);
+    return { ok: true, hasOtherClinic: true };
+  }
+
+  // Sem outra clínica — limpa o contexto ativo
+  await db
+    .from('users')
+    .update({ active_clinica_id: null })
+    .eq('id', ctx.userId);
+
+  return { ok: true, hasOtherClinic: false };
 }
 
 export async function removerMembro(
@@ -176,9 +249,19 @@ export async function removerMembro(
       .update({ ativo: false })
       .eq('id', dentista.id as string);
 
+    // Auto-downgrade: busca outra clínica ativa antes de limpar o contexto
+    const { data: outraClinicaLegacy } = await db
+      .from('clinica_usuarios')
+      .select('clinica_id')
+      .eq('usuario_id', membroUserId)
+      .eq('status', 'ativo')
+      .neq('clinica_id', ctx.clinicId)
+      .limit(1)
+      .maybeSingle<{ clinica_id: string }>();
+
     await db
       .from('users')
-      .update({ active_clinica_id: null })
+      .update({ active_clinica_id: outraClinicaLegacy?.clinica_id ?? null })
       .eq('id', membroUserId)
       .eq('active_clinica_id', ctx.clinicId);
 
@@ -209,11 +292,32 @@ export async function removerMembro(
       .update({ ativo: false })
       .eq('user_id', membroUserId)
       .eq('clinica_id', ctx.clinicId),
-    db.from('users')
+  ]);
+
+  // Auto-downgrade: redireciona o dentista para a sua própria clínica (SOLO),
+  // caso ele tenha outra membership ativa. Se não, limpa o contexto ativo.
+  const { data: outraClinica } = await db
+    .from('clinica_usuarios')
+    .select('clinica_id')
+    .eq('usuario_id', membroUserId)
+    .eq('status', 'ativo')
+    .neq('clinica_id', ctx.clinicId)
+    .limit(1)
+    .maybeSingle<{ clinica_id: string }>();
+
+  if (outraClinica) {
+    await db
+      .from('users')
+      .update({ active_clinica_id: outraClinica.clinica_id })
+      .eq('id', membroUserId)
+      .eq('active_clinica_id', ctx.clinicId);
+  } else {
+    await db
+      .from('users')
       .update({ active_clinica_id: null })
       .eq('id', membroUserId)
-      .eq('active_clinica_id', ctx.clinicId),
-  ]);
+      .eq('active_clinica_id', ctx.clinicId);
+  }
 
   return { ok: true };
 }

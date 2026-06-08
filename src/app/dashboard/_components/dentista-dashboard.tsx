@@ -138,9 +138,8 @@ export async function DentistaDashboard({ dentista }: { dentista: DentistaCache 
     <>
       <DashboardHeader
         nome={dentista.nome}
-        totalHoje={consultasHoje ?? 0}
-        proximoAtendimento={nextApt}
         now={now}
+        atendimentos={atendimentosHoje}
       />
 
       <MetricsCards
