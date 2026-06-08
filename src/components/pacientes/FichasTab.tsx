@@ -18,6 +18,7 @@ import {
   Sparkles,
   Lock,
   PenLine,
+  ChevronDown,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { DexLoader } from "@/components/ui/dex-loader";
@@ -46,6 +47,16 @@ import { temFeature, type PlanoId } from "@/lib/planos";
 import { Odontograma } from "@/components/odontograma/Odontograma";
 import dynamic from 'next/dynamic';
 import type SignaturePadLib from 'signature_pad';
+import { format as fmtDate, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import {
+  buscarTratamentoAtivo,
+  buscarHistoricoTratamentos,
+  criarTratamento,
+  vincularFichasAoTratamento,
+  encerrarTratamento,
+  type Tratamento,
+} from '@/app/dashboard/pacientes/[id]/tratamento-actions';
 const SignaturePad = dynamic(
   () => import('@/components/fichas/SignaturePad').then(m => m.SignaturePad),
   { ssr: false }
@@ -79,6 +90,7 @@ interface Evolution {
   procedimentosConcluidos: string[];
   assinaturaUrl: string | null;
   assinadoEm: string | null;
+  tratamentoId: string | null;
 }
 
 type FichaDB = {
@@ -93,6 +105,7 @@ type FichaDB = {
   procedimentos_concluidos: string[];
   assinatura_url: string | null;
   assinado_em: string | null;
+  tratamento_id: string | null;
 };
 
 const ALLOWED_MIME: Record<string, boolean> = {
@@ -128,6 +141,7 @@ const mapFichaToEvolution = (f: FichaDB): Evolution => ({
   procedimentosConcluidos: f.procedimentos_concluidos ?? [],
   assinaturaUrl: f.assinatura_url ?? null,
   assinadoEm: f.assinado_em ?? null,
+  tratamentoId: f.tratamento_id ?? null,
 });
 
 interface FichasTabProps {
@@ -161,6 +175,22 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
     Array<{ name: string; url: string; docId: string; storagePath: string }>
   >([]);
   const [isUploading, setIsUploading] = React.useState(false);
+
+  // ── Episódios de Tratamento ──────────────────────────────────────────────
+  const [tratamentoAtivo, setTratamentoAtivo] = React.useState<Tratamento | null>(null);
+  const [historicoTratamentos, setHistoricoTratamentos] = React.useState<Tratamento[]>([]);
+  const [loadingTratamento, setLoadingTratamento] = React.useState(true);
+  const [historicoAberto, setHistoricoAberto] = React.useState(false);
+  const [modalIniciarOpen, setModalIniciarOpen] = React.useState(false);
+  const [novoTratNome, setNovoTratNome] = React.useState('');
+  const [novoTratFichasSelecionadas, setNovoTratFichasSelecionadas] = React.useState<Set<string>>(new Set());
+  const [salvandoTratamento, setSalvandoTratamento] = React.useState(false);
+  const [tratamentoError, setTratamentoError] = React.useState<string | null>(null);
+  const [modalAdicionarOpen, setModalAdicionarOpen] = React.useState(false);
+  const [adicionarFichasSelecionadas, setAdicionarFichasSelecionadas] = React.useState<Set<string>>(new Set());
+  const [adicionandoFichas, setAdicionandoFichas] = React.useState(false);
+  const [encerrando, setEncerrando] = React.useState(false);
+  const [confirmarEncerramentoOpen, setConfirmarEncerramentoOpen] = React.useState(false);
 
   const [formData, setFormData] = React.useState({
     type: "Evolução",
@@ -233,7 +263,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
       const supabase = createClient();
       const { data, error } = await supabase
         .from("fichas")
-        .select("id, created_at, queixa_principal, anotacoes, dentes_afetados, dentes_observacoes, status, procedimentos_concluidos, assinatura_url, assinado_em, dentista:dentistas(nome)")
+        .select("id, created_at, queixa_principal, anotacoes, dentes_afetados, dentes_observacoes, status, procedimentos_concluidos, assinatura_url, assinado_em, tratamento_id, dentista:dentistas(nome)")
         .eq("paciente_id", patientId)
         .eq("clinica_id", clinicaId)
         .order("created_at", { ascending: false });
@@ -252,6 +282,20 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
       void fetchFichas();
     }
   }, [patientId, clinicaId, fetchFichas]);
+
+  React.useEffect(() => {
+    if (!patientId || !clinicaId) return;
+    void (async () => {
+      setLoadingTratamento(true);
+      const [ativo, historico] = await Promise.all([
+        buscarTratamentoAtivo(patientId),
+        buscarHistoricoTratamentos(patientId),
+      ]);
+      setTratamentoAtivo(ativo.tratamento);
+      setHistoricoTratamentos(historico.tratamentos);
+      setLoadingTratamento(false);
+    })();
+  }, [patientId, clinicaId]);
 
   // Dentes mencionados em fichas anteriores — usados pelo odontograma premium
   const historicalTeeth = React.useMemo(() => {
@@ -395,27 +439,6 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
           : tn
       ),
     }));
-  };
-
-  const handleToggleProcedimento = async (fichaId: string, key: string, current: string[]): Promise<void> => {
-    const supabase = createClient();
-    const newConcluidos = current.includes(key)
-      ? current.filter((k) => k !== key)
-      : [...current, key];
-
-    const { error } = await supabase
-      .from('fichas')
-      .update({ procedimentos_concluidos: newConcluidos })
-      .eq('id', fichaId)
-      .eq('clinica_id', clinicaId);
-
-    if (!error) {
-      setEvolutions((prev) =>
-        prev.map((e) =>
-          e.id === fichaId ? { ...e, procedimentosConcluidos: newConcluidos } : e
-        )
-      );
-    }
   };
 
   const handleSave = async () => {
@@ -718,11 +741,80 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
     }
   };
 
+  // ── Handlers de Tratamento ───────────────────────────────────────────────
+
+  const handleIniciarTratamento = async (): Promise<void> => {
+    setSalvandoTratamento(true);
+    setTratamentoError(null);
+    const result = await criarTratamento(
+      patientId,
+      novoTratNome.trim() || null,
+      Array.from(novoTratFichasSelecionadas)
+    );
+    if (result.error) {
+      setTratamentoError(result.error);
+      setSalvandoTratamento(false);
+      return;
+    }
+    const [ativo, historico] = await Promise.all([
+      buscarTratamentoAtivo(patientId),
+      buscarHistoricoTratamentos(patientId),
+    ]);
+    setTratamentoAtivo(ativo.tratamento);
+    setHistoricoTratamentos(historico.tratamentos);
+    await fetchFichas();
+    setModalIniciarOpen(false);
+    setNovoTratNome('');
+    setNovoTratFichasSelecionadas(new Set());
+    setSalvandoTratamento(false);
+  };
+
+  const handleEncerrarTratamento = async (): Promise<void> => {
+    if (!tratamentoAtivo) return;
+    setEncerrando(true);
+    const result = await encerrarTratamento(tratamentoAtivo.id, patientId);
+    if (result.error) {
+      setEncerrando(false);
+      return;
+    }
+    const [ativo, historico] = await Promise.all([
+      buscarTratamentoAtivo(patientId),
+      buscarHistoricoTratamentos(patientId),
+    ]);
+    setTratamentoAtivo(ativo.tratamento);
+    setHistoricoTratamentos(historico.tratamentos);
+    setConfirmarEncerramentoOpen(false);
+    setEncerrando(false);
+  };
+
+  const handleAdicionarFichasAoTratamento = async (): Promise<void> => {
+    if (!tratamentoAtivo) return;
+    setAdicionandoFichas(true);
+    await vincularFichasAoTratamento(
+      tratamentoAtivo.id,
+      Array.from(adicionarFichasSelecionadas),
+      patientId
+    );
+    await fetchFichas();
+    setModalAdicionarOpen(false);
+    setAdicionarFichasSelecionadas(new Set());
+    setAdicionandoFichas(false);
+  };
+
   if (isLoading) {
     return (
       <DexLoader className="p-20" />
     );
   }
+
+  // ── Computed: fichas agrupadas por episódio ──────────────────────────────
+  const fichasDoTratamentoAtivo = tratamentoAtivo
+    ? evolutions.filter(e => e.tratamentoId === tratamentoAtivo.id)
+    : [];
+  const fichasAvulsas = evolutions.filter(e => e.tratamentoId === null);
+  const fichasPorTratamento = (tratId: string) =>
+    evolutions.filter(e => e.tratamentoId === tratId);
+  const fichasDisponiveis = evolutions.filter(e => e.tratamentoId === null);
 
   return (
     <div className="space-y-6">
@@ -1109,6 +1201,69 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
         )}
       </AnimatePresence>
 
+      {/* ── EPISÓDIO DE TRATAMENTO ───────────────────────────────── */}
+      {!loadingTratamento && (
+        <div className="mb-6 space-y-4">
+          {tratamentoAtivo ? (
+            <div className="rounded-2xl border border-teal/20 bg-teal/5 overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-3.5 border-b border-teal/10">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-2 h-2 rounded-full bg-teal animate-pulse shrink-0" />
+                  <div>
+                    <p className="text-sm font-bold text-teal leading-tight">
+                      {tratamentoAtivo.nome ?? 'Tratamento ativo'}
+                    </p>
+                    <p className="text-[10px] text-teal/70 font-medium">
+                      Desde {fmtDate(parseISO(tratamentoAtivo.created_at), "dd 'de' MMM yyyy", { locale: ptBR })}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setConfirmarEncerramentoOpen(true)}
+                  disabled={encerrando}
+                  className="text-xs font-bold text-teal/70 hover:text-teal transition-colors flex items-center gap-1 disabled:opacity-40"
+                >
+                  {encerrando ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                  Encerrar
+                </button>
+              </div>
+              <div className="px-5 py-4">
+                {fichasDoTratamentoAtivo.length === 0 ? (
+                  <p className="text-xs text-teal/60 italic">Nenhuma ficha vinculada ainda</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {fichasDoTratamentoAtivo.map(f => (
+                      <span
+                        key={f.id}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-surface border border-teal/20 text-text-primary"
+                      >
+                        <FileText className="w-3 h-3 text-teal/60" />
+                        {f.type} · {f.date.split(' ')[0]}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <button
+                  onClick={() => { setAdicionarFichasSelecionadas(new Set()); setModalAdicionarOpen(true); }}
+                  className="text-xs font-semibold text-teal hover:text-teal-lt transition-colors flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" />
+                  Adicionar ficha existente
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => { setNovoTratFichasSelecionadas(new Set()); setNovoTratNome(''); setTratamentoError(null); setModalIniciarOpen(true); }}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-dashed border-teal/30 text-sm font-semibold text-teal hover:border-teal/60 hover:bg-teal/5 transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              Iniciar Tratamento
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Timeline */}
       {evolutions.length === 0 && !isPanelOpen && (
         <div className="bg-surface rounded-2xl border border-border p-12 text-center">
@@ -1120,149 +1275,359 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
       )}
 
       <div className="relative space-y-8 before:absolute before:left-[19px] before:top-4 before:bottom-4 before:w-px before:bg-border/40">
-        {evolutions.map((evo, idx) => {
-          const validKeys = evo.teethNotes.flatMap((tn) =>
-            tn.notes.filter(Boolean).map((_, i) => `${tn.tooth}_${i}`)
-          );
-          const totalProcs = validKeys.length;
-          const doneProcs = evo.procedimentosConcluidos.filter((k) => validKeys.includes(k)).length;
-          const allDone = totalProcs > 0 && doneProcs === totalProcs;
+        {/* Fichas avulsas */}
+        {fichasAvulsas.length > 0 && (
+          <div className="mb-4">
+            {tratamentoAtivo && (
+              <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary/50 mb-3">
+                Fichas avulsas
+              </p>
+            )}
+            {fichasAvulsas.map((evo, idx) => {
+              const validKeys = evo.teethNotes.flatMap((tn) =>
+                tn.notes.filter(Boolean).map((_, i) => `${tn.tooth}_${i}`)
+              );
+              const totalProcs = validKeys.length;
+              const doneProcs = evo.procedimentosConcluidos.filter((k) => validKeys.includes(k)).length;
+              const allDone = totalProcs > 0 && doneProcs === totalProcs;
 
-          return (
-          <motion.div
-            key={evo.id}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: idx * 0.05 }}
-            className="relative pl-10 sm:pl-12 group"
-          >
-            <div className={`absolute left-0 top-1 w-10 h-10 rounded-full bg-surface border-2 flex items-center justify-center z-10 shadow-sm group-hover:scale-110 transition-transform ${allDone ? 'border-emerald-500' : 'border-teal'}`}>
-              {allDone
-                ? <Check className="w-4 h-4 text-emerald-500" />
-                : <div className="w-2 h-2 rounded-full bg-teal" />
-              }
-            </div>
-
-            <div
-              className="bg-surface rounded-2xl border border-border/60 shadow-sm p-6 hover:shadow-md transition-all"
-              style={allDone ? { boxShadow: '-3px 0 0 0 #10b981, 0 1px 3px rgba(0,0,0,0.06)' } : undefined}
-            >
-              <div className="flex flex-wrap justify-between items-start mb-4 gap-2">
-                <div className="space-y-1 min-w-0">
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <span className="bg-teal/10 text-teal px-2.5 py-1 rounded-md text-[9px] font-bold uppercase tracking-widest">
-                      {evo.type}
-                    </span>
-                    <h4 className="text-sm font-bold text-text-primary">{evo.date}</h4>
-                    {totalProcs > 0 && (
-                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold border ${allDone ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/20'}`}>
-                        {allDone ? '✓ Concluído' : `${doneProcs}/${totalProcs} realizados`}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 text-[10px] text-text-secondary font-medium">
-                    <User className="w-3 h-3" /> {evo.professional}
-                  </div>
+              return (
+              <motion.div
+                key={evo.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: idx * 0.05 }}
+                className="relative pl-10 sm:pl-12 group"
+              >
+                <div className={`absolute left-0 top-1 w-10 h-10 rounded-full bg-surface border-2 flex items-center justify-center z-10 shadow-sm group-hover:scale-110 transition-transform ${allDone ? 'border-emerald-500' : 'border-teal'}`}>
+                  {allDone
+                    ? <Check className="w-4 h-4 text-emerald-500" />
+                    : <div className="w-2 h-2 rounded-full bg-teal" />
+                  }
                 </div>
 
-                <div className="flex items-center gap-2">
-                  {evo.assinadoEm ? (
-                    <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[9px] font-bold">
-                      <Check className="w-3 h-3" />
-                      Assinado em {new Date(evo.assinadoEm).toLocaleDateString('pt-BR')}
-                    </span>
-                  ) : (
-                    <button
-                      onClick={() => setSigningFichaId(evo.id)}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 min-h-[36px] rounded-lg text-[10px] font-bold border border-border text-text-secondary hover:border-teal hover:text-teal transition-colors"
-                    >
-                      <PenLine className="w-3 h-3" />
-                      Assinar
-                    </button>
-                  )}
-
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button className="p-2 hover:bg-surface-alt rounded-lg transition-colors text-text-secondary hover:text-text-primary">
-                        <MoreVertical className="w-4 h-4" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleEdit(evo)}>
-                        <Edit2 className="w-3 h-3" /> Editar
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => window.open(`/api/fichas/${evo.id}/pdf`, '_blank')}>
-                        <Download className="w-3 h-3" /> Imprimir Ficha
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onClick={() => setShowDeleteConfirm(evo.id)}
-                        className="text-red-500 focus:text-red-500"
-                      >
-                        <Trash2 className="w-3 h-3" /> Excluir
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-
-              {evo.observation && (
-                <p className="text-sm text-text-secondary leading-relaxed mb-4">
-                  {evo.observation}
-                </p>
-              )}
-
-              {evo.teethNotes.length > 0 && (
-                <div className="flex flex-col gap-2 mb-4">
-                  {evo.teethNotes.map((tn) => (
-                    <div
-                      key={tn.tooth}
-                      className="bg-surface-alt rounded-lg border border-border/40 px-3 py-2"
-                    >
-                      <span className="font-mono text-[10px] font-bold text-teal block mb-1.5">
-                        {tn.tooth in ARCH_LABELS ? ARCH_LABELS[tn.tooth] : `D${tn.tooth}`}
-                      </span>
-                      <div className="flex flex-col gap-1.5">
-                        {tn.notes.filter(Boolean).map((n, i) => {
-                          const procKey = `${tn.tooth}_${i}`;
-                          const done = evo.procedimentosConcluidos.includes(procKey);
-                          return (
-                            <button
-                              key={i}
-                              onClick={() => void handleToggleProcedimento(evo.id, procKey, evo.procedimentosConcluidos)}
-                              className="flex items-center gap-2 text-left group/proc w-full"
-                            >
-                              <div className={`w-4 h-4 rounded border shrink-0 flex items-center justify-center transition-all ${done ? 'bg-emerald-500 border-emerald-500' : 'border-border group-hover/proc:border-teal'}`}>
-                                {done && <Check className="w-2.5 h-2.5 text-white" />}
-                              </div>
-                              <span className={`text-[11px] font-medium transition-all ${done ? 'line-through text-text-secondary' : 'text-text-primary group-hover/proc:text-teal'}`}>
-                                {n}
-                              </span>
-                            </button>
-                          );
-                        })}
+                <div
+                  className="bg-surface rounded-2xl border border-border/60 shadow-sm p-6 hover:shadow-md transition-all"
+                  style={allDone ? { boxShadow: '-3px 0 0 0 #10b981, 0 1px 3px rgba(0,0,0,0.06)' } : undefined}
+                >
+                  <div className="flex flex-wrap justify-between items-start mb-4 gap-2">
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <span className="bg-teal/10 text-teal px-2.5 py-1 rounded-md text-[9px] font-bold uppercase tracking-widest">
+                          {evo.type}
+                        </span>
+                        <h4 className="text-sm font-bold text-text-primary">{evo.date}</h4>
+                        {totalProcs > 0 && (
+                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold border ${allDone ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/20'}`}>
+                            {allDone ? '✓ Concluído' : `${doneProcs}/${totalProcs} realizados`}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-[10px] text-text-secondary font-medium">
+                        <User className="w-3 h-3" /> {evo.professional}
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
 
-              {evo.files.length > 0 && (
-                <div className="flex gap-2">
-                  {evo.files.map((f, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center gap-2 px-3 py-2 bg-surface-alt rounded-xl border border-border/40 text-[10px] font-bold text-text-primary"
-                    >
-                      <FileText className="w-3 h-3 text-teal" /> {f}
+                    <div className="flex items-center gap-2">
+                      {evo.assinadoEm ? (
+                        <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[9px] font-bold">
+                          <Check className="w-3 h-3" />
+                          Assinado em {new Date(evo.assinadoEm).toLocaleDateString('pt-BR')}
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => setSigningFichaId(evo.id)}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 min-h-[36px] rounded-lg text-[10px] font-bold border border-border text-text-secondary hover:border-teal hover:text-teal transition-colors"
+                        >
+                          <PenLine className="w-3 h-3" />
+                          Assinar
+                        </button>
+                      )}
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="p-2 hover:bg-surface-alt rounded-lg transition-colors text-text-secondary hover:text-text-primary">
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEdit(evo)}>
+                            <Edit2 className="w-3 h-3" /> Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => window.open(`/api/fichas/${evo.id}/pdf`, '_blank')}>
+                            <Download className="w-3 h-3" /> Imprimir Ficha
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => setShowDeleteConfirm(evo.id)}
+                            className="text-red-500 focus:text-red-500"
+                          >
+                            <Trash2 className="w-3 h-3" /> Excluir
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
-                  ))}
+                  </div>
+
+                  {evo.observation && (
+                    <p className="text-sm text-text-secondary leading-relaxed mb-4">
+                      {evo.observation}
+                    </p>
+                  )}
+
+                  {evo.teethNotes.length > 0 && (
+                    <div className="flex flex-col gap-2 mb-4">
+                      {evo.teethNotes.map((tn) => (
+                        <div
+                          key={tn.tooth}
+                          className="bg-surface-alt rounded-lg border border-border/40 px-3 py-2"
+                        >
+                          <span className="font-mono text-[10px] font-bold text-teal block mb-1.5">
+                            {tn.tooth in ARCH_LABELS ? ARCH_LABELS[tn.tooth] : `D${tn.tooth}`}
+                          </span>
+                          <div className="flex flex-col gap-1.5">
+                            {tn.notes.filter(Boolean).map((n, i) => {
+                              const procKey = `${tn.tooth}_${i}`;
+                              const done = evo.procedimentosConcluidos.includes(procKey);
+                              return (
+                                <div key={i} className="flex items-center gap-2">
+                                  <div className={`w-4 h-4 rounded border shrink-0 flex items-center justify-center ${done ? 'bg-emerald-500 border-emerald-500' : 'border-border/60'}`}>
+                                    {done && <Check className="w-2.5 h-2.5 text-white" />}
+                                  </div>
+                                  <span className={`text-[11px] font-medium ${done ? 'line-through text-text-secondary' : 'text-text-primary'}`}>
+                                    {n}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {evo.files.length > 0 && (
+                    <div className="flex gap-2">
+                      {evo.files.map((f, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center gap-2 px-3 py-2 bg-surface-alt rounded-xl border border-border/40 text-[10px] font-bold text-text-primary"
+                        >
+                          <FileText className="w-3 h-3 text-teal" /> {f}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
+              </motion.div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Fichas do tratamento ativo */}
+        {fichasDoTratamentoAtivo.length > 0 && (
+          <div className="mb-4">
+            {fichasDoTratamentoAtivo.map((evo, idx) => {
+              const validKeys = evo.teethNotes.flatMap((tn) =>
+                tn.notes.filter(Boolean).map((_, i) => `${tn.tooth}_${i}`)
+              );
+              const totalProcs = validKeys.length;
+              const doneProcs = evo.procedimentosConcluidos.filter((k) => validKeys.includes(k)).length;
+              const allDone = totalProcs > 0 && doneProcs === totalProcs;
+
+              return (
+              <motion.div
+                key={evo.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: idx * 0.05 }}
+                className="relative pl-10 sm:pl-12 group"
+              >
+                <div className={`absolute left-0 top-1 w-10 h-10 rounded-full bg-surface border-2 flex items-center justify-center z-10 shadow-sm group-hover:scale-110 transition-transform ${allDone ? 'border-emerald-500' : 'border-teal'}`}>
+                  {allDone
+                    ? <Check className="w-4 h-4 text-emerald-500" />
+                    : <div className="w-2 h-2 rounded-full bg-teal" />
+                  }
+                </div>
+
+                <div
+                  className="bg-surface rounded-2xl border border-border/60 shadow-sm p-6 hover:shadow-md transition-all"
+                  style={allDone ? { boxShadow: '-3px 0 0 0 #10b981, 0 1px 3px rgba(0,0,0,0.06)' } : undefined}
+                >
+                  <div className="flex flex-wrap justify-between items-start mb-4 gap-2">
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <span className="bg-teal/10 text-teal px-2.5 py-1 rounded-md text-[9px] font-bold uppercase tracking-widest">
+                          {evo.type}
+                        </span>
+                        <h4 className="text-sm font-bold text-text-primary">{evo.date}</h4>
+                        {totalProcs > 0 && (
+                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold border ${allDone ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/20'}`}>
+                            {allDone ? '✓ Concluído' : `${doneProcs}/${totalProcs} realizados`}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-[10px] text-text-secondary font-medium">
+                        <User className="w-3 h-3" /> {evo.professional}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {evo.assinadoEm ? (
+                        <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[9px] font-bold">
+                          <Check className="w-3 h-3" />
+                          Assinado em {new Date(evo.assinadoEm).toLocaleDateString('pt-BR')}
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => setSigningFichaId(evo.id)}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 min-h-[36px] rounded-lg text-[10px] font-bold border border-border text-text-secondary hover:border-teal hover:text-teal transition-colors"
+                        >
+                          <PenLine className="w-3 h-3" />
+                          Assinar
+                        </button>
+                      )}
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="p-2 hover:bg-surface-alt rounded-lg transition-colors text-text-secondary hover:text-text-primary">
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEdit(evo)}>
+                            <Edit2 className="w-3 h-3" /> Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => window.open(`/api/fichas/${evo.id}/pdf`, '_blank')}>
+                            <Download className="w-3 h-3" /> Imprimir Ficha
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => setShowDeleteConfirm(evo.id)}
+                            className="text-red-500 focus:text-red-500"
+                          >
+                            <Trash2 className="w-3 h-3" /> Excluir
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+
+                  {evo.observation && (
+                    <p className="text-sm text-text-secondary leading-relaxed mb-4">
+                      {evo.observation}
+                    </p>
+                  )}
+
+                  {evo.teethNotes.length > 0 && (
+                    <div className="flex flex-col gap-2 mb-4">
+                      {evo.teethNotes.map((tn) => (
+                        <div
+                          key={tn.tooth}
+                          className="bg-surface-alt rounded-lg border border-border/40 px-3 py-2"
+                        >
+                          <span className="font-mono text-[10px] font-bold text-teal block mb-1.5">
+                            {tn.tooth in ARCH_LABELS ? ARCH_LABELS[tn.tooth] : `D${tn.tooth}`}
+                          </span>
+                          <div className="flex flex-col gap-1.5">
+                            {tn.notes.filter(Boolean).map((n, i) => {
+                              const procKey = `${tn.tooth}_${i}`;
+                              const done = evo.procedimentosConcluidos.includes(procKey);
+                              return (
+                                <div key={i} className="flex items-center gap-2">
+                                  <div className={`w-4 h-4 rounded border shrink-0 flex items-center justify-center ${done ? 'bg-emerald-500 border-emerald-500' : 'border-border/60'}`}>
+                                    {done && <Check className="w-2.5 h-2.5 text-white" />}
+                                  </div>
+                                  <span className={`text-[11px] font-medium ${done ? 'line-through text-text-secondary' : 'text-text-primary'}`}>
+                                    {n}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {evo.files.length > 0 && (
+                    <div className="flex gap-2">
+                      {evo.files.map((f, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center gap-2 px-3 py-2 bg-surface-alt rounded-xl border border-border/40 text-[10px] font-bold text-text-primary"
+                        >
+                          <FileText className="w-3 h-3 text-teal" /> {f}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── HISTÓRICO DE TRATAMENTOS ─────────────────────────────── */}
+        {historicoTratamentos.length > 0 && (
+          <div className="mt-6 border-t border-border/40 pt-4">
+            <button
+              onClick={() => setHistoricoAberto(v => !v)}
+              className="w-full flex items-center justify-between text-[11px] font-bold uppercase tracking-widest text-text-secondary/50 hover:text-text-secondary transition-colors mb-3"
+            >
+              <span>Histórico de Tratamentos ({historicoTratamentos.length})</span>
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${historicoAberto ? 'rotate-180' : ''}`} />
+            </button>
+            <AnimatePresence>
+              {historicoAberto && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden space-y-3"
+                >
+                  {historicoTratamentos.map(trat => {
+                    const fichas = fichasPorTratamento(trat.id);
+                    return (
+                      <div key={trat.id} className="rounded-xl border border-border/50 bg-surface overflow-hidden">
+                        <div className="flex items-center justify-between px-4 py-3">
+                          <div>
+                            <p className="text-sm font-semibold text-text-primary">
+                              {trat.nome ?? 'Tratamento'}
+                            </p>
+                            <p className="text-[10px] text-text-secondary mt-0.5">
+                              {fmtDate(parseISO(trat.created_at), "dd MMM yyyy", { locale: ptBR })}
+                              {trat.encerrado_em && ` → ${fmtDate(parseISO(trat.encerrado_em), "dd MMM yyyy", { locale: ptBR })}`}
+                              {' · '}{fichas.length} ficha{fichas.length !== 1 ? 's' : ''}
+                            </p>
+                          </div>
+                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-teal/10 text-teal">
+                            Concluído
+                          </span>
+                        </div>
+                        {fichas.length > 0 && (
+                          <div className="px-4 pb-3 flex flex-wrap gap-1.5">
+                            {fichas.map(f => (
+                              <span
+                                key={f.id}
+                                className="text-[10px] text-text-secondary bg-surface-alt px-2 py-0.5 rounded"
+                              >
+                                {f.type} · {f.date.split(' ')[0]}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </motion.div>
               )}
-            </div>
-          </motion.div>
-          );
-        })}
+            </AnimatePresence>
+          </div>
+        )}
       </div>
 
       {/* Modal: Orçamento sugerido pela IA */}
@@ -1464,6 +1829,172 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
           </div>
         )}
       </AnimatePresence>
+
+      {/* ── MODAL INICIAR TRATAMENTO ────────────────────────────── */}
+      <Dialog open={modalIniciarOpen} onOpenChange={setModalIniciarOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Iniciar Tratamento</DialogTitle>
+            <DialogDescription>
+              Crie um episódio de tratamento e vincule as fichas existentes.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-text-secondary">
+                Nome do tratamento <span className="font-normal text-text-muted">(opcional)</span>
+              </label>
+              <input
+                type="text"
+                value={novoTratNome}
+                onChange={e => setNovoTratNome(e.target.value)}
+                placeholder="Ex: Faceta de Porcelana, Ortodontia…"
+                maxLength={80}
+                className="w-full text-sm border border-border rounded-xl px-3 py-2 bg-surface-alt text-text-primary placeholder:text-text-muted outline-none focus:ring-1 focus:ring-teal/40"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-text-secondary">
+                Fichas deste tratamento <span className="font-normal text-text-muted">(opcional)</span>
+              </label>
+              {fichasDisponiveis.length === 0 ? (
+                <p className="text-xs text-text-muted italic">Nenhuma ficha avulsa disponível</p>
+              ) : (
+                <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
+                  {fichasDisponiveis.map(f => {
+                    const sel = novoTratFichasSelecionadas.has(f.id);
+                    return (
+                      <button
+                        key={f.id}
+                        onClick={() => {
+                          setNovoTratFichasSelecionadas(prev => {
+                            const next = new Set(prev);
+                            sel ? next.delete(f.id) : next.add(f.id);
+                            return next;
+                          });
+                        }}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl border text-left transition-all ${sel ? 'border-teal/40 bg-teal/5' : 'border-border/50 hover:border-teal/20'}`}
+                      >
+                        <div className={`w-4 h-4 rounded border shrink-0 flex items-center justify-center transition-all ${sel ? 'bg-teal border-teal' : 'border-border'}`}>
+                          {sel && <Check className="w-2.5 h-2.5 text-white" />}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-text-primary truncate">{f.type}</p>
+                          <p className="text-[10px] text-text-secondary">{f.date}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {tratamentoError && (
+              <p className="text-xs text-coral font-medium">{tratamentoError}</p>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setModalIniciarOpen(false)} disabled={salvandoTratamento}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => void handleIniciarTratamento()}
+              disabled={salvandoTratamento}
+              className="bg-teal hover:bg-teal-lt text-white"
+            >
+              {salvandoTratamento ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+              Iniciar Tratamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── MODAL ADICIONAR FICHAS AO TRATAMENTO ATIVO ──────────── */}
+      <Dialog open={modalAdicionarOpen} onOpenChange={setModalAdicionarOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Adicionar fichas ao tratamento</DialogTitle>
+          </DialogHeader>
+
+          <div className="py-2">
+            {fichasDisponiveis.length === 0 ? (
+              <p className="text-sm text-text-muted italic">Nenhuma ficha avulsa disponível para vincular</p>
+            ) : (
+              <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
+                {fichasDisponiveis.map(f => {
+                  const sel = adicionarFichasSelecionadas.has(f.id);
+                  return (
+                    <button
+                      key={f.id}
+                      onClick={() => {
+                        setAdicionarFichasSelecionadas(prev => {
+                          const next = new Set(prev);
+                          sel ? next.delete(f.id) : next.add(f.id);
+                          return next;
+                        });
+                      }}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl border text-left transition-all ${sel ? 'border-teal/40 bg-teal/5' : 'border-border/50 hover:border-teal/20'}`}
+                    >
+                      <div className={`w-4 h-4 rounded border shrink-0 flex items-center justify-center transition-all ${sel ? 'bg-teal border-teal' : 'border-border'}`}>
+                        {sel && <Check className="w-2.5 h-2.5 text-white" />}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-text-primary truncate">{f.type}</p>
+                        <p className="text-[10px] text-text-secondary">{f.date}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setModalAdicionarOpen(false)} disabled={adicionandoFichas}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => void handleAdicionarFichasAoTratamento()}
+              disabled={adicionandoFichas || adicionarFichasSelecionadas.size === 0}
+              className="bg-teal hover:bg-teal-lt text-white"
+            >
+              {adicionandoFichas ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+              Vincular {adicionarFichasSelecionadas.size > 0 ? `(${adicionarFichasSelecionadas.size})` : ''}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── DIALOG CONFIRMAR ENCERRAMENTO ───────────────────────── */}
+      <Dialog open={confirmarEncerramentoOpen} onOpenChange={setConfirmarEncerramentoOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Encerrar tratamento?</DialogTitle>
+            <DialogDescription>
+              {tratamentoAtivo?.nome
+                ? `Encerrar "${tratamentoAtivo.nome}"? `
+                : 'Encerrar este tratamento? '}
+              As fichas vinculadas serão mantidas no histórico.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmarEncerramentoOpen(false)} disabled={encerrando}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => void handleEncerrarTratamento()}
+              disabled={encerrando}
+              variant="destructive"
+            >
+              {encerrando ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+              Encerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -482,11 +482,67 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
     return 'pendente';
   };
 
+  /**
+   * Sincroniza status de conclusão de procedimento com a tabela fichas.
+   * fichaRef = "fichaId::dente::lineIndex"
+   * fichaKey  = "dente_lineIndex" (chave em procedimentos_concluidos)
+   */
+  async function syncFichaConclusion(
+    supabase: ReturnType<typeof createClient>,
+    fichaRef: string | null,
+    newStatus: PlanProc['status']
+  ): Promise<void> {
+    if (!fichaRef) return;
+
+    const parts = fichaRef.split('::');
+    if (parts.length !== 3) return;
+    const [fichaId, dente, lineIndex] = parts;
+    const fichaKey = `${dente}_${lineIndex}`;
+
+    try {
+      const { data } = await supabase
+        .from('fichas')
+        .select('procedimentos_concluidos')
+        .eq('id', fichaId)
+        .single();
+
+      const current: string[] = (data as { procedimentos_concluidos: string[] } | null)
+        ?.procedimentos_concluidos ?? [];
+
+      if (newStatus === 'concluido') {
+        if (current.includes(fichaKey)) return;
+        await supabase
+          .from('fichas')
+          .update({ procedimentos_concluidos: [...current, fichaKey] })
+          .eq('id', fichaId)
+          .eq('clinica_id', clinicaId);
+      } else {
+        await supabase
+          .from('fichas')
+          .update({ procedimentos_concluidos: current.filter(k => k !== fichaKey) })
+          .eq('id', fichaId)
+          .eq('clinica_id', clinicaId);
+      }
+    } catch (err) {
+      console.warn('[syncFichaConclusion] best-effort sync falhou:', err);
+    }
+  }
+
   const updateProcStatus = async (procId: string, newStatus: PlanProc['status']): Promise<void> => {
     setUpdatingProcId(procId);
+    const proc = planProcs.find(p => p.id === procId);
     setPlanProcs(prev => prev.map(p => p.id === procId ? { ...p, status: newStatus } : p));
+
     const supabase = createClient();
-    await supabase.from('planejamento_procedimentos').update({ status: newStatus }).eq('id', procId);
+    await supabase
+      .from('planejamento_procedimentos')
+      .update({ status: newStatus })
+      .eq('id', procId);
+
+    if (proc) {
+      await syncFichaConclusion(supabase, proc.fichaRef ?? null, newStatus);
+    }
+
     setUpdatingProcId(null);
   };
 
