@@ -428,7 +428,7 @@ export default function LandingPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.2 }}
-              className="max-w-3xl mx-auto text-lg md:text-xl text-gray-500 mb-12 leading-relaxed"
+              className="max-w-3xl mx-auto text-lg md:text-xl text-gray-500 dark:text-gray-300 mb-12 leading-relaxed"
             >
               Você fala. O Dex transcreve, estrutura a ficha clínica e prepara o orçamento.
               <br className="hidden md:block" />
@@ -502,7 +502,7 @@ export default function LandingPage() {
                   >
                     {item.value}
                   </p>
-                  <p className="text-xs text-gray-500 font-mono leading-snug">{item.label}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-300 font-mono leading-snug">{item.label}</p>
                 </div>
               ))}
             </motion.div>
@@ -516,7 +516,7 @@ export default function LandingPage() {
               <h2 className="text-3xl md:text-5xl font-[family-name:var(--font-dm-serif)] mb-6">
                 O Poder da <span className="italic text-teal">IA</span> no seu Consultório
               </h2>
-              <p className="text-gray-500 max-w-xl mx-auto">
+              <p className="text-gray-500 dark:text-gray-300 max-w-xl mx-auto">
                 Tecnologia de ponta desenhada para a rotina real do dentista.
               </p>
             </motion.div>
@@ -557,7 +557,7 @@ export default function LandingPage() {
                       <feat.icon className="w-7 h-7" />
                     </div>
                     <h3 className="text-xl font-[family-name:var(--font-dm-serif)] mb-4">{feat.title}</h3>
-                    <p className="text-gray-500 leading-relaxed">{feat.description}</p>
+                    <p className="text-gray-500 dark:text-gray-300 leading-relaxed">{feat.description}</p>
                   </div>
                 </motion.div>
               ))}
@@ -623,7 +623,7 @@ export default function LandingPage() {
                       <CheckCircle2 className="w-6 h-6 text-teal mt-1 shrink-0" />
                       <div>
                         <h4 className="text-lg font-semibold mb-1">{item.title}</h4>
-                        <p className="text-gray-500">{item.desc}</p>
+                        <p className="text-gray-500 dark:text-gray-300">{item.desc}</p>
                       </div>
                     </div>
                   ))}
@@ -703,7 +703,7 @@ export default function LandingPage() {
               <h2 className="text-3xl md:text-5xl font-[family-name:var(--font-dm-serif)] mb-4">
                 Preços <span className="italic text-teal">sem surpresa</span>
               </h2>
-              <p className="text-gray-500">
+              <p className="text-gray-500 dark:text-gray-300">
                 Sem taxa de setup. Sem contratos. Todos os planos incluem{' '}
                 <strong className="text-teal">7 dias de teste gratuito.</strong>
               </p>
@@ -751,14 +751,14 @@ export default function LandingPage() {
                         </span>
                         <span className="text-sm text-gray-400 mb-1.5">/mês</span>
                       </div>
-                      <p className="text-sm text-gray-500 leading-relaxed">{plano.desc}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-300 leading-relaxed">{plano.desc}</p>
                     </div>
 
                     <ul className="space-y-3 mb-8 flex-1">
                       {plano.features.map(feat => (
                         <li key={feat} className="flex items-start gap-2.5">
                           <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-teal" />
-                          <span className="text-sm text-gray-500">{feat}</span>
+                          <span className="text-sm text-gray-500 dark:text-gray-300">{feat}</span>
                         </li>
                       ))}
                     </ul>
@@ -795,7 +795,7 @@ export default function LandingPage() {
               <h2 className="text-3xl md:text-4xl font-[family-name:var(--font-dm-serif)] mb-4">
                 Dúvidas Frequentes
               </h2>
-              <p className="text-gray-500">Tudo o que você precisa saber sobre o Odonto.IA.</p>
+              <p className="text-gray-500 dark:text-gray-300">Tudo o que você precisa saber sobre o Odonto.IA.</p>
             </motion.div>
 
             <motion.div {...fadeIn} className="space-y-3">
@@ -825,7 +825,7 @@ export default function LandingPage() {
                         className="overflow-hidden"
                       >
                         <div className="mx-6 mb-4 border-t" style={{ borderColor: `color-mix(in srgb, ${TEAL} 12%, transparent)` }} />
-                        <p className="px-6 pb-5 text-sm text-gray-500 leading-relaxed">{faq.a}</p>
+                        <p className="px-6 pb-5 text-sm text-gray-500 dark:text-gray-300 leading-relaxed">{faq.a}</p>
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -890,7 +890,7 @@ export default function LandingPage() {
           </span>
           <div className="flex gap-8">
             {['Termos', 'Privacidade', 'Contato'].map(label => (
-              <a key={label} href="#" className="text-sm text-gray-500 hover:text-teal transition-colors">
+              <a key={label} href="#" className="text-sm text-gray-500 dark:text-gray-300 hover:text-teal transition-colors">
                 {label}
               </a>
             ))}
