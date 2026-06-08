@@ -46,6 +46,16 @@ import { temFeature, type PlanoId } from "@/lib/planos";
 import { Odontograma } from "@/components/odontograma/Odontograma";
 import dynamic from 'next/dynamic';
 import type SignaturePadLib from 'signature_pad';
+import { format as fmtDate, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import {
+  buscarTratamentoAtivo,
+  buscarHistoricoTratamentos,
+  criarTratamento,
+  vincularFichasAoTratamento,
+  encerrarTratamento,
+  type Tratamento,
+} from '@/app/dashboard/pacientes/[id]/tratamento-actions';
 const SignaturePad = dynamic(
   () => import('@/components/fichas/SignaturePad').then(m => m.SignaturePad),
   { ssr: false }
@@ -79,6 +89,7 @@ interface Evolution {
   procedimentosConcluidos: string[];
   assinaturaUrl: string | null;
   assinadoEm: string | null;
+  tratamentoId: string | null;
 }
 
 type FichaDB = {
@@ -93,6 +104,7 @@ type FichaDB = {
   procedimentos_concluidos: string[];
   assinatura_url: string | null;
   assinado_em: string | null;
+  tratamento_id: string | null;
 };
 
 const ALLOWED_MIME: Record<string, boolean> = {
@@ -128,6 +140,7 @@ const mapFichaToEvolution = (f: FichaDB): Evolution => ({
   procedimentosConcluidos: f.procedimentos_concluidos ?? [],
   assinaturaUrl: f.assinatura_url ?? null,
   assinadoEm: f.assinado_em ?? null,
+  tratamentoId: f.tratamento_id ?? null,
 });
 
 interface FichasTabProps {
@@ -161,6 +174,22 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
     Array<{ name: string; url: string; docId: string; storagePath: string }>
   >([]);
   const [isUploading, setIsUploading] = React.useState(false);
+
+  // ── Episódios de Tratamento ──────────────────────────────────────────────
+  const [tratamentoAtivo, setTratamentoAtivo] = React.useState<Tratamento | null>(null);
+  const [historicoTratamentos, setHistoricoTratamentos] = React.useState<Tratamento[]>([]);
+  const [loadingTratamento, setLoadingTratamento] = React.useState(true);
+  const [historicoAberto, setHistoricoAberto] = React.useState(false);
+  const [modalIniciarOpen, setModalIniciarOpen] = React.useState(false);
+  const [novoTratNome, setNovoTratNome] = React.useState('');
+  const [novoTratFichasSelecionadas, setNovoTratFichasSelecionadas] = React.useState<Set<string>>(new Set());
+  const [salvandoTratamento, setSalvandoTratamento] = React.useState(false);
+  const [tratamentoError, setTratamentoError] = React.useState<string | null>(null);
+  const [modalAdicionarOpen, setModalAdicionarOpen] = React.useState(false);
+  const [adicionarFichasSelecionadas, setAdicionarFichasSelecionadas] = React.useState<Set<string>>(new Set());
+  const [adicionandoFichas, setAdicionandoFichas] = React.useState(false);
+  const [encerrando, setEncerrando] = React.useState(false);
+  const [confirmarEncerramentoOpen, setConfirmarEncerramentoOpen] = React.useState(false);
 
   const [formData, setFormData] = React.useState({
     type: "Evolução",
@@ -233,7 +262,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
       const supabase = createClient();
       const { data, error } = await supabase
         .from("fichas")
-        .select("id, created_at, queixa_principal, anotacoes, dentes_afetados, dentes_observacoes, status, procedimentos_concluidos, assinatura_url, assinado_em, dentista:dentistas(nome)")
+        .select("id, created_at, queixa_principal, anotacoes, dentes_afetados, dentes_observacoes, status, procedimentos_concluidos, assinatura_url, assinado_em, tratamento_id, dentista:dentistas(nome)")
         .eq("paciente_id", patientId)
         .eq("clinica_id", clinicaId)
         .order("created_at", { ascending: false });
@@ -252,6 +281,20 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
       void fetchFichas();
     }
   }, [patientId, clinicaId, fetchFichas]);
+
+  React.useEffect(() => {
+    if (!patientId || !clinicaId) return;
+    void (async () => {
+      setLoadingTratamento(true);
+      const [ativo, historico] = await Promise.all([
+        buscarTratamentoAtivo(patientId),
+        buscarHistoricoTratamentos(patientId),
+      ]);
+      setTratamentoAtivo(ativo.tratamento);
+      setHistoricoTratamentos(historico.tratamentos);
+      setLoadingTratamento(false);
+    })();
+  }, [patientId, clinicaId]);
 
   // Dentes mencionados em fichas anteriores — usados pelo odontograma premium
   const historicalTeeth = React.useMemo(() => {
