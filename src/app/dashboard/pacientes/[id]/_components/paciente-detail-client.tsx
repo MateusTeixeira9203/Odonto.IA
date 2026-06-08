@@ -18,12 +18,12 @@ import {
   XCircle,
   AlertCircle,
   FileText,
-  Trash2,
   Loader2,
   Lock,
-  Check,
-  ClipboardList,
   Stethoscope,
+  MoreHorizontal,
+  Activity,
+  Bell,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -77,7 +77,7 @@ import {
 import { criarAgendamento } from '@/app/dashboard/agendamentos/actions';
 import type { Paciente } from '@/types/database';
 import type { TimelineEvent } from '@/server/patients/get-visible-timeline-events';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, differenceInCalendarDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { STATUS_ORCAMENTO } from '@/lib/constants/orcamento-status';
@@ -167,7 +167,8 @@ export function PacienteDetailClient({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  const showClinicalTabs = role === 'admin' || role === 'dentista';
+  const canViewClinical  = true;
+  const canWriteClinical = role === 'admin' || role === 'dentista';
 
   const [activeTab, setActiveTab] = useState('resumo');
   const [mountedTabs, setMountedTabs] = useState<Set<string>>(() => new Set(['resumo']));
@@ -184,6 +185,12 @@ export function PacienteDetailClient({
   const [editEmail, setEditEmail] = useState(paciente.email ?? '');
   const [editEndereco, setEditEndereco] = useState(paciente.endereco ?? '');
   const [editError, setEditError] = useState<string | null>(null);
+
+  // Dados exibíveis do paciente — atualizados localmente após edição (sem router.refresh)
+  const [displayNome, setDisplayNome] = useState(paciente.nome);
+  const [displayTelefone, setDisplayTelefone] = useState<string | null>(paciente.telefone ?? null);
+  const [displayEmail, setDisplayEmail] = useState<string | null>(paciente.email ?? null);
+  const [displayEndereco, setDisplayEndereco] = useState<string | null>(paciente.endereco ?? null);
 
   // Orçamentos — cópia local para atualizações otimistas
   const [orcamentosState, setOrcamentosState] = useState<OrcamentoComItens[]>(orcamentos);
@@ -228,6 +235,9 @@ export function PacienteDetailClient({
   const [confirmDeleteOrcId, setConfirmDeleteOrcId] = useState<string | null>(null);
   const [orcDeleteSaving, setOrcDeleteSaving] = useState(false);
 
+  // Contato dropdown (⋯)
+  const [showContato, setShowContato] = useState(false);
+
   // Nova Consulta
   const [isNovaConsultaOpen, setIsNovaConsultaOpen] = useState(false);
   const [consultaForm, setConsultaForm] = useState({
@@ -250,7 +260,6 @@ export function PacienteDetailClient({
   const [followupPendente, setFollowupPendente] = useState<boolean>(paciente.followup_pendente ?? false);
   const [followupNota, setFollowupNota] = useState<string>(paciente.followup_nota ?? '');
   const [showFollowupInput, setShowFollowupInput] = useState(false);
-  const [showSnoozeMenu, setShowSnoozeMenu] = useState(false);
   const [followupSaving, setFollowupSaving] = useState(false);
 
   // Pendências — widget persistente acima das abas
@@ -303,7 +312,7 @@ export function PacienteDetailClient({
       });
   }, [activeTab, agendamentosTabData, paciente.id, clinicaId]);
 
-  const iniciais = paciente.nome
+  const iniciais = displayNome
     .split(' ')
     .map((n) => n[0])
     .join('')
@@ -311,7 +320,7 @@ export function PacienteDetailClient({
     .toUpperCase();
 
   const endereco = [
-    paciente.endereco,
+    displayEndereco,
     paciente.cidade && paciente.estado
       ? `${paciente.cidade}, ${paciente.estado}`
       : (paciente.cidade ?? paciente.estado),
@@ -324,6 +333,10 @@ export function PacienteDetailClient({
     : null;
 
   const membroDesde = format(parseISO(paciente.created_at), "MMM 'de' yyyy", { locale: ptBR });
+
+  const idade = paciente.data_nascimento
+    ? Math.floor((Date.now() - new Date(paciente.data_nascimento).getTime()) / (1000 * 60 * 60 * 24 * 365.25))
+    : null;
 
   // Orçamento selecionado no detalhe
   const detalheOrc = orcamentosState.find((o) => o.id === detalheOrcId) ?? null;
@@ -347,6 +360,29 @@ export function PacienteDetailClient({
       temHistorico: allPagamentos.length > 0,
     };
   }, [orcamentosState]);
+
+  const orcamentosAprovados = useMemo(
+    () => orcamentosState.filter(o => o.status === 'aprovado'),
+    [orcamentosState]
+  );
+  const orcamentosAbertos = useMemo(
+    () => orcamentosState.filter(o => ['rascunho', 'enviado'].includes(o.status)),
+    [orcamentosState]
+  );
+  const orcamentosAguardando = useMemo(
+    () => orcamentosState.filter(o => o.status === 'enviado'),
+    [orcamentosState]
+  );
+  const pendenciasAtivas = useMemo(
+    () => pendencias.filter(p => !pendenciasConcluidas.has(p.globalKey)),
+    [pendencias, pendenciasConcluidas]
+  );
+
+  // Procedimentos clínicos dos orçamentos aprovados — headline da Col 2
+  const procedimentosPrincipais = useMemo(() => {
+    const itens = orcamentosAprovados.flatMap(o => o.itens ?? []);
+    return itens.sort((a, b) => (b.preco_total ?? 0) - (a.preco_total ?? 0));
+  }, [orcamentosAprovados]);
 
   const handleMarcarFollowUp = async () => {
     setFollowupSaving(true);
@@ -389,7 +425,6 @@ export function PacienteDetailClient({
   };
 
   const handleSnooze = async (days: number) => {
-    setShowSnoozeMenu(false);
     setFollowupSaving(true);
     const res = await snoozeFollowUp(paciente.id, days);
     if (res.ok) {
@@ -413,8 +448,11 @@ export function PacienteDetailClient({
       if (result.error) {
         setEditError(result.error);
       } else {
+        setDisplayNome(editNome);
+        setDisplayTelefone(editTelefone || null);
+        setDisplayEmail(editEmail || null);
+        setDisplayEndereco(editEndereco || null);
         setIsEditModalOpen(false);
-        router.refresh();
       }
     });
   };
@@ -430,7 +468,7 @@ export function PacienteDetailClient({
       .order('nome')
       .then(({ data }) => setProcedimentosClinica(data ?? []));
 
-    if (!showClinicalTabs) return;
+    if (!canViewClinical) return;
 
     // fichasRecentes já foram carregadas no servidor — evita roundtrip desnecessário
     if (fichasRecentesSSR === undefined) {
@@ -554,7 +592,6 @@ export function PacienteDetailClient({
         formaPagamento: 'pix',
         data: new Date().toISOString().split('T')[0],
       });
-      router.refresh();
     }
     setPagSaving(false);
   };
@@ -671,13 +708,30 @@ export function PacienteDetailClient({
     if (result.error) {
       setOrcError(result.error);
     } else {
+      const novoOrc: OrcamentoComItens = {
+        id: result.id ?? crypto.randomUUID(),
+        status: 'rascunho',
+        total: itensValidos.reduce((s, i) => s + i.quantidade * i.preco, 0),
+        created_at: new Date().toISOString(),
+        validade_dias: 30,
+        condicoes_pagamento: null,
+        itens: itensValidos.map((i, idx) => ({
+          id: `temp-${idx}`,
+          descricao: i.descricao,
+          quantidade: i.quantidade,
+          preco_total: i.quantidade * i.preco,
+        })),
+        pagamentos: [],
+        aprovado_por: null,
+        aprovado_em: null,
+      };
+      setOrcamentosState((prev) => [novoOrc, ...prev]);
       setIsNovoOrcOpen(false);
       setNovoOrcItens([{ procedimentoId: '', descricao: '', quantidade: 1, preco: 0 }]);
       toast.success('Orçamento criado como rascunho', {
         description: 'Revise os itens e envie para o paciente quando estiver pronto.',
         duration: 4000,
       });
-      router.refresh();
     }
     setOrcSaving(false);
   };
@@ -722,7 +776,6 @@ export function PacienteDetailClient({
         )
       );
       setOrcEditMode(false);
-      router.refresh();
     }
     setOrcEditSaving(false);
   };
@@ -735,7 +788,6 @@ export function PacienteDetailClient({
       setOrcamentosState((prev) => prev.filter((o) => o.id !== confirmDeleteOrcId));
       setDetalheOrcId(null);
       setConfirmDeleteOrcId(null);
-      router.refresh();
     }
     setOrcDeleteSaving(false);
   };
@@ -759,90 +811,332 @@ export function PacienteDetailClient({
     } else {
       setIsNovaConsultaOpen(false);
       setConsultaForm({ data: '', hora: '', duracao: '30', observacoes: '' });
-      router.refresh();
+      setAgendamentosTabData(null); // força recarregar a aba Agenda na próxima abertura
+      toast.success('Consulta agendada.');
     }
     setConsultaSaving(false);
   };
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+
+      {/* ── HEADER (Task 6) ─────────────────────────────────────────── */}
       <motion.div
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        className="flex items-center gap-4 mb-8"
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center justify-between gap-4 mb-6"
       >
-        <button
-          onClick={() => router.push('/dashboard/pacientes')}
-          className="p-2 hover:bg-surface rounded-xl transition-colors border border-transparent hover:border-border/40"
-        >
-          <ArrowLeft className="w-5 h-5 text-text-secondary" />
-        </button>
-        <div>
-          <h1 className="font-heading font-bold text-3xl md:text-4xl text-text-primary">{paciente.nome}</h1>
-          <p className="text-text-secondary text-sm font-medium mt-1">
-            Paciente desde {membroDesde}
-            {dataNascimento && ` • Nascimento: ${dataNascimento}`}
-          </p>
+        <div className="flex items-center gap-3 min-w-0">
+          <button
+            onClick={() => router.push('/dashboard/pacientes')}
+            className="p-2 hover:bg-surface rounded-xl transition-colors border border-transparent hover:border-border/40 shrink-0"
+          >
+            <ArrowLeft className="w-5 h-5 text-text-secondary" />
+          </button>
+          <div className="w-11 h-11 rounded-xl bg-teal flex items-center justify-center text-white font-bold text-base shadow-md shrink-0">
+            {iniciais}
+          </div>
+          <div className="min-w-0">
+            <h1 className="font-heading font-bold text-2xl md:text-3xl text-text-primary leading-none truncate">{displayNome}</h1>
+            <p className="text-text-secondary text-sm font-medium mt-0.5">
+              {idade !== null ? `${idade} anos · ` : ''}Paciente desde {membroDesde}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => { setConsultaError(null); setIsNovaConsultaOpen(true); }}
+            className="flex items-center gap-2 px-4 py-2.5 bg-teal text-white rounded-xl text-xs font-bold hover:bg-teal-lt transition-colors shadow-md"
+          >
+            <Calendar className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Nova Consulta</span>
+          </button>
+
+          {/* ⋯ dropdown — contato + editar + exportar */}
+          <div className="relative">
+            {showContato && (
+              <div className="fixed inset-0 z-20" onClick={() => setShowContato(false)} />
+            )}
+            <button
+              onClick={() => setShowContato(v => !v)}
+              className="flex items-center gap-2 px-3 py-2.5 bg-surface-alt rounded-xl text-xs font-bold text-text-primary hover:bg-surface-alt/70 transition-colors border border-border/40"
+              title="Mais opções"
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+            <AnimatePresence>
+              {showContato && (
+                <motion.div
+                  initial={{ opacity: 0, y: 4, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 4, scale: 0.97 }}
+                  transition={{ duration: 0.12 }}
+                  className="absolute right-0 top-full mt-2 z-30 bg-surface border border-border/60 rounded-2xl shadow-lg p-4 min-w-[220px]"
+                >
+                  {(displayTelefone || displayEmail || endereco) && (
+                    <>
+                      <p className="text-xs font-bold uppercase tracking-widest text-text-secondary mb-3">Contato</p>
+                      <div className="space-y-2 mb-3">
+                        {displayTelefone && (
+                          <div className="flex items-center gap-2 text-sm text-text-primary">
+                            <Phone className="w-3.5 h-3.5 text-teal shrink-0" />
+                            {displayTelefone}
+                          </div>
+                        )}
+                        {displayEmail && (
+                          <div className="flex items-center gap-2 text-sm text-text-primary">
+                            <Mail className="w-3.5 h-3.5 text-teal shrink-0" />
+                            <span className="truncate">{displayEmail}</span>
+                          </div>
+                        )}
+                        {endereco && (
+                          <div className="flex items-start gap-2 text-sm text-text-primary">
+                            <MapPin className="w-3.5 h-3.5 text-teal shrink-0 mt-0.5" />
+                            <span className="leading-snug">{endereco}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="h-px bg-border/40 mb-3" />
+                    </>
+                  )}
+                  <div className="space-y-0.5">
+                    <button
+                      onClick={() => { setIsEditModalOpen(true); setShowContato(false); }}
+                      className="flex items-center gap-2.5 px-3 py-2 w-full hover:bg-surface-alt rounded-xl text-xs font-semibold text-text-primary transition-colors"
+                    >
+                      <Edit2 className="w-3.5 h-3.5 text-text-secondary" />
+                      Editar Paciente
+                    </button>
+                    <button
+                      onClick={() => { window.open(`/api/pacientes/${paciente.id}/prontuario`, '_blank'); setShowContato(false); }}
+                      className="flex items-center gap-2.5 px-3 py-2 w-full hover:bg-surface-alt rounded-xl text-xs font-semibold text-text-primary transition-colors"
+                    >
+                      <FileDown className="w-3.5 h-3.5 text-text-secondary" />
+                      Exportar prontuário
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </motion.div>
 
       <div className="space-y-6">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
+          transition={{ delay: 0.05 }}
           className="space-y-6"
         >
-          {/* Header Card */}
-          <div className="bg-surface rounded-2xl border border-border/60 shadow-sm p-6 flex flex-wrap items-center justify-between gap-6">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-teal flex items-center justify-center text-white font-bold text-xl shadow-lg">
-                {iniciais}
+
+          {/* ── HERO STRIP ─────────────────────────────────────────── */}
+          <div className="grid grid-cols-1 md:grid-cols-3 bg-surface rounded-2xl border border-border overflow-hidden">
+
+            {/* Col 1 — Próxima Consulta */}
+            <div
+              className="p-5 md:p-6 border-b md:border-b-0 md:border-r border-border/50 hover:bg-surface-alt/30 transition-colors group cursor-pointer"
+              onClick={() => handleTabChange('agenda')}
+              role="button"
+              tabIndex={0}
+              onKeyDown={e => e.key === 'Enter' && handleTabChange('agenda')}
+            >
+              <div className="flex items-center gap-1.5 mb-4">
+                <Calendar className="w-3 h-3 text-text-secondary/50" />
+                <span className="text-[9px] font-bold uppercase tracking-[0.28em] text-text-secondary/50">Próxima Consulta</span>
               </div>
-              <div className="space-y-1">
-                {paciente.telefone && (
-                  <div className="flex items-center gap-2 text-sm font-medium text-text-primary">
-                    <Phone className="w-4 h-4 text-teal" /> {paciente.telefone}
+              {agendamentoProximo ? (
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-xl font-bold text-text-primary leading-tight">
+                        {format(parseISO(agendamentoProximo.data_hora), "dd 'de' MMM", { locale: ptBR })}
+                      </p>
+                      <p className="text-sm text-text-secondary mt-0.5">
+                        {format(parseISO(agendamentoProximo.data_hora), "EEE 'às' HH:mm", { locale: ptBR })}
+                      </p>
+                      {agendamentoProximo.dentista && (
+                        <p className="text-xs text-teal font-medium mt-1 truncate">{agendamentoProximo.dentista.nome}</p>
+                      )}
+                    </div>
+                    {(() => {
+                      const diff = differenceInCalendarDays(parseISO(agendamentoProximo.data_hora), new Date());
+                      if (diff === 0) return <span className="shrink-0 px-2 py-1 rounded-lg text-[10px] font-bold bg-teal/10 text-teal">Hoje</span>;
+                      if (diff === 1) return <span className="shrink-0 px-2 py-1 rounded-lg text-[10px] font-bold bg-amber-500/10 text-amber-500 dark:text-amber-400">Amanhã</span>;
+                      if (diff <= 7)  return <span className="shrink-0 px-2 py-1 rounded-lg text-[10px] font-bold bg-surface-alt text-text-secondary">Em {diff} dias</span>;
+                      return <span className="shrink-0 px-2 py-1 rounded-lg text-[10px] font-semibold bg-surface-alt text-text-secondary/60">Em {diff}d</span>;
+                    })()}
                   </div>
-                )}
-                {paciente.email && (
-                  <div className="flex items-center gap-2 text-sm font-medium text-text-primary">
-                    <Mail className="w-4 h-4 text-teal" /> {paciente.email}
-                  </div>
-                )}
-                {endereco && (
-                  <div className="flex items-center gap-2 text-sm font-medium text-text-primary">
-                    <MapPin className="w-4 h-4 text-teal" /> {endereco}
-                  </div>
-                )}
-                {!paciente.telefone && !paciente.email && !endereco && (
-                  <div className="text-sm text-text-secondary">Sem informações de contato</div>
-                )}
-              </div>
+                  {canWriteClinical && !['cancelado', 'faltou', 'realizado', 'cancelled', 'no_show', 'completed'].includes(agendamentoProximo.status) && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); router.push(`/consulta/${agendamentoProximo.id}`); }}
+                      className="w-full py-2 rounded-xl bg-teal text-white text-xs font-bold flex items-center justify-center gap-2 hover:bg-teal-lt transition-colors"
+                    >
+                      <Stethoscope className="w-3.5 h-3.5" />
+                      Iniciar Consulta
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-text-secondary/70">Sem consulta agendada</p>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setConsultaError(null); setIsNovaConsultaOpen(true); }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+                    style={{ background: 'rgba(47,156,133,0.08)', color: 'var(--color-teal)' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(47,156,133,0.15)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'rgba(47,156,133,0.08)')}
+                  >
+                    <Plus className="w-3 h-3" />
+                    Agendar agora
+                  </button>
+                </div>
+              )}
             </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => { setConsultaError(null); setIsNovaConsultaOpen(true); }}
-                className="flex items-center gap-2 px-4 py-2.5 bg-teal text-white rounded-xl text-xs font-bold hover:bg-teal-lt transition-colors shadow-md"
-              >
-                <Calendar className="w-3.5 h-3.5" />
-                Nova Consulta
-              </button>
-              <button
-                onClick={() => setIsEditModalOpen(true)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-surface-alt rounded-xl text-xs font-bold text-text-primary hover:bg-surface-alt/70 transition-colors border border-border/40"
-              >
-                <Edit2 className="w-3.5 h-3.5" />
-                Editar Perfil
-              </button>
-              <button
-                onClick={() => window.open(`/api/pacientes/${paciente.id}/prontuario`, '_blank')}
-                className="flex items-center gap-2 px-4 py-2.5 bg-surface-alt rounded-xl text-xs font-bold text-text-primary hover:bg-surface-alt/70 transition-colors border border-border/40"
-                title="Exportar prontuário completo"
-              >
-                <FileDown className="w-3.5 h-3.5" />
-                Exportar
-              </button>
+
+            {/* Col 2 — Tratamento */}
+            <div
+              className="p-5 md:p-6 border-b md:border-b-0 md:border-r border-border/50 hover:bg-surface-alt/30 transition-colors cursor-pointer relative"
+              onClick={() => handleTabChange('tratamento')}
+              role="button"
+              tabIndex={0}
+              onKeyDown={e => e.key === 'Enter' && handleTabChange('tratamento')}
+            >
+              <ChevronRight className="absolute top-4 right-4 w-3.5 h-3.5 text-text-secondary/30" />
+              <div className="flex items-center gap-1.5 mb-4">
+                <Activity className="w-3 h-3 text-text-secondary/50" />
+                <span className="text-[9px] font-bold uppercase tracking-[0.28em] text-text-secondary/50">Tratamento</span>
+              </div>
+              {procedimentosPrincipais.length === 0 && pendenciasAtivas.length === 0 ? (
+                <p className="text-sm text-text-secondary/70">Nenhum tratamento ativo</p>
+              ) : (
+                <div className="space-y-3">
+                  {procedimentosPrincipais.length > 0 && (
+                    <div>
+                      <p className="text-sm font-semibold text-text-primary leading-snug line-clamp-2">
+                        {procedimentosPrincipais[0].descricao}
+                      </p>
+                      {procedimentosPrincipais.length > 1 && (
+                        <p className="text-xs text-text-secondary mt-1">
+                          + {procedimentosPrincipais.length - 1} procedimento{procedimentosPrincipais.length - 1 !== 1 ? 's' : ''}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {procedimentosPrincipais.length === 0 && pendenciasAtivas.length > 0 && (
+                    <p className="text-sm text-text-secondary/70">
+                      {pendenciasAtivas.length} procedimento{pendenciasAtivas.length !== 1 ? 's' : ''} pendente{pendenciasAtivas.length !== 1 ? 's' : ''}
+                    </p>
+                  )}
+                  {canWriteClinical && pendenciasAtivas.length > 0 && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                      {pendenciasAtivas.length} pendente{pendenciasAtivas.length !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Col 3 — Pendências */}
+            <div className="p-5 md:p-6 hover:bg-surface-alt/30 transition-colors">
+              <div className="flex items-center gap-1.5 mb-4">
+                <Bell className="w-3 h-3 text-text-secondary/50" />
+                <span className="text-[9px] font-bold uppercase tracking-[0.28em] text-text-secondary/50">Pendências</span>
+              </div>
+              {!followupPendente && orcamentosAguardando.length === 0 ? (
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-teal/50" />
+                  <p className="text-sm text-text-secondary/70">Tudo em dia</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {/* Follow-up ativo */}
+                  {followupPendente && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                          Follow-up
+                        </span>
+                        <button
+                          onClick={() => void handleLimparFollowUp()}
+                          disabled={followupSaving}
+                          className="text-xs font-bold text-teal hover:text-teal-lt transition-colors disabled:opacity-40 flex items-center gap-1"
+                        >
+                          {followupSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Concluir'}
+                        </button>
+                      </div>
+                      {paciente.followup_nota && (
+                        <p className="text-[11px] text-text-secondary italic truncate">{paciente.followup_nota}</p>
+                      )}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-text-secondary/50">Adiar:</span>
+                        {[{ label: 'Amanhã', days: 1 }, { label: '3d', days: 3 }, { label: '7d', days: 7 }].map(opt => (
+                          <button
+                            key={opt.days}
+                            onClick={() => void handleSnooze(opt.days)}
+                            disabled={followupSaving}
+                            className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-surface-alt border border-border/60 text-text-secondary hover:border-teal/40 hover:text-teal transition-colors disabled:opacity-40"
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Follow-up inativo — marcar */}
+                  {!followupPendente && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-text-secondary/70">Follow-up</span>
+                        <button
+                          onClick={() => setShowFollowupInput(v => !v)}
+                          className="text-xs text-teal hover:text-teal-lt font-semibold transition-colors"
+                        >
+                          {showFollowupInput ? 'Cancelar' : '+ Marcar'}
+                        </button>
+                      </div>
+                      {showFollowupInput && (
+                        <div className="space-y-1.5">
+                          <input
+                            type="text"
+                            placeholder="Nota (opcional)"
+                            value={followupNota}
+                            onChange={e => setFollowupNota(e.target.value)}
+                            className="w-full text-xs border border-border rounded-lg px-2.5 py-1.5 bg-surface-alt text-text-primary placeholder:text-text-secondary outline-none focus:ring-1 focus:ring-teal/40"
+                            maxLength={120}
+                          />
+                          <button
+                            onClick={() => void handleMarcarFollowUp()}
+                            disabled={followupSaving}
+                            className="w-full py-1.5 bg-teal text-white rounded-lg text-xs font-bold hover:bg-teal-lt transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                          >
+                            {followupSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                            Marcar Follow-up
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Orçamentos aguardando aprovação */}
+                  {orcamentosAguardando.length > 0 && (
+                    <button
+                      className="w-full flex items-center justify-between hover:opacity-80 transition-opacity"
+                      onClick={() => handleTabChange('orcamentos')}
+                    >
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-coral/10 text-coral">
+                        <span className="w-1.5 h-1.5 rounded-full bg-coral shrink-0" />
+                        Aguardando aprovação
+                      </span>
+                      <span className="text-sm font-bold text-coral">{orcamentosAguardando.length}</span>
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -852,8 +1146,8 @@ export function PacienteDetailClient({
               {(
                 [
                   ['resumo',        'Resumo',       undefined],
-                  ...(showClinicalTabs ? [['tratamento',   'Tratamento',   'tab-apresentacao'] as const] : []),
-                  ...(showClinicalTabs ? [['ficha-clinica','Ficha Clínica','tab-fichas'      ] as const] : []),
+                  ...(canWriteClinical ? [['tratamento',   'Tratamento',   'tab-apresentacao'] as const] : []),
+                  ...(canViewClinical  ? [['ficha-clinica','Ficha Clínica','tab-fichas'      ] as const] : []),
                   ['agenda',        'Agenda',        undefined],
                   ['orcamentos',    'Orçamentos',   'tab-orcamento'   ],
                   ['arquivos',      'Arquivos',     'tab-documentos'  ],
@@ -870,243 +1164,12 @@ export function PacienteDetailClient({
               ))}
             </TabsList>
 
-            <div className="flex flex-col-reverse lg:flex-row gap-6 items-start">
-              {/* Conteúdo da aba */}
-              <div className="flex-1 min-w-0">
+            <div>
               <div>
                 {/* Resumo */}
                 <TabsContent value="resumo" className="mt-0 space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Próxima Consulta */}
-                    <div className="bg-surface rounded-2xl border border-border/60 shadow-sm p-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-heading text-xl text-text-primary">Próxima Consulta</h3>
-                        <Clock className="w-5 h-5 text-teal" />
-                      </div>
-                      {agendamentoProximo ? (
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-4 p-4 bg-surface-alt rounded-2xl border border-border/20">
-                            <div className="w-12 h-12 bg-surface rounded-xl flex flex-col items-center justify-center shadow-sm shrink-0">
-                              <span className="text-[10px] font-bold text-teal uppercase">
-                                {format(parseISO(agendamentoProximo.data_hora), 'MMM', { locale: ptBR })}
-                              </span>
-                              <span className="text-lg font-bold text-text-primary leading-none">
-                                {format(parseISO(agendamentoProximo.data_hora), 'dd')}
-                              </span>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-bold text-sm text-text-primary">
-                                {agendamentoProximo.observacoes ?? 'Consulta agendada'}
-                              </div>
-                              <div className="text-xs text-text-secondary mt-0.5">
-                                {format(parseISO(agendamentoProximo.data_hora), "EEEE, 'às' HH:mm", {
-                                  locale: ptBR,
-                                })}
-                              </div>
-                              {agendamentoProximo.dentista && (
-                                <div className="text-xs text-teal mt-0.5 font-medium">
-                                  {agendamentoProximo.dentista.nome}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          {showClinicalTabs && !['cancelado', 'faltou', 'realizado'].includes(agendamentoProximo.status) && (
-                            <button
-                              onClick={() => router.push(`/consulta/${agendamentoProximo.id}`)}
-                              className="w-full py-2.5 rounded-xl bg-teal text-white text-sm font-bold flex items-center justify-center gap-2 hover:bg-teal-lt transition-colors shadow-[0_0_15px_rgba(47,156,133,0.3)]"
-                            >
-                              <Stethoscope className="w-4 h-4" />
-                              Iniciar consulta
-                            </button>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="p-4 bg-surface-alt rounded-2xl border border-border/20 text-center">
-                          <p className="text-sm text-text-secondary">Nenhuma consulta agendada.</p>
-                        </div>
-                      )}
-                      <button
-                        onClick={() => setActiveTab('agenda')}
-                        className="w-full mt-4 py-3 text-xs font-bold text-teal hover:text-teal-lt transition-colors flex items-center justify-center gap-2"
-                      >
-                        Ver Agenda <ChevronRight className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    {/* Status do Paciente */}
-                    <div className="bg-surface rounded-2xl border border-border/60 shadow-sm p-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-heading text-xl text-text-primary">Status</h3>
-                        <ClipboardList className="w-5 h-5 text-teal" />
-                      </div>
-                      <div className="space-y-0">
-                        <div className="flex items-center justify-between py-3 border-b border-border/40">
-                          <span className="text-xs text-text-secondary font-medium">Pendências clínicas</span>
-                          <span className="font-mono text-sm font-bold text-text-primary">
-                            {pendencias.filter((p) => !pendenciasConcluidas.has(p.globalKey)).length}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between py-3 border-b border-border/40">
-                          <span className="text-xs text-text-secondary font-medium">Orçamentos em aberto</span>
-                          <span className="font-mono text-sm font-bold text-text-primary">
-                            {orcamentosState.filter((o) => ['rascunho', 'enviado'].includes(o.status)).length}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between py-3">
-                          <span className="text-xs text-text-secondary font-medium">Orçamentos aprovados</span>
-                          <span className="font-mono text-sm font-bold text-teal">
-                            {orcamentosState.filter((o) => o.status === 'aprovado').length}
-                          </span>
-                        </div>
-                      </div>
-                      {/* Follow-up */}
-                      <div className="mt-0 border-t border-border/40 pt-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-text-secondary font-medium">Follow-up</span>
-                          {followupPendente ? (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[10px] font-bold uppercase tracking-wider bg-teal/10 text-teal px-2 py-0.5 rounded-full">
-                                pendente
-                              </span>
-                              <button
-                                onClick={() => void handleLimparFollowUp()}
-                                disabled={followupSaving}
-                                className="text-[10px] text-text-secondary hover:text-teal transition-colors disabled:opacity-40"
-                                title="Concluir follow-up"
-                              >
-                                {followupSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : '✓'}
-                              </button>
-                              <div className="relative">
-                                <button
-                                  onClick={() => setShowSnoozeMenu(v => !v)}
-                                  className="text-[10px] text-text-secondary hover:text-text-primary transition-colors"
-                                  title="Adiar"
-                                >
-                                  Adiar
-                                </button>
-                                {showSnoozeMenu && (
-                                  <div className="absolute right-0 top-5 z-20 bg-surface border border-border rounded-xl shadow-lg p-1 min-w-[120px]">
-                                    {[
-                                      { label: 'Amanhã', days: 1 },
-                                      { label: '3 dias', days: 3 },
-                                      { label: '7 dias', days: 7 },
-                                    ].map(opt => (
-                                      <button
-                                        key={opt.days}
-                                        onClick={() => void handleSnooze(opt.days)}
-                                        className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-text-primary hover:bg-surface-alt rounded-lg transition-colors"
-                                      >
-                                        {opt.label}
-                                      </button>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => setShowFollowupInput(v => !v)}
-                              className="text-xs text-teal hover:text-teal-lt font-semibold transition-colors"
-                            >
-                              {showFollowupInput ? 'Cancelar' : '+ Marcar'}
-                            </button>
-                          )}
-                        </div>
-                        {followupPendente && paciente.followup_nota && (
-                          <p className="text-xs text-text-secondary mt-1 italic leading-relaxed">{paciente.followup_nota}</p>
-                        )}
-                        {showFollowupInput && !followupPendente && (
-                          <div className="mt-2 space-y-2">
-                            <input
-                              type="text"
-                              placeholder="Nota (opcional)"
-                              value={followupNota}
-                              onChange={e => setFollowupNota(e.target.value)}
-                              className="w-full text-xs border border-border rounded-lg px-2.5 py-1.5 bg-surface-alt text-text-primary placeholder:text-text-secondary outline-none focus:ring-1 focus:ring-teal/40"
-                              maxLength={120}
-                            />
-                            <button
-                              onClick={() => void handleMarcarFollowUp()}
-                              disabled={followupSaving}
-                              className="w-full py-1.5 bg-teal text-white rounded-lg text-xs font-bold hover:bg-teal-lt transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
-                            >
-                              {followupSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
-                              Marcar Follow-up
-                            </button>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex gap-2 mt-3">
-                        <button
-                          onClick={() => void abrirNovoOrcamento()}
-                          disabled={isLoadingFichaParaOrc}
-                          className="flex-1 py-2.5 bg-surface-alt hover:bg-surface-alt/70 rounded-xl text-xs font-bold text-text-primary transition-colors border border-border/40 disabled:opacity-50"
-                        >
-                          Novo Orçamento
-                        </button>
-                        <button
-                          onClick={() => setActiveTab('orcamentos')}
-                          className="flex-1 py-2.5 bg-surface-alt hover:bg-surface-alt/70 rounded-xl text-xs font-bold text-text-primary transition-colors border border-border/40"
-                        >
-                          Ver Orçamentos
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Resumo Financeiro do Paciente */}
-                  {resumoFinanceiro.temHistorico && (
-                    <div className="bg-surface rounded-2xl border border-border/60 shadow-sm p-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-heading text-xl text-text-primary">Financeiro</h3>
-                        <CreditCard className="w-5 h-5 text-teal" />
-                      </div>
-                      <div className="grid grid-cols-3 gap-3 mb-4">
-                        <div className="bg-surface-alt rounded-xl p-3 text-center">
-                          <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-text-secondary mb-1">Aprovado</p>
-                          <p className="font-mono text-base font-bold text-text-primary tabular-nums">
-                            {resumoFinanceiro.totalAprovado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                          </p>
-                        </div>
-                        <div className="bg-teal/5 rounded-xl p-3 text-center border border-teal/15">
-                          <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-text-secondary mb-1">Recebido</p>
-                          <p className="font-mono text-base font-bold text-teal tabular-nums">
-                            {resumoFinanceiro.totalPago.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                          </p>
-                        </div>
-                        <div className={`rounded-xl p-3 text-center ${
-                          resumoFinanceiro.totalPendente > 0
-                            ? 'bg-coral/5 border border-coral/15'
-                            : 'bg-surface-alt'
-                        }`}>
-                          <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-text-secondary mb-1">Pendente</p>
-                          <p className={`font-mono text-base font-bold tabular-nums ${
-                            resumoFinanceiro.totalPendente > 0 ? 'text-coral' : 'text-text-secondary'
-                          }`}>
-                            {resumoFinanceiro.totalPendente.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                          </p>
-                        </div>
-                      </div>
-                      {resumoFinanceiro.totalAprovado > 0 && (
-                        <div className="w-full bg-surface-alt rounded-full h-1.5 overflow-hidden">
-                          <div
-                            className="h-full bg-teal rounded-full transition-all duration-500"
-                            style={{ width: `${Math.min(100, (resumoFinanceiro.totalPago / resumoFinanceiro.totalAprovado) * 100)}%` }}
-                          />
-                        </div>
-                      )}
-                      <button
-                        onClick={() => setActiveTab('orcamentos')}
-                        className="w-full mt-3 py-2.5 text-xs font-bold text-teal hover:text-teal-lt transition-colors flex items-center justify-center gap-2"
-                      >
-                        Ver Orçamentos <ChevronRight className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Atividade Recente — apenas para dentista/admin */}
-                  {showClinicalTabs && (
+                  {/* ── 1. Atividade Recente ──────────────────────────────── */}
+                  {canWriteClinical && (
                     <div className="bg-surface rounded-2xl border border-border/60 shadow-sm p-6">
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="font-heading text-xl text-text-primary">Atividade Recente</h3>
@@ -1137,11 +1200,11 @@ export function PacienteDetailClient({
                                   </div>
                                 )}
                                 <div className="flex items-center gap-3 mt-1">
-                                  <span className="text-[10px] text-text-secondary">
+                                  <span className="text-xs text-text-secondary">
                                     {format(parseISO(ficha.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                                   </span>
                                   {ficha.dentista && (
-                                    <span className="text-[10px] text-teal font-medium">
+                                    <span className="text-xs text-teal font-medium">
                                       {ficha.dentista.nome}
                                     </span>
                                   )}
@@ -1154,7 +1217,57 @@ export function PacienteDetailClient({
                     </div>
                   )}
 
-                  {/* Timeline do paciente — todos os roles */}
+                  {/* ── 2. Resumo Financeiro ──────────────────────────────── */}
+                  {resumoFinanceiro.temHistorico && (
+                    <div className="bg-surface rounded-2xl border border-border/60 shadow-sm p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-heading text-xl text-text-primary">Financeiro</h3>
+                        <CreditCard className="w-5 h-5 text-teal" />
+                      </div>
+                      <div className="grid grid-cols-3 gap-3 mb-4">
+                        <div className="bg-surface-alt rounded-xl p-3 text-center">
+                          <p className="text-xs font-bold uppercase tracking-[0.15em] text-text-secondary mb-1">Aprovado</p>
+                          <p className="font-mono text-base font-bold text-text-primary tabular-nums">
+                            {resumoFinanceiro.totalAprovado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </p>
+                        </div>
+                        <div className="bg-teal/5 rounded-xl p-3 text-center border border-teal/15">
+                          <p className="text-xs font-bold uppercase tracking-[0.15em] text-text-secondary mb-1">Recebido</p>
+                          <p className="font-mono text-base font-bold text-teal tabular-nums">
+                            {resumoFinanceiro.totalPago.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </p>
+                        </div>
+                        <div className={`rounded-xl p-3 text-center ${
+                          resumoFinanceiro.totalPendente > 0
+                            ? 'bg-coral/5 border border-coral/15'
+                            : 'bg-surface-alt'
+                        }`}>
+                          <p className="text-xs font-bold uppercase tracking-[0.15em] text-text-secondary mb-1">Pendente</p>
+                          <p className={`font-mono text-base font-bold tabular-nums ${
+                            resumoFinanceiro.totalPendente > 0 ? 'text-coral' : 'text-text-secondary'
+                          }`}>
+                            {resumoFinanceiro.totalPendente.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </p>
+                        </div>
+                      </div>
+                      {resumoFinanceiro.totalAprovado > 0 && (
+                        <div className="w-full bg-surface-alt rounded-full h-1.5 overflow-hidden">
+                          <div
+                            className="h-full bg-teal rounded-full transition-all duration-500"
+                            style={{ width: `${Math.min(100, (resumoFinanceiro.totalPago / resumoFinanceiro.totalAprovado) * 100)}%` }}
+                          />
+                        </div>
+                      )}
+                      <button
+                        onClick={() => setActiveTab('orcamentos')}
+                        className="w-full mt-3 py-2.5 text-xs font-bold text-teal hover:text-teal-lt transition-colors flex items-center justify-center gap-2"
+                      >
+                        Ver Orçamentos <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* ── 3. Timeline Clínica ───────────────────────────────── */}
                   {timeline.length > 0 && (
                     <div className="bg-surface rounded-2xl border border-border/60 shadow-sm p-6">
                       <div className="flex items-center justify-between mb-4">
@@ -1180,7 +1293,7 @@ export function PacienteDetailClient({
                                     <p className="text-sm font-medium text-text-primary leading-snug">
                                       {event.title}
                                     </p>
-                                    <span className="text-[10px] font-mono text-text-secondary shrink-0">
+                                    <span className="text-xs font-mono text-text-secondary shrink-0">
                                       {format(parseISO(event.timestamp), 'dd/MM', { locale: ptBR })}
                                     </span>
                                   </div>
@@ -1201,9 +1314,17 @@ export function PacienteDetailClient({
                       </div>
                     </div>
                   )}
+
+                  {/* placeholder para que a aba nunca fique completamente vazia */}
+                  {!canWriteClinical && !resumoFinanceiro.temHistorico && timeline.length === 0 && (
+                    <div className="bg-surface rounded-2xl border border-border/60 shadow-sm p-10 text-center">
+                      <Clock className="w-10 h-10 text-text-secondary/20 mx-auto mb-3" />
+                      <p className="text-sm text-text-secondary">Nenhuma atividade registrada ainda.</p>
+                    </div>
+                  )}
                 </TabsContent>
 
-                {showClinicalTabs && (
+                {canViewClinical && (
                   <TabsContent value="ficha-clinica" className="mt-0">
                     {mountedTabs.has('ficha-clinica') && (
                       <FichasTab
@@ -1211,16 +1332,17 @@ export function PacienteDetailClient({
                         clinicaId={clinicaId}
                         dentistaId={dentistaId}
                         plano={plano}
+                        canWrite={canWriteClinical}
                       />
                     )}
                   </TabsContent>
                 )}
 
-                {showClinicalTabs && (
+                {canWriteClinical && (
                   <TabsContent value="tratamento" className="mt-0">
                     {mountedTabs.has('tratamento') && (
                       temFeature(plano, 'planejamentoIA') ? (
-                        <PlanejamentoTab patientId={paciente.id} clinicaId={clinicaId} patientName={paciente.nome} />
+                        <PlanejamentoTab patientId={paciente.id} clinicaId={clinicaId} patientName={displayNome} />
                       ) : (
                         <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
                           <div className="w-14 h-14 rounded-2xl bg-teal/10 border border-teal/20 flex items-center justify-center">
@@ -1238,23 +1360,24 @@ export function PacienteDetailClient({
 
                 {/* Orçamentos */}
                 <TabsContent value="orcamentos" className="mt-0 space-y-4">
-                  {/* Botão novo orçamento — sempre visível */}
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-text-secondary font-medium">
                       {orcamentosState.length} orçamento{orcamentosState.length !== 1 ? 's' : ''}
                     </span>
-                    <button
-                      onClick={() => void abrirNovoOrcamento()}
-                      disabled={isLoadingFichaParaOrc}
-                      className="bg-teal text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 hover:bg-teal-lt transition-all shadow-md disabled:opacity-60"
-                    >
-                      {isLoadingFichaParaOrc ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <Plus className="w-3.5 h-3.5" />
-                      )}
-                      Novo Orçamento
-                    </button>
+                    {role !== 'secretaria' && (
+                      <button
+                        onClick={() => void abrirNovoOrcamento()}
+                        disabled={isLoadingFichaParaOrc}
+                        className="bg-teal text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 hover:bg-teal-lt transition-all shadow-md disabled:opacity-60"
+                      >
+                        {isLoadingFichaParaOrc ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Plus className="w-3.5 h-3.5" />
+                        )}
+                        Novo Orçamento
+                      </button>
+                    )}
                   </div>
 
                   {orcamentosState.length === 0 ? (
@@ -1290,7 +1413,7 @@ export function PacienteDetailClient({
                               <div>
                                 <div className="flex items-center gap-2">
                                   <span
-                                    className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md ${st.cls}`}
+                                    className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md ${st.cls}`}
                                   >
                                     {st.label}
                                   </span>
@@ -1346,7 +1469,7 @@ export function PacienteDetailClient({
 
                           {orc.pagamentos.length > 0 && (
                             <div className="pt-3 border-t border-border/40">
-                              <div className="text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-2">
+                              <div className="text-xs font-bold text-text-secondary uppercase tracking-widest mb-2">
                                 Pagamentos
                               </div>
                               {orc.pagamentos.map((pg) => (
@@ -1427,7 +1550,7 @@ export function PacienteDetailClient({
                             className="bg-surface rounded-2xl border border-border/60 shadow-sm p-5 flex items-start gap-4"
                           >
                             <div className="w-12 h-12 bg-surface-alt rounded-xl flex flex-col items-center justify-center shrink-0">
-                              <span className="text-[10px] font-bold text-teal uppercase">
+                              <span className="text-xs font-bold text-teal uppercase">
                                 {format(parseISO(ag.data_hora), 'MMM', { locale: ptBR })}
                               </span>
                               <span className="text-base font-bold text-text-primary leading-none">
@@ -1436,7 +1559,7 @@ export function PacienteDetailClient({
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="mb-1">
-                                <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md ${statusInfo.cls}`}>
+                                <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md ${statusInfo.cls}`}>
                                   {statusInfo.label}
                                 </span>
                               </div>
@@ -1450,7 +1573,7 @@ export function PacienteDetailClient({
                                 <div className="text-xs text-teal mt-0.5 font-medium">{ag.dentista.nome}</div>
                               )}
                             </div>
-                            {showClinicalTabs && isUpcoming && !['cancelled', 'no_show', 'completed'].includes(ag.status) && (
+                            {canWriteClinical && isUpcoming && !['cancelled', 'no_show', 'completed'].includes(ag.status) && (
                               <button
                                 onClick={() => router.push(`/consulta/${ag.id}`)}
                                 className="shrink-0 px-3 py-1.5 bg-teal text-white rounded-lg text-xs font-bold hover:bg-teal-lt transition-colors"
@@ -1472,97 +1595,7 @@ export function PacienteDetailClient({
                   )}
                 </TabsContent>
               </div>
-            </div>{/* fim flex-1 */}
-
-              {/* Sidebar: Procedimentos Pendentes */}
-              <AnimatePresence>
-                {showClinicalTabs && activeTab === 'visao-geral' && (() => {
-                  const pending = pendencias.filter((p) => !pendenciasConcluidas.has(p.globalKey));
-                  const total = pendencias.length;
-                  const doneCount = total - pending.length;
-                  return (
-                    <motion.div
-                      key="pendencias-sidebar"
-                      initial={{ opacity: 0, x: 16 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 16 }}
-                      transition={{ duration: 0.2 }}
-                      className="w-full lg:w-72 shrink-0 lg:sticky lg:top-6"
-                    >
-                      <div className="bg-surface rounded-2xl border border-border/60 shadow-sm p-5">
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center gap-2">
-                            <ClipboardList className="w-4 h-4 text-teal" />
-                            <h3 className="font-heading text-base text-text-primary">Pendências</h3>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            {doneCount > 0 && (
-                              <span className="text-[9px] font-bold font-mono bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 px-1.5 py-0.5 rounded-full">
-                                {doneCount} ok
-                              </span>
-                            )}
-                            {pending.length > 0 && (
-                              <span className="text-[9px] font-bold font-mono bg-amber-500/10 text-amber-600 border border-amber-500/20 px-1.5 py-0.5 rounded-full">
-                                {pending.length} pendente{pending.length !== 1 ? 's' : ''}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {pending.length === 0 ? (
-                          <div className="flex items-center gap-2.5 py-2">
-                            <div className="w-7 h-7 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0">
-                              <Check className="w-3.5 h-3.5 text-emerald-500" />
-                            </div>
-                            <p className="text-xs text-text-secondary">
-                              {total === 0 ? 'Nenhum procedimento.' : 'Tudo concluído!'}
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="space-y-1.5">
-                            {pending.slice(0, 8).map((item) => (
-                              <button
-                                key={item.globalKey}
-                                onClick={() => void togglePendencia(item)}
-                                disabled={togglingPendencia === item.globalKey}
-                                className="flex items-center gap-2 w-full p-2 rounded-xl bg-surface-alt hover:bg-surface-alt/70 border border-border/40 hover:border-teal/30 transition-all text-left group disabled:opacity-50"
-                              >
-                                <div className="w-3.5 h-3.5 rounded border-2 border-border group-hover:border-teal shrink-0 transition-colors flex items-center justify-center">
-                                  {togglingPendencia === item.globalKey && (
-                                    <Loader2 className="w-2 h-2 animate-spin text-teal" />
-                                  )}
-                                </div>
-                                <span className="text-[11px] text-text-primary truncate flex-1">{item.descricao}</span>
-                                <span className="text-[9px] font-mono font-bold text-teal shrink-0 bg-teal/10 px-1 py-0.5 rounded">
-                                  {ARCH_LABEL_SHORT[item.tooth] ?? `D${item.tooth}`}
-                                </span>
-                              </button>
-                            ))}
-                            {pending.length > 8 && (
-                              <button
-                                onClick={() => handleTabChange('ficha-clinica')}
-                                className="w-full text-center text-[11px] text-text-secondary hover:text-teal transition-colors py-1"
-                              >
-                                +{pending.length - 8} mais
-                              </button>
-                            )}
-                          </div>
-                        )}
-
-                        {total > 0 && (
-                          <button
-                            onClick={() => handleTabChange('ficha-clinica')}
-                            className="mt-3 w-full text-[11px] font-bold text-teal hover:text-teal-lt transition-colors flex items-center justify-center gap-1 border-t border-border/40 pt-3"
-                          >
-                            Ver fichas clínicas <ChevronRight className="w-3 h-3" />
-                          </button>
-                        )}
-                      </div>
-                    </motion.div>
-                  );
-                })()}
-              </AnimatePresence>
-            </div>{/* fim flex gap-6 */}
+            </div>
           </Tabs>
         </motion.div>
       </div>
@@ -1633,7 +1666,7 @@ export function PacienteDetailClient({
           setIsNovaConsultaOpen(open);
           if (!open) setConsultaError(null);
         }}
-        pacienteNome={paciente.nome}
+        pacienteNome={displayNome}
         consultaForm={consultaForm}
         setConsultaForm={setConsultaForm}
         consultaError={consultaError}
