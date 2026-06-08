@@ -1,7 +1,12 @@
 // Next.js requer que o middleware esteja na raiz do projeto (ao lado de /src).
-// A lógica real está em src/proxy.ts — o config precisa ser declarado inline
-// pois o Next.js o parseia estaticamente (não aceita re-export de outro arquivo).
-export { proxy as middleware } from './src/proxy';
+// A lógica real está em src/proxy.ts — re-export nomeado não gera o .nft.json
+// corretamente no Vercel, por isso usamos wrapper explícito.
+import { proxy } from './src/proxy';
+import type { NextRequest } from 'next/server';
+
+export async function middleware(request: NextRequest) {
+  return proxy(request);
+}
 
 export const config = {
   matcher: [
