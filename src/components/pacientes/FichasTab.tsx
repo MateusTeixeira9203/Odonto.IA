@@ -1829,6 +1829,172 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano }: FichasTab
           </div>
         )}
       </AnimatePresence>
+
+      {/* ── MODAL INICIAR TRATAMENTO ────────────────────────────── */}
+      <Dialog open={modalIniciarOpen} onOpenChange={setModalIniciarOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Iniciar Tratamento</DialogTitle>
+            <DialogDescription>
+              Crie um episódio de tratamento e vincule as fichas existentes.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-text-secondary">
+                Nome do tratamento <span className="font-normal text-text-muted">(opcional)</span>
+              </label>
+              <input
+                type="text"
+                value={novoTratNome}
+                onChange={e => setNovoTratNome(e.target.value)}
+                placeholder="Ex: Faceta de Porcelana, Ortodontia…"
+                maxLength={80}
+                className="w-full text-sm border border-border rounded-xl px-3 py-2 bg-surface-alt text-text-primary placeholder:text-text-muted outline-none focus:ring-1 focus:ring-teal/40"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-text-secondary">
+                Fichas deste tratamento <span className="font-normal text-text-muted">(opcional)</span>
+              </label>
+              {fichasDisponiveis.length === 0 ? (
+                <p className="text-xs text-text-muted italic">Nenhuma ficha avulsa disponível</p>
+              ) : (
+                <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
+                  {fichasDisponiveis.map(f => {
+                    const sel = novoTratFichasSelecionadas.has(f.id);
+                    return (
+                      <button
+                        key={f.id}
+                        onClick={() => {
+                          setNovoTratFichasSelecionadas(prev => {
+                            const next = new Set(prev);
+                            sel ? next.delete(f.id) : next.add(f.id);
+                            return next;
+                          });
+                        }}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl border text-left transition-all ${sel ? 'border-teal/40 bg-teal/5' : 'border-border/50 hover:border-teal/20'}`}
+                      >
+                        <div className={`w-4 h-4 rounded border shrink-0 flex items-center justify-center transition-all ${sel ? 'bg-teal border-teal' : 'border-border'}`}>
+                          {sel && <Check className="w-2.5 h-2.5 text-white" />}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-text-primary truncate">{f.type}</p>
+                          <p className="text-[10px] text-text-secondary">{f.date}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {tratamentoError && (
+              <p className="text-xs text-coral font-medium">{tratamentoError}</p>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setModalIniciarOpen(false)} disabled={salvandoTratamento}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => void handleIniciarTratamento()}
+              disabled={salvandoTratamento}
+              className="bg-teal hover:bg-teal-lt text-white"
+            >
+              {salvandoTratamento ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+              Iniciar Tratamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── MODAL ADICIONAR FICHAS AO TRATAMENTO ATIVO ──────────── */}
+      <Dialog open={modalAdicionarOpen} onOpenChange={setModalAdicionarOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Adicionar fichas ao tratamento</DialogTitle>
+          </DialogHeader>
+
+          <div className="py-2">
+            {fichasDisponiveis.length === 0 ? (
+              <p className="text-sm text-text-muted italic">Nenhuma ficha avulsa disponível para vincular</p>
+            ) : (
+              <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
+                {fichasDisponiveis.map(f => {
+                  const sel = adicionarFichasSelecionadas.has(f.id);
+                  return (
+                    <button
+                      key={f.id}
+                      onClick={() => {
+                        setAdicionarFichasSelecionadas(prev => {
+                          const next = new Set(prev);
+                          sel ? next.delete(f.id) : next.add(f.id);
+                          return next;
+                        });
+                      }}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl border text-left transition-all ${sel ? 'border-teal/40 bg-teal/5' : 'border-border/50 hover:border-teal/20'}`}
+                    >
+                      <div className={`w-4 h-4 rounded border shrink-0 flex items-center justify-center transition-all ${sel ? 'bg-teal border-teal' : 'border-border'}`}>
+                        {sel && <Check className="w-2.5 h-2.5 text-white" />}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-text-primary truncate">{f.type}</p>
+                        <p className="text-[10px] text-text-secondary">{f.date}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setModalAdicionarOpen(false)} disabled={adicionandoFichas}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => void handleAdicionarFichasAoTratamento()}
+              disabled={adicionandoFichas || adicionarFichasSelecionadas.size === 0}
+              className="bg-teal hover:bg-teal-lt text-white"
+            >
+              {adicionandoFichas ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+              Vincular {adicionarFichasSelecionadas.size > 0 ? `(${adicionarFichasSelecionadas.size})` : ''}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── DIALOG CONFIRMAR ENCERRAMENTO ───────────────────────── */}
+      <Dialog open={confirmarEncerramentoOpen} onOpenChange={setConfirmarEncerramentoOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Encerrar tratamento?</DialogTitle>
+            <DialogDescription>
+              {tratamentoAtivo?.nome
+                ? `Encerrar "${tratamentoAtivo.nome}"? `
+                : 'Encerrar este tratamento? '}
+              As fichas vinculadas serão mantidas no histórico.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmarEncerramentoOpen(false)} disabled={encerrando}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => void handleEncerrarTratamento()}
+              disabled={encerrando}
+              variant="destructive"
+            >
+              {encerrando ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+              Encerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
