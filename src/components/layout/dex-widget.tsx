@@ -76,10 +76,11 @@ export function DexWidget({ nome, dentistaId, hideTrigger }: DexWidgetProps) {
     return () => window.removeEventListener('dex-toggle', handler);
   }, []);
 
-  // Onboarding gate
+  // Onboarding gate — também aceita a chave legada "dex_welcome_v1_*"
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (localStorage.getItem(userOnboardingKey(dentistaId))) {
+    const legacyKey = `dex_welcome_v1_${dentistaId}`;
+    if (localStorage.getItem(userOnboardingKey(dentistaId)) || localStorage.getItem(legacyKey)) {
       setOnboardingDone(true);
       return;
     }

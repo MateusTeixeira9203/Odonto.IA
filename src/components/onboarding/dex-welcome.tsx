@@ -27,6 +27,9 @@ export function DexWelcome({ nome: _nome, dentistaId }: DexWelcomeProps) {
 
   function finish() {
     localStorage.setItem(STORAGE_KEY(dentistaId), '1');
+    // Garante que o DexWidget (que checa dex_onboarding_v1_*) também reconheça
+    localStorage.setItem(`dex_onboarding_v1_${dentistaId}`, '1');
+    window.dispatchEvent(new Event('dex-onboarding-done'));
     setDone(true);
   }
 

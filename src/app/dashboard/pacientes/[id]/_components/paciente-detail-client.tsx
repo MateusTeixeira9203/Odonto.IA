@@ -224,6 +224,7 @@ export function PacienteDetailClient({
   const [isLoadingFichaParaOrc, setIsLoadingFichaParaOrc] = useState(false);
   const [fichasParaOrc, setFichasParaOrc] = useState<FichaParaOrc[]>([]);
   const [etapaNovoOrc, setEtapaNovoOrc] = useState<'selecionar' | 'itens'>('itens');
+  const [novoOrcDesconto, setNovoOrcDesconto] = useState<0 | 5 | 10 | 15 | 20>(0);
 
   // Edição de orçamento
   const [orcEditMode, setOrcEditMode] = useState(false);
@@ -340,9 +341,13 @@ export function PacienteDetailClient({
 
   // Orçamento selecionado no detalhe
   const detalheOrc = orcamentosState.find((o) => o.id === detalheOrcId) ?? null;
-  const novoOrcTotal = useMemo(
+  const novoOrcSubtotal = useMemo(
     () => novoOrcItens.reduce((s, i) => s + i.quantidade * i.preco, 0),
     [novoOrcItens]
+  );
+  const novoOrcTotal = useMemo(
+    () => Math.max(0, novoOrcSubtotal * (1 - novoOrcDesconto / 100)),
+    [novoOrcSubtotal, novoOrcDesconto]
   );
 
   const resumoFinanceiro = useMemo(() => {
@@ -695,8 +700,12 @@ export function PacienteDetailClient({
     setOrcError(null);
     setOrcSaving(true);
 
+    const subtotalValido = itensValidos.reduce((s, i) => s + i.quantidade * i.preco, 0);
+    const descontoValor  = Math.round((subtotalValido * (novoOrcDesconto / 100)) * 100) / 100;
+
     const result = await criarOrcamento({
       pacienteId: paciente.id,
+      desconto:   descontoValor,
       itens: itensValidos.map((i) => ({
         procedimentoId: i.procedimentoId || null,
         descricao: i.descricao,
@@ -711,7 +720,7 @@ export function PacienteDetailClient({
       const novoOrc: OrcamentoComItens = {
         id: result.id ?? crypto.randomUUID(),
         status: 'rascunho',
-        total: itensValidos.reduce((s, i) => s + i.quantidade * i.preco, 0),
+        total: Math.max(0, subtotalValido - descontoValor),
         created_at: new Date().toISOString(),
         validade_dias: 30,
         condicoes_pagamento: null,
@@ -1678,7 +1687,7 @@ export function PacienteDetailClient({
         open={isNovoOrcOpen}
         onOpenChange={(open) => {
           setIsNovoOrcOpen(open);
-          if (!open) { setEtapaNovoOrc('itens'); setFichasParaOrc([]); setOrcError(null); }
+          if (!open) { setEtapaNovoOrc('itens'); setFichasParaOrc([]); setOrcError(null); setNovoOrcDesconto(0); }
         }}
         etapaNovoOrc={etapaNovoOrc}
         setEtapaNovoOrc={setEtapaNovoOrc}
@@ -1687,7 +1696,10 @@ export function PacienteDetailClient({
         novoOrcItens={novoOrcItens}
         setNovoOrcItens={setNovoOrcItens}
         procedimentosClinica={procedimentosClinica}
+        novoOrcSubtotal={novoOrcSubtotal}
         novoOrcTotal={novoOrcTotal}
+        novoOrcDesconto={novoOrcDesconto}
+        setNovoOrcDesconto={setNovoOrcDesconto}
         orcSaving={orcSaving}
         onCriarOrcamento={handleCriarOrcamento}
         onSelecionarFicha={selecionarFichaParaOrc}
