@@ -68,6 +68,8 @@ export interface HorarioDia {
   hora_fim: string;
   intervalo_minutos: number;
   ativo: boolean;
+  almoco_inicio: string | null;
+  almoco_fim: string | null;
 }
 
 export async function salvarHorarios(
@@ -103,6 +105,8 @@ export async function salvarHorarios(
       hora_inicio:       h.hora_inicio,
       hora_fim:          h.hora_fim,
       intervalo_minutos: h.intervalo_minutos,
+      almoco_inicio:     h.almoco_inicio || null,
+      almoco_fim:        h.almoco_fim || null,
       ativo:             true,
     }));
 
@@ -192,6 +196,17 @@ export async function criarProcedimento(
     return { error: error.message };
   }
 
+  return {};
+}
+
+export async function salvarLogoUrl(logoUrl: string): Promise<{ error?: string }> {
+  const { supabase, clinicId } = await requirePermission('configuracoes');
+
+  const { error } = await supabase
+    .from('configuracoes_clinica')
+    .upsert({ clinica_id: clinicId, logo_url: logoUrl }, { onConflict: 'clinica_id' });
+
+  if (error) return { error: error.message };
   return {};
 }
 

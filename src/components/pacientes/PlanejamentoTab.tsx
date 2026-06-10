@@ -5,35 +5,43 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Plus,
   Trash2,
-  Image as ImageIcon,
   CheckCircle2,
   X,
   Calendar,
   Download,
-  Sparkles,
   Loader2,
-  Save,
   Presentation,
-  ChevronLeft,
-  ChevronRight,
   ChevronDown,
   ChevronUp,
   Clock,
   Circle,
-  LayoutGrid,
   Activity,
   Zap,
   Filter,
   AlertTriangle,
+  FileText,
+  Square,
+  Edit2,
 } from 'lucide-react';
+import {
+  buscarFichasSemTratamento,
+  criarTratamento,
+  buscarTratamentoAtivo,
+  buscarHistoricoTratamentos,
+  encerrarTratamento,
+  excluirTratamento,
+  renomearTratamento,
+  type Tratamento,
+  type FichaSemTratamento,
+} from '@/app/dashboard/pacientes/[id]/tratamento-actions';
+import { ApresentarPanel } from '@/components/pacientes/ApresentarPanel';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
+import { toast } from 'sonner';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { createClient } from '@/lib/supabase/client';
-import { HelpTooltip } from '@/components/ui/help-tooltip';
 import { Odontograma, TOOTH_NAMES } from '@/components/odontograma/Odontograma';
-import { getProcStatus, getSectionStatus } from '@/lib/constants/treatment-status';
+import { getProcStatus } from '@/lib/constants/treatment-status';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -93,6 +101,29 @@ interface PlanejamentoTabProps {
   patientId: string;
   clinicaId: string;
   patientName: string;
+}
+
+// ─── Module-level helpers ─────────────────────────────────────────────────────
+
+function mapPlanProc(row: Record<string, unknown>): PlanProc {
+  return {
+    id: row.id as string,
+    descricao: row.descricao as string,
+    dente: row.dente as number | null,
+    status: (row.status as PlanProc['status']) ?? 'pendente',
+    fichaRef: row.ficha_ref as string | null,
+    ordem: row.ordem as number,
+  };
+}
+
+function dedupProcs(procs: PlanProc[]): PlanProc[] {
+  const seen = new Set<string>();
+  return procs.filter(p => {
+    const key = p.fichaRef ?? p.id;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 // ─── Inline sub-components ────────────────────────────────────────────────────
@@ -157,7 +188,6 @@ function ProcCard({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function PlanejamentoTab({ patientId, clinicaId, patientName }: PlanejamentoTabProps) {
-  const [planningTitle, setPlanningTitle] = useState(patientName);
   const [sections, setSections] = useState<Section[]>([]);
   const [isImagePickerOpen, setIsImagePickerOpen] = useState<string | null>(null);
   const [isGeneratingAI, setIsGeneratingAI] = useState<string | null>(null);
@@ -165,17 +195,46 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
   const [budgetProcedures, setBudgetProcedures] = useState<BudgetProcedure[]>([]);
   const [budgetExists, setBudgetExists] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
+  const [clinicaLogoUrl, setClinicaLogoUrl] = useState<string | null>(null);
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
-  const [isPresentationOpen, setIsPresentationOpen] = useState(false);
-  const [currentSlide, setCurrentSlide] = useState(0);
-  const [slideDirection, setSlideDirection] = useState(1);
-  const [overviewMode, setOverviewMode] = useState(false);
-
   // Treatment Map
   const [selectedTooth, setSelectedTooth] = useState<number | null>(null);
   const [fichaDateMap, setFichaDateMap] = useState<Record<string, string>>({});
-  const [timelineExpanded, setTimelineExpanded] = useState(true);
   const [mapExpanded, setMapExpanded] = useState(true);
+
+  // Treatment state
+  const [tratamentoAtivo, setTratamentoAtivo] = useState<Tratamento | null>(null);
+  const [historicoTratamentos, setHistoricoTratamentos] = useState<Tratamento[]>([]);
+  const [loadingTratamento, setLoadingTratamento] = useState(true);
+  const [historicoAberto, setHistoricoAberto] = useState(false);
+  const [modalIniciarOpen, setModalIniciarOpen] = useState(false);
+  const [fichasSemTratamento, setFichasSemTratamento] = useState<FichaSemTratamento[]>([]);
+  const [fichasSelecionadas, setFichasSelecionadas] = useState<Set<string>>(new Set());
+  const [salvandoTratamento, setSalvandoTratamento] = useState(false);
+  const [loadingFichasSemTrat, setLoadingFichasSemTrat] = useState(false);
+  const [tratamentoError, setTratamentoError] = useState<string | null>(null);
+  const [confirmarEncerramentoOpen, setConfirmarEncerramentoOpen] = useState(false);
+  const [encerrando, setEncerrando] = useState(false);
+  const [confirmarExclusaoOpen, setConfirmarExclusaoOpen] = useState(false);
+  const [excluindo, setExcluindo] = useState(false);
+  const [confirmarExclusaoHistId, setConfirmarExclusaoHistId] = useState<string | null>(null);
+  const [excluindoHist, setExcluindoHist] = useState(false);
+
+  // Apresentar panel
+  const [apresentarOpen, setApresentarOpen] = useState(false);
+
+  // Renomear modal
+  const [renomearOpen, setRenomearOpen] = useState(false);
+  const [novoNomeTratamento, setNovoNomeTratamento] = useState('');
+  const [renomeando, setRenomeando] = useState(false);
+
+  // Concluded treatment inline expansion
+  const [expandedConcluidoId, setExpandedConcluidoId] = useState<string | null>(null);
+  const [concluidoData, setConcluidoData] = useState<{
+    planProcs: PlanProc[];
+    fichaDateMap: Record<string, string>;
+  } | null>(null);
+  const [loadingConcluido, setLoadingConcluido] = useState(false);
 
   const router = useRouter();
 
@@ -187,181 +246,229 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
 
   useEffect(() => { sectionsRef.current = sections; }, [sections]);
 
-  // Keyboard navigation for presentation mode
-  useEffect(() => {
-    if (!isPresentationOpen) return;
-    const maxSlide = sections.length;
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { setIsPresentationOpen(false); setOverviewMode(false); return; }
-      if (e.key === 'ArrowRight' || e.key === ' ') {
-        e.preventDefault();
-        setCurrentSlide(prev => { if (prev < maxSlide) { setSlideDirection(1); return prev + 1; } return prev; });
-      }
-      if (e.key === 'ArrowLeft') {
-        setCurrentSlide(prev => { if (prev > 0) { setSlideDirection(-1); return prev - 1; } return prev; });
-      }
-      if (e.key === 'o' || e.key === 'O') setOverviewMode(prev => !prev);
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [isPresentationOpen, sections.length]);
 
 
-  const fetchData = useCallback(async () => {
+
+  const fetchGlobalData = useCallback(async () => {
     setLoadingData(true);
     try {
       const supabase = createClient();
-
-      type FichaRow = {
-        id: string;
-        created_at: string;
-        dentes_observacoes: Record<string, string> | null;
-      };
-
-      const [docsResult, budgetResult, secoesResult, fichasResult, existingProcsResult] =
-        await Promise.all([
-          supabase
-            .from('paciente_documentos')
-            .select('*')
-            .eq('paciente_id', patientId)
-            .in('categoria', ['Radiografias', 'Fotografias']),
-          supabase
-            .from('orcamentos')
-            .select('*, orcamento_itens(*)')
-            .eq('paciente_id', patientId)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle(),
-          supabase
-            .from('planejamento_secoes')
-            .select('*')
-            .eq('paciente_id', patientId)
-            .order('ordem', { ascending: true }),
-          supabase
-            .from('fichas')
-            .select('id, created_at, dentes_observacoes')
-            .eq('paciente_id', patientId)
-            .not('dentes_observacoes', 'is', null),
-          supabase
-            .from('planejamento_procedimentos')
-            .select('*')
-            .eq('paciente_id', patientId)
-            .order('ordem', { ascending: true }),
-        ]);
-
+      const [docsResult, budgetResult, secoesResult] = await Promise.all([
+        supabase.from('paciente_documentos').select('*').eq('paciente_id', patientId).in('categoria', ['Radiografias', 'Fotografias']),
+        supabase.from('orcamentos').select('*, orcamento_itens(*)').eq('paciente_id', patientId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+        supabase.from('planejamento_secoes').select('*').eq('paciente_id', patientId).order('ordem', { ascending: true }),
+      ]);
       if (docsResult.error) throw docsResult.error;
-      setDocuments(
-        (docsResult.data ?? []).map((doc: Record<string, unknown>) => ({
-          id: doc.id as string,
-          name: doc.nome as string,
-          category: doc.categoria as string,
-          url: doc.url as string,
-          thumbnail: (doc.thumbnail as string | undefined) ?? (doc.url as string),
-        }))
-      );
-
+      setDocuments((docsResult.data ?? []).map((doc: Record<string, unknown>) => ({
+        id: doc.id as string, name: doc.nome as string, category: doc.categoria as string,
+        url: doc.url as string, thumbnail: (doc.thumbnail as string | undefined) ?? (doc.url as string),
+      })));
       if (budgetResult.error) throw budgetResult.error;
       if (budgetResult.data) {
         setBudgetExists(true);
-        setBudgetProcedures(
-          (budgetResult.data.orcamento_itens as Array<Record<string, unknown>> ?? []).map(p => ({
-            id: p.id as string,
-            name: p.descricao as string,
-            value: p.preco_total as number,
-          }))
-        );
+        setBudgetProcedures((budgetResult.data.orcamento_itens as Array<Record<string, unknown>> ?? []).map(p => ({
+          id: p.id as string, name: p.descricao as string, value: p.preco_total as number,
+        })));
       } else {
         setBudgetExists(false);
         setBudgetProcedures([]);
       }
-
       if (secoesResult.error) throw secoesResult.error;
       if (secoesResult.data && secoesResult.data.length > 0) {
-        setSections(
-          (secoesResult.data as Array<Record<string, unknown>>).map(row => ({
-            id: row.id as string,
-            title: row.titulo as string,
-            content: (row.conteudo as string) ?? '',
-            imageIds: (row.imagem_ids as string[]) ?? [],
-            status: ((row.status as string) ?? 'pendente') as Section['status'],
-            dataEstimada: (row.data_estimada as string | null) ?? null,
-          }))
-        );
-      }
-
-      // Build ficha date map
-      const dateMap: Record<string, string> = {};
-      for (const ficha of (fichasResult.data ?? []) as FichaRow[]) {
-        dateMap[ficha.id] = ficha.created_at;
-      }
-      setFichaDateMap(dateMap);
-
-      // Sync procedures from fichas
-      const rawProcs: { fichaRef: string; descricao: string; dente: number }[] = [];
-      for (const ficha of (fichasResult.data ?? []) as FichaRow[]) {
-        const obs = ficha.dentes_observacoes ?? {};
-        for (const [dente, desc] of Object.entries(obs)) {
-          if (typeof desc === 'string' && desc.trim()) {
-            const lines = desc.split('\n').filter(Boolean);
-            for (const line of lines) {
-              rawProcs.push({
-                fichaRef: `${ficha.id}::${dente}::${lines.indexOf(line)}`,
-                descricao: line.trim(),
-                dente: parseInt(dente, 10),
-              });
-            }
-          }
-        }
-      }
-
-      const existingRefs = new Set(
-        (existingProcsResult.data ?? []).map((p: Record<string, unknown>) => p.ficha_ref as string)
-      );
-      const toInsert = rawProcs.filter(p => !existingRefs.has(p.fichaRef));
-
-      const mapPlanProc = (row: Record<string, unknown>): PlanProc => ({
-        id: row.id as string,
-        descricao: row.descricao as string,
-        dente: row.dente as number | null,
-        status: (row.status as PlanProc['status']) ?? 'pendente',
-        fichaRef: row.ficha_ref as string | null,
-        ordem: row.ordem as number,
-      });
-
-      if (toInsert.length > 0) {
-        const startOrdem = (existingProcsResult.data ?? []).length;
-        await supabase.from('planejamento_procedimentos').insert(
-          toInsert.map((p, i) => ({
-            clinica_id: clinicaId,
-            paciente_id: patientId,
-            descricao: p.descricao,
-            dente: p.dente,
-            status: 'pendente',
-            ficha_ref: p.fichaRef,
-            ordem: startOrdem + i,
-          }))
-        );
-        const { data: refreshed } = await supabase
-          .from('planejamento_procedimentos')
-          .select('*')
-          .eq('paciente_id', patientId)
-          .order('ordem', { ascending: true });
-        setPlanProcs((refreshed ?? []).map(r => mapPlanProc(r as Record<string, unknown>)));
-      } else {
-        setPlanProcs(
-          (existingProcsResult.data ?? []).map(r => mapPlanProc(r as Record<string, unknown>))
-        );
+        setSections((secoesResult.data as Array<Record<string, unknown>>).map(row => ({
+          id: row.id as string, title: row.titulo as string, content: (row.conteudo as string) ?? '',
+          imageIds: (row.imagem_ids as string[]) ?? [], status: ((row.status as string) ?? 'pendente') as Section['status'],
+          dataEstimada: (row.data_estimada as string | null) ?? null,
+        })));
       }
     } catch (error) {
-      console.error('Erro ao buscar dados de planejamento:', JSON.stringify(error), error);
+      console.error('Erro ao buscar dados globais:', JSON.stringify(error), error);
     } finally {
       setLoadingData(false);
+    }
+  }, [patientId]);
+
+  const fetchTratamentoData = useCallback(async (tratamentoId: string | null) => {
+    if (!tratamentoId) {
+      setPlanProcs([]);
+      setFichaDateMap({});
+      return;
+    }
+    const supabase = createClient();
+    type FichaRow = { id: string; created_at: string; dentes_observacoes: Record<string, string> | null };
+    const [fichasResult, existingProcsResult] = await Promise.all([
+      supabase.from('fichas').select('id, created_at, dentes_observacoes').eq('paciente_id', patientId).eq('tratamento_id', tratamentoId).not('dentes_observacoes', 'is', null),
+      supabase.from('planejamento_procedimentos').select('*').eq('paciente_id', patientId).order('ordem', { ascending: true }),
+    ]);
+    const fichas = (fichasResult.data ?? []) as FichaRow[];
+    const fichaIds = new Set(fichas.map(f => f.id));
+    const dateMap: Record<string, string> = {};
+    for (const f of fichas) dateMap[f.id] = f.created_at;
+    setFichaDateMap(dateMap);
+
+    const rawProcs: { fichaRef: string; descricao: string; dente: number }[] = [];
+    for (const ficha of fichas) {
+      const obs = ficha.dentes_observacoes ?? {};
+      for (const [dente, desc] of Object.entries(obs)) {
+        if (typeof desc === 'string' && desc.trim()) {
+          desc.split('\n').filter(Boolean).forEach((line, idx) => {
+            rawProcs.push({ fichaRef: `${ficha.id}::${dente}::${idx}`, descricao: line.trim(), dente: parseInt(dente, 10) });
+          });
+        }
+      }
+    }
+    const filterByTrat = (procs: PlanProc[]) => procs.filter(p => { const id = p.fichaRef?.split('::')?.[0]; return id !== undefined && fichaIds.has(id); });
+    const existingRefs = new Set((existingProcsResult.data ?? []).map((p: Record<string, unknown>) => p.ficha_ref as string));
+    const toInsert = rawProcs.filter(p => !existingRefs.has(p.fichaRef));
+    if (toInsert.length > 0) {
+      const startOrdem = (existingProcsResult.data ?? []).length;
+      await supabase.from('planejamento_procedimentos').insert(toInsert.map((p, i) => ({
+        clinica_id: clinicaId, paciente_id: patientId, descricao: p.descricao, dente: p.dente, status: 'pendente', ficha_ref: p.fichaRef, ordem: startOrdem + i,
+      })));
+      const { data: refreshed } = await supabase.from('planejamento_procedimentos').select('*').eq('paciente_id', patientId).order('ordem', { ascending: true });
+      setPlanProcs(filterByTrat(dedupProcs((refreshed ?? []).map(r => mapPlanProc(r as Record<string, unknown>)))));
+    } else {
+      setPlanProcs(filterByTrat(dedupProcs((existingProcsResult.data ?? []).map(r => mapPlanProc(r as Record<string, unknown>)))));
     }
   }, [patientId, clinicaId]);
 
   useEffect(() => {
-    if (patientId) void fetchData();
-  }, [patientId, fetchData]);
+    if (patientId) void fetchGlobalData();
+  }, [patientId, fetchGlobalData]);
+
+  const loadTratamento = useCallback(async () => {
+    setLoadingTratamento(true);
+    const [ativoResult, historicoResult] = await Promise.all([
+      buscarTratamentoAtivo(patientId),
+      buscarHistoricoTratamentos(patientId),
+    ]);
+    setTratamentoAtivo(ativoResult.tratamento);
+    setHistoricoTratamentos(historicoResult.tratamentos);
+    setLoadingTratamento(false);
+    await fetchTratamentoData(ativoResult.tratamento?.id ?? null);
+  }, [patientId, fetchTratamentoData]);
+
+  useEffect(() => {
+    if (patientId) void loadTratamento();
+  }, [patientId, loadTratamento]);
+
+  useEffect(() => {
+    const supabase = createClient();
+    void supabase
+      .from('configuracoes_clinica')
+      .select('logo_url')
+      .eq('clinica_id', clinicaId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.logo_url) setClinicaLogoUrl(data.logo_url as string);
+      });
+  }, [clinicaId]);
+
+  const handleAbrirModalIniciar = async () => {
+    setLoadingFichasSemTrat(true);
+    setModalIniciarOpen(true);
+    setFichasSelecionadas(new Set());
+    setTratamentoError(null);
+    const { fichas } = await buscarFichasSemTratamento(patientId);
+    setFichasSemTratamento(fichas);
+    setLoadingFichasSemTrat(false);
+  };
+
+  const toggleFicha = (id: string) => {
+    setFichasSelecionadas(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleIniciarTratamento = async () => {
+    if (fichasSelecionadas.size === 0) return;
+    setSalvandoTratamento(true);
+    setTratamentoError(null);
+    const { error } = await criarTratamento(patientId, null, Array.from(fichasSelecionadas));
+    if (error) {
+      setTratamentoError(error);
+    } else {
+      setModalIniciarOpen(false);
+      await loadTratamento();
+    }
+    setSalvandoTratamento(false);
+  };
+
+  const handleEncerrarTratamento = async () => {
+    if (!tratamentoAtivo) return;
+    setEncerrando(true);
+    const { error } = await encerrarTratamento(tratamentoAtivo.id, patientId);
+    if (!error) {
+      setConfirmarEncerramentoOpen(false);
+      await loadTratamento();
+    }
+    setEncerrando(false);
+  };
+
+  const handleExcluirTratamento = async () => {
+    if (!tratamentoAtivo) return;
+    setExcluindo(true);
+    const { error } = await excluirTratamento(tratamentoAtivo.id, patientId);
+    if (!error) {
+      setConfirmarExclusaoOpen(false);
+      await loadTratamento();
+    }
+    setExcluindo(false);
+  };
+
+  const handleExcluirHistorico = async () => {
+    if (!confirmarExclusaoHistId) return;
+    setExcluindoHist(true);
+    const { error } = await excluirTratamento(confirmarExclusaoHistId, patientId);
+    if (!error) {
+      setHistoricoTratamentos(prev => prev.filter(t => t.id !== confirmarExclusaoHistId));
+      if (expandedConcluidoId === confirmarExclusaoHistId) setExpandedConcluidoId(null);
+      setConfirmarExclusaoHistId(null);
+    }
+    setExcluindoHist(false);
+  };
+
+  const handleRenomearTratamento = async () => {
+    if (!tratamentoAtivo || !novoNomeTratamento.trim()) return;
+    setRenomeando(true);
+    const { error } = await renomearTratamento(tratamentoAtivo.id, novoNomeTratamento, patientId);
+    if (!error) {
+      setTratamentoAtivo(prev => prev ? { ...prev, nome: novoNomeTratamento.trim() } : prev);
+      setRenomearOpen(false);
+      setNovoNomeTratamento('');
+    }
+    setRenomeando(false);
+  };
+
+  const handleToggleConcluido = async (tratamento: Tratamento) => {
+    if (expandedConcluidoId === tratamento.id) {
+      setExpandedConcluidoId(null);
+      setConcluidoData(null);
+      return;
+    }
+    setExpandedConcluidoId(tratamento.id);
+    setConcluidoData(null);
+    setLoadingConcluido(true);
+    const supabase = createClient();
+    type FichaRow = { id: string; created_at: string; dentes_observacoes: Record<string, string> | null };
+    const [fichasResult, allProcsResult] = await Promise.all([
+      supabase.from('fichas').select('id, created_at, dentes_observacoes').eq('paciente_id', patientId).eq('tratamento_id', tratamento.id),
+      supabase.from('planejamento_procedimentos').select('*').eq('paciente_id', patientId).order('ordem', { ascending: true }),
+    ]);
+    const fichas = (fichasResult.data ?? []) as FichaRow[];
+    const fichaIds = new Set(fichas.map(f => f.id));
+    const dateMap: Record<string, string> = {};
+    for (const f of fichas) dateMap[f.id] = f.created_at;
+    const filtered = dedupProcs(
+      (allProcsResult.data ?? [])
+        .map(r => mapPlanProc(r as Record<string, unknown>))
+        .filter(p => { const id = p.fichaRef?.split('::')?.[0]; return id !== undefined && fichaIds.has(id); })
+    );
+    setConcluidoData({ planProcs: filtered, fichaDateMap: dateMap });
+    setLoadingConcluido(false);
+  };
 
   // ── Computed values ──────────────────────────────────────────────────────────
 
@@ -425,7 +532,7 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
     if (total === 0) return msgs;
 
     if (done === total) {
-      msgs.push({ text: 'Tratamento concluído', type: 'success' });
+      msgs.push({ text: 'Planejamento concluído', type: 'success' });
       return msgs;
     }
 
@@ -454,7 +561,6 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
     : 0;
 
   const totalBudget = budgetProcedures.reduce((acc, curr) => acc + curr.value, 0);
-  const totalSlides = sections.length + 2;
 
   // ── Tooth detail (selected tooth procedures) ──────────────────────────────
 
@@ -626,7 +732,10 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
           pacienteNome: patientName,
         }),
       });
-      if (!response.ok) throw new Error('Falha ao gerar');
+      if (!response.ok) {
+        const errBody = await response.json().catch(() => ({})) as { error?: string };
+        throw new Error(errBody.error ?? 'Falha ao gerar apresentação');
+      }
       const data = await response.json() as { secoes?: Array<{ title: string; content: string }> };
       if (data.secoes && data.secoes.length > 0) {
         setSections(data.secoes.map((s, i) => ({
@@ -637,9 +746,11 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
           status: 'pendente' as const,
           dataEstimada: null,
         })));
+        toast.success('Apresentação gerada com sucesso!');
       }
     } catch (error) {
-      console.error('Erro ao gerar plano completo:', error);
+      console.error('Erro ao gerar apresentação:', error);
+      toast.error(error instanceof Error ? error.message : 'Falha ao gerar apresentação');
     } finally {
       setIsGeneratingAI(null);
     }
@@ -648,9 +759,28 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
   const escapeHtml = (str: string): string =>
     str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-  const handleGerarPDF = () => {
+  const handleGerarPDF = async () => {
     const printWindow = window.open('', '_blank', 'width=900,height=700');
     if (!printWindow) return;
+
+    // Convert clinic logo to base64 so it works in the print window without CORS issues
+    let logoBase64 = '';
+    if (clinicaLogoUrl) {
+      try {
+        const resp = await fetch(clinicaLogoUrl);
+        const blob = await resp.blob();
+        logoBase64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+      } catch { /* logo unavailable, continue without it */ }
+    }
+
+    const logoHTML = logoBase64
+      ? `<img src="${logoBase64}" class="clinica-logo" alt="Logo" />`
+      : '';
+
     const proceduresHTML = budgetProcedures.length > 0
       ? `<table><thead><tr><th>Procedimento</th><th>Valor</th></tr></thead><tbody>${budgetProcedures.map(p => `<tr><td>${escapeHtml(p.name)}</td><td>R$ ${p.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td></tr>`).join('')}</tbody><tfoot><tr><td><strong>Total</strong></td><td><strong>R$ ${totalBudget.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></td></tr></tfoot></table>`
       : '<p style="color:#8a8a8a">Nenhum procedimento vinculado.</p>';
@@ -658,7 +788,40 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
       const contentFormatted = s.content ? escapeHtml(s.content).replace(/\n/g, '<br>') : '<em style="color:#8a8a8a">Sem conteúdo.</em>';
       return `<div class="section"><h2>${String(i + 1).padStart(2, '0')}. ${escapeHtml(s.title || 'Seção sem título')}</h2><p>${contentFormatted}</p></div>`;
     }).join('');
-    const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>${escapeHtml(planningTitle)} — ${escapeHtml(patientName)}</title><style>body{font-family:Georgia,serif;max-width:780px;margin:40px auto;color:#0d0d0d;line-height:1.6}header{border-bottom:2px solid #2f9c85;padding-bottom:16px;margin-bottom:32px}header small{display:block;color:#2f9c85;font-family:monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.15em;margin-bottom:8px}h1{font-size:28px;margin:0 0 4px}header p{margin:4px 0 0;color:#8a8a8a;font-size:13px}.section{margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid #d4d1ca}.section h2{font-size:18px;color:#2f9c85;margin:0 0 10px}.section p{margin:0;font-size:14px}.budget{margin-top:36px}.budget h2{font-size:18px;margin-bottom:12px}table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;padding:8px 12px;background:#f5f3ef;border-bottom:2px solid #d4d1ca}td{padding:8px 12px;border-bottom:1px solid #eceae4}tfoot td{border-top:2px solid #d4d1ca;border-bottom:none;font-size:15px}@media print{body{margin:20px}}</style></head><body><header><small>Apresentação ao Paciente</small><h1>${escapeHtml(planningTitle)}</h1><p>Paciente: <strong>${escapeHtml(patientName)}</strong></p></header>${sectionsHTML}<div class="budget"><h2>Resumo do Investimento</h2>${proceduresHTML}</div><script>window.onload=function(){window.print();}<\/script></body></html>`;
+    const treatmentTitle = tratamentoAtivo?.nome ?? patientName;
+    const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>${escapeHtml(treatmentTitle)} — ${escapeHtml(patientName)}</title><style>
+body{font-family:Georgia,serif;max-width:780px;margin:40px auto;color:#0d0d0d;line-height:1.6}
+header{display:flex;align-items:center;gap:20px;border-bottom:2px solid #2f9c85;padding-bottom:20px;margin-bottom:32px}
+.clinica-logo{height:72px;width:auto;object-fit:contain;flex-shrink:0}
+.header-text{flex:1}
+.header-text small{display:block;color:#2f9c85;font-family:monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.15em;margin-bottom:8px}
+h1{font-size:28px;margin:0 0 4px}
+.header-text p{margin:4px 0 0;color:#8a8a8a;font-size:13px}
+.footer{margin-top:48px;padding-top:16px;text-align:center;font-family:monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.18em;color:#bbb}
+.section{margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid #d4d1ca}
+.section h2{font-size:18px;color:#2f9c85;margin:0 0 10px}
+.section p{margin:0;font-size:14px}
+.budget{margin-top:36px}
+.budget h2{font-size:18px;margin-bottom:12px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:8px 12px;background:#f5f3ef;border-bottom:2px solid #d4d1ca}
+td{padding:8px 12px;border-bottom:1px solid #eceae4}
+tfoot td{border-top:2px solid #d4d1ca;border-bottom:none;font-size:15px}
+@media print{body{margin:20px}}
+</style></head><body>
+<header>
+  ${logoHTML}
+  <div class="header-text">
+    <small>Apresentação ao Paciente</small>
+    <h1>${escapeHtml(treatmentTitle)}</h1>
+    <p>Paciente: <strong>${escapeHtml(patientName)}</strong></p>
+  </div>
+</header>
+${sectionsHTML}
+<div class="budget"><h2>Resumo do Investimento</h2>${proceduresHTML}</div>
+<div class="footer">Odonto.IA</div>
+<script>window.onload=function(){window.print();}<\/script>
+</body></html>`;
     printWindow.document.open();
     printWindow.document.write(html);
     printWindow.document.close();
@@ -745,52 +908,144 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
   return (
     <div className="space-y-6 pb-20">
 
-      {/* ── HEADER ── */}
-      <div className="bg-surface rounded-3xl border border-border/60 shadow-sm p-8">
-        <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
-          <div className="flex-1">
-            <div className="text-xs font-bold text-teal uppercase tracking-[0.2em] mb-2">
-              Plano Clínico
-            </div>
-            <input
-              type="text"
-              value={planningTitle}
-              onChange={(e) => setPlanningTitle(e.target.value)}
-              className="font-heading text-3xl text-text-primary bg-transparent border-none outline-none w-full focus:ring-0 p-0"
-              placeholder="Título do Planejamento"
-            />
+      {/* ── HEADER: título estático da aba ── */}
+      <div className="px-1">
+        <div className="text-xs font-bold text-teal uppercase tracking-[0.2em] mb-1">
+          Planejamento Clínico
+        </div>
+        <h1 className="font-heading text-2xl text-text-primary">{patientName}</h1>
+      </div>
 
-            {/* Progress bar */}
+      {/* ── CTA: SEM TRATAMENTO ATIVO ── */}
+      {!tratamentoAtivo && !loadingTratamento && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-surface rounded-3xl border-2 border-dashed border-border/50 shadow-sm p-10 flex flex-col items-center text-center gap-4"
+        >
+          <div className="w-12 h-12 rounded-2xl bg-teal/10 border border-teal/20 flex items-center justify-center">
+            <Plus className="w-6 h-6 text-teal" />
+          </div>
+          <div>
+            <p className="font-heading text-lg text-text-primary">Nenhum planejamento ativo</p>
+            <p className="text-sm text-text-secondary mt-1 max-w-xs mx-auto">
+              Vincule as fichas clínicas para iniciar o acompanhamento do planejamento.
+            </p>
+          </div>
+          <button
+            onClick={() => void handleAbrirModalIniciar()}
+            className="bg-teal text-white px-6 py-3 rounded-2xl font-bold text-sm flex items-center gap-2 hover:bg-teal/90 transition-all shadow-[0_0_20px_rgba(47,156,133,0.3)]"
+          >
+            <Plus className="w-4 h-4" /> Iniciar Planejamento
+          </button>
+        </motion.div>
+      )}
+
+      {/* ── CARD COMBINADO: tratamento ativo ── */}
+      {tratamentoAtivo && (
+        <div className="bg-surface rounded-3xl border border-border/60 shadow-sm overflow-hidden">
+          {/* Header clicável */}
+          <div
+            onClick={() => setMapExpanded(prev => !prev)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setMapExpanded(prev => !prev); }}
+            className="w-full px-6 pt-6 pb-5 hover:bg-surface-alt/10 transition-colors cursor-pointer"
+          >
+            {/* Linha superior: nome do tratamento + botões + chevron */}
+            <div className="flex items-start justify-between gap-4 mb-4">
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-bold text-text-secondary uppercase tracking-[0.2em] mb-1">
+                  Planejamento Ativo · iniciado em {format(parseISO(tratamentoAtivo.created_at), "d 'de' MMM 'de' yyyy", { locale: ptBR })}
+                </div>
+                <div className="font-heading text-xl text-text-primary truncate">
+                  {tratamentoAtivo.nome ?? 'Sem nome'}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 pt-0.5" onClick={(e) => e.stopPropagation()}>
+                <button
+                  onClick={() => setApresentarOpen(true)}
+                  className="flex items-center gap-1.5 text-xs font-bold text-white bg-teal hover:bg-teal/90 px-3 py-1.5 rounded-xl transition-colors shadow-[0_0_12px_rgba(47,156,133,0.25)]"
+                >
+                  <Presentation className="w-3 h-3" /> Apresentar
+                </button>
+                <button
+                  onClick={() => void handleGerarPDF()}
+                  className="flex items-center gap-1.5 text-xs font-bold text-text-secondary border border-border/60 hover:bg-surface-alt px-3 py-1.5 rounded-xl transition-colors"
+                  title="Gerar PDF do planejamento"
+                >
+                  <Download className="w-3 h-3" /> PDF
+                </button>
+                <button
+                  onClick={() => setConfirmarEncerramentoOpen(true)}
+                  disabled={encerrando}
+                  className="flex items-center gap-1.5 text-xs font-bold text-text-secondary border border-border/60 hover:bg-surface-alt px-3 py-1.5 rounded-xl transition-colors disabled:opacity-40"
+                >
+                  {encerrando ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
+                  Encerrar
+                </button>
+                <button
+                  onClick={() => { setNovoNomeTratamento(tratamentoAtivo.nome ?? ''); setRenomearOpen(true); }}
+                  className="flex items-center gap-1.5 text-xs font-bold text-text-secondary border border-border/60 hover:bg-surface-alt px-3 py-1.5 rounded-xl transition-colors"
+                >
+                  <Edit2 className="w-3 h-3" /> Renomear
+                </button>
+                <button
+                  onClick={() => setConfirmarExclusaoOpen(true)}
+                  className="flex items-center gap-1.5 text-xs font-bold text-red-500 border border-red-500/20 hover:bg-red-500/5 px-3 py-1.5 rounded-xl transition-colors"
+                >
+                  <Trash2 className="w-3 h-3" /> Excluir
+                </button>
+                <div className="shrink-0 ml-1">
+                  {mapExpanded
+                    ? <ChevronUp className="w-4 h-4 text-text-secondary" />
+                    : <ChevronDown className="w-4 h-4 text-text-secondary" />
+                  }
+                </div>
+              </div>
+            </div>
+
+            {/* Progresso + stats */}
             {planProcs.length > 0 && (
-              <div className="mt-5">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold text-text-secondary">Progresso geral</span>
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs text-text-secondary">Progresso geral</span>
                   <span className="font-mono text-xs font-bold text-teal">{progressPercent}%</span>
                 </div>
-                <div className="w-full bg-surface-alt rounded-full h-2">
+                <div className="w-full bg-surface-alt rounded-full h-1.5 mb-3">
                   <motion.div
-                    className="bg-teal h-2 rounded-full"
+                    className="bg-teal h-1.5 rounded-full"
                     initial={{ width: 0 }}
                     animate={{ width: `${progressPercent}%` }}
                     transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
                   />
                 </div>
-                <div className="flex items-center gap-6 mt-3 flex-wrap">
+                <div className="flex items-center gap-5 flex-wrap">
                   <div className="flex items-center gap-1.5">
-                    <span className="font-mono text-lg font-bold text-text-primary">{planProcs.length}</span>
+                    <span className="font-mono text-base font-bold text-text-primary">{planProcs.length}</span>
                     <span className="text-xs text-text-secondary">procedimentos</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="font-mono text-lg font-bold text-teal">{concluidosCount}</span>
+                    <span className="font-mono text-base font-bold text-teal">{concluidosCount}</span>
                     <span className="text-xs text-text-secondary">concluídos</span>
                   </div>
                   {budgetExists && (
                     <div className="flex items-center gap-1.5">
-                      <span className="font-mono text-lg font-bold text-text-primary">
+                      <span className="font-mono text-base font-bold text-text-primary">
                         R$ {totalBudget.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </span>
                       <span className="text-xs text-text-secondary">orçamento</span>
                     </div>
+                  )}
+                  {selectedTooth && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setSelectedTooth(null); }}
+                      className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-teal/15 border border-teal/30 text-teal text-xs font-bold"
+                    >
+                      <Filter className="w-2.5 h-2.5" />
+                      D{selectedTooth}
+                      <X className="w-2.5 h-2.5 ml-0.5" />
+                    </button>
                   )}
                 </div>
               </div>
@@ -798,7 +1053,7 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
 
             {/* Intelligence indicators */}
             {intelligenceMessages.length > 0 && (
-              <div className="flex items-center gap-2 mt-4 flex-wrap">
+              <div className="flex items-center gap-2 mt-3 flex-wrap">
                 {intelligenceMessages.map((msg, i) => (
                   <div
                     key={i}
@@ -819,66 +1074,6 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
               </div>
             )}
           </div>
-
-          <div className="flex items-center gap-3 flex-shrink-0 flex-wrap">
-            <button
-              onClick={() => void generateFullPlanWithAI()}
-              disabled={isGeneratingAI !== null || (budgetProcedures.length === 0 && planProcs.length === 0)}
-              className="bg-surface border border-border text-text-primary px-5 py-3 rounded-2xl font-bold text-sm flex items-center gap-2 hover:bg-surface-alt transition-all disabled:opacity-50"
-            >
-              {isGeneratingAI === '__full__'
-                ? <><Loader2 className="w-4 h-4 animate-spin" /> Gerando...</>
-                : <><Sparkles className="w-4 h-4 text-teal" /> Gerar com IA</>
-              }
-            </button>
-            <button
-              onClick={() => { setCurrentSlide(0); setIsPresentationOpen(true); }}
-              disabled={sections.length === 0}
-              className="bg-teal/10 text-teal px-6 py-3 rounded-2xl font-bold text-sm flex items-center gap-2 hover:bg-teal/20 transition-all border border-teal/20 disabled:opacity-50"
-            >
-              <Presentation className="w-4 h-4" />
-              Apresentar
-            </button>
-            <button
-              onClick={handleGerarPDF}
-              className="bg-text-primary text-bg px-6 py-3 rounded-2xl font-bold text-sm flex items-center gap-2 hover:opacity-80 transition-all shadow-md"
-            >
-              <Download className="w-4 h-4" /> PDF
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* ── MAPA DO TRATAMENTO ── */}
-      {planProcs.length > 0 && (
-        <div className="bg-surface rounded-3xl border border-border/60 shadow-sm overflow-hidden">
-          <button
-            onClick={() => setMapExpanded(prev => !prev)}
-            className="w-full p-6 flex items-center justify-between hover:bg-surface-alt/20 transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <div className="text-xs font-bold text-text-secondary uppercase tracking-[0.2em]">
-                Mapa do Tratamento
-              </div>
-              <span className="px-2 py-0.5 rounded-full bg-teal/10 text-teal text-xs font-bold">
-                {treatedTeeth.size} dente{treatedTeeth.size !== 1 ? 's' : ''}
-              </span>
-              {selectedTooth && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); setSelectedTooth(null); }}
-                  className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-teal/15 border border-teal/30 text-teal text-xs font-bold"
-                >
-                  <Filter className="w-2.5 h-2.5" />
-                  D{selectedTooth}
-                  <X className="w-2.5 h-2.5 ml-0.5" />
-                </button>
-              )}
-            </div>
-            {mapExpanded
-              ? <ChevronUp className="w-4 h-4 text-text-secondary" />
-              : <ChevronDown className="w-4 h-4 text-text-secondary" />
-            }
-          </button>
 
           <AnimatePresence initial={false}>
             {mapExpanded && (
@@ -1055,50 +1250,24 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
                     )}
                   </AnimatePresence>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      )}
 
-      {/* ── TIMELINE DO TRATAMENTO ── */}
-      {planProcs.length > 0 && (
-        <div className="bg-surface rounded-3xl border border-border/60 shadow-sm overflow-hidden">
-          <button
-            onClick={() => setTimelineExpanded(prev => !prev)}
-            className="w-full p-6 flex items-center justify-between hover:bg-surface-alt/20 transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <div className="text-xs font-bold text-text-secondary uppercase tracking-[0.2em]">
-                Jornada Clínica
-              </div>
-              <span className="px-2 py-0.5 rounded-full bg-teal/10 text-teal text-xs font-bold">
-                {timelineSessions.length} sess{timelineSessions.length !== 1 ? 'ões' : 'ão'}
-              </span>
-              {selectedTooth && (
-                <span className="text-xs text-text-secondary font-medium">
-                  · filtrando dente {selectedTooth}
-                </span>
-              )}
-            </div>
-            {timelineExpanded
-              ? <ChevronUp className="w-4 h-4 text-text-secondary" />
-              : <ChevronDown className="w-4 h-4 text-text-secondary" />
-            }
-          </button>
-
-          <AnimatePresence initial={false}>
-            {timelineExpanded && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.22 }}
-                className="overflow-hidden"
-              >
-                <div className="px-6 pb-8">
+                {/* Sessões Clínicas — timeline completo */}
+                <div className="px-6 pb-8 border-t border-border/30 pt-6">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="text-xs font-bold text-text-secondary uppercase tracking-[0.2em]">
+                      Sessões Clínicas
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full bg-teal/10 text-teal text-xs font-bold">
+                      {timelineSessions.length} sess{timelineSessions.length !== 1 ? 'ões' : 'ão'}
+                    </span>
+                    {selectedTooth && (
+                      <span className="text-xs text-text-secondary/60 font-medium">
+                        · filtrando dente {selectedTooth}
+                      </span>
+                    )}
+                  </div>
                   {timelineSessions.length === 0 ? (
-                    <div className="py-10 text-center">
+                    <div className="py-8 text-center">
                       <Activity className="w-8 h-8 text-text-secondary/30 mx-auto mb-3" />
                       <p className="text-sm text-text-secondary">
                         {selectedTooth
@@ -1112,15 +1281,11 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
                         const sessionDone = session.procedures.filter(p => p.status === 'concluido').length;
                         const sessionTotal = session.procedures.length;
                         const isLast = idx === timelineSessions.length - 1;
-
                         return (
                           <div key={session.fichaId} className="relative flex gap-5 pb-8 last:pb-0">
-                            {/* Vertical connector line */}
                             {!isLast && (
                               <div className="absolute left-[13px] top-7 bottom-0 w-px bg-border/50" />
                             )}
-
-                            {/* Timeline dot */}
                             <div className="relative z-10 shrink-0 mt-0.5">
                               <div className={`w-7 h-7 rounded-full border-2 flex items-center justify-center transition-colors ${
                                 sessionDone === sessionTotal
@@ -1132,17 +1297,13 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
                                 }`} />
                               </div>
                             </div>
-
-                            {/* Session content */}
                             <div className="flex-1 min-w-0">
-                              {/* Session header */}
                               <div className="flex items-center gap-3 mb-3">
                                 <div>
                                   <div className="font-bold text-xs text-text-primary">
                                     {session.date
                                       ? format(parseISO(session.date), "d 'de' MMMM 'de' yyyy", { locale: ptBR })
-                                      : 'Sessão clínica'
-                                    }
+                                      : 'Sessão clínica'}
                                   </div>
                                   <div className="text-xs text-text-secondary mt-0.5">
                                     {sessionTotal} procedimento{sessionTotal !== 1 ? 's' : ''}
@@ -1155,8 +1316,6 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
                                   </span>
                                 )}
                               </div>
-
-                              {/* Procedure cards */}
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 {session.procedures.map(proc => (
                                   <ProcCard
@@ -1181,467 +1340,445 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
         </div>
       )}
 
-      {/* ── SEÇÕES DO PLANEJAMENTO ── */}
-      <div className="space-y-6">
-        <AnimatePresence initial={false}>
-          {sections.map((section, index) => {
-            const secSt = getSectionStatus(section.status);
-            return (
-              <motion.div
-                key={section.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-surface rounded-3xl border border-border/60 shadow-sm overflow-hidden group"
-              >
-                <div className="p-6 border-b border-border/40 flex items-center justify-between bg-surface-alt/30">
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="w-8 h-8 rounded-full bg-text-primary text-bg flex items-center justify-center font-mono text-xs font-bold shrink-0">
-                      {String(index + 1).padStart(2, '0')}
-                    </div>
-                    <div className="flex-1 min-w-0 space-y-1.5">
-                      <input
-                        type="text"
-                        value={section.title}
-                        onChange={(e) => updateSection(section.id, 'title', e.target.value)}
-                        placeholder="Título da Seção (ex: Situação Atual)"
-                        className="font-heading text-xl text-text-primary bg-transparent border-none outline-none focus:ring-0 p-0 w-full"
-                      />
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <select
-                          value={section.status}
-                          onChange={(e) => updateSection(section.id, 'status', e.target.value as Section['status'])}
-                          className={`text-xs font-bold uppercase tracking-wider px-2 py-1 rounded-lg border cursor-pointer outline-none transition-all ${secSt.className}`}
-                          style={{ appearance: 'none' }}
-                        >
-                          <option value="pendente">Pendente</option>
-                          <option value="em_andamento">Em Andamento</option>
-                          <option value="concluido">Concluído</option>
-                        </select>
-                        <input
-                          type="date"
-                          value={section.dataEstimada ?? ''}
-                          onChange={(e) => updateSection(section.id, 'dataEstimada', e.target.value || '')}
-                          className="text-[11px] text-text-secondary bg-transparent border border-border/60 rounded-lg px-2 py-1 focus:ring-0 focus:border-teal transition-colors outline-none"
-                          title="Data estimada"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0 ml-2">
-                    {savingIds.has(section.id) ? (
-                      <div className="p-2 text-text-secondary">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => void saveSectionToDb(section.id)}
-                        className="p-2 text-text-secondary hover:text-teal transition-colors opacity-0 group-hover:opacity-100"
-                        title="Salvar seção"
-                      >
-                        <Save className="w-4 h-4" />
-                      </button>
-                    )}
-                    <button
-                      onClick={() => void removeSection(section.id)}
-                      className="p-2 text-text-secondary hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="p-8 grid grid-cols-1 lg:grid-cols-2 gap-10">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">Explicação para o Paciente</label>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => void generateSectionWithAI(section.id)}
-                          disabled={isGeneratingAI === section.id || !section.title}
-                          className="text-teal text-xs font-bold flex items-center gap-1 hover:text-teal-dark transition-colors disabled:opacity-50"
-                        >
-                          {isGeneratingAI === section.id ? (
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                          ) : (
-                            <Sparkles className="w-3 h-3" />
-                          )}
-                          Gerar com a IA
-                        </button>
-                        <HelpTooltip content="Descreva os procedimentos e a IA gera um texto profissional." className="ml-0.5" />
-                      </div>
-                    </div>
-                    <textarea
-                      value={section.content}
-                      onChange={(e) => updateSection(section.id, 'content', e.target.value)}
-                      placeholder="Descreva aqui o que o paciente precisa entender de forma simples..."
-                      className="w-full h-40 bg-surface-alt/50 border border-border/60 rounded-2xl p-4 text-sm text-text-primary leading-relaxed outline-none focus:border-teal transition-colors resize-none"
-                    />
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">Imagens Ilustrativas</label>
-                      <button
-                        onClick={() => setIsImagePickerOpen(section.id)}
-                        className="text-teal text-xs font-bold flex items-center gap-1 hover:text-teal-dark transition-colors"
-                      >
-                        <Plus className="w-3 h-3" /> Buscar da aba Documentos
-                        {documents.length > 0 && (
-                          <span className="ml-0.5 text-text-secondary font-normal">({documents.length})</span>
-                        )}
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-3">
-                      {section.imageIds.length > 0 ? (
-                        section.imageIds.map(imgId => {
-                          const doc = documents.find(d => d.id === imgId);
-                          if (!doc) return null;
-                          return (
-                            <div key={imgId} className="aspect-square relative rounded-xl overflow-hidden border border-border/60 group/img">
-                              <Image src={doc.thumbnail} alt={doc.name} fill className="object-cover" referrerPolicy="no-referrer" />
-                              <button
-                                onClick={() => toggleImageSelection(section.id, imgId)}
-                                className="absolute top-1 right-1 p-1 bg-black/60 text-white rounded-md opacity-0 group-hover/img:opacity-100 transition-opacity"
-                              >
-                                <X className="w-3 h-3" />
-                              </button>
-                            </div>
-                          );
-                        })
-                      ) : (
-                        <div
-                          onClick={() => setIsImagePickerOpen(section.id)}
-                          className="col-span-3 h-32 border-2 border-dashed border-border rounded-2xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-surface-alt/50 transition-colors"
-                        >
-                          <ImageIcon className="w-6 h-6 text-text-secondary" />
-                          <span className="text-xs font-medium text-text-secondary">Nenhuma imagem selecionada</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
-
-        <button
-          onClick={() => void addSection()}
-          className="w-full py-6 border-2 border-dashed border-border rounded-3xl flex items-center justify-center gap-2 text-text-secondary hover:text-text-primary hover:border-text-primary transition-all group"
-        >
-          <Plus className="w-5 h-5 group-hover:scale-110 transition-transform" />
-          <span className="font-bold text-sm">Adicionar Nova Seção ao Plano</span>
-        </button>
-      </div>
-
-      {/* ── PRESENTATION ENGINE ── */}
-      <AnimatePresence>
-        {isPresentationOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0, transition: { duration: 0.2 } }}
-            className="fixed inset-0 z-[200] flex flex-col select-none"
-            style={{ background: '#080c0b' }}
+      {/* ── TRATAMENTOS CONCLUÍDOS ── */}
+      {historicoTratamentos.length > 0 && (
+        <div className="bg-surface rounded-3xl border border-border/60 shadow-sm overflow-hidden">
+          <button
+            onClick={() => setHistoricoAberto(prev => !prev)}
+            className="w-full flex items-center justify-between px-6 py-5 hover:bg-surface-alt/20 transition-colors"
           >
-            <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(ellipse 60% 50% at 50% 40%, rgba(47,156,133,0.08) 0%, transparent 70%)' }} />
-
-            <div className="relative z-10 flex items-center justify-between px-6 sm:px-10 py-4 shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={{ background: '#2f9c85' }}>
-                  <Presentation className="w-3.5 h-3.5 text-white" />
-                </div>
-                <div>
-                  <p className="text-[11px] font-bold text-white/90 leading-none">{planningTitle}</p>
-                  <p className="text-xs text-white/35 mt-0.5">{patientName}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setOverviewMode(prev => !prev)}
-                  className={`p-2 rounded-lg transition-colors ${overviewMode ? 'bg-teal/20 text-teal' : 'bg-white/8 text-white/50 hover:bg-white/12 hover:text-white/80'}`}
-                  title="Visão geral (O)"
-                >
-                  <LayoutGrid className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => { setIsPresentationOpen(false); setOverviewMode(false); }}
-                  className="p-2 rounded-lg bg-white/8 hover:bg-white/15 transition-colors text-white/60 hover:text-white"
-                  title="Fechar (Esc)"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-bold text-text-secondary uppercase tracking-[0.2em]">Planejamentos Concluídos</span>
+              <span className="px-2 py-0.5 rounded-full bg-surface-alt text-text-secondary text-xs font-bold">
+                {historicoTratamentos.length}
+              </span>
             </div>
-
-            <div className="relative z-10 flex-1 overflow-hidden">
-              <AnimatePresence mode="wait">
-                {overviewMode ? (
-                  <motion.div
-                    key="overview"
-                    initial={{ opacity: 0, scale: 0.97 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.97 }}
-                    className="absolute inset-0 overflow-y-auto p-8"
-                  >
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 max-w-5xl mx-auto">
-                      {[null, ...sections, null].map((sec, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => { setCurrentSlide(idx); setOverviewMode(false); }}
-                          className={`relative rounded-2xl p-5 text-left transition-all border ${
-                            currentSlide === idx ? 'border-teal bg-teal/10' : 'border-white/10 bg-white/4 hover:bg-white/8 hover:border-white/20'
+            {historicoAberto ? <ChevronUp className="w-4 h-4 text-text-secondary" /> : <ChevronDown className="w-4 h-4 text-text-secondary" />}
+          </button>
+          <AnimatePresence initial={false}>
+            {historicoAberto && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.22 }}
+                className="overflow-hidden"
+              >
+                <div className="px-6 pb-6 space-y-2">
+                  {historicoTratamentos.map(t => {
+                    const isExpanded = expandedConcluidoId === t.id;
+                    const sessionsMap = new Map<string, PlanProc[]>();
+                    if (isExpanded && concluidoData) {
+                      for (const proc of concluidoData.planProcs) {
+                        const fichaId = proc.fichaRef?.split('::')?.[0] ?? '__unknown__';
+                        if (!sessionsMap.has(fichaId)) sessionsMap.set(fichaId, []);
+                        sessionsMap.get(fichaId)!.push(proc);
+                      }
+                    }
+                    const sessions = Array.from(sessionsMap.entries())
+                      .sort((a, b) => {
+                        const dA = concluidoData?.fichaDateMap[a[0]] ?? '';
+                        const dB = concluidoData?.fichaDateMap[b[0]] ?? '';
+                        return dB.localeCompare(dA);
+                      })
+                      .map(([fichaId, procs], idx) => ({
+                        fichaId,
+                        date: concluidoData?.fichaDateMap[fichaId] ?? null,
+                        sessionNumber: idx + 1,
+                        procedures: procs.sort((a, b) => (a.dente ?? 0) - (b.dente ?? 0)),
+                      }));
+                    return (
+                      <div key={t.id}>
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => void handleToggleConcluido(t)}
+                          onKeyDown={(e) => e.key === 'Enter' && void handleToggleConcluido(t)}
+                          className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                            isExpanded ? 'border-teal/30 bg-teal/5' : 'border-border/40 bg-surface-alt/50 hover:bg-surface-alt/80'
                           }`}
                         >
-                          <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#2f9c85' }}>
-                            {idx === 0 ? '◎' : idx <= sections.length ? String(idx).padStart(2, '0') : '★'}
-                          </p>
-                          <p className="text-xs font-semibold text-white/90 leading-snug line-clamp-2">
-                            {idx === 0 ? 'Progresso' : sec ? (sec.title || 'Sem título') : 'Investimento'}
-                          </p>
-                          {sec && sec.content && (
-                            <p className="text-xs text-white/40 mt-1.5 line-clamp-2 leading-relaxed">{sec.content}</p>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  </motion.div>
-                ) : (
-                  <AnimatePresence mode="wait" custom={slideDirection}>
-                    <motion.div
-                      key={currentSlide}
-                      custom={slideDirection}
-                      initial={{ x: slideDirection * 60, opacity: 0 }}
-                      animate={{ x: 0, opacity: 1 }}
-                      exit={{ x: slideDirection * -60, opacity: 0 }}
-                      transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
-                      className="absolute inset-0 flex flex-col items-center justify-center px-8 sm:px-16 py-10"
-                    >
-                      {currentSlide === 0 ? (
-                        /* ── Slide 0: Progresso ── */
-                        <div className="w-full max-w-lg flex flex-col items-center text-center">
-                          <p className="text-xs font-bold uppercase tracking-[0.25em] mb-4" style={{ color: '#2f9c85' }}>
-                            Progresso do Tratamento
-                          </p>
-                          <h2 className="font-heading text-3xl sm:text-5xl text-white mb-2 leading-tight">
-                            {patientName}
-                          </h2>
-                          <p className="text-white/45 text-sm mb-10">
-                            {planProcs.length} procedimento{planProcs.length !== 1 ? 's' : ''} · {concluidosCount} concluído{concluidosCount !== 1 ? 's' : ''}
-                          </p>
-
-                          {/* Círculo de progresso */}
-                          <div className="relative w-32 h-32 mb-10">
-                            <svg className="w-32 h-32 -rotate-90" viewBox="0 0 128 128">
-                              <circle cx="64" cy="64" r="52" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="10" />
-                              <circle
-                                cx="64" cy="64" r="52"
-                                fill="none"
-                                stroke="#2f9c85"
-                                strokeWidth="10"
-                                strokeLinecap="round"
-                                strokeDasharray={`${2 * Math.PI * 52}`}
-                                strokeDashoffset={`${2 * Math.PI * 52 * (1 - progressPercent / 100)}`}
-                                style={{ transition: 'stroke-dashoffset 0.8s ease' }}
-                              />
-                            </svg>
-                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5">
-                              <span className="text-3xl font-bold text-white leading-none">{progressPercent}%</span>
-                              <span className="text-[10px] text-white/35 font-medium uppercase tracking-wider">concluído</span>
-                            </div>
+                          <div>
+                            <p className="text-sm font-semibold text-text-primary">{t.nome ?? 'Planejamento sem nome'}</p>
+                            <p className="text-xs text-text-secondary mt-0.5">
+                              {format(parseISO(t.created_at), 'dd/MM/yyyy', { locale: ptBR })}
+                              {t.encerrado_em && ` → ${format(parseISO(t.encerrado_em), 'dd/MM/yyyy', { locale: ptBR })}`}
+                            </p>
                           </div>
-
-                          {/* Breakdown por quadrante */}
-                          <div className="grid grid-cols-2 gap-3 w-full max-w-sm">
-                            {(['Q1', 'Q2', 'Q3', 'Q4'] as const).map(qKey => {
-                              const qProcs = planProcs.filter(p => p.dente && Q_LABELS[qKey].teeth.includes(p.dente));
-                              if (qProcs.length === 0) return null;
-                              const qDone = qProcs.filter(p => p.status === 'concluido').length;
-                              const pct = Math.round((qDone / qProcs.length) * 100);
-                              return (
-                                <div key={qKey} className="rounded-2xl p-4 text-left border border-white/8" style={{ background: 'rgba(255,255,255,0.04)' }}>
-                                  <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: '#2f9c85' }}>
-                                    {Q_LABELS[qKey].short}
-                                  </p>
-                                  <p className="text-white text-sm font-semibold mb-2">{qDone}/{qProcs.length}</p>
-                                  <div className="h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.10)' }}>
-                                    <div className="h-full rounded-full" style={{ width: `${pct}%`, background: '#2f9c85', transition: 'width 0.6s ease' }} />
-                                  </div>
-                                </div>
-                              );
-                            })}
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-[10px] font-bold text-text-secondary bg-surface-alt border border-border/40 px-2 py-0.5 rounded-full">
+                              Concluído
+                            </span>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setConfirmarExclusaoHistId(t.id); }}
+                              className="p-1.5 rounded-lg text-text-secondary/40 hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                              title="Excluir planejamento"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                            {isExpanded
+                              ? <ChevronUp className="w-4 h-4 text-teal" />
+                              : <ChevronDown className="w-4 h-4 text-text-secondary" />
+                            }
                           </div>
                         </div>
-                      ) : currentSlide <= sections.length ? (
-                        /* ── Slides de conteúdo ── */
-                        <div className="w-full max-w-3xl flex flex-col items-center text-center">
-                          <p className="text-xs font-bold uppercase tracking-[0.25em] mb-5" style={{ color: '#2f9c85' }}>
-                            {String(currentSlide).padStart(2, '0')} / {String(sections.length).padStart(2, '0')}
-                          </p>
-                          <h2 className="font-heading text-3xl sm:text-5xl text-white mb-6 leading-tight">
-                            {sections[currentSlide - 1].title || 'Sem título'}
-                          </h2>
-                          <p className="text-base sm:text-xl text-white/65 leading-relaxed max-w-2xl">
-                            {sections[currentSlide - 1].content || 'Sem conteúdo.'}
-                          </p>
-                          {sections[currentSlide - 1].imageIds.length > 0 && (
-                            <div className="mt-10 grid grid-cols-3 gap-3 w-full max-w-2xl">
-                              {sections[currentSlide - 1].imageIds.map(imgId => {
-                                const doc = documents.find(d => d.id === imgId);
-                                if (!doc) return null;
-                                return (
-                                  <div key={imgId} className="aspect-square relative rounded-xl overflow-hidden border border-white/10">
-                                    <Image src={doc.thumbnail} alt={doc.name} fill className="object-cover" referrerPolicy="no-referrer" />
+                        <AnimatePresence initial={false}>
+                          {isExpanded && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.2 }}
+                              className="overflow-hidden"
+                            >
+                              <div className="mt-2 ml-2 pl-4 border-l-2 border-teal/20 space-y-4 pb-2">
+                                {loadingConcluido ? (
+                                  <div className="flex items-center gap-2 py-4 text-text-secondary">
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    <span className="text-sm">Carregando sessões...</span>
                                   </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        /* ── Slide final: Investimento ── */
-                        <div className="w-full max-w-lg flex flex-col items-center text-center">
-                          <p className="text-xs font-bold uppercase tracking-[0.25em] mb-5" style={{ color: '#2f9c85' }}>
-                            Resumo do Investimento
-                          </p>
-                          <h2 className="font-heading text-3xl sm:text-5xl text-white mb-10 leading-tight">
-                            Seu Investimento
-                          </h2>
-                          {!budgetExists ? (
-                            <p className="text-white/40 italic">Nenhum orçamento gerado ainda.</p>
-                          ) : (
-                            <div className="w-full space-y-1">
-                              {budgetProcedures.map(proc => (
-                                <div key={proc.id} className="flex items-center justify-between py-3 border-b border-white/8">
-                                  <span className="text-sm text-white/70 text-left pr-4">{proc.name}</span>
-                                  <span className="font-mono text-sm font-semibold text-white shrink-0">
-                                    R$ {proc.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                  </span>
-                                </div>
-                              ))}
-                              <div className="flex items-center justify-between pt-5">
-                                <span className="text-sm font-bold text-white/90">Total</span>
-                                <span className="font-mono text-2xl sm:text-3xl font-bold" style={{ color: '#2f9c85' }}>
-                                  R$ {totalBudget.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                </span>
+                                ) : sessions.length === 0 ? (
+                                  <p className="text-sm text-text-secondary/60 italic py-4">Nenhuma sessão registrada.</p>
+                                ) : sessions.map(session => (
+                                  <div key={session.fichaId}>
+                                    <p className="text-[11px] font-bold text-teal uppercase tracking-widest mb-2">
+                                      Sessão {session.sessionNumber}
+                                      {session.date && ` · ${format(parseISO(session.date), 'dd/MM/yyyy', { locale: ptBR })}`}
+                                    </p>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      {session.procedures.map(proc => (
+                                        <div key={proc.id} className="bg-surface-alt/40 border border-border/50 rounded-xl p-3 flex flex-col gap-1.5">
+                                          {proc.dente && (
+                                            <span className="text-[10px] font-bold text-teal uppercase tracking-wider">Dente {proc.dente}</span>
+                                          )}
+                                          <p className="text-xs text-text-primary leading-snug">{proc.descricao}</p>
+                                          <span className={`text-[10px] font-bold uppercase tracking-wide w-fit px-2 py-0.5 rounded-md border ${getProcStatus(proc.status).className}`}>
+                                            {getProcStatus(proc.status).label}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
-                            </div>
+                            </motion.div>
                           )}
-                        </div>
-                      )}
-                    </motion.div>
-                  </AnimatePresence>
-                )}
-              </AnimatePresence>
-            </div>
-
-            {!overviewMode && (
-              <div className="relative z-10 flex items-center justify-between px-6 sm:px-10 py-4 shrink-0">
-                <button
-                  onClick={() => { setSlideDirection(-1); setCurrentSlide(prev => Math.max(0, prev - 1)); }}
-                  disabled={currentSlide === 0}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/8 hover:bg-white/15 transition-colors text-white/70 hover:text-white font-semibold text-sm disabled:opacity-25"
-                >
-                  <ChevronLeft className="w-4 h-4" /> Anterior
-                </button>
-
-                <div className="flex items-center gap-1.5">
-                  {Array.from({ length: totalSlides }).map((_, i) => (
-                    <button
-                      key={i}
-                      onClick={() => { setSlideDirection(i > currentSlide ? 1 : -1); setCurrentSlide(i); }}
-                      className="transition-all rounded-full"
-                      style={{ width: i === currentSlide ? 20 : 6, height: 6, background: i === currentSlide ? '#2f9c85' : 'rgba(255,255,255,0.20)' }}
-                    />
-                  ))}
+                        </AnimatePresence>
+                      </div>
+                    );
+                  })}
                 </div>
-
-                <button
-                  onClick={() => { setSlideDirection(1); setCurrentSlide(prev => Math.min(totalSlides - 1, prev + 1)); }}
-                  disabled={currentSlide === totalSlides - 1}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/8 hover:bg-white/15 transition-colors text-white/70 hover:text-white font-semibold text-sm disabled:opacity-25"
-                >
-                  Próximo <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
+              </motion.div>
             )}
+          </AnimatePresence>
+        </div>
+      )}
 
-            <div className="relative z-10 pb-3 flex justify-center">
-              <p className="text-xs text-white/20 font-mono">← → navegar · O visão geral · Esc fechar</p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* ── APRESENTAR PANEL ── */}
+      <ApresentarPanel
+        open={apresentarOpen}
+        onClose={() => setApresentarOpen(false)}
+        patientName={patientName}
+        planningTitle={tratamentoAtivo?.nome ?? patientName}
+        tratamentoAtivo={tratamentoAtivo}
+        sections={sections}
+        planProcs={planProcs}
+        documents={documents}
+        budgetProcedures={budgetProcedures}
+        budgetExists={budgetExists}
+        concluidosCount={concluidosCount}
+        progressPercent={progressPercent}
+        totalBudget={totalBudget}
+        savingIds={savingIds}
+        isGeneratingAI={isGeneratingAI}
+        isImagePickerOpen={isImagePickerOpen}
+        setIsImagePickerOpen={setIsImagePickerOpen}
+        onUpdateSection={updateSection}
+        onRemoveSection={removeSection}
+        onAddSection={addSection}
+        onGenerateSectionWithAI={generateSectionWithAI}
+        onToggleImageSelection={toggleImageSelection}
+        onGenerateFullPlanWithAI={generateFullPlanWithAI}
+        onSaveSectionToDb={saveSectionToDb}
+      />
 
-      {/* ── IMAGE PICKER MODAL ── */}
+      {/* ── MODAL: INICIAR TRATAMENTO ─────────────────────────── */}
       <AnimatePresence>
-        {isImagePickerOpen && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-8">
+        {modalIniciarOpen && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setIsImagePickerOpen(null)}
+              onClick={() => setModalIniciarOpen(false)}
               className="absolute inset-0 bg-black/80 backdrop-blur-sm"
             />
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-2xl bg-surface rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[80vh] border border-border/40"
+              className="relative w-full max-w-lg bg-surface rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[80vh] border border-border/40"
             >
               <div className="p-6 border-b border-border/60 flex items-center justify-between">
-                <h3 className="font-heading text-xl text-text-primary">
-                  Documentos do Paciente
-                  {documents.length === 0 && <span className="text-sm font-normal text-text-secondary ml-2">— nenhum encontrado</span>}
-                </h3>
-                <button onClick={() => setIsImagePickerOpen(null)} className="p-2 rounded-xl hover:bg-surface-alt/50 transition-colors text-text-secondary">
+                <div>
+                  <h3 className="font-heading text-lg text-text-primary">Iniciar Planejamento</h3>
+                  <p className="text-xs text-text-secondary mt-0.5">Selecione as fichas que serão a base deste planejamento.</p>
+                </div>
+                <button onClick={() => setModalIniciarOpen(false)} className="p-2 rounded-xl hover:bg-surface-alt/50 transition-colors text-text-secondary">
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               <div className="flex-1 overflow-y-auto p-6">
-                {documents.length === 0 && (
-                  <div className="flex flex-col items-center justify-center py-16 text-center">
-                    <ImageIcon className="w-10 h-10 text-text-secondary/40 mb-3" />
-                    <p className="text-sm font-medium text-text-secondary">Nenhum documento encontrado</p>
-                    <p className="text-xs text-text-secondary/60 mt-1 max-w-xs">Adicione fotos ou radiografias na aba Documentos do paciente.</p>
+                {loadingFichasSemTrat ? (
+                  <div className="space-y-3">
+                    {[0, 1, 2].map(i => (
+                      <div key={i} className="h-14 rounded-2xl bg-surface-alt animate-pulse" />
+                    ))}
                   </div>
-                )}
-                <div className="grid grid-cols-3 gap-4">
-                  {documents.map(doc => {
-                    const isSelected = sections.find(s => s.id === isImagePickerOpen)?.imageIds.includes(doc.id);
-                    return (
-                      <div
-                        key={doc.id}
-                        onClick={() => toggleImageSelection(isImagePickerOpen, doc.id)}
-                        className={`relative aspect-square rounded-2xl overflow-hidden cursor-pointer border-4 transition-all ${isSelected ? 'border-teal' : 'border-transparent hover:border-border'}`}
-                      >
-                        <Image src={doc.thumbnail} alt={doc.name} fill className="object-cover" referrerPolicy="no-referrer" />
-                        {isSelected && (
-                          <div className="absolute inset-0 bg-teal/20 flex items-center justify-center">
-                            <div className="w-8 h-8 rounded-full bg-teal text-white flex items-center justify-center shadow-lg">
-                              <CheckCircle2 className="w-5 h-5" />
+                ) : fichasSemTratamento.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <FileText className="w-10 h-10 text-text-secondary/30 mb-3" />
+                    <p className="text-sm font-medium text-text-secondary">Nenhuma ficha disponível</p>
+                    <p className="text-xs text-text-secondary/60 mt-1 max-w-xs">
+                      Todas as fichas já estão vinculadas a um planejamento ou não há fichas cadastradas.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {fichasSemTratamento.map(f => {
+                      const selected = fichasSelecionadas.has(f.id);
+                      return (
+                        <button
+                          key={f.id}
+                          onClick={() => toggleFicha(f.id)}
+                          className={`w-full flex items-center gap-3 p-3.5 rounded-2xl border text-left transition-all ${
+                            selected
+                              ? 'border-teal/50 bg-teal/8'
+                              : 'border-border/50 hover:border-border bg-surface-alt/30'
+                          }`}
+                        >
+                          {selected
+                            ? <CheckCircle2 className="w-4 h-4 text-teal shrink-0" />
+                            : <Square className="w-4 h-4 text-text-secondary/40 shrink-0" />
+                          }
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-text-primary truncate">
+                              {f.queixa_principal ?? 'Evolução'}
+                            </p>
+                            <div className="flex items-center gap-3 mt-0.5">
+                              <p className="text-xs text-text-secondary">
+                                {format(new Date(f.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                              </p>
+                              {f.dentes_afetados?.length > 0 && (
+                                <p className="text-xs text-teal/80 font-medium">
+                                  Dentes: {f.dentes_afetados.join(', ')}
+                                </p>
+                              )}
                             </div>
                           </div>
-                        )}
-                        <div className="absolute bottom-0 left-0 right-0 p-2 bg-black/60 backdrop-blur-sm">
-                          <div className="text-[10px] font-bold text-white uppercase truncate">{doc.name}</div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
-              <div className="p-6 border-t border-border/60 bg-surface-alt/30 flex justify-end">
+              <div className="p-6 border-t border-border/60 bg-surface-alt/30 space-y-3">
+                {tratamentoError && (
+                  <p className="text-xs text-red-500 font-medium text-center">{tratamentoError}</p>
+                )}
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-text-secondary">
+                    {fichasSelecionadas.size > 0 ? `${fichasSelecionadas.size} ficha(s) selecionada(s)` : 'Nenhuma ficha selecionada'}
+                  </p>
+                  <button
+                    onClick={() => void handleIniciarTratamento()}
+                    disabled={fichasSelecionadas.size === 0 || salvandoTratamento}
+                    className="flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-teal text-white font-bold text-sm hover:bg-teal/90 transition-colors disabled:opacity-40 shadow-[0_0_15px_rgba(47,156,133,0.3)]"
+                  >
+                    {salvandoTratamento ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                    Iniciar
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── MODAL: ENCERRAR TRATAMENTO ────────────────────────── */}
+      <AnimatePresence>
+        {confirmarEncerramentoOpen && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setConfirmarEncerramentoOpen(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-sm bg-surface rounded-3xl overflow-hidden shadow-2xl border border-border/40 p-6"
+            >
+              <h3 className="font-heading text-lg text-text-primary mb-2">Encerrar planejamento?</h3>
+              <p className="text-sm text-text-secondary mb-6">
+                O planejamento será marcado como concluído e movido para o histórico. As fichas vinculadas permanecem no sistema.
+              </p>
+              <div className="flex gap-3 justify-end">
                 <button
-                  onClick={() => setIsImagePickerOpen(null)}
-                  className="px-8 py-3 rounded-2xl bg-teal text-white font-bold text-sm hover:bg-teal-dark transition-colors shadow-[0_0_15px_rgba(47,156,133,0.3)]"
+                  onClick={() => setConfirmarEncerramentoOpen(false)}
+                  disabled={encerrando}
+                  className="px-4 py-2 rounded-xl border border-border text-sm font-semibold text-text-secondary hover:bg-surface-alt transition-colors disabled:opacity-40"
                 >
-                  Confirmar Seleção
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => void handleEncerrarTratamento()}
+                  disabled={encerrando}
+                  className="flex items-center gap-2 px-5 py-2 rounded-xl bg-teal text-white text-sm font-bold hover:bg-teal/90 transition-colors disabled:opacity-40"
+                >
+                  {encerrando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                  Encerrar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── MODAL: EXCLUIR TRATAMENTO ─────────────────────────── */}
+      <AnimatePresence>
+        {confirmarExclusaoOpen && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setConfirmarExclusaoOpen(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-sm bg-surface rounded-3xl overflow-hidden shadow-2xl border border-border/40 p-6"
+            >
+              <h3 className="font-heading text-lg text-text-primary mb-2">Excluir planejamento?</h3>
+              <p className="text-sm text-text-secondary mb-6">
+                O planejamento será removido permanentemente. As fichas vinculadas ficarão livres e poderão ser usadas em um novo planejamento.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setConfirmarExclusaoOpen(false)}
+                  disabled={excluindo}
+                  className="px-4 py-2 rounded-xl border border-border text-sm font-semibold text-text-secondary hover:bg-surface-alt transition-colors disabled:opacity-40"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => void handleExcluirTratamento()}
+                  disabled={excluindo}
+                  className="flex items-center gap-2 px-5 py-2 rounded-xl bg-red-500 text-white text-sm font-bold hover:bg-red-600 transition-colors disabled:opacity-40"
+                >
+                  {excluindo ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                  Excluir
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── MODAL: EXCLUIR PLANEJAMENTO CONCLUÍDO ─────────────── */}
+      <AnimatePresence>
+        {confirmarExclusaoHistId && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setConfirmarExclusaoHistId(null)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-sm bg-surface rounded-3xl overflow-hidden shadow-2xl border border-border/40 p-6"
+            >
+              <h3 className="font-heading text-lg text-text-primary mb-2">Excluir planejamento concluído?</h3>
+              <p className="text-sm text-text-secondary mb-6">
+                O planejamento será removido permanentemente. As fichas vinculadas ficarão livres.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setConfirmarExclusaoHistId(null)}
+                  disabled={excluindoHist}
+                  className="px-4 py-2 rounded-xl border border-border text-sm font-semibold text-text-secondary hover:bg-surface-alt transition-colors disabled:opacity-40"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => void handleExcluirHistorico()}
+                  disabled={excluindoHist}
+                  className="flex items-center gap-2 px-5 py-2 rounded-xl bg-red-500 text-white text-sm font-bold hover:bg-red-600 transition-colors disabled:opacity-40"
+                >
+                  {excluindoHist ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                  Excluir
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── MODAL: RENOMEAR TRATAMENTO ────────────────────────── */}
+      <AnimatePresence>
+        {renomearOpen && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => { setRenomearOpen(false); setNovoNomeTratamento(''); }}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-sm bg-surface rounded-3xl overflow-hidden shadow-2xl border border-border/40 p-6"
+            >
+              <h3 className="font-heading text-lg text-text-primary mb-2">Renomear planejamento</h3>
+              <p className="text-sm text-text-secondary mb-4">Dê um nome que identifique o objetivo deste planejamento.</p>
+              <input
+                type="text"
+                value={novoNomeTratamento}
+                onChange={(e) => setNovoNomeTratamento(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') void handleRenomearTratamento(); }}
+                placeholder="Ex: Reabilitação Oral 2025"
+                autoFocus
+                className="w-full bg-surface-alt border border-border/60 rounded-2xl px-4 py-3 text-sm text-text-primary outline-none focus:border-teal transition-colors mb-5"
+              />
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => { setRenomearOpen(false); setNovoNomeTratamento(''); }}
+                  disabled={renomeando}
+                  className="px-4 py-2 rounded-xl border border-border text-sm font-semibold text-text-secondary hover:bg-surface-alt transition-colors disabled:opacity-40"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => void handleRenomearTratamento()}
+                  disabled={renomeando || !novoNomeTratamento.trim()}
+                  className="flex items-center gap-2 px-5 py-2 rounded-xl bg-teal text-white text-sm font-bold hover:bg-teal-dark transition-colors disabled:opacity-40 shadow-[0_0_15px_rgba(47,156,133,0.3)]"
+                >
+                  {renomeando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                  Salvar
                 </button>
               </div>
             </motion.div>

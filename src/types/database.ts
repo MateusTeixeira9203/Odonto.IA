@@ -126,7 +126,7 @@ export interface Orcamento {
   ficha_id: string;
   paciente_id: string;
   dentista_id: string;
-  status: "rascunho" | "enviado" | "aprovado" | "recusado";
+  status: "rascunho" | "enviado" | "aprovado" | "recusado" | "pago";
   validade_dias: number;
   condicoes_pagamento: string | null;
   total: number | null;
@@ -190,6 +190,7 @@ export interface ConfiguracaoClinica {
   formas_pagamento: string[];
   aceita_convenio: boolean;
   convenios: string[];
+  logo_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -230,6 +231,8 @@ export interface HorarioDisponivel {
   hora_fim: string;
   intervalo_minutos: number;
   ativo: boolean;
+  almoco_inicio: string | null;
+  almoco_fim: string | null;
   created_at: string;
   updated_at: string;
 }

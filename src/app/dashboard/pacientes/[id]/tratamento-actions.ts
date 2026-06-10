@@ -11,7 +11,7 @@ export type Tratamento = {
   encerrado_em: string | null;
 };
 
-/** Busca o tratamento ativo do paciente (no máximo um). */
+/** Busca o tratamento ativo do paciente. Usa limit(1) para tolerar dados legados com múltiplos registros ativos. */
 export async function buscarTratamentoAtivo(
   pacienteId: string
 ): Promise<{ tratamento: Tratamento | null; error?: string }> {
@@ -23,10 +23,12 @@ export async function buscarTratamentoAtivo(
     .eq("clinica_id", clinicId)
     .eq("paciente_id", pacienteId)
     .eq("status", "ativo")
-    .maybeSingle();
+    .order("created_at", { ascending: false })
+    .limit(1);
 
   if (error) return { tratamento: null, error: error.message };
-  return { tratamento: (data as Tratamento | null) };
+  const row = (data as Tratamento[])?.[0] ?? null;
+  return { tratamento: row };
 }
 
 /** Busca todos os tratamentos concluídos do paciente (histórico). */
@@ -115,6 +117,75 @@ export async function vincularFichasAoTratamento(
     .in("id", fichaIds)
     .eq("clinica_id", clinicId);
 
+  if (error) return { error: error.message };
+  revalidatePath(`/dashboard/pacientes/${pacienteId}`);
+  return {};
+}
+
+export type FichaSemTratamento = {
+  id: string;
+  created_at: string;
+  queixa_principal: string | null;
+  dentes_afetados: number[];
+};
+
+/** Busca fichas do paciente que ainda não estão vinculadas a nenhum tratamento. */
+export async function buscarFichasSemTratamento(
+  pacienteId: string
+): Promise<{ fichas: FichaSemTratamento[]; error?: string }> {
+  const { supabase, clinicId } = await requireClinicContext();
+
+  const { data, error } = await supabase
+    .from("fichas")
+    .select("id, created_at, queixa_principal, dentes_afetados")
+    .eq("clinica_id", clinicId)
+    .eq("paciente_id", pacienteId)
+    .is("tratamento_id", null)
+    .order("created_at", { ascending: false });
+
+  if (error) return { fichas: [], error: error.message };
+  return { fichas: (data as FichaSemTratamento[]) ?? [] };
+}
+
+/** Exclui um tratamento e libera as fichas vinculadas a ele. */
+export async function excluirTratamento(
+  tratamentoId: string,
+  pacienteId: string
+): Promise<{ error?: string }> {
+  const { supabase, clinicId, role } = await requireClinicContext();
+
+  if (role === "secretaria") return { error: "Sem permissão para excluir tratamentos" };
+
+  await supabase
+    .from("fichas")
+    .update({ tratamento_id: null })
+    .eq("tratamento_id", tratamentoId)
+    .eq("clinica_id", clinicId);
+
+  const { error } = await supabase
+    .from("tratamentos")
+    .delete()
+    .eq("id", tratamentoId)
+    .eq("clinica_id", clinicId);
+
+  if (error) return { error: error.message };
+  revalidatePath(`/dashboard/pacientes/${pacienteId}`);
+  return {};
+}
+
+/** Renomeia o tratamento. */
+export async function renomearTratamento(
+  tratamentoId: string,
+  nome: string,
+  pacienteId: string
+): Promise<{ error?: string }> {
+  const { supabase, clinicId, role } = await requireClinicContext();
+  if (role === 'secretaria') return { error: 'Sem permissão' };
+  const { error } = await supabase
+    .from('tratamentos')
+    .update({ nome: nome.trim() || null })
+    .eq('id', tratamentoId)
+    .eq('clinica_id', clinicId);
   if (error) return { error: error.message };
   revalidatePath(`/dashboard/pacientes/${pacienteId}`);
   return {};

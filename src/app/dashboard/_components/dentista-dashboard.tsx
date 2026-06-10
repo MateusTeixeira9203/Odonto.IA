@@ -40,7 +40,7 @@ export async function DentistaDashboard({ dentista }: { dentista: DentistaCache 
     { count: concluidosHoje },
     { count: agendaSemana },
     { count: semConfirmacao },
-    { count: orcamentosAguardando },
+    { data: orcamentosAguardandoRaw },
     { data: atendimentosHojeRaw },
   ] = await Promise.all([
     // Consultas hoje (não canceladas / no-show)
@@ -83,12 +83,14 @@ export async function DentistaDashboard({ dentista }: { dentista: DentistaCache 
       .gte('data_hora', todayStart)
       .lte('data_hora', todayEnd),
 
-    // Orçamentos aguardando retorno
+    // Orçamentos aguardando retorno (com nome do paciente)
     supabase
       .from('orcamentos')
-      .select('*', { count: 'exact', head: true })
+      .select('id, total, paciente_id, paciente:pacientes(nome)')
       .eq('clinica_id', dentista.clinica_id)
-      .in('status', ['rascunho', 'enviado']),
+      .in('status', ['rascunho', 'enviado'])
+      .order('created_at', { ascending: false })
+      .limit(20),
 
     // Lista completa de atendimentos hoje com dados do paciente
     supabase
@@ -103,6 +105,14 @@ export async function DentistaDashboard({ dentista }: { dentista: DentistaCache 
   ]);
 
   const atendimentosHoje = (atendimentosHojeRaw ?? []) as unknown as AtendimentoRaw[];
+
+  type OrcRaw = { id: string; total: number | null; paciente_id: string; paciente: { nome: string } | null };
+  const orcamentosAguardando = ((orcamentosAguardandoRaw ?? []) as unknown as OrcRaw[]).map(o => ({
+    id: o.id,
+    total: o.total,
+    paciente_id: o.paciente_id,
+    paciente_nome: o.paciente?.nome ?? 'Paciente',
+  }));
 
   // Próximo = primeiro atendimento não encerrado
   const nextApt = atendimentosHoje.find((a) => !DONE.has(a.status)) ?? null;
@@ -156,7 +166,7 @@ export async function DentistaDashboard({ dentista }: { dentista: DentistaCache 
 
       <AttentionPanel
         semConfirmacao={semConfirmacao ?? 0}
-        orcamentosAguardando={orcamentosAguardando ?? 0}
+        orcamentosAguardando={orcamentosAguardando}
       />
     </>
   );

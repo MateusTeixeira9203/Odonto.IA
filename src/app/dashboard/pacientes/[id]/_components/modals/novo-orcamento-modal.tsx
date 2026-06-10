@@ -22,9 +22,6 @@ import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { FichaParaOrc, ProcedimentoClinica, NovoOrcItem } from '../types';
 
-const DISCOUNT_OPTIONS = [5, 10, 15, 20] as const;
-type DescontoOpcao = 0 | 5 | 10 | 15 | 20;
-
 interface NovoOrcamentoModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -37,8 +34,8 @@ interface NovoOrcamentoModalProps {
   procedimentosClinica: ProcedimentoClinica[];
   novoOrcSubtotal: number;
   novoOrcTotal: number;
-  novoOrcDesconto: DescontoOpcao;
-  setNovoOrcDesconto: React.Dispatch<React.SetStateAction<DescontoOpcao>>;
+  novoOrcValorFinal: number | null;
+  setNovoOrcValorFinal: React.Dispatch<React.SetStateAction<number | null>>;
   orcSaving: boolean;
   onCriarOrcamento: () => void;
   onSelecionarFicha: (fichaId: string | null) => void;
@@ -56,12 +53,17 @@ export function NovoOrcamentoModal({
   procedimentosClinica,
   novoOrcSubtotal,
   novoOrcTotal,
-  novoOrcDesconto,
-  setNovoOrcDesconto,
+  novoOrcValorFinal,
+  setNovoOrcValorFinal,
   orcSaving,
   onCriarOrcamento,
   onSelecionarFicha,
 }: NovoOrcamentoModalProps) {
+  const temDesconto = novoOrcValorFinal !== null && novoOrcSubtotal > 0 && novoOrcValorFinal < novoOrcSubtotal;
+  const pctDesconto = temDesconto
+    ? Math.round(((novoOrcSubtotal - novoOrcValorFinal!) / novoOrcSubtotal) * 100 * 10) / 10
+    : 0;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -210,7 +212,6 @@ export function NovoOrcamentoModal({
                     </div>
                   </div>
 
-                  {/* Subtotal do item */}
                   {item.preco > 0 && (
                     <div className="flex justify-end pt-1 border-t border-border/40">
                       <span className="text-xs font-mono font-semibold text-teal">
@@ -237,44 +238,48 @@ export function NovoOrcamentoModal({
                   Resumo
                 </p>
 
-                {/* Seletor de desconto */}
-                <div className="space-y-2">
+                {/* Subtotal */}
+                <div className="space-y-1">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">
-                    Desconto
+                    Total dos procedimentos
                   </p>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {/* Sem desconto */}
-                    <button
-                      type="button"
-                      onClick={() => setNovoOrcDesconto(0)}
-                      className={`rounded-xl py-1.5 text-xs font-semibold transition-all ${
-                        novoOrcDesconto === 0
-                          ? 'bg-teal text-white shadow-sm'
-                          : 'bg-surface border border-border text-text-secondary hover:border-teal/40 hover:text-teal'
-                      }`}
-                    >
-                      Sem
-                    </button>
-                    {DISCOUNT_OPTIONS.map((pct) => (
-                      <button
-                        key={pct}
-                        type="button"
-                        onClick={() => setNovoOrcDesconto(pct as DescontoOpcao)}
-                        className={`rounded-xl py-1.5 text-xs font-semibold transition-all ${
-                          novoOrcDesconto === pct
-                            ? 'bg-teal text-white shadow-sm'
-                            : 'bg-surface border border-border text-text-secondary hover:border-teal/40 hover:text-teal'
-                        }`}
-                      >
-                        {pct}%
-                      </button>
-                    ))}
-                  </div>
+                  <p className="font-mono text-lg font-semibold text-text-primary">
+                    R$ {novoOrcSubtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
                 </div>
 
-                {/* Card de totais */}
+                {/* Campo valor final negociado */}
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">
+                    Valor final negociado (R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder={novoOrcSubtotal.toFixed(2)}
+                    value={novoOrcValorFinal ?? ''}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setNovoOrcValorFinal(v === '' ? null : parseFloat(v) || 0);
+                    }}
+                    className="rounded-xl bg-surface border-border text-text-primary font-mono"
+                  />
+                  {temDesconto && (
+                    <p className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                      Desconto de {pctDesconto}% aplicado
+                    </p>
+                  )}
+                  {novoOrcValorFinal !== null && novoOrcValorFinal > novoOrcSubtotal && (
+                    <p className="text-[11px] text-amber-500">
+                      Valor maior que o total
+                    </p>
+                  )}
+                </div>
+
+                {/* Card de total final */}
                 <div className="rounded-2xl p-4 space-y-2 border border-teal/15" style={{ background: 'rgba(47,156,133,0.07)' }}>
-                  {novoOrcDesconto > 0 && (
+                  {temDesconto && (
                     <>
                       <div className="flex items-center justify-between">
                         <p className="text-[10px] text-text-secondary font-mono">Subtotal</p>
@@ -283,9 +288,9 @@ export function NovoOrcamentoModal({
                         </p>
                       </div>
                       <div className="flex items-center justify-between">
-                        <p className="text-[10px] text-text-secondary font-mono">Desconto ({novoOrcDesconto}%)</p>
+                        <p className="text-[10px] text-text-secondary font-mono">Desconto ({pctDesconto}%)</p>
                         <p className="text-xs font-mono font-semibold text-red-400">
-                          − R$ {(novoOrcSubtotal * novoOrcDesconto / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          − R$ {(novoOrcSubtotal - novoOrcTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </p>
                       </div>
                       <div className="h-px bg-teal/20" />

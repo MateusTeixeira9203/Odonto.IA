@@ -1281,15 +1281,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, canWrite = 
                 </button>
               </div>
             </div>
-          ) : (
-            <button
-              onClick={() => { setNovoTratFichasSelecionadas(new Set()); setNovoTratNome(''); setTratamentoError(null); setModalIniciarOpen(true); }}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-dashed border-teal/30 text-sm font-semibold text-teal hover:border-teal/60 hover:bg-teal/5 transition-all"
-            >
-              <Plus className="w-4 h-4" />
-              Iniciar Tratamento
-            </button>
-          )}
+          ) : null}
         </div>
       )}
 
@@ -1303,10 +1295,10 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, canWrite = 
         </div>
       )}
 
-      <div className="relative space-y-8 before:absolute before:left-[19px] before:top-4 before:bottom-4 before:w-px before:bg-border/40">
+      <div className="relative space-y-14 before:absolute before:left-[19px] before:top-4 before:bottom-4 before:w-px before:bg-border/40">
         {/* Fichas avulsas */}
         {fichasAvulsas.length > 0 && (
-          <div className="mb-4">
+          <div className="space-y-14">
             {tratamentoAtivo && (
               <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary/50 mb-3">
                 Fichas avulsas
@@ -1496,7 +1488,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, canWrite = 
 
         {/* Fichas do tratamento ativo */}
         {fichasDoTratamentoAtivo.length > 0 && (
-          <div className="mb-4">
+          <div className="space-y-14">
             {fichasDoTratamentoAtivo.map((evo, idx) => {
               const validKeys = evo.teethNotes.flatMap((tn) =>
                 tn.notes.filter(Boolean).map((_, i) => `${tn.tooth}_${i}`)
@@ -1639,64 +1631,6 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, canWrite = 
           </div>
         )}
 
-        {/* ── HISTÓRICO DE TRATAMENTOS ─────────────────────────────── */}
-        {historicoTratamentos.length > 0 && (
-          <div className="mt-6 border-t border-border/40 pt-4">
-            <button
-              onClick={() => setHistoricoAberto(v => !v)}
-              className="w-full flex items-center justify-between text-[11px] font-bold uppercase tracking-widest text-text-secondary/50 hover:text-text-secondary transition-colors mb-3"
-            >
-              <span>Histórico de Tratamentos ({historicoTratamentos.length})</span>
-              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${historicoAberto ? 'rotate-180' : ''}`} />
-            </button>
-            <AnimatePresence>
-              {historicoAberto && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="overflow-hidden space-y-3"
-                >
-                  {historicoTratamentos.map(trat => {
-                    const fichas = fichasPorTratamento(trat.id);
-                    return (
-                      <div key={trat.id} className="rounded-xl border border-border/50 bg-surface overflow-hidden">
-                        <div className="flex items-center justify-between px-4 py-3">
-                          <div>
-                            <p className="text-sm font-semibold text-text-primary">
-                              {trat.nome ?? 'Tratamento'}
-                            </p>
-                            <p className="text-[10px] text-text-secondary mt-0.5">
-                              {fmtDate(parseISO(trat.created_at), "dd MMM yyyy", { locale: ptBR })}
-                              {trat.encerrado_em && ` → ${fmtDate(parseISO(trat.encerrado_em), "dd MMM yyyy", { locale: ptBR })}`}
-                              {' · '}{fichas.length} ficha{fichas.length !== 1 ? 's' : ''}
-                            </p>
-                          </div>
-                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-teal/10 text-teal">
-                            Concluído
-                          </span>
-                        </div>
-                        {fichas.length > 0 && (
-                          <div className="px-4 pb-3 flex flex-wrap gap-1.5">
-                            {fichas.map(f => (
-                              <span
-                                key={f.id}
-                                className="text-[10px] text-text-secondary bg-surface-alt px-2 py-0.5 rounded"
-                              >
-                                {f.type} · {f.date.split(' ')[0]}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        )}
       </div>
 
       {/* Modal: Orçamento sugerido pela IA */}

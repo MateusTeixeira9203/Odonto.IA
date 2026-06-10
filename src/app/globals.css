@@ -62,11 +62,11 @@
 
   --color-bg: #f4f4f6;
   --color-surface: #ffffff;
-  --color-surface-alt: #e4e4e8;
-  --color-border: #d4d4d8;
+  --color-surface-alt: #dadade;  /* era #e4e4e8 — mais escuro p/ inputs e tooth fill */
+  --color-border: #c2c2c6;       /* era #d4d4d8 — bordas mais definidas */
   --color-text-primary: #09090b;
-  --color-text-secondary: #71717a;
-  --color-text-muted: #b4b4b8;
+  --color-text-secondary: #4b5563; /* era #71717a — contraste 7:1 em branco (WCAG AA) */
+  --color-text-muted: #6b7280;     /* era #b4b4b8 — contraste 4.6:1 em branco */
 
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -265,6 +265,15 @@
 }
 
 
+/* ── Legibilidade mínima — texto micro (ambos os modos) ────────── */
+@layer utilities {
+  .text-\[8px\]    { font-size: 10px; }
+  .text-\[8\.5px\] { font-size: 10px; }
+  .text-\[9px\]    { font-size: 10px; }
+  .text-\[10px\]   { font-size: 11px; }
+  .text-\[11px\]   { font-size: 12px; }
+}
+
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -447,4 +456,74 @@
 }
 .driver-overlay {
   opacity: 0.6 !important;
+}
+
+/* ── Inputs nativos date / time — tema Odonto.IA ───────────────────── */
+
+/* Base dentro de @layer base → Tailwind utilities sobrescrevem sem problema */
+@layer base {
+  input[type="date"],
+  input[type="time"] {
+    font-family: var(--font-sans);
+    color: var(--color-text-primary);
+    background-color: var(--color-surface-alt);
+    border: 1.5px solid var(--color-border);
+    border-radius: 12px;
+    padding: 0.5rem 0.875rem;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    line-height: 1.5;
+  }
+
+  input[type="date"]:hover,
+  input[type="time"]:hover {
+    border-color: var(--color-teal);
+  }
+
+  input[type="date"]:focus,
+  input[type="time"]:focus {
+    border-color: var(--color-teal);
+    box-shadow: 0 0 0 3px rgba(47, 156, 133, 0.12);
+  }
+
+  input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+  input[type="time"]::-webkit-datetime-edit-fields-wrapper {
+    color: var(--color-text-primary);
+  }
+
+  input[type="date"]::-webkit-datetime-edit-text {
+    color: var(--color-text-secondary);
+    padding: 0 1px;
+  }
+
+  input[type="date"]::-webkit-inner-spin-button,
+  input[type="time"]::-webkit-inner-spin-button {
+    display: none;
+  }
+}
+
+/* Pseudo-elementos do picker ficam fora do layer (não afetam utilities) */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.55;
+  filter: invert(42%) sepia(70%) saturate(500%) hue-rotate(127deg) brightness(90%);
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.dark input[type="date"]::-webkit-calendar-picker-indicator,
+.dark input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(70%) sepia(40%) saturate(400%) hue-rotate(127deg) brightness(130%);
+  opacity: 0.65;
+}
+
+.dark input[type="date"]::-webkit-calendar-picker-indicator:hover,
+.dark input[type="time"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
 }

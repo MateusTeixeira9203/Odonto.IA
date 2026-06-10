@@ -25,8 +25,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!dentista) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
   if (dentista.role === 'secretaria') return NextResponse.json({ error: 'Sem permissão.' }, { status: 403 });
 
-  if (!process.env.GEMINI_API_KEY) {
-    return NextResponse.json({ error: 'GEMINI_API_KEY não configurada.' }, { status: 500 });
+  if (!process.env.GROQ_API_KEY) {
+    return NextResponse.json({ error: 'GROQ_API_KEY não configurada.' }, { status: 500 });
   }
 
   let body: GerarPlanejamentoBody;
@@ -108,8 +108,8 @@ Responda APENAS com o texto, sem títulos, sem markdown, entre 2 e 4 frases clar
     const errorMsg = err instanceof Error ? err.message : 'Erro interno';
     logAICall({
       feature:    'gerar-planejamento',
-      provider:   'gemini',
-      model:      'gemini-2.5-flash',
+      provider:   'groq',
+      model:      'llama-3.3-70b-versatile',
       latencyMs:  Date.now() - callStart,
       success:    false,
       dentistaId: dentista.id,
@@ -117,6 +117,15 @@ Responda APENAS com o texto, sem títulos, sem markdown, entre 2 e 4 frases clar
       error:      errorMsg,
     });
     console.error('[gerar-planejamento] Erro:', err);
-    return NextResponse.json({ error: 'Erro ao gerar planejamento com IA.' }, { status: 500 });
+    const raw = err instanceof Error ? err.message : String(err);
+    let userMsg = 'Erro ao gerar planejamento com IA.';
+    if (raw.includes('rate_limit') || raw.includes('429')) {
+      userMsg = 'Limite de requisições atingido. Tente novamente em instantes.';
+    } else if (raw.includes('API_KEY') || raw.includes('401') || raw.includes('403')) {
+      userMsg = 'Chave da API de IA inválida ou sem permissão.';
+    } else if (raw.includes('timeout') || raw.includes('UNAVAILABLE') || raw.includes('503')) {
+      userMsg = 'IA indisponível no momento. Tente novamente em instantes.';
+    }
+    return NextResponse.json({ error: userMsg }, { status: 500 });
   }
 }

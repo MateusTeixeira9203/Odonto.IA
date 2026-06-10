@@ -15,6 +15,7 @@ interface ConfirmarDeleteOrcModalProps {
   confirmDeleteOrcId: string | null;
   onOpenChange: (open: boolean) => void;
   orcDeleteSaving: boolean;
+  orcDeleteError: string | null;
   onExcluir: () => void;
 }
 
@@ -22,6 +23,7 @@ export function ConfirmarDeleteOrcModal({
   confirmDeleteOrcId,
   onOpenChange,
   orcDeleteSaving,
+  orcDeleteError,
   onExcluir,
 }: ConfirmarDeleteOrcModalProps) {
   return (
@@ -60,6 +62,12 @@ export function ConfirmarDeleteOrcModal({
             Orçamentos com pagamentos já confirmados são protegidos automaticamente.
           </p>
         </div>
+
+        {orcDeleteError && (
+          <p className="mx-6 mb-3 text-xs text-red-500 bg-red-500/10 rounded-xl px-3 py-2">
+            {orcDeleteError}
+          </p>
+        )}
 
         <DialogFooter className="px-6 pb-6 gap-2">
           <Button

@@ -173,6 +173,16 @@ export function PacienteDetailClient({
   const [activeTab, setActiveTab] = useState('resumo');
   const [mountedTabs, setMountedTabs] = useState<Set<string>>(() => new Set(['resumo']));
 
+  // Lê ?tab= da URL para navegar direto à aba correta (ex: vindo do AttentionPanel)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
+    if (tab) {
+      setActiveTab(tab);
+      setMountedTabs(prev => new Set([...prev, tab]));
+    }
+  }, []);
+
   const handleTabChange = useCallback((tab: string) => {
     setActiveTab(tab);
     setMountedTabs(prev => prev.has(tab) ? prev : new Set([...prev, tab]));
@@ -224,7 +234,7 @@ export function PacienteDetailClient({
   const [isLoadingFichaParaOrc, setIsLoadingFichaParaOrc] = useState(false);
   const [fichasParaOrc, setFichasParaOrc] = useState<FichaParaOrc[]>([]);
   const [etapaNovoOrc, setEtapaNovoOrc] = useState<'selecionar' | 'itens'>('itens');
-  const [novoOrcDesconto, setNovoOrcDesconto] = useState<0 | 5 | 10 | 15 | 20>(0);
+  const [novoOrcValorFinal, setNovoOrcValorFinal] = useState<number | null>(null);
 
   // Edição de orçamento
   const [orcEditMode, setOrcEditMode] = useState(false);
@@ -235,6 +245,7 @@ export function PacienteDetailClient({
   // Exclusão de orçamento
   const [confirmDeleteOrcId, setConfirmDeleteOrcId] = useState<string | null>(null);
   const [orcDeleteSaving, setOrcDeleteSaving] = useState(false);
+  const [orcDeleteError, setOrcDeleteError] = useState<string | null>(null);
 
   // Contato dropdown (⋯)
   const [showContato, setShowContato] = useState(false);
@@ -346,8 +357,8 @@ export function PacienteDetailClient({
     [novoOrcItens]
   );
   const novoOrcTotal = useMemo(
-    () => Math.max(0, novoOrcSubtotal * (1 - novoOrcDesconto / 100)),
-    [novoOrcSubtotal, novoOrcDesconto]
+    () => novoOrcValorFinal !== null ? Math.max(0, novoOrcValorFinal) : novoOrcSubtotal,
+    [novoOrcSubtotal, novoOrcValorFinal]
   );
 
   const resumoFinanceiro = useMemo(() => {
@@ -701,7 +712,8 @@ export function PacienteDetailClient({
     setOrcSaving(true);
 
     const subtotalValido = itensValidos.reduce((s, i) => s + i.quantidade * i.preco, 0);
-    const descontoValor  = Math.round((subtotalValido * (novoOrcDesconto / 100)) * 100) / 100;
+    const finalValido    = novoOrcValorFinal !== null ? Math.max(0, novoOrcValorFinal) : subtotalValido;
+    const descontoValor  = Math.max(0, Math.round((subtotalValido - finalValido) * 100) / 100);
 
     const result = await criarOrcamento({
       pacienteId: paciente.id,
@@ -792,11 +804,14 @@ export function PacienteDetailClient({
   const handleExcluirOrc = async () => {
     if (!confirmDeleteOrcId) return;
     setOrcDeleteSaving(true);
+    setOrcDeleteError(null);
     const result = await excluirOrcamento(confirmDeleteOrcId, paciente.id);
     if (!result.error) {
       setOrcamentosState((prev) => prev.filter((o) => o.id !== confirmDeleteOrcId));
       setDetalheOrcId(null);
       setConfirmDeleteOrcId(null);
+    } else {
+      setOrcDeleteError(result.error);
     }
     setOrcDeleteSaving(false);
   };
@@ -940,214 +955,6 @@ export function PacienteDetailClient({
           className="space-y-6"
         >
 
-          {/* ── HERO STRIP ─────────────────────────────────────────── */}
-          <div className="grid grid-cols-1 md:grid-cols-3 bg-surface rounded-2xl border border-border overflow-hidden">
-
-            {/* Col 1 — Próxima Consulta */}
-            <div
-              className="p-5 md:p-6 border-b md:border-b-0 md:border-r border-border/50 hover:bg-surface-alt/30 transition-colors group cursor-pointer"
-              onClick={() => handleTabChange('agenda')}
-              role="button"
-              tabIndex={0}
-              onKeyDown={e => e.key === 'Enter' && handleTabChange('agenda')}
-            >
-              <div className="flex items-center gap-1.5 mb-4">
-                <Calendar className="w-3 h-3 text-text-secondary/50" />
-                <span className="text-[9px] font-bold uppercase tracking-[0.28em] text-text-secondary/50">Próxima Consulta</span>
-              </div>
-              {agendamentoProximo ? (
-                <div className="space-y-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-xl font-bold text-text-primary leading-tight">
-                        {format(parseISO(agendamentoProximo.data_hora), "dd 'de' MMM", { locale: ptBR })}
-                      </p>
-                      <p className="text-sm text-text-secondary mt-0.5">
-                        {format(parseISO(agendamentoProximo.data_hora), "EEE 'às' HH:mm", { locale: ptBR })}
-                      </p>
-                      {agendamentoProximo.dentista && (
-                        <p className="text-xs text-teal font-medium mt-1 truncate">{agendamentoProximo.dentista.nome}</p>
-                      )}
-                    </div>
-                    {(() => {
-                      const diff = differenceInCalendarDays(parseISO(agendamentoProximo.data_hora), new Date());
-                      if (diff === 0) return <span className="shrink-0 px-2 py-1 rounded-lg text-[10px] font-bold bg-teal/10 text-teal">Hoje</span>;
-                      if (diff === 1) return <span className="shrink-0 px-2 py-1 rounded-lg text-[10px] font-bold bg-amber-500/10 text-amber-500 dark:text-amber-400">Amanhã</span>;
-                      if (diff <= 7)  return <span className="shrink-0 px-2 py-1 rounded-lg text-[10px] font-bold bg-surface-alt text-text-secondary">Em {diff} dias</span>;
-                      return <span className="shrink-0 px-2 py-1 rounded-lg text-[10px] font-semibold bg-surface-alt text-text-secondary/60">Em {diff}d</span>;
-                    })()}
-                  </div>
-                  {canWriteClinical && !['cancelado', 'faltou', 'realizado', 'cancelled', 'no_show', 'completed'].includes(agendamentoProximo.status) && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); router.push(`/consulta/${agendamentoProximo.id}`); }}
-                      className="w-full py-2 rounded-xl bg-teal text-white text-xs font-bold flex items-center justify-center gap-2 hover:bg-teal-lt transition-colors"
-                    >
-                      <Stethoscope className="w-3.5 h-3.5" />
-                      Iniciar Consulta
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <p className="text-sm text-text-secondary/70">Sem consulta agendada</p>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setConsultaError(null); setIsNovaConsultaOpen(true); }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
-                    style={{ background: 'rgba(47,156,133,0.08)', color: 'var(--color-teal)' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(47,156,133,0.15)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'rgba(47,156,133,0.08)')}
-                  >
-                    <Plus className="w-3 h-3" />
-                    Agendar agora
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Col 2 — Tratamento */}
-            <div
-              className="p-5 md:p-6 border-b md:border-b-0 md:border-r border-border/50 hover:bg-surface-alt/30 transition-colors cursor-pointer relative"
-              onClick={() => handleTabChange('tratamento')}
-              role="button"
-              tabIndex={0}
-              onKeyDown={e => e.key === 'Enter' && handleTabChange('tratamento')}
-            >
-              <ChevronRight className="absolute top-4 right-4 w-3.5 h-3.5 text-text-secondary/30" />
-              <div className="flex items-center gap-1.5 mb-4">
-                <Activity className="w-3 h-3 text-text-secondary/50" />
-                <span className="text-[9px] font-bold uppercase tracking-[0.28em] text-text-secondary/50">Tratamento</span>
-              </div>
-              {procedimentosPrincipais.length === 0 && pendenciasAtivas.length === 0 ? (
-                <p className="text-sm text-text-secondary/70">Nenhum tratamento ativo</p>
-              ) : (
-                <div className="space-y-3">
-                  {procedimentosPrincipais.length > 0 && (
-                    <div>
-                      <p className="text-sm font-semibold text-text-primary leading-snug line-clamp-2">
-                        {procedimentosPrincipais[0].descricao}
-                      </p>
-                      {procedimentosPrincipais.length > 1 && (
-                        <p className="text-xs text-text-secondary mt-1">
-                          + {procedimentosPrincipais.length - 1} procedimento{procedimentosPrincipais.length - 1 !== 1 ? 's' : ''}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  {procedimentosPrincipais.length === 0 && pendenciasAtivas.length > 0 && (
-                    <p className="text-sm text-text-secondary/70">
-                      {pendenciasAtivas.length} procedimento{pendenciasAtivas.length !== 1 ? 's' : ''} pendente{pendenciasAtivas.length !== 1 ? 's' : ''}
-                    </p>
-                  )}
-                  {canWriteClinical && pendenciasAtivas.length > 0 && (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
-                      {pendenciasAtivas.length} pendente{pendenciasAtivas.length !== 1 ? 's' : ''}
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Col 3 — Pendências */}
-            <div className="p-5 md:p-6 hover:bg-surface-alt/30 transition-colors">
-              <div className="flex items-center gap-1.5 mb-4">
-                <Bell className="w-3 h-3 text-text-secondary/50" />
-                <span className="text-[9px] font-bold uppercase tracking-[0.28em] text-text-secondary/50">Pendências</span>
-              </div>
-              {!followupPendente && orcamentosAguardando.length === 0 ? (
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-teal/50" />
-                  <p className="text-sm text-text-secondary/70">Tudo em dia</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {/* Follow-up ativo */}
-                  {followupPendente && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
-                          Follow-up
-                        </span>
-                        <button
-                          onClick={() => void handleLimparFollowUp()}
-                          disabled={followupSaving}
-                          className="text-xs font-bold text-teal hover:text-teal-lt transition-colors disabled:opacity-40 flex items-center gap-1"
-                        >
-                          {followupSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Concluir'}
-                        </button>
-                      </div>
-                      {paciente.followup_nota && (
-                        <p className="text-[11px] text-text-secondary italic truncate">{paciente.followup_nota}</p>
-                      )}
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] text-text-secondary/50">Adiar:</span>
-                        {[{ label: 'Amanhã', days: 1 }, { label: '3d', days: 3 }, { label: '7d', days: 7 }].map(opt => (
-                          <button
-                            key={opt.days}
-                            onClick={() => void handleSnooze(opt.days)}
-                            disabled={followupSaving}
-                            className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-surface-alt border border-border/60 text-text-secondary hover:border-teal/40 hover:text-teal transition-colors disabled:opacity-40"
-                          >
-                            {opt.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Follow-up inativo — marcar */}
-                  {!followupPendente && (
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-text-secondary/70">Follow-up</span>
-                        <button
-                          onClick={() => setShowFollowupInput(v => !v)}
-                          className="text-xs text-teal hover:text-teal-lt font-semibold transition-colors"
-                        >
-                          {showFollowupInput ? 'Cancelar' : '+ Marcar'}
-                        </button>
-                      </div>
-                      {showFollowupInput && (
-                        <div className="space-y-1.5">
-                          <input
-                            type="text"
-                            placeholder="Nota (opcional)"
-                            value={followupNota}
-                            onChange={e => setFollowupNota(e.target.value)}
-                            className="w-full text-xs border border-border rounded-lg px-2.5 py-1.5 bg-surface-alt text-text-primary placeholder:text-text-secondary outline-none focus:ring-1 focus:ring-teal/40"
-                            maxLength={120}
-                          />
-                          <button
-                            onClick={() => void handleMarcarFollowUp()}
-                            disabled={followupSaving}
-                            className="w-full py-1.5 bg-teal text-white rounded-lg text-xs font-bold hover:bg-teal-lt transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
-                          >
-                            {followupSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
-                            Marcar Follow-up
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Orçamentos aguardando aprovação */}
-                  {orcamentosAguardando.length > 0 && (
-                    <button
-                      className="w-full flex items-center justify-between hover:opacity-80 transition-opacity"
-                      onClick={() => handleTabChange('orcamentos')}
-                    >
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-coral/10 text-coral">
-                        <span className="w-1.5 h-1.5 rounded-full bg-coral shrink-0" />
-                        Aguardando aprovação
-                      </span>
-                      <span className="text-sm font-bold text-coral">{orcamentosAguardando.length}</span>
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
 
           {/* Tabs — IDs usados pelo tour DEX */}
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
@@ -1155,7 +962,7 @@ export function PacienteDetailClient({
               {(
                 [
                   ['resumo',        'Resumo',       undefined],
-                  ...(canWriteClinical ? [['tratamento',   'Tratamento',   'tab-apresentacao'] as const] : []),
+                  ...(canWriteClinical ? [['tratamento',   'Planejamento', 'tab-apresentacao'] as const] : []),
                   ...(canViewClinical  ? [['ficha-clinica','Ficha Clínica','tab-fichas'      ] as const] : []),
                   ['agenda',        'Agenda',        undefined],
                   ['orcamentos',    'Orçamentos',   'tab-orcamento'   ],
@@ -1412,7 +1219,11 @@ export function PacienteDetailClient({
                         <div
                           key={orc.id}
                           onClick={() => setDetalheOrcId(orc.id)}
-                          className="bg-surface rounded-2xl border border-border/60 shadow-sm p-6 cursor-pointer hover:border-teal/30 transition-colors"
+                          className={`rounded-2xl border shadow-sm p-6 cursor-pointer transition-colors ${
+                            (orc.status === 'rascunho' || orc.status === 'enviado')
+                              ? 'bg-amber-500/[0.03] border-amber-500/40 hover:border-amber-500/60'
+                              : 'bg-surface border-border/60 hover:border-teal/30'
+                          }`}
                         >
                           <div className="flex items-start justify-between mb-4">
                             <div className="flex items-center gap-3">
@@ -1664,8 +1475,9 @@ export function PacienteDetailClient({
 
       <ConfirmarDeleteOrcModal
         confirmDeleteOrcId={confirmDeleteOrcId}
-        onOpenChange={(open) => { if (!open) setConfirmDeleteOrcId(null); }}
+        onOpenChange={(open) => { if (!open) { setConfirmDeleteOrcId(null); setOrcDeleteError(null); } }}
         orcDeleteSaving={orcDeleteSaving}
+        orcDeleteError={orcDeleteError}
         onExcluir={handleExcluirOrc}
       />
 
@@ -1687,7 +1499,7 @@ export function PacienteDetailClient({
         open={isNovoOrcOpen}
         onOpenChange={(open) => {
           setIsNovoOrcOpen(open);
-          if (!open) { setEtapaNovoOrc('itens'); setFichasParaOrc([]); setOrcError(null); setNovoOrcDesconto(0); }
+          if (!open) { setEtapaNovoOrc('itens'); setFichasParaOrc([]); setOrcError(null); setNovoOrcValorFinal(null); }
         }}
         etapaNovoOrc={etapaNovoOrc}
         setEtapaNovoOrc={setEtapaNovoOrc}
@@ -1698,8 +1510,8 @@ export function PacienteDetailClient({
         procedimentosClinica={procedimentosClinica}
         novoOrcSubtotal={novoOrcSubtotal}
         novoOrcTotal={novoOrcTotal}
-        novoOrcDesconto={novoOrcDesconto}
-        setNovoOrcDesconto={setNovoOrcDesconto}
+        novoOrcValorFinal={novoOrcValorFinal}
+        setNovoOrcValorFinal={setNovoOrcValorFinal}
         orcSaving={orcSaving}
         onCriarOrcamento={handleCriarOrcamento}
         onSelecionarFicha={selecionarFichaParaOrc}

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
@@ -20,13 +21,11 @@ export type ClinicContext = {
  * Resolve o contexto autenticado de clínica a partir das fontes canônicas:
  *
  * 1. users.active_clinica_id  — qual clínica está ativa para este usuário
- * 2. clinica_usuarios          — valida membership ativa e obtém o role
- * 3. dentistas                 — fornece o ID de perfil clínico (escopo da clínica ativa)
+ * 2. clinica_usuarios + dentistas — em paralelo, pois ambos dependem só de clinicId
  *
- * Nunca usa dentistas como fonte de clinicId ou role.
- * Nunca faz .maybeSingle() sem escopo explícito de clínica.
+ * Usa React.cache() para deduplicar chamadas dentro do mesmo render (layout + page).
  */
-export async function requireClinicContext(): Promise<ClinicContext> {
+export const requireClinicContext = cache(async (): Promise<ClinicContext> => {
   const supabase = await createClient();
 
   const {
@@ -46,25 +45,24 @@ export async function requireClinicContext(): Promise<ClinicContext> {
 
   const clinicId = userRecord.active_clinica_id as string;
 
-  // ── 2. Validar membership ativa e obter role ─────────────────────────────────
-  const { data: membership } = await supabase
-    .from("clinica_usuarios")
-    .select("role")
-    .eq("usuario_id", user.id)
-    .eq("clinica_id", clinicId)
-    .eq("status", "ativo")
-    .maybeSingle();
+  // ── 2. Membership + perfil clínico em paralelo ───────────────────────────────
+  const [{ data: membership }, { data: dentista }] = await Promise.all([
+    supabase
+      .from("clinica_usuarios")
+      .select("role")
+      .eq("usuario_id", user.id)
+      .eq("clinica_id", clinicId)
+      .eq("status", "ativo")
+      .maybeSingle(),
+    supabase
+      .from("dentistas")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("clinica_id", clinicId)
+      .maybeSingle(),
+  ]);
 
   if (!membership) redirect("/onboarding");
-
-  // ── 3. Perfil clínico (dentistas) — escopo explícito da clínica ativa ────────
-  const { data: dentista } = await supabase
-    .from("dentistas")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("clinica_id", clinicId)
-    .maybeSingle();
-
   if (!dentista) redirect("/onboarding");
 
   return {
@@ -74,4 +72,4 @@ export async function requireClinicContext(): Promise<ClinicContext> {
     dentistaId: dentista.id,
     role: membership.role as ClinicRole,
   };
-}
+});

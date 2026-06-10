@@ -517,7 +517,7 @@ export function Odontograma({
             {isUpper && (
               <span
                 style={{
-                  fontSize: '10px',
+                  fontSize: '11px',
                   fontFamily: 'ui-monospace, SFMono-Regular, monospace',
                   fontWeight: numWeight,
                   color: numColor,
@@ -543,7 +543,7 @@ export function Odontograma({
             {!isUpper && (
               <span
                 style={{
-                  fontSize: '10px',
+                  fontSize: '11px',
                   fontFamily: 'ui-monospace, SFMono-Regular, monospace',
                   fontWeight: numWeight,
                   color: numColor,
@@ -729,29 +729,29 @@ export function Odontograma({
       {/* ── Info bar ── */}
       <div className="h-5 flex items-center px-1">
         {hoveredTooth ? (
-          <div className="flex items-center gap-1.5 text-[10px] leading-none">
+          <div className="flex items-center gap-1.5 text-[11px] leading-none">
             <span className="font-bold font-mono" style={{ color: 'var(--color-text-primary)' }}>
               {hoveredTooth}
             </span>
             <span style={{ color: 'var(--color-text-muted)' }}>—</span>
             <span style={{ color: 'var(--color-text-secondary)' }}>{TOOTH_NAMES[hoveredTooth] ?? ''}</span>
             <span style={{ color: 'var(--color-text-muted)' }}>·</span>
-            <span className="text-[8.5px]" style={{ color: 'var(--color-text-muted)' }}>
+            <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
               {getQuadrantLabel(hoveredTooth)}
             </span>
             {hoveredState === 'historical' && (
-              <span className="text-[8.5px] font-semibold ml-0.5" style={{ color: 'var(--color-teal)' }}>
+              <span className="text-[10px] font-semibold ml-0.5" style={{ color: 'var(--color-teal)' }}>
                 · histórico
               </span>
             )}
             {(hoveredState === 'selected' || hoveredState === 'shared') && (
-              <span className="text-[8.5px] font-semibold ml-0.5" style={{ color: 'var(--color-teal)' }}>
+              <span className="text-[10px] font-semibold ml-0.5" style={{ color: 'var(--color-teal)' }}>
                 · selecionado
               </span>
             )}
           </div>
         ) : (
-          <span className="text-[9px] italic leading-none" style={{ color: 'var(--color-text-muted)' }}>
+          <span className="text-[10px] italic leading-none" style={{ color: 'var(--color-text-muted)' }}>
             Clique para selecionar um dente
           </span>
         )}

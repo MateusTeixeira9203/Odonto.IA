@@ -97,6 +97,16 @@ import { StatusBadge } from './status-badge';
 
 const STATUSES_ATIVOS = new Set(['scheduled', 'confirmed', 'checked_in', 'in_progress']);
 
+const STATUS_PT: Record<string, string> = {
+  scheduled:   'Agendado',
+  confirmed:   'Confirmado',
+  checked_in:  'Na Recepção',
+  in_progress: 'Em Atendimento',
+  completed:   'Realizado',
+  cancelled:   'Cancelado',
+  no_show:     'Faltou',
+};
+
 interface Props {
   agendamentos: AgendamentoRow[];
   clinicaId: string;
@@ -1104,11 +1114,15 @@ export function AgendamentosClient({
 
             <div className="grid grid-cols-5 gap-2">
               {[
-                { value: '15', label: '15', sub: 'min' },
-                { value: '30', label: '30', sub: 'min' },
-                { value: '45', label: '45', sub: 'min' },
-                { value: '60', label: '1h', sub: '' },
-                { value: '90', label: '1h', sub: '30m' },
+                { value: '30',  label: '30',  sub: 'min' },
+                { value: '45',  label: '45',  sub: 'min' },
+                { value: '60',  label: '1h',  sub: '' },
+                { value: '90',  label: '1h',  sub: '30m' },
+                { value: '120', label: '2h',  sub: '' },
+                { value: '180', label: '3h',  sub: '' },
+                { value: '240', label: '4h',  sub: '' },
+                { value: '300', label: '5h',  sub: '' },
+                { value: '360', label: '6h',  sub: '' },
               ].map((opt) => (
                 <button
                   key={opt.value}
@@ -1172,7 +1186,7 @@ export function AgendamentosClient({
                     <p className="text-sm font-bold text-text-primary truncate">{novoForm.pacienteNome}</p>
                     <p className="text-xs text-text-secondary font-mono mt-0.5">
                       {novoForm.data.split('-').reverse().join('/')} · {novoForm.hora} ·{' '}
-                      {novoForm.duracao === '60' ? '1h' : novoForm.duracao === '90' ? '1h30' : `${novoForm.duracao}min`}
+                      {(() => { const m = parseInt(novoForm.duracao, 10); if (!m) return '–'; if (m < 60) return `${m}min`; const h = Math.floor(m / 60); const rem = m % 60; return rem ? `${h}h${rem}m` : `${h}h`; })()}
                     </p>
                   </div>
                 </div>
@@ -1372,17 +1386,32 @@ export function AgendamentosClient({
               </div>
               <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Duração</Label>
-                <Select value={encaixeForm.duracao} onValueChange={v => v && setEncaixeForm(f => ({ ...f, duracao: v }))}>
-                  <SelectTrigger className="rounded-xl bg-surface-alt border-border text-text-primary">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-surface border-border">
-                    <SelectItem value="15">15 min</SelectItem>
-                    <SelectItem value="30">30 min</SelectItem>
-                    <SelectItem value="45">45 min</SelectItem>
-                    <SelectItem value="60">1 hora</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {[
+                    { value: '30',  label: '30m' },
+                    { value: '45',  label: '45m' },
+                    { value: '60',  label: '1h' },
+                    { value: '90',  label: '1h30' },
+                    { value: '120', label: '2h' },
+                    { value: '180', label: '3h' },
+                    { value: '240', label: '4h' },
+                    { value: '300', label: '5h' },
+                    { value: '360', label: '6h' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setEncaixeForm((f) => ({ ...f, duracao: opt.value }))}
+                      className={`py-2 rounded-xl border-2 text-xs font-bold transition-all ${
+                        encaixeForm.duracao === opt.value
+                          ? 'bg-teal/10 border-teal text-teal'
+                          : 'border-border text-text-secondary hover:border-teal/40 hover:text-teal bg-surface-alt'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -1519,7 +1548,7 @@ export function AgendamentosClient({
                         onValueChange={(val) => val && void handleStatusChange(selectedApt.id, val)}
                       >
                         <SelectTrigger className="rounded-xl bg-surface-alt border-border text-text-primary">
-                          <SelectValue />
+                          <SelectValue>{STATUS_PT[selectedApt.status] ?? selectedApt.status}</SelectValue>
                         </SelectTrigger>
                         <SelectContent className="bg-surface border-border">
                           <SelectItem value="scheduled">Agendado</SelectItem>

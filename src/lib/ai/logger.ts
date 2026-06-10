@@ -2,7 +2,7 @@ import { createServiceClient } from '@/lib/supabase/service';
 
 export interface AILogEntry {
   feature: string;
-  provider: 'gemini';
+  provider: 'gemini' | 'groq';
   model: string;
   latencyMs: number;
   success: boolean;

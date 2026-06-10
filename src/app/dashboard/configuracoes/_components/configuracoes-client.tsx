@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Building2, Clock, Stethoscope, Check, Plus, Loader2, Pencil, X, Users, UserCircle, LogOut, AlertTriangle } from 'lucide-react';
+import { Building2, Clock, Stethoscope, Check, Plus, Loader2, Pencil, X, Users, UserCircle, LogOut, AlertTriangle, ImageIcon } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 import { getLabelContexto } from '@/lib/planos';
 import type { PlanoId } from '@/lib/planos';
 import { motion } from 'motion/react';
@@ -13,6 +14,7 @@ import {
   salvarClinica,
   salvarHorarios,
   salvarPerfil,
+  salvarLogoUrl,
   atualizarProcedimento,
   toggleProcedimento,
   criarProcedimento,
@@ -114,6 +116,45 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
     });
   };
 
+  // --- Logo da clínica ---
+  const [logoUrl, setLogoUrl] = useState<string | null>(config?.logo_url ?? null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { setErrorMsg('Selecione uma imagem (JPG, PNG, WebP)'); return; }
+    if (file.size > 2 * 1024 * 1024) { setErrorMsg('A imagem deve ter no máximo 2 MB'); return; }
+
+    setUploadingLogo(true);
+    setErrorMsg(null);
+    try {
+      const supabase = createClient();
+      const ext = file.name.split('.').pop() ?? 'png';
+      const path = `clinicas/${config?.clinica_id ?? 'logo'}/logo.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(path, file, { upsert: true, contentType: file.type });
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path);
+      const urlComCache = `${publicUrl}?t=${Date.now()}`;
+
+      const result = await salvarLogoUrl(urlComCache);
+      if (result.error) throw new Error(result.error);
+
+      setLogoUrl(urlComCache);
+      setSuccessMsg('Logo atualizada com sucesso!');
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Erro ao fazer upload da logo');
+    } finally {
+      setUploadingLogo(false);
+      if (logoInputRef.current) logoInputRef.current.value = '';
+    }
+  };
+
   // --- Aba Clínica ---
   const [clinicaForm, setClinicaForm] = useState({
     nome_clinica: config?.nome_clinica ?? dentista.clinica,
@@ -149,6 +190,8 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
             hora_fim: existente.hora_fim,
             intervalo_minutos: existente.intervalo_minutos,
             ativo: existente.ativo,
+            almoco_inicio: existente.almoco_inicio ?? null,
+            almoco_fim:    existente.almoco_fim    ?? null,
           }
         : {
             dia_semana: dia,
@@ -156,6 +199,8 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
             hora_fim: '18:00',
             intervalo_minutos: 30,
             ativo: false,
+            almoco_inicio: null,
+            almoco_fim: null,
           };
     });
 
@@ -422,6 +467,45 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
             <div className="bg-surface p-6 rounded-3xl border border-border shadow-sm space-y-6">
               <h2 className="font-heading font-bold text-2xl text-text-primary">Dados do {labelContexto}</h2>
 
+              {/* Logo da clínica */}
+              <div className="space-y-3">
+                <label className="text-xs font-bold text-text-secondary uppercase tracking-widest block">
+                  Logo do {labelContexto}
+                </label>
+                <div className="flex items-center gap-4">
+                  <div className="w-20 h-20 rounded-2xl border-2 border-dashed border-border bg-surface-alt flex items-center justify-center overflow-hidden shrink-0">
+                    {logoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={logoUrl} alt="Logo" className="w-full h-full object-contain p-1" />
+                    ) : (
+                      <ImageIcon className="w-7 h-7 text-text-secondary/40" />
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <p className="text-sm text-text-secondary">
+                      A logo aparece nos PDFs de planejamento enviados aos pacientes.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => logoInputRef.current?.click()}
+                      disabled={uploadingLogo}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl border border-border bg-surface-alt hover:bg-surface text-sm font-semibold text-text-primary transition-colors disabled:opacity-50"
+                    >
+                      {uploadingLogo ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
+                      {logoUrl ? 'Trocar logo' : 'Enviar logo'}
+                    </button>
+                    <p className="text-[11px] text-text-secondary/60">JPG, PNG ou WebP · máx. 2 MB</p>
+                  </div>
+                </div>
+                <input
+                  ref={logoInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(e) => void handleLogoUpload(e)}
+                />
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2 space-y-1.5">
                   <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
@@ -580,20 +664,22 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
                               />
                             </div>
                             <div className="flex items-center gap-2">
-                              <span className="text-xs text-text-secondary font-medium">Intervalo:</span>
-                              <select
-                                value={h.intervalo_minutos}
-                                onChange={(e) =>
-                                  updateHorario(dia, 'intervalo_minutos', parseInt(e.target.value, 10))
-                                }
+                              <span className="text-xs text-text-secondary font-medium">Almoço:</span>
+                              <input
+                                type="time"
+                                value={h.almoco_inicio ?? ''}
+                                onChange={(e) => updateHorario(dia, 'almoco_inicio', e.target.value)}
+                                placeholder="--:--"
                                 className="border border-border rounded-lg px-2 py-1.5 text-xs font-mono bg-surface-alt text-text-primary outline-none focus:border-teal"
-                              >
-                                <option value={15}>15 min</option>
-                                <option value={20}>20 min</option>
-                                <option value={30}>30 min</option>
-                                <option value={45}>45 min</option>
-                                <option value={60}>60 min</option>
-                              </select>
+                              />
+                              <span className="text-text-secondary text-xs font-medium">até</span>
+                              <input
+                                type="time"
+                                value={h.almoco_fim ?? ''}
+                                onChange={(e) => updateHorario(dia, 'almoco_fim', e.target.value)}
+                                placeholder="--:--"
+                                className="border border-border rounded-lg px-2 py-1.5 text-xs font-mono bg-surface-alt text-text-primary outline-none focus:border-teal"
+                              />
                             </div>
                           </>
                         )}
