@@ -2,7 +2,8 @@
 
 import { useState, useTransition, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Building2, Clock, Stethoscope, Check, Plus, Loader2, Pencil, X, Users, UserCircle, LogOut, AlertTriangle, ImageIcon } from 'lucide-react';
+import { Building2, Clock, Stethoscope, Check, Plus, Loader2, Pencil, X, Users, UserCircle, LogOut, AlertTriangle, ImageIcon, FileUp } from 'lucide-react';
+import { ImportarProcedimentosModal } from './importar-procedimentos-modal';
 import { createClient } from '@/lib/supabase/client';
 import { getLabelContexto } from '@/lib/planos';
 import type { PlanoId } from '@/lib/planos';
@@ -230,6 +231,7 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ nome: '', preco_padrao: 0, duracao_minutos: 0 });
   const [showNovoProcedimento, setShowNovoProcedimento] = useState(false);
+  const [showImportar, setShowImportar] = useState(false);
   const [novoProc, setNovoProc] = useState({
     nome: '',
     descricao: '',
@@ -726,12 +728,20 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
                     Catálogo de Procedimentos
                     <HelpTooltip content="Cadastre seus procedimentos e valores para uso nos orçamentos." />
                   </h2>
-                  <button
-                    onClick={() => setShowNovoProcedimento(true)}
-                    className="bg-gradient-to-r from-teal to-teal-lt text-white px-4 py-2 rounded-xl font-semibold text-sm flex items-center gap-2 transition-all shadow-[0_4px_14px_rgba(47,156,133,0.3)] hover:-translate-y-0.5"
-                  >
-                    <Plus className="w-4 h-4" /> Novo
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowImportar(true)}
+                      className="border border-border text-text-secondary px-4 py-2 rounded-xl font-semibold text-sm flex items-center gap-2 transition-all hover:border-teal/40 hover:text-teal hover:bg-teal/5"
+                    >
+                      <FileUp className="w-4 h-4" /> Importar
+                    </button>
+                    <button
+                      onClick={() => setShowNovoProcedimento(true)}
+                      className="bg-gradient-to-r from-teal to-teal-lt text-white px-4 py-2 rounded-xl font-semibold text-sm flex items-center gap-2 transition-all shadow-[0_4px_14px_rgba(47,156,133,0.3)] hover:-translate-y-0.5"
+                    >
+                      <Plus className="w-4 h-4" /> Novo
+                    </button>
+                  </div>
                 </div>
 
                 {/* Formulário novo procedimento */}
@@ -932,6 +942,12 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
           )}
         </motion.div>
       </div>
+
+      <ImportarProcedimentosModal
+        open={showImportar}
+        onOpenChange={setShowImportar}
+        onSaved={() => router.refresh()}
+      />
 
       {/* Dialog de confirmação — sair da clínica */}
       {showSairDialog && (
