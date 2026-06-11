@@ -34,11 +34,15 @@ export default async function ConfiguracoesPage({
     supabase.from('procedimentos').select('*').eq('clinica_id', clinicId).order('categoria', { ascending: true }),
     supabase.from('dentistas').select('id, nome, email, role, ativo, created_at').eq('clinica_id', clinicId).order('created_at', { ascending: true }),
     supabase.from('convites').select('id, email, role, expires_at, created_at').eq('clinica_id', clinicId).gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false }),
-    supabase.from('clinicas').select('limite_dentistas, plano').eq('id', clinicId).single(),
+    supabase.from('clinicas').select('limite_dentistas, plano, status_assinatura, trial_ends_at').eq('id', clinicId).single(),
   ]);
 
-  const limiteDentistas = (clinicaRaw as { limite_dentistas: number; plano?: string } | null)?.limite_dentistas ?? 5;
-  const planoClinica = ((clinicaRaw as { limite_dentistas: number; plano?: string } | null)?.plano ?? 'SOLO') as PlanoId;
+  const clinicaData = clinicaRaw as { limite_dentistas: number; plano?: string; status_assinatura?: string; trial_ends_at?: string | null } | null;
+  const limiteDentistas = clinicaData?.limite_dentistas ?? 5;
+  const planoClinica = (clinicaData?.plano ?? 'SOLO') as PlanoId;
+  const statusAssinatura = (clinicaData?.status_assinatura ?? 'inativo') as 'trial' | 'ativo' | 'inativo';
+  const trialEndsAt = clinicaData?.trial_ends_at ?? null;
+
   const dentistasAtivos = ((usuariosRaw ?? []) as Array<{ role: string; ativo: boolean }>).filter(
     (u) => u.role !== 'secretaria' && u.ativo
   ).length;
@@ -53,6 +57,9 @@ export default async function ConfiguracoesPage({
     <PageTransition>
       <ConfiguracoesClient
         plano={planoClinica}
+        assinatura={{ status: statusAssinatura, trialEndsAt }}
+        clinicId={clinicId}
+        appUrl={process.env.NEXT_PUBLIC_APP_URL ?? 'https://dentia.app.br'}
         dentista={{
           id: dentistaPerfil?.id ?? '',
           nome: (dentistaPerfil?.nome as string) ?? '',

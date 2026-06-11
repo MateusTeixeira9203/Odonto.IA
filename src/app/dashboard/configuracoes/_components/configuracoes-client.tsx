@@ -2,10 +2,11 @@
 
 import { useState, useTransition, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Building2, Clock, Stethoscope, Check, Plus, Loader2, Pencil, X, Users, UserCircle, LogOut, AlertTriangle, ImageIcon, FileUp } from 'lucide-react';
+import { Building2, Clock, Stethoscope, Check, Plus, Loader2, Pencil, X, Users, UserCircle, LogOut, AlertTriangle, ImageIcon, FileUp, CreditCard, Gift, Copy, ArrowUpRight, Sparkles } from 'lucide-react';
+import Link from 'next/link';
 import { ImportarProcedimentosModal } from './importar-procedimentos-modal';
 import { createClient } from '@/lib/supabase/client';
-import { getLabelContexto } from '@/lib/planos';
+import { getLabelContexto, getPlano } from '@/lib/planos';
 import type { PlanoId } from '@/lib/planos';
 import { motion } from 'motion/react';
 import type { ConfiguracaoClinica, HorarioDisponivel, Procedimento, DentistaRole } from '@/types/database';
@@ -37,7 +38,7 @@ const DIAS_SEMANA = [
   { label: 'Sábado', value: 6 },
 ];
 
-const ABAS_IDS = ['perfil', 'clinica', 'horarios', 'procedimentos', 'equipe'] as const;
+const ABAS_IDS = ['perfil', 'clinica', 'horarios', 'procedimentos', 'equipe', 'plano'] as const;
 type Aba = (typeof ABAS_IDS)[number];
 
 interface Props {
@@ -55,11 +56,18 @@ interface Props {
     limiteDentistas: number;
     convitesRestantes: number;
   };
+  assinatura?: {
+    status: 'trial' | 'ativo' | 'inativo';
+    trialEndsAt: string | null;
+  };
+  clinicId?: string;
+  appUrl?: string;
 }
 
-export function ConfiguracoesClient({ plano, dentista, config, horarios, procedimentos: procedimentosIniciais, abaInicial, equipe }: Props) {
+export function ConfiguracoesClient({ plano, dentista, config, horarios, procedimentos: procedimentosIniciais, abaInicial, equipe, assinatura, clinicId, appUrl }: Props) {
   const labelContexto = getLabelContexto(plano); // "Consultório" (SOLO) ou "Clínica" (CLINICA)
   const isSolo = !plano || plano === 'SOLO' || (plano as string) === 'BASICO';
+  const planoConfig = getPlano(plano);
 
   const ABAS = [
     { id: 'perfil'        as const, label: 'Meu Perfil',      icon: UserCircle  },
@@ -67,12 +75,29 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
     { id: 'horarios'      as const, label: 'Horários',         icon: Clock       },
     { id: 'procedimentos' as const, label: 'Procedimentos',    icon: Stethoscope },
     { id: 'equipe'        as const, label: 'Equipe',           icon: Users       },
+    { id: 'plano'         as const, label: 'Plano',            icon: CreditCard  },
   ];
   const router = useRouter();
   const [abaAtiva, setAbaAtiva] = useState<Aba>((ABAS.some(a => a.id === abaInicial) ? abaInicial : 'clinica') as Aba);
   const [isPending, startTransition] = useTransition();
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // --- Plano e Indicação ---
+  const [copiouLink, setCopiouLink] = useState(false);
+  const codigoIndicacao = (clinicId ?? '').replace(/-/g, '').slice(0, 8).toUpperCase();
+  const baseUrl = appUrl ?? 'https://dentia.app.br';
+  const linkIndicacao = `${baseUrl}/cadastro?ref=${codigoIndicacao}`;
+
+  function copiarLink() {
+    void navigator.clipboard.writeText(linkIndicacao);
+    setCopiouLink(true);
+    setTimeout(() => setCopiouLink(false), 2500);
+  }
+
+  function formatarDataTrial(iso: string): string {
+    return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+  }
 
   // --- Sair da clínica ---
   const [showSairDialog, setShowSairDialog] = useState(false);
@@ -714,6 +739,7 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
                 meuRole={equipe.meuRole}
                 limiteDentistas={equipe.limiteDentistas}
                 convitesRestantes={equipe.convitesRestantes}
+                plano={plano}
                 asTab
               />
             </div>
@@ -940,6 +966,178 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
               </div>
             </div>
           )}
+
+          {/* === ABA: PLANO === */}
+          {abaAtiva === 'plano' && (
+            <div className="space-y-6">
+
+              {/* Card: Plano Atual */}
+              <div className="bg-surface p-6 rounded-3xl border border-border shadow-sm">
+                <div className="flex items-start justify-between gap-4 mb-6">
+                  <div>
+                    <h2 className="font-heading font-bold text-2xl text-text-primary">Plano e Assinatura</h2>
+                    <p className="text-sm text-text-secondary mt-1">
+                      Acompanhe seu plano e gerencie sua assinatura.
+                    </p>
+                  </div>
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold shrink-0 ${
+                    assinatura?.status === 'ativo'  ? 'bg-teal/10 text-teal' :
+                    assinatura?.status === 'trial'  ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' :
+                                                      'bg-surface-alt text-text-secondary'
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${
+                      assinatura?.status === 'ativo'  ? 'bg-teal' :
+                      assinatura?.status === 'trial'  ? 'bg-amber-500 animate-pulse' :
+                                                        'bg-text-secondary'
+                    }`} />
+                    {assinatura?.status === 'ativo'  ? 'Ativo' :
+                     assinatura?.status === 'trial'  ? 'Trial' : 'Inativo'}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-4 p-5 rounded-2xl bg-surface-alt border border-border/60">
+                  <div
+                    className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
+                    style={{ background: 'rgba(47,156,133,0.12)', border: '1px solid rgba(47,156,133,0.25)' }}
+                  >
+                    {isSolo
+                      ? <Stethoscope className="w-5 h-5 text-teal" />
+                      : <Building2 className="w-5 h-5 text-teal" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-text-primary text-base">{labelContexto}</p>
+                    <p className="text-sm text-text-secondary font-mono">
+                      R${planoConfig.preco}{isSolo ? '/mês' : '/dentista/mês'}
+                    </p>
+                  </div>
+                  {isSolo && (
+                    <Link
+                      href="/planos"
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-teal bg-teal/10 border border-teal/20 hover:bg-teal/20 transition-colors shrink-0"
+                    >
+                      Fazer upgrade
+                      <ArrowUpRight className="w-3.5 h-3.5" />
+                    </Link>
+                  )}
+                </div>
+
+                {assinatura?.status === 'trial' && assinatura.trialEndsAt && (
+                  <div className="mt-4 flex items-start gap-3 p-4 rounded-xl border border-amber-300/40 bg-amber-50/60 dark:bg-amber-900/15">
+                    <div className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 shrink-0 animate-pulse" />
+                    <p className="text-sm text-amber-700 dark:text-amber-400 font-medium">
+                      Trial ativo. Expira em{' '}
+                      <span className="font-bold">{formatarDataTrial(assinatura.trialEndsAt)}</span>.{' '}
+                      Assine para não perder o acesso.
+                    </p>
+                  </div>
+                )}
+
+                {assinatura?.status === 'inativo' && (
+                  <div className="mt-4">
+                    <Link
+                      href="/planos"
+                      className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl text-sm font-bold text-white transition-all hover:-translate-y-0.5"
+                      style={{
+                        background: 'linear-gradient(135deg, #2f9c85 0%, #1e7a67 100%)',
+                        boxShadow: '0 4px 20px -4px rgba(47,156,133,0.45)',
+                      }}
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      Ativar assinatura
+                    </Link>
+                  </div>
+                )}
+              </div>
+
+              {/* Card: Programa de Indicação */}
+              <div
+                className="rounded-3xl overflow-hidden"
+                style={{
+                  border: '1px solid rgba(47,156,133,0.25)',
+                  background: 'linear-gradient(135deg, rgba(47,156,133,0.07) 0%, rgba(14,28,24,0.02) 100%)',
+                }}
+              >
+                <div className="px-6 pt-6 pb-5 flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] font-mono text-teal">
+                      Programa de Indicação
+                    </span>
+                    <h3 className="font-heading font-bold text-xl text-text-primary mt-1">
+                      Indique e ganhe 1 mês grátis
+                    </h3>
+                    <p className="text-sm text-text-secondary mt-2 leading-relaxed">
+                      Compartilhe seu link. Quando um colega assinar,
+                      vocês dois ganham 1 mês grátis automaticamente.
+                    </p>
+                  </div>
+                  <div
+                    className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0"
+                    style={{ background: 'rgba(47,156,133,0.12)', border: '1px solid rgba(47,156,133,0.25)' }}
+                  >
+                    <Gift className="w-7 h-7 text-teal" />
+                  </div>
+                </div>
+
+                <div className="px-6 pb-6 space-y-6">
+                  {/* Link de indicação */}
+                  <div className="flex gap-2">
+                    <div className="flex-1 flex items-center gap-2 px-4 py-3 bg-surface/80 rounded-2xl border border-border/60 overflow-hidden">
+                      <span className="text-xs text-teal shrink-0">🔗</span>
+                      <span className="text-sm font-mono text-text-primary truncate">
+                        {linkIndicacao.replace('https://', '')}
+                      </span>
+                    </div>
+                    <button
+                      onClick={copiarLink}
+                      className={`flex items-center gap-2 px-4 py-3 rounded-2xl text-sm font-bold transition-all shrink-0 ${
+                        copiouLink
+                          ? 'bg-teal text-white'
+                          : 'bg-surface border border-border/60 text-text-primary hover:border-teal/40 hover:text-teal'
+                      }`}
+                    >
+                      {copiouLink
+                        ? <><Check className="w-4 h-4" /> Copiado!</>
+                        : <><Copy className="w-4 h-4" /> Copiar</>
+                      }
+                    </button>
+                  </div>
+
+                  {/* Como funciona — 3 etapas */}
+                  <div className="grid grid-cols-3 gap-4">
+                    {[
+                      'Compartilhe o link com um colega dentista',
+                      'Ele assina qualquer plano pelo seu link',
+                      'Vocês dois ganham 1 mês grátis',
+                    ].map((label, i) => (
+                      <div key={i} className="flex flex-col items-center text-center gap-2.5">
+                        <div
+                          className="w-9 h-9 rounded-full flex items-center justify-center text-teal font-bold text-base font-mono"
+                          style={{ background: 'rgba(47,156,133,0.12)', border: '1px solid rgba(47,156,133,0.25)' }}
+                        >
+                          {i + 1}
+                        </div>
+                        <p className="text-xs text-text-secondary leading-snug">{label}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Stats */}
+                  <div className="border-t border-border/30 pt-5 grid grid-cols-2 gap-4">
+                    <div className="text-center">
+                      <p className="font-mono text-3xl font-bold text-text-primary">0</p>
+                      <p className="text-xs text-text-secondary mt-1">indicações feitas</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="font-mono text-3xl font-bold text-teal">0</p>
+                      <p className="text-xs text-text-secondary mt-1">meses conquistados</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          )}
+
         </motion.div>
       </div>
 
