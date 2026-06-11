@@ -962,7 +962,7 @@ export function PacienteDetailClient({
               {(
                 [
                   ['resumo',        'Resumo',       undefined],
-                  ...(canWriteClinical ? [['tratamento',   'Planejamento', 'tab-apresentacao'] as const] : []),
+                  ...(canWriteClinical ? [['tratamento',   'Tratamento',   'tab-apresentacao'] as const] : []),
                   ...(canViewClinical  ? [['ficha-clinica','Ficha Clínica','tab-fichas'      ] as const] : []),
                   ['agenda',        'Agenda',        undefined],
                   ['orcamentos',    'Orçamentos',   'tab-orcamento'   ],

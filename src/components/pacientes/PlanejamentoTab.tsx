@@ -22,15 +22,18 @@ import {
   FileText,
   Square,
   Edit2,
+  MoreHorizontal,
 } from 'lucide-react';
 import {
   buscarFichasSemTratamento,
   criarTratamento,
   buscarTratamentoAtivo,
+  buscarTratamentosPendentes,
   buscarHistoricoTratamentos,
   encerrarTratamento,
   excluirTratamento,
   renomearTratamento,
+  tornarPrincipal,
   type Tratamento,
   type FichaSemTratamento,
 } from '@/app/dashboard/pacientes/[id]/tratamento-actions';
@@ -204,8 +207,15 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
 
   // Treatment state
   const [tratamentoAtivo, setTratamentoAtivo] = useState<Tratamento | null>(null);
+  const [tratamentosPendentes, setTratamentosPendentes] = useState<Tratamento[]>([]);
   const [historicoTratamentos, setHistoricoTratamentos] = useState<Tratamento[]>([]);
   const [loadingTratamento, setLoadingTratamento] = useState(true);
+
+  // Review mode — visualizar tratamento em pausa ou concluído no Mapa
+  const [reviewingTratamento, setReviewingTratamento] = useState<Tratamento | null>(null);
+  const [reviewData, setReviewData] = useState<{ planProcs: PlanProc[]; fichaDateMap: Record<string, string> } | null>(null);
+  const [loadingReview, setLoadingReview] = useState(false);
+  const [tornarPrincipalId, setTornarPrincipalId] = useState<string | null>(null);
   const [historicoAberto, setHistoricoAberto] = useState(false);
   const [modalIniciarOpen, setModalIniciarOpen] = useState(false);
   const [fichasSemTratamento, setFichasSemTratamento] = useState<FichaSemTratamento[]>([]);
@@ -222,6 +232,10 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
 
   // Apresentar panel
   const [apresentarOpen, setApresentarOpen] = useState(false);
+
+  // More menu (Renomear / Encerrar / Excluir)
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
 
   // Renomear modal
   const [renomearOpen, setRenomearOpen] = useState(false);
@@ -246,8 +260,15 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
 
   useEffect(() => { sectionsRef.current = sections; }, [sections]);
 
-
-
+  useEffect(() => {
+    if (!moreMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node))
+        setMoreMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [moreMenuOpen]);
 
   const fetchGlobalData = useCallback(async () => {
     setLoadingData(true);
@@ -300,7 +321,9 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
       supabase.from('fichas').select('id, created_at, dentes_observacoes').eq('paciente_id', patientId).eq('tratamento_id', tratamentoId).not('dentes_observacoes', 'is', null),
       supabase.from('planejamento_procedimentos').select('*').eq('paciente_id', patientId).order('ordem', { ascending: true }),
     ]);
-    const fichas = (fichasResult.data ?? []) as FichaRow[];
+    // Only consider fichas that actually have tooth observations
+    const allFichas = (fichasResult.data ?? []) as FichaRow[];
+    const fichas = allFichas.filter(f => f.dentes_observacoes && Object.keys(f.dentes_observacoes).length > 0);
     const fichaIds = new Set(fichas.map(f => f.id));
     const dateMap: Record<string, string> = {};
     for (const f of fichas) dateMap[f.id] = f.created_at;
@@ -318,6 +341,18 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
       }
     }
     const filterByTrat = (procs: PlanProc[]) => procs.filter(p => { const id = p.fichaRef?.split('::')?.[0]; return id !== undefined && fichaIds.has(id); });
+
+    // Clean up any orphaned procs whose ficha no longer exists (belt-and-suspenders — trigger handles it on delete, this catches any that slipped through)
+    const orphanIds = (existingProcsResult.data ?? [])
+      .filter((p: Record<string, unknown>) => {
+        const fichaId = (p.ficha_ref as string | null)?.split('::')?.[0];
+        return fichaId !== undefined && !fichaIds.has(fichaId);
+      })
+      .map((p: Record<string, unknown>) => p.id as string);
+    if (orphanIds.length > 0) {
+      void supabase.from('planejamento_procedimentos').delete().in('id', orphanIds);
+    }
+
     const existingRefs = new Set((existingProcsResult.data ?? []).map((p: Record<string, unknown>) => p.ficha_ref as string));
     const toInsert = rawProcs.filter(p => !existingRefs.has(p.fichaRef));
     if (toInsert.length > 0) {
@@ -338,11 +373,13 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
 
   const loadTratamento = useCallback(async () => {
     setLoadingTratamento(true);
-    const [ativoResult, historicoResult] = await Promise.all([
+    const [ativoResult, pendentesResult, historicoResult] = await Promise.all([
       buscarTratamentoAtivo(patientId),
+      buscarTratamentosPendentes(patientId),
       buscarHistoricoTratamentos(patientId),
     ]);
     setTratamentoAtivo(ativoResult.tratamento);
+    setTratamentosPendentes(pendentesResult.tratamentos);
     setHistoricoTratamentos(historicoResult.tratamentos);
     setLoadingTratamento(false);
     await fetchTratamentoData(ativoResult.tratamento?.id ?? null);
@@ -457,7 +494,8 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
       supabase.from('fichas').select('id, created_at, dentes_observacoes').eq('paciente_id', patientId).eq('tratamento_id', tratamento.id),
       supabase.from('planejamento_procedimentos').select('*').eq('paciente_id', patientId).order('ordem', { ascending: true }),
     ]);
-    const fichas = (fichasResult.data ?? []) as FichaRow[];
+    const allFichasConcluido = (fichasResult.data ?? []) as FichaRow[];
+    const fichas = allFichasConcluido.filter(f => f.dentes_observacoes && Object.keys(f.dentes_observacoes).length > 0);
     const fichaIds = new Set(fichas.map(f => f.id));
     const dateMap: Record<string, string> = {};
     for (const f of fichas) dateMap[f.id] = f.created_at;
@@ -470,27 +508,80 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
     setLoadingConcluido(false);
   };
 
+  const handleReviewTratamento = async (t: Tratamento) => {
+    if (reviewingTratamento?.id === t.id) {
+      setReviewingTratamento(null);
+      setReviewData(null);
+      setSelectedTooth(null);
+      return;
+    }
+    setReviewingTratamento(t);
+    setReviewData(null);
+    setLoadingReview(true);
+    setSelectedTooth(null);
+    const supabase = createClient();
+    type FichaRow = { id: string; created_at: string; dentes_observacoes: Record<string, string> | null };
+    const [fichasResult, allProcsResult] = await Promise.all([
+      supabase.from('fichas').select('id, created_at, dentes_observacoes').eq('paciente_id', patientId).eq('tratamento_id', t.id),
+      supabase.from('planejamento_procedimentos').select('*').eq('paciente_id', patientId).order('ordem', { ascending: true }),
+    ]);
+    const allFichas = (fichasResult.data ?? []) as FichaRow[];
+    const fichas = allFichas.filter(f => f.dentes_observacoes && Object.keys(f.dentes_observacoes).length > 0);
+    const fichaIds = new Set(fichas.map(f => f.id));
+    const dateMap: Record<string, string> = {};
+    for (const f of fichas) dateMap[f.id] = f.created_at;
+    const filtered = dedupProcs(
+      (allProcsResult.data ?? [])
+        .map(r => mapPlanProc(r as Record<string, unknown>))
+        .filter(p => { const id = p.fichaRef?.split('::')?.[0]; return id !== undefined && fichaIds.has(id); })
+    );
+    setReviewData({ planProcs: filtered, fichaDateMap: dateMap });
+    setLoadingReview(false);
+  };
+
+  const handleTornarPrincipal = async (t: Tratamento) => {
+    setTornarPrincipalId(t.id);
+    const { error } = await tornarPrincipal(t.id, patientId);
+    if (!error) {
+      setReviewingTratamento(null);
+      setReviewData(null);
+      setSelectedTooth(null);
+      await loadTratamento();
+    } else {
+      toast.error(error);
+    }
+    setTornarPrincipalId(null);
+  };
+
   // ── Computed values ──────────────────────────────────────────────────────────
+
+  // When reviewing, show the reviewed treatment's data in the Mapa
+  const displayProcs = reviewingTratamento ? (reviewData?.planProcs ?? []) : planProcs;
+  const displayFichaDateMap = reviewingTratamento ? (reviewData?.fichaDateMap ?? {}) : fichaDateMap;
+  const displayTratamento = reviewingTratamento ?? tratamentoAtivo;
 
   const treatedTeeth = useMemo(() => {
     const teeth = new Set<number>();
-    for (const p of planProcs) {
+    for (const p of displayProcs) {
       if (p.dente) teeth.add(p.dente);
     }
     return teeth;
-  }, [planProcs]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayProcs]);
 
   const concludedTeeth = useMemo(() => {
     const teeth = new Set<number>();
-    for (const p of planProcs) {
+    for (const p of displayProcs) {
       if (p.dente && p.status === 'concluido') teeth.add(p.dente);
     }
     return teeth;
-  }, [planProcs]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayProcs]);
 
   const filteredProcs = useMemo(() =>
-    selectedTooth ? planProcs.filter(p => p.dente === selectedTooth) : planProcs,
-    [planProcs, selectedTooth]
+    selectedTooth ? displayProcs.filter(p => p.dente === selectedTooth) : displayProcs,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [displayProcs, selectedTooth]
   );
 
   const timelineSessions = useMemo(() => {
@@ -502,37 +593,39 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
     }
     return Array.from(sessionsMap.entries())
       .sort((a, b) => {
-        const dateA = fichaDateMap[a[0]] ?? '';
-        const dateB = fichaDateMap[b[0]] ?? '';
+        const dateA = displayFichaDateMap[a[0]] ?? '';
+        const dateB = displayFichaDateMap[b[0]] ?? '';
         return dateB.localeCompare(dateA);
       })
       .map(([fichaId, procs], idx) => ({
         fichaId,
-        date: fichaDateMap[fichaId] ?? null,
+        date: displayFichaDateMap[fichaId] ?? null,
         sessionNumber: idx + 1,
         procedures: procs.sort((a, b) => (a.dente ?? 0) - (b.dente ?? 0)),
       }));
-  }, [filteredProcs, fichaDateMap]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredProcs, displayFichaDateMap]);
 
   const quadrantStats = useMemo(() => {
     return Object.entries(Q_LABELS).map(([key, meta]) => {
-      const procs = planProcs.filter(p => p.dente && meta.teeth.includes(p.dente));
+      const procs = displayProcs.filter(p => p.dente && meta.teeth.includes(p.dente));
       const done = procs.filter(p => p.status === 'concluido').length;
       return { key, ...meta, total: procs.length, done };
     }).filter(q => q.total > 0);
-  }, [planProcs]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayProcs]);
 
   const intelligenceMessages = useMemo(() => {
     const msgs: { text: string; type: 'info' | 'warning' | 'success' }[] = [];
 
-    const pending = planProcs.filter(p => p.status === 'pendente').length;
-    const done = planProcs.filter(p => p.status === 'concluido').length;
-    const total = planProcs.length;
+    const pending = displayProcs.filter(p => p.status === 'pendente').length;
+    const done = displayProcs.filter(p => p.status === 'concluido').length;
+    const total = displayProcs.length;
 
     if (total === 0) return msgs;
 
     if (done === total) {
-      msgs.push({ text: 'Planejamento concluído', type: 'success' });
+      msgs.push({ text: 'Tratamento concluído', type: 'success' });
       return msgs;
     }
 
@@ -543,7 +636,7 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
       msgs.push({ text: `Quadrante${completedQuads.length > 1 ? 's' : ''} ${completedQuads.map(q => q.short).join(', ')} concluído${completedQuads.length > 1 ? 's' : ''}`, type: 'success' });
     }
 
-    const allDates = Object.values(fichaDateMap).sort((a, b) => b.localeCompare(a));
+    const allDates = Object.values(displayFichaDateMap).sort((a, b) => b.localeCompare(a));
     if (allDates.length > 0) {
       const lastDate = parseISO(allDates[0]);
       const daysSince = differenceInDays(new Date(), lastDate);
@@ -553,11 +646,12 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
     }
 
     return msgs.slice(0, 3);
-  }, [planProcs, quadrantStats, fichaDateMap]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayProcs, quadrantStats, displayFichaDateMap]);
 
-  const concluidosCount = planProcs.filter(p => p.status === 'concluido').length;
-  const progressPercent = planProcs.length > 0
-    ? Math.round((concluidosCount / planProcs.length) * 100)
+  const concluidosCount = displayProcs.filter(p => p.status === 'concluido').length;
+  const progressPercent = displayProcs.length > 0
+    ? Math.round((concluidosCount / displayProcs.length) * 100)
     : 0;
 
   const totalBudget = budgetProcedures.reduce((acc, curr) => acc + curr.value, 0);
@@ -565,8 +659,9 @@ export function PlanejamentoTab({ patientId, clinicaId, patientName }: Planejame
   // ── Tooth detail (selected tooth procedures) ──────────────────────────────
 
   const selectedToothProcs = useMemo(() =>
-    selectedTooth ? planProcs.filter(p => p.dente === selectedTooth) : [],
-    [planProcs, selectedTooth]
+    selectedTooth ? displayProcs.filter(p => p.dente === selectedTooth) : [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [displayProcs, selectedTooth]
   );
 
   // ── Proc actions ──────────────────────────────────────────────────────────
@@ -911,7 +1006,7 @@ ${sectionsHTML}
       {/* ── HEADER: título estático da aba ── */}
       <div className="px-1">
         <div className="text-xs font-bold text-teal uppercase tracking-[0.2em] mb-1">
-          Planejamento Clínico
+          Mapa de Tratamento
         </div>
         <h1 className="font-heading text-2xl text-text-primary">{patientName}</h1>
       </div>
@@ -927,22 +1022,63 @@ ${sectionsHTML}
             <Plus className="w-6 h-6 text-teal" />
           </div>
           <div>
-            <p className="font-heading text-lg text-text-primary">Nenhum planejamento ativo</p>
+            <p className="font-heading text-lg text-text-primary">Nenhum tratamento ativo</p>
             <p className="text-sm text-text-secondary mt-1 max-w-xs mx-auto">
-              Vincule as fichas clínicas para iniciar o acompanhamento do planejamento.
+              Vincule as fichas clínicas para iniciar o acompanhamento do tratamento.
             </p>
           </div>
           <button
             onClick={() => void handleAbrirModalIniciar()}
             className="bg-teal text-white px-6 py-3 rounded-2xl font-bold text-sm flex items-center gap-2 hover:bg-teal/90 transition-all shadow-[0_0_20px_rgba(47,156,133,0.3)]"
           >
-            <Plus className="w-4 h-4" /> Iniciar Planejamento
+            <Plus className="w-4 h-4" /> Iniciar Tratamento
           </button>
         </motion.div>
       )}
 
-      {/* ── CARD COMBINADO: tratamento ativo ── */}
-      {tratamentoAtivo && (
+      {/* ── BANNER DE REVISÃO — aparece acima do Mapa quando revisando outro tratamento ── */}
+      <AnimatePresence>
+        {reviewingTratamento && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+            className="flex items-center gap-3 px-4 py-3 bg-surface rounded-2xl border border-teal/25 shadow-sm"
+          >
+            <button
+              onClick={() => { setReviewingTratamento(null); setReviewData(null); setSelectedTooth(null); }}
+              className="flex items-center gap-1.5 text-xs font-bold text-text-secondary hover:text-text-primary transition-colors"
+            >
+              <ChevronDown className="w-3.5 h-3.5 rotate-90" /> Voltar
+            </button>
+            <div className="w-px h-4 bg-border/60" />
+            <div className="flex-1 min-w-0">
+              <span className="text-xs font-bold text-text-secondary uppercase tracking-[0.15em]">
+                {reviewingTratamento.status === 'pendente' ? 'Em Pausa' : 'Concluído'} · Revisando
+              </span>
+              <p className="text-sm font-semibold text-text-primary truncate">
+                {reviewingTratamento.nome ?? 'Sem nome'}
+              </p>
+            </div>
+            {reviewingTratamento.status === 'pendente' && (
+              <button
+                onClick={() => void handleTornarPrincipal(reviewingTratamento)}
+                disabled={tornarPrincipalId === reviewingTratamento.id}
+                className="flex items-center gap-1.5 text-xs font-bold text-teal border border-teal/30 bg-teal/8 hover:bg-teal/15 px-3 py-1.5 rounded-xl transition-all disabled:opacity-50"
+              >
+                {tornarPrincipalId === reviewingTratamento.id
+                  ? <Loader2 className="w-3 h-3 animate-spin" />
+                  : <CheckCircle2 className="w-3 h-3" />}
+                Tornar Principal
+              </button>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── CARD COMBINADO: tratamento principal (ou revisado) ── */}
+      {(tratamentoAtivo ?? reviewingTratamento) && displayTratamento && (
         <div className="bg-surface rounded-3xl border border-border/60 shadow-sm overflow-hidden">
           {/* Header clicável */}
           <div
@@ -955,47 +1091,91 @@ ${sectionsHTML}
             {/* Linha superior: nome do tratamento + botões + chevron */}
             <div className="flex items-start justify-between gap-4 mb-4">
               <div className="flex-1 min-w-0">
-                <div className="text-xs font-bold text-text-secondary uppercase tracking-[0.2em] mb-1">
-                  Planejamento Ativo · iniciado em {format(parseISO(tratamentoAtivo.created_at), "d 'de' MMM 'de' yyyy", { locale: ptBR })}
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={`text-[10px] font-bold uppercase tracking-[0.15em] px-2 py-0.5 rounded-full border ${
+                    reviewingTratamento
+                      ? reviewingTratamento.status === 'pendente'
+                        ? 'text-amber-600 bg-amber-500/8 border-amber-500/20'
+                        : 'text-text-secondary bg-surface-alt border-border/50'
+                      : 'text-teal bg-teal/8 border-teal/20'
+                  }`}>
+                    {reviewingTratamento
+                      ? reviewingTratamento.status === 'pendente' ? 'Em Pausa' : 'Concluído'
+                      : 'Em Tratamento'}
+                  </span>
+                  <span className="text-xs text-text-secondary">
+                    iniciado em {format(parseISO(displayTratamento.created_at), "d 'de' MMM 'de' yyyy", { locale: ptBR })}
+                  </span>
                 </div>
                 <div className="font-heading text-xl text-text-primary truncate">
-                  {tratamentoAtivo.nome ?? 'Sem nome'}
+                  {displayTratamento.nome ?? 'Sem nome'}
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0 pt-0.5" onClick={(e) => e.stopPropagation()}>
+                {/* Apresentar — ação principal */}
                 <button
                   onClick={() => setApresentarOpen(true)}
                   className="flex items-center gap-1.5 text-xs font-bold text-white bg-teal hover:bg-teal/90 px-3 py-1.5 rounded-xl transition-colors shadow-[0_0_12px_rgba(47,156,133,0.25)]"
                 >
                   <Presentation className="w-3 h-3" /> Apresentar
                 </button>
+
+                {/* PDF — ação secundária */}
                 <button
                   onClick={() => void handleGerarPDF()}
-                  className="flex items-center gap-1.5 text-xs font-bold text-text-secondary border border-border/60 hover:bg-surface-alt px-3 py-1.5 rounded-xl transition-colors"
-                  title="Gerar PDF do planejamento"
+                  className="p-1.5 rounded-xl text-text-secondary border border-border/50 hover:bg-surface-alt hover:border-border hover:text-text-primary transition-all"
+                  title="Gerar PDF"
                 >
-                  <Download className="w-3 h-3" /> PDF
+                  <Download className="w-3.5 h-3.5" />
                 </button>
-                <button
-                  onClick={() => setConfirmarEncerramentoOpen(true)}
-                  disabled={encerrando}
-                  className="flex items-center gap-1.5 text-xs font-bold text-text-secondary border border-border/60 hover:bg-surface-alt px-3 py-1.5 rounded-xl transition-colors disabled:opacity-40"
-                >
-                  {encerrando ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
-                  Encerrar
-                </button>
-                <button
-                  onClick={() => { setNovoNomeTratamento(tratamentoAtivo.nome ?? ''); setRenomearOpen(true); }}
-                  className="flex items-center gap-1.5 text-xs font-bold text-text-secondary border border-border/60 hover:bg-surface-alt px-3 py-1.5 rounded-xl transition-colors"
-                >
-                  <Edit2 className="w-3 h-3" /> Renomear
-                </button>
-                <button
-                  onClick={() => setConfirmarExclusaoOpen(true)}
-                  className="flex items-center gap-1.5 text-xs font-bold text-red-500 border border-red-500/20 hover:bg-red-500/5 px-3 py-1.5 rounded-xl transition-colors"
-                >
-                  <Trash2 className="w-3 h-3" /> Excluir
-                </button>
+
+                {/* ⋮ — Renomear / Encerrar / Excluir */}
+                <div className="relative" ref={moreMenuRef}>
+                  <button
+                    onClick={() => setMoreMenuOpen(prev => !prev)}
+                    className={`p-1.5 rounded-xl border transition-all ${
+                      moreMenuOpen
+                        ? 'bg-surface-alt border-border text-text-primary'
+                        : 'border-border/50 text-text-secondary hover:bg-surface-alt hover:border-border hover:text-text-primary'
+                    }`}
+                  >
+                    <MoreHorizontal className="w-3.5 h-3.5" />
+                  </button>
+                  <AnimatePresence>
+                    {moreMenuOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                        transition={{ duration: 0.12 }}
+                        className="absolute right-0 top-full mt-1.5 w-48 bg-surface border border-border/60 rounded-2xl shadow-xl overflow-hidden z-50"
+                      >
+                        <button
+                          onClick={() => { setMoreMenuOpen(false); setNovoNomeTratamento(displayTratamento.nome ?? ''); setRenomearOpen(true); }}
+                          className="w-full flex items-center gap-2.5 px-4 py-3 text-sm font-semibold text-text-primary hover:bg-surface-alt/60 text-left transition-colors"
+                        >
+                          <Edit2 className="w-4 h-4 text-text-secondary" /> Renomear
+                        </button>
+                        <button
+                          onClick={() => { setMoreMenuOpen(false); setConfirmarEncerramentoOpen(true); }}
+                          disabled={encerrando}
+                          className="w-full flex items-center gap-2.5 px-4 py-3 text-sm font-semibold text-text-primary hover:bg-surface-alt/60 text-left transition-colors disabled:opacity-40"
+                        >
+                          {encerrando ? <Loader2 className="w-4 h-4 animate-spin text-text-secondary" /> : <CheckCircle2 className="w-4 h-4 text-text-secondary" />}
+                          Encerrar
+                        </button>
+                        <div className="h-px bg-border/40 mx-3" />
+                        <button
+                          onClick={() => { setMoreMenuOpen(false); setConfirmarExclusaoOpen(true); }}
+                          className="w-full flex items-center gap-2.5 px-4 py-3 text-sm font-semibold text-red-500 hover:bg-red-500/5 text-left transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" /> Excluir tratamento
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
                 <div className="shrink-0 ml-1">
                   {mapExpanded
                     ? <ChevronUp className="w-4 h-4 text-text-secondary" />
@@ -1006,7 +1186,7 @@ ${sectionsHTML}
             </div>
 
             {/* Progresso + stats */}
-            {planProcs.length > 0 && (
+            {displayProcs.length > 0 && (
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-xs text-text-secondary">Progresso geral</span>
@@ -1022,7 +1202,7 @@ ${sectionsHTML}
                 </div>
                 <div className="flex items-center gap-5 flex-wrap">
                   <div className="flex items-center gap-1.5">
-                    <span className="font-mono text-base font-bold text-text-primary">{planProcs.length}</span>
+                    <span className="font-mono text-base font-bold text-text-primary">{displayProcs.length}</span>
                     <span className="text-xs text-text-secondary">procedimentos</span>
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -1084,6 +1264,16 @@ ${sectionsHTML}
                 transition={{ duration: 0.22 }}
                 className="overflow-hidden"
               >
+                {/* Loading spinner while fetching review data */}
+                {loadingReview && (
+                  <div className="flex items-center justify-center gap-3 py-16 text-text-secondary">
+                    <Loader2 className="w-5 h-5 animate-spin text-teal" />
+                    <span className="text-sm font-medium">Carregando sessões...</span>
+                  </div>
+                )}
+
+                {!loadingReview && (
+                <>
                 <div className="px-6 pb-8 grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
 
                   {/* Odontogram */}
@@ -1334,13 +1524,70 @@ ${sectionsHTML}
                     </div>
                   )}
                 </div>
+                </>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
         </div>
       )}
 
-      {/* ── TRATAMENTOS CONCLUÍDOS ── */}
+      {/* ── EM PAUSA ── */}
+      {tratamentosPendentes.length > 0 && (
+        <div className="bg-surface rounded-3xl border border-border/60 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-5">
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-bold text-text-secondary uppercase tracking-[0.2em]">Em Pausa</span>
+              <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 text-xs font-bold border border-amber-500/20">
+                {tratamentosPendentes.length}
+              </span>
+            </div>
+          </div>
+          <div className="px-6 pb-6 space-y-2">
+            {tratamentosPendentes.map(t => {
+              const isReviewing = reviewingTratamento?.id === t.id;
+              return (
+                <div
+                  key={t.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => void handleReviewTratamento(t)}
+                  onKeyDown={(e) => e.key === 'Enter' && void handleReviewTratamento(t)}
+                  className={`w-full flex items-center justify-between px-4 py-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
+                    isReviewing ? 'border-teal/30 bg-teal/5' : 'border-border/40 bg-surface-alt/40 hover:bg-surface-alt/80'
+                  }`}
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-text-primary">{t.nome ?? 'Sem nome'}</p>
+                    <p className="text-xs text-text-secondary mt-0.5">
+                      Iniciado em {format(parseISO(t.created_at), "d 'de' MMM 'de' yyyy", { locale: ptBR })}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {loadingReview && isReviewing
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin text-teal" />
+                      : <span className="text-[10px] font-bold text-amber-600 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">Em Pausa</span>
+                    }
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── NOVO TRATAMENTO (quando já há um principal) ── */}
+      {tratamentoAtivo && !loadingTratamento && (
+        <button
+          onClick={() => void handleAbrirModalIniciar()}
+          className="w-full py-4 border-2 border-dashed border-border/50 rounded-3xl flex items-center justify-center gap-2 text-text-secondary hover:text-teal hover:border-teal/40 transition-all group"
+        >
+          <Plus className="w-4 h-4 group-hover:scale-110 transition-transform" />
+          <span className="font-bold text-sm">Novo Tratamento</span>
+        </button>
+      )}
+
+      {/* ── CONCLUÍDOS ── */}
       {historicoTratamentos.length > 0 && (
         <div className="bg-surface rounded-3xl border border-border/60 shadow-sm overflow-hidden">
           <button
@@ -1348,7 +1595,7 @@ ${sectionsHTML}
             className="w-full flex items-center justify-between px-6 py-5 hover:bg-surface-alt/20 transition-colors"
           >
             <div className="flex items-center gap-3">
-              <span className="text-xs font-bold text-text-secondary uppercase tracking-[0.2em]">Planejamentos Concluídos</span>
+              <span className="text-xs font-bold text-text-secondary uppercase tracking-[0.2em]">Concluídos</span>
               <span className="px-2 py-0.5 rounded-full bg-surface-alt text-text-secondary text-xs font-bold">
                 {historicoTratamentos.length}
               </span>
@@ -1366,104 +1613,37 @@ ${sectionsHTML}
               >
                 <div className="px-6 pb-6 space-y-2">
                   {historicoTratamentos.map(t => {
-                    const isExpanded = expandedConcluidoId === t.id;
-                    const sessionsMap = new Map<string, PlanProc[]>();
-                    if (isExpanded && concluidoData) {
-                      for (const proc of concluidoData.planProcs) {
-                        const fichaId = proc.fichaRef?.split('::')?.[0] ?? '__unknown__';
-                        if (!sessionsMap.has(fichaId)) sessionsMap.set(fichaId, []);
-                        sessionsMap.get(fichaId)!.push(proc);
-                      }
-                    }
-                    const sessions = Array.from(sessionsMap.entries())
-                      .sort((a, b) => {
-                        const dA = concluidoData?.fichaDateMap[a[0]] ?? '';
-                        const dB = concluidoData?.fichaDateMap[b[0]] ?? '';
-                        return dB.localeCompare(dA);
-                      })
-                      .map(([fichaId, procs], idx) => ({
-                        fichaId,
-                        date: concluidoData?.fichaDateMap[fichaId] ?? null,
-                        sessionNumber: idx + 1,
-                        procedures: procs.sort((a, b) => (a.dente ?? 0) - (b.dente ?? 0)),
-                      }));
+                    const isReviewing = reviewingTratamento?.id === t.id;
                     return (
-                      <div key={t.id}>
-                        <div
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => void handleToggleConcluido(t)}
-                          onKeyDown={(e) => e.key === 'Enter' && void handleToggleConcluido(t)}
-                          className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl border text-left transition-all cursor-pointer ${
-                            isExpanded ? 'border-teal/30 bg-teal/5' : 'border-border/40 bg-surface-alt/50 hover:bg-surface-alt/80'
-                          }`}
-                        >
-                          <div>
-                            <p className="text-sm font-semibold text-text-primary">{t.nome ?? 'Planejamento sem nome'}</p>
-                            <p className="text-xs text-text-secondary mt-0.5">
-                              {format(parseISO(t.created_at), 'dd/MM/yyyy', { locale: ptBR })}
-                              {t.encerrado_em && ` → ${format(parseISO(t.encerrado_em), 'dd/MM/yyyy', { locale: ptBR })}`}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-[10px] font-bold text-text-secondary bg-surface-alt border border-border/40 px-2 py-0.5 rounded-full">
-                              Concluído
-                            </span>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setConfirmarExclusaoHistId(t.id); }}
-                              className="p-1.5 rounded-lg text-text-secondary/40 hover:text-red-500 hover:bg-red-500/10 transition-colors"
-                              title="Excluir planejamento"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                            {isExpanded
-                              ? <ChevronUp className="w-4 h-4 text-teal" />
-                              : <ChevronDown className="w-4 h-4 text-text-secondary" />
-                            }
-                          </div>
+                      <div key={t.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => void handleReviewTratamento(t)}
+                        onKeyDown={(e) => e.key === 'Enter' && void handleReviewTratamento(t)}
+                        className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                          isReviewing ? 'border-teal/30 bg-teal/5' : 'border-border/40 bg-surface-alt/50 hover:bg-surface-alt/80'
+                        }`}
+                      >
+                        <div>
+                          <p className="text-sm font-semibold text-text-primary">{t.nome ?? 'Sem nome'}</p>
+                          <p className="text-xs text-text-secondary mt-0.5">
+                            {format(parseISO(t.created_at), 'dd/MM/yyyy', { locale: ptBR })}
+                            {t.encerrado_em && ` → ${format(parseISO(t.encerrado_em), 'dd/MM/yyyy', { locale: ptBR })}`}
+                          </p>
                         </div>
-                        <AnimatePresence initial={false}>
-                          {isExpanded && (
-                            <motion.div
-                              initial={{ height: 0, opacity: 0 }}
-                              animate={{ height: 'auto', opacity: 1 }}
-                              exit={{ height: 0, opacity: 0 }}
-                              transition={{ duration: 0.2 }}
-                              className="overflow-hidden"
-                            >
-                              <div className="mt-2 ml-2 pl-4 border-l-2 border-teal/20 space-y-4 pb-2">
-                                {loadingConcluido ? (
-                                  <div className="flex items-center gap-2 py-4 text-text-secondary">
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                    <span className="text-sm">Carregando sessões...</span>
-                                  </div>
-                                ) : sessions.length === 0 ? (
-                                  <p className="text-sm text-text-secondary/60 italic py-4">Nenhuma sessão registrada.</p>
-                                ) : sessions.map(session => (
-                                  <div key={session.fichaId}>
-                                    <p className="text-[11px] font-bold text-teal uppercase tracking-widest mb-2">
-                                      Sessão {session.sessionNumber}
-                                      {session.date && ` · ${format(parseISO(session.date), 'dd/MM/yyyy', { locale: ptBR })}`}
-                                    </p>
-                                    <div className="grid grid-cols-2 gap-2">
-                                      {session.procedures.map(proc => (
-                                        <div key={proc.id} className="bg-surface-alt/40 border border-border/50 rounded-xl p-3 flex flex-col gap-1.5">
-                                          {proc.dente && (
-                                            <span className="text-[10px] font-bold text-teal uppercase tracking-wider">Dente {proc.dente}</span>
-                                          )}
-                                          <p className="text-xs text-text-primary leading-snug">{proc.descricao}</p>
-                                          <span className={`text-[10px] font-bold uppercase tracking-wide w-fit px-2 py-0.5 rounded-md border ${getProcStatus(proc.status).className}`}>
-                                            {getProcStatus(proc.status).label}
-                                          </span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {loadingReview && isReviewing
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin text-teal" />
+                            : <span className="text-[10px] font-bold text-text-secondary bg-surface-alt border border-border/40 px-2 py-0.5 rounded-full">Concluído</span>
+                          }
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setConfirmarExclusaoHistId(t.id); }}
+                            className="p-1.5 rounded-lg text-text-secondary/40 hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                            title="Excluir"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
