@@ -2,9 +2,10 @@
 // Usadas tanto na UI (PlanGuard, Sidebar) quanto no backend (onboarding, validações).
 //
 // Dois planos:
-//   SOLO    — dentista autônomo ou consultório próprio. Features clínicas completas,
-//             sem multi-dentistas. Até 1 secretária.
-//   CLINICA — equipe multi-profissional, silos de privacidade, co-piloto e gestão avançada.
+//   SOLO    — dentista autônomo, 1 dentista + 1 secretária. Features clínicas completas.
+//             Sem WhatsApp. Cobrança única de R$249/mês.
+//   CLINICA — múltiplos dentistas, secretária com visão unificada, WhatsApp integrado.
+//             R$179/dentista/mês. Mínimo 3 dentistas. Cada dentista paga individualmente.
 
 export type PlanoId = 'SOLO' | 'CLINICA';
 
@@ -46,14 +47,14 @@ export interface PlanoConfig {
 export const PLANOS: Record<PlanoId, PlanoConfig> = {
   SOLO: {
     id: 'SOLO',
-    label: 'Solo',
+    label: 'Consultório',
     labelContexto: 'Consultório',
-    preco: 197,
+    preco: 249,
     precoPorDentistaExtra: null,
     limiteDentistas: 1,
     features: {
-      botCustomizavel:  true,
-      botAgendamento:   true,
+      botCustomizavel:  false,
+      botAgendamento:   false,
       transcricaoVoz:   true,
       orcamentoIA:      true,
       planejamentoIA:   true,
@@ -68,9 +69,9 @@ export const PLANOS: Record<PlanoId, PlanoConfig> = {
     id: 'CLINICA',
     label: 'Clínica',
     labelContexto: 'Clínica',
-    preco: 397,
-    precoPorDentistaExtra: 147,
-    limiteDentistas: 5,
+    preco: 179,
+    precoPorDentistaExtra: null, // cada dentista paga R$179 individualmente
+    limiteDentistas: 99,
     features: {
       botCustomizavel:  true,
       botAgendamento:   true,

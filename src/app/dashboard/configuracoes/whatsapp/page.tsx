@@ -1,5 +1,6 @@
 import { requireRole } from '@/server/auth/roles';
 import { createServiceClient } from '@/lib/supabase/service';
+import { redirect } from 'next/navigation';
 import WhatsAppConfigClient from './_components/whatsapp-config-client';
 import type { BotConfigForm } from './actions';
 
@@ -7,6 +8,15 @@ export default async function WhatsAppConfigPage() {
   const { clinicId } = await requireRole(['admin', 'dentista']);
 
   const db = createServiceClient();
+  const { data: clinica } = await db
+    .from('clinicas')
+    .select('plano')
+    .eq('id', clinicId)
+    .maybeSingle();
+
+  if (clinica?.plano === 'SOLO') {
+    redirect('/planos?feature=whatsapp');
+  }
 
   const { data: configRaw } = await db
     .from('bot_config')

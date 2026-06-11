@@ -29,42 +29,29 @@ const WORDS = ['Inteligência.', 'Velocidade.', 'Qualidade.'];
 // ── Plans ─────────────────────────────────────────────────────────────────────
 const PLANOS = [
   {
-    id: 'SOLO', nome: 'Solo', preco: '167',
-    desc: 'Para o dentista autônomo que quer eliminar burocracia e focar no paciente.',
+    id: 'SOLO', nome: 'Consultório', preco: '249', precoSuffix: '/mês',
+    desc: 'Sistema completo para atendimento clínico — IA, fichas, planejamento, orçamentos, agenda e secretária.',
     features: [
-      '1 Dentista',
-      'Modo Consulta completo',
-      'Orçamentos por voz',
-      'Agenda inteligente',
-      'Dex briefing diário',
+      '1 Dentista + 1 Secretária',
+      'Ficha clínica estruturada por IA',
+      'Planejamento visual e orçamentos',
+      'Transcrição de voz por IA',
+      'Agenda e financeiro completo',
       '7 dias grátis para testar',
     ],
     popular: false, cta: '7 dias grátis',
   },
   {
-    id: 'BASICO', nome: 'Básico', preco: '247',
-    desc: 'Dentista e secretária em sincronia, com IA no centro do atendimento.',
+    id: 'CLINICA', nome: 'Clínica', preco: '179', precoSuffix: '/dentista/mês',
+    desc: 'Tudo do Consultório, mais secretária com visão unificada de todos os dentistas e WhatsApp integrado.',
     features: [
-      '1 Dentista + 1 Secretária',
-      'Tudo do Solo',
-      'Notificações em tempo real',
-      'Relatórios financeiros',
-      'Check-in com 1 clique',
+      'A partir de 3 dentistas',
+      'Secretária gerencia todos os dentistas',
+      'WhatsApp com bot e lembretes',
+      'Gestão de funções (admin/dentista)',
       '7 dias grátis para testar',
     ],
     popular: true, cta: '7 dias grátis',
-  },
-  {
-    id: 'CLINICA', nome: 'Clínica', preco: '397',
-    desc: 'Para clínicas com múltiplos dentistas e gestão avançada.',
-    features: [
-      'Até 5 dentistas',
-      'Tudo do Básico',
-      '+ R$ 147 por dentista extra',
-      'Silos de privacidade total',
-      '7 dias grátis para testar',
-    ],
-    popular: false, cta: '7 dias grátis',
   },
 ];
 
@@ -709,7 +696,7 @@ export default function LandingPage() {
               </p>
             </motion.div>
 
-            <div className="grid md:grid-cols-3 gap-6 items-stretch">
+            <div className="grid md:grid-cols-2 gap-6 items-stretch max-w-3xl mx-auto">
               {PLANOS.map((plano, i) => (
                 <motion.div
                   key={plano.id}
@@ -749,7 +736,7 @@ export default function LandingPage() {
                         <span className="font-[family-name:var(--font-dm-serif)] text-5xl">
                           R${plano.preco}
                         </span>
-                        <span className="text-sm text-gray-400 mb-1.5">/mês</span>
+                        <span className="text-sm text-gray-400 mb-1.5">{plano.precoSuffix}</span>
                       </div>
                       <p className="text-sm text-gray-500 dark:text-gray-300 leading-relaxed">{plano.desc}</p>
                     </div>
@@ -783,7 +770,7 @@ export default function LandingPage() {
             </div>
 
             <p className="text-center text-xs font-mono text-gray-400 mt-6">
-              dentistas adicionais no plano clínica: R$ 147/mês por dentista
+              plano clínica: mínimo 3 dentistas · cada dentista paga individualmente
             </p>
           </div>
         </section>

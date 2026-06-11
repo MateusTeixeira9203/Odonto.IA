@@ -43,7 +43,7 @@ export default async function UsuariosPage() {
         .order('created_at', { ascending: false }),
       supabase
         .from('clinicas')
-        .select('limite_dentistas')
+        .select('limite_dentistas, plano')
         .eq('id', clinicId)
         .single(),
     ]);
@@ -54,7 +54,9 @@ export default async function UsuariosPage() {
   const convitesDentistasPendentes = (convites ?? []).filter(
     (c) => (c as ConvitePendente).role !== 'secretaria'
   ).length;
-  const limiteDentistas = (clinica as { limite_dentistas: number } | null)?.limite_dentistas ?? 5;
+  const clinicaData = clinica as { limite_dentistas: number; plano: string } | null;
+  const limiteDentistas = clinicaData?.limite_dentistas ?? 5;
+  const plano = (clinicaData?.plano ?? 'SOLO') as import('@/lib/planos').PlanoId;
   const convitesRestantes = Math.max(0, limiteDentistas - dentistasAtivos - convitesDentistasPendentes);
 
   return (
@@ -65,6 +67,7 @@ export default async function UsuariosPage() {
       meuRole={role as DentistaRole}
       limiteDentistas={limiteDentistas}
       convitesRestantes={convitesRestantes}
+      plano={plano}
     />
   );
 }

@@ -22,6 +22,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import type { DentistaRole } from '@/types/database';
+import type { PlanoId } from '@/lib/planos';
+import { getLabelContexto } from '@/lib/planos';
 import type { UsuarioRow, ConvitePendente } from '../page';
 import { deletarUsuario, criarSecretariaAction } from '../actions';
 
@@ -54,6 +56,7 @@ interface Props {
   meuRole: DentistaRole;
   limiteDentistas: number;
   convitesRestantes: number;
+  plano?: PlanoId;
   asTab?: boolean;
 }
 
@@ -66,8 +69,10 @@ type DialogStep = 'form' | 'sucesso';
 
 export function UsuariosClient({
   usuarios, convitesPendentes, meuId, meuRole,
-  limiteDentistas, convitesRestantes, asTab = false,
+  limiteDentistas, convitesRestantes, plano, asTab = false,
 }: Props): React.JSX.Element {
+  const labelContexto = getLabelContexto(plano ?? 'SOLO');
+  const da = labelContexto === 'Clínica' ? 'da' : 'do';
 
   // ── Estado do dialog de adicionar ────────────────────────────────────────
   const [showDialog, setShowDialog]       = useState(false);
@@ -222,7 +227,7 @@ export function UsuariosClient({
     try {
       await deletarUsuario(confirmDelete.id);
       setUsuariosAtivos(prev => prev.filter(u => u.id !== confirmDelete.id));
-      toast.success(`${confirmDelete.nome} foi removido da clínica`);
+      toast.success(`${confirmDelete.nome} foi removido ${da} ${labelContexto.toLowerCase()}`);
       setConfirmDelete(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erro ao excluir usuário');
@@ -257,7 +262,7 @@ export function UsuariosClient({
             : <h1 className="font-heading font-bold text-3xl text-text-primary">Equipe</h1>
           }
           <p className="text-text-secondary text-sm mt-1">
-            Gerencie dentistas e secretárias da clínica
+            Gerencie dentistas e secretárias {da} {labelContexto.toLowerCase()}
           </p>
           <p className="text-xs text-text-secondary mt-1 font-mono">
             {convitesRestantes > 0
@@ -287,7 +292,7 @@ export function UsuariosClient({
         <div className="flex items-center gap-2 px-6 py-4 border-b border-border">
           <Users className="w-4 h-4 text-teal" />
           <h2 className="font-semibold text-text-primary text-sm">
-            Membros da clínica ({usuariosAtivos.length})
+            Membros {da} {labelContexto.toLowerCase()} ({usuariosAtivos.length})
           </h2>
         </div>
 
@@ -335,7 +340,7 @@ export function UsuariosClient({
                   <button
                     onClick={() => setConfirmDelete(u)}
                     className="p-1.5 rounded-lg text-text-secondary hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                    title="Remover da clínica"
+                    title={`Remover ${da} ${labelContexto.toLowerCase()}`}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -399,7 +404,7 @@ export function UsuariosClient({
             <AlertDialogTitle className="font-heading font-semibold text-xl">Remover membro?</AlertDialogTitle>
             <AlertDialogDescription className="text-sm">
               <span className="font-medium text-text-primary">{confirmDelete?.nome}</span>
-              {' '}será removido da clínica e não conseguirá mais fazer login.
+              {' '}será removido {da} {labelContexto.toLowerCase()} e não conseguirá mais fazer login.
               Fichas, orçamentos e agendamentos vinculados serão preservados.
               <br /><br />
               <span className="font-medium text-red-600">Esta ação é irreversível.</span>
@@ -505,7 +510,7 @@ export function UsuariosClient({
                 <DialogHeader className="mb-4">
                   <DialogTitle className="font-heading font-semibold text-xl">Adicionar membro</DialogTitle>
                   <DialogDescription>
-                    Escolha o tipo de acesso para o novo membro da clínica.
+                    Escolha o tipo de acesso para o novo membro {da} {labelContexto.toLowerCase()}.
                   </DialogDescription>
                 </DialogHeader>
 

@@ -19,18 +19,19 @@ interface PlanosClientProps {
 const plans = [
   {
     id: 'SOLO' as const,
-    name: 'Solo',
-    tagline: 'Para o dentista autônomo',
+    name: 'Consultório',
+    tagline: 'Para o dentista e seu consultório',
     icon: Stethoscope,
-    price: '197',
-    description: 'Todas as ferramentas clínicas de ponta — IA, fichas, orçamentos, agenda — para você trabalhar com mais velocidade e menos papel.',
+    price: '249',
+    pricePeriod: '/mês',
+    description: 'Sistema completo para atendimento clínico — IA, fichas estruturadas, planejamento visual, orçamentos, agenda e secretária. Tudo para atender mais em menos tempo.',
     features: [
       '1 Dentista + 1 Secretária',
-      'Modo Consulta com IA',
-      'Fichas e Planejamentos IA',
-      'Orçamentos e Financeiro',
-      'Bot WhatsApp customizável',
+      'Ficha clínica estruturada por IA',
+      'Planejamento e orçamento visual',
       'Transcrição de voz por IA',
+      'Agenda e financeiro completo',
+      'Modo Consulta com Dex',
     ],
     popular: false,
     trial: false,
@@ -40,17 +41,17 @@ const plans = [
   {
     id: 'CLINICA' as const,
     name: 'Clínica',
-    tagline: 'Para equipes e condomínios',
+    tagline: 'Para consultórios com múltiplos dentistas',
     icon: Building2,
-    price: '397',
-    description: 'Tudo do plano Solo mais gestão de equipe multi-profissional, silos de privacidade e inteligência avançada para clínicas em crescimento.',
+    price: '179',
+    pricePeriod: '/dentista/mês',
+    description: 'Tudo do Consultório, mais secretária com visão unificada de todos os dentistas, WhatsApp integrado com bot e lembretes automáticos.',
     features: [
-      'Multi-dentistas (+ R$ 147/cada)',
-      'Dentistas Agregados',
-      'Silos de Privacidade Total',
-      'Rateio de Custos Automático',
-      'Dex Co-Piloto avançado',
-      'Gestão de Condomínio',
+      'A partir de 3 dentistas',
+      'Secretária gerencia todos os dentistas',
+      'WhatsApp com bot e lembretes',
+      'Gestão de funções (admin/dentista)',
+      'Tudo do plano Consultório',
     ],
     popular: true,
     trial: true,
@@ -208,7 +209,7 @@ export function PlanosClient({
                   <div className="mb-5 flex items-baseline gap-1 text-text-primary">
                     <span className="font-mono text-sm text-text-secondary">R$</span>
                     <span className="font-mono text-5xl font-medium tracking-tight">{plan.price}</span>
-                    <span className="text-text-secondary text-sm">/mês</span>
+                    <span className="text-text-secondary text-sm">{plan.pricePeriod}</span>
                   </div>
 
                   <p className="text-sm text-text-secondary leading-relaxed mb-6 min-h-[56px]">
@@ -272,14 +273,14 @@ export function PlanosClient({
             })}
           </motion.div>
 
-          {/* Nota dentista agregado */}
+          {/* Nota plano Clínica */}
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5 }}
             className="text-center text-xs text-text-secondary mt-8"
           >
-            Dentista convidado por uma clínica? Você será cadastrado como <strong>Dentista Agregado</strong> com taxa especial — sem precisar assinar um plano separado.
+            Plano Clínica: mínimo 3 dentistas. Cada dentista paga R$&nbsp;179/mês individualmente.
           </motion.p>
         </section>
 
