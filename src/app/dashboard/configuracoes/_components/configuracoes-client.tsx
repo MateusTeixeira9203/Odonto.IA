@@ -432,7 +432,7 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2 space-y-1.5">
-                  <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
+                  <label className="text-sm font-semibold text-text-secondary uppercase tracking-wide">
                     Nome completo
                   </label>
                   <input
@@ -444,7 +444,7 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
+                  <label className="text-sm font-semibold text-text-secondary uppercase tracking-wide">
                     CRO
                   </label>
                   <input
@@ -476,7 +476,7 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
                 <div className="flex items-center justify-between gap-4 p-4 rounded-xl border border-red-200 dark:border-red-900/40 bg-red-50/50 dark:bg-red-900/10">
                   <div>
                     <p className="text-sm font-semibold text-text-primary">Sair deste {labelContexto.toLowerCase()}</p>
-                    <p className="text-xs text-text-secondary mt-0.5">
+                    <p className="text-sm text-text-secondary mt-0.5">
                       Você perderá acesso imediatamente. Seus dados clínicos serão preservados.
                     </p>
                   </div>
@@ -500,7 +500,7 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
 
               {/* Logo da clínica */}
               <div className="space-y-3">
-                <label className="text-xs font-bold text-text-secondary uppercase tracking-widest block">
+                <label className="text-sm font-semibold text-text-secondary uppercase tracking-wide block">
                   Logo do {labelContexto}
                 </label>
                 <div className="flex items-center gap-4">
@@ -525,7 +525,7 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
                       {uploadingLogo ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
                       {logoUrl ? 'Trocar logo' : 'Enviar logo'}
                     </button>
-                    <p className="text-[11px] text-text-secondary/60">JPG, PNG ou WebP · máx. 2 MB</p>
+                    <p className="text-xs text-text-secondary">JPG, PNG ou WebP · máx. 2 MB</p>
                   </div>
                 </div>
                 <input
@@ -539,7 +539,7 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2 space-y-1.5">
-                  <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
+                  <label className="text-sm font-semibold text-text-secondary uppercase tracking-wide">
                     Nome do {labelContexto}
                   </label>
                   <input
@@ -550,7 +550,7 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
+                  <label className="text-sm font-semibold text-text-secondary uppercase tracking-wide">
                     Telefone
                   </label>
                   <input
@@ -562,7 +562,7 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
+                  <label className="text-sm font-semibold text-text-secondary uppercase tracking-wide">
                     Endereço
                   </label>
                   <input
@@ -577,7 +577,7 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
 
               {/* Formas de pagamento */}
               <div className="space-y-2">
-                <label className="text-xs font-bold text-text-secondary uppercase tracking-widest block">
+                <label className="text-sm font-semibold text-text-secondary uppercase tracking-wide block">
                   Formas de Pagamento Aceitas
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -1053,6 +1053,45 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
                 )}
               </div>
 
+              {/* Card: Método de Pagamento */}
+              <div className="bg-surface p-6 rounded-3xl border border-border shadow-sm">
+                <div className="flex items-start justify-between gap-4 mb-5">
+                  <div>
+                    <h2 className="font-heading font-bold text-xl text-text-primary">Método de Pagamento</h2>
+                    <p className="text-sm text-text-secondary mt-1">
+                      Cartão utilizado para cobranças mensais da assinatura.
+                    </p>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-surface-alt flex items-center justify-center shrink-0">
+                    <CreditCard className="w-5 h-5 text-text-secondary" />
+                  </div>
+                </div>
+
+                {/* Empty state — nenhum cartão cadastrado */}
+                <div className="flex items-center gap-4 p-5 rounded-2xl border-2 border-dashed border-border/60 bg-surface-alt/40">
+                  <div
+                    className="w-14 h-10 rounded-lg shrink-0 flex items-center justify-center"
+                    style={{ background: 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)', border: '1px solid rgba(0,0,0,0.06)' }}
+                  >
+                    <CreditCard className="w-5 h-5" style={{ color: '#94a3b8' }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-text-primary">Nenhum cartão cadastrado</p>
+                    <p className="text-sm text-text-secondary mt-0.5">
+                      Adicione um cartão para ativar ou renovar sua assinatura.
+                    </p>
+                  </div>
+                  <button className="shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold text-teal bg-teal/10 border border-teal/20 hover:bg-teal/20 transition-colors">
+                    <Plus className="w-3.5 h-3.5" />
+                    Adicionar
+                  </button>
+                </div>
+
+                <p className="text-xs text-text-secondary/60 mt-3 text-center">
+                  Pagamentos processados com segurança via Abacate Pay
+                </p>
+              </div>
+
               {/* Card: Progresso de Migração (Solo com convites enviados) */}
               {isSolo && dentistasAtivos > 1 && (
                 <div className="bg-surface p-6 rounded-3xl border border-amber-400/25 shadow-sm">
@@ -1167,7 +1206,7 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
                         >
                           {i + 1}
                         </div>
-                        <p className="text-xs text-text-secondary leading-snug">{label}</p>
+                        <p className="text-sm text-text-secondary leading-snug">{label}</p>
                       </div>
                     ))}
                   </div>
@@ -1176,11 +1215,11 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
                   <div className="border-t border-border/30 pt-5 grid grid-cols-2 gap-4">
                     <div className="text-center">
                       <p className="font-mono text-3xl font-bold text-text-primary">0</p>
-                      <p className="text-xs text-text-secondary mt-1">indicações feitas</p>
+                      <p className="text-sm text-text-secondary mt-1">indicações feitas</p>
                     </div>
                     <div className="text-center">
                       <p className="font-mono text-3xl font-bold text-teal">0</p>
-                      <p className="text-xs text-text-secondary mt-1">meses conquistados</p>
+                      <p className="text-sm text-text-secondary mt-1">meses conquistados</p>
                     </div>
                   </div>
                 </div>
