@@ -20,6 +20,8 @@ interface NextAppointmentHeroProps {
   } | null;
   now: Date;
   allConcluded?: boolean;
+  orcamentosAbertos?: number;
+  planejamentoAtivo?: string | null;
 }
 
 function toTitleCase(name: string): string {
@@ -192,7 +194,7 @@ function CountdownRing({ mins, state }: { mins: number; state: FilledState }) {
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
-export function NextAppointmentHero({ agendamento, now, allConcluded }: NextAppointmentHeroProps) {
+export function NextAppointmentHero({ agendamento, now, allConcluded, orcamentosAbertos, planejamentoAtivo }: NextAppointmentHeroProps) {
   // ── Empty / concluded states ──────────────────────────────────────────────
   if (!agendamento?.paciente) {
     const concluded = !!allConcluded;
@@ -455,6 +457,27 @@ export function NextAppointmentHero({ agendamento, now, allConcluded }: NextAppo
                 Último:{' '}
                 <span className="text-text-primary font-medium">{ultimaFichaQueixa}</span>
               </span>
+            </div>
+          )}
+
+          {/* Context chips */}
+          {((orcamentosAbertos ?? 0) > 0 || planejamentoAtivo) && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              {planejamentoAtivo && (
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-teal/10 text-teal border border-teal/20">
+                  <FileText className="w-3 h-3" />
+                  {planejamentoAtivo}
+                </span>
+              )}
+              {(orcamentosAbertos ?? 0) > 0 && (
+                <span
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full"
+                  style={{ background: 'rgba(59,130,246,0.09)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.2)' }}
+                >
+                  <AlertCircle className="w-3 h-3" />
+                  {orcamentosAbertos} orçamento{(orcamentosAbertos ?? 0) > 1 ? 's' : ''} em aberto
+                </span>
+              )}
             </div>
           )}
         </div>

@@ -1,6 +1,7 @@
 'use server';
 
 import { requireClinicContext } from '@/server/auth/clinic';
+import { createServiceClient } from '@/lib/supabase/service';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { inserirNotificacao } from '@/lib/notificacoes';
@@ -17,7 +18,7 @@ export async function salvarFichaConsulta(params: {
   conduta?:           string;
   retorno_sugerido?:  string | null;
   alerta_novo?:       string | null;
-}): Promise<{ error?: string }> {
+}): Promise<{ fichaId?: string; error?: string }> {
   const { supabase, user, clinicId, role } = await requireClinicContext();
 
   if (role === 'secretaria') return { error: 'Sem permissão.' };
@@ -31,7 +32,7 @@ export async function salvarFichaConsulta(params: {
 
   if (!dentistaPerfil) redirect('/onboarding');
 
-  const { error: fichaError } = await supabase.from('fichas').insert({
+  const { data: fichaData, error: fichaError } = await supabase.from('fichas').insert({
     clinica_id:          clinicId,
     paciente_id:         params.pacienteId,
     dentista_id:         dentistaPerfil.id,
@@ -45,7 +46,7 @@ export async function salvarFichaConsulta(params: {
     ...(params.retorno_sugerido !== undefined && { retorno_sugerido: params.retorno_sugerido }),
     ...(params.alerta_novo != null && { alerta_novo: params.alerta_novo }),
     status:              'concluida',
-  });
+  }).select('id').single();
 
   if (fichaError) {
     console.error('[salvarFichaConsulta]', fichaError.message);
@@ -76,7 +77,50 @@ export async function salvarFichaConsulta(params: {
     href:          '/dashboard/agendamentos',
   });
 
-  return {};
+  return { fichaId: (fichaData as { id: string }).id };
+}
+
+export async function salvarAssinaturaConsulta(
+  fichaId: string,
+  pacienteId: string,
+  assinaturaDataUrl: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const { clinicId, role } = await requireClinicContext();
+  if (role === 'secretaria') return { ok: false, error: 'Sem permissão' };
+
+  const db = createServiceClient();
+
+  const { data: ficha } = await db
+    .from('fichas')
+    .select('id')
+    .eq('id', fichaId)
+    .eq('clinica_id', clinicId)
+    .eq('paciente_id', pacienteId)
+    .maybeSingle();
+
+  if (!ficha) return { ok: false, error: 'Ficha não encontrada' };
+
+  const base64 = assinaturaDataUrl.split(',')[1];
+  if (!base64) return { ok: false, error: 'Assinatura inválida' };
+  const buffer = Buffer.from(base64, 'base64');
+
+  const storagePath = `${clinicId}/${pacienteId}/assinatura_${fichaId}.png`;
+
+  const { error: storageErr } = await db.storage
+    .from('fichas')
+    .upload(storagePath, buffer, { contentType: 'image/png', upsert: true });
+
+  if (storageErr) return { ok: false, error: storageErr.message };
+
+  const { error: dbErr } = await db
+    .from('fichas')
+    .update({ assinatura_url: storagePath, assinado_em: new Date().toISOString() })
+    .eq('id', fichaId)
+    .eq('clinica_id', clinicId);
+
+  if (dbErr) return { ok: false, error: dbErr.message };
+
+  return { ok: true };
 }
 
 export async function iniciarAtendimentoConsulta(agendamentoId: string): Promise<{ error?: string }> {

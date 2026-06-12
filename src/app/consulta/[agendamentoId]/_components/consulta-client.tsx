@@ -6,11 +6,12 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowLeft,
   Loader2,
-  Check, Edit2, Mic, MicOff, Bot, Play, X, AlertTriangle,
+  Check, Edit2, Mic, MicOff, Bot, Play, X, AlertTriangle, PenLine,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { salvarFichaConsulta, iniciarAtendimentoConsulta } from '../actions';
+import { ConsultaAssinaturaModal } from './consulta-assinatura-modal';
 import type { EvolucaoFormatada } from '@/app/api/dex/formatar-evolucao/route';
 import { ConsultationSidebar } from './consultation-sidebar';
 import { BotaoMensagemIA } from '@/components/orcamentos/botao-mensagem-ia';
@@ -121,6 +122,10 @@ export function ConsultaClient({
   const [evolucao, setEvolucao] = useState<EvolucaoFormatada | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [savedFichaId, setSavedFichaId] = useState<string | null>(null);
+  const [saveCountdown, setSaveCountdown] = useState(5);
+  const [showSignature, setShowSignature] = useState(false);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [aptStatus, setAptStatus] = useState(agendamentoStatus);
   const [isIniciando, setIsIniciando] = useState(false);
@@ -239,8 +244,20 @@ export function ConsultaClient({
       alerta_novo:        evolucao.alerta_novo,
     });
     if (result.error) { toast.error(result.error); setIsSaving(false); return; }
+    if (result.fichaId) setSavedFichaId(result.fichaId);
     setSaved(true);
-    setTimeout(() => router.push(`/dashboard/pacientes/${paciente.id}`), 1800);
+    setSaveCountdown(5);
+    countdownRef.current = setInterval(() => {
+      setSaveCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(countdownRef.current!);
+          countdownRef.current = null;
+          router.push(`/dashboard/pacientes/${paciente.id}`);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
   };
 
   const handleIniciarAtendimento = async () => {
@@ -339,8 +356,67 @@ export function ConsultaClient({
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
-                className="flex flex-col h-full"
+                className="flex flex-col h-full relative"
               >
+                {/* ── DEX Processing Overlay (Item 1) ── */}
+                <AnimatePresence>
+                  {isFormatando && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.22 }}
+                      className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-bg/90"
+                      style={{ backdropFilter: 'blur(10px)' }}
+                    >
+                      <div className="flex flex-col items-center gap-5 max-w-xs text-center">
+                        {/* DEX avatar with pulse rings */}
+                        <div className="relative flex items-center justify-center" style={{ width: 72, height: 72 }}>
+                          {[0, 1].map(i => (
+                            <motion.span
+                              key={i}
+                              className="absolute rounded-full"
+                              style={{ width: 72, height: 72, border: '1.5px solid rgba(47,156,133,0.4)' }}
+                              animate={{ scale: [1, 1.6 + i * 0.35], opacity: [0.5, 0] }}
+                              transition={{ duration: 1.8, repeat: Infinity, delay: i * 0.65, ease: 'easeOut' }}
+                            />
+                          ))}
+                          <div
+                            className="w-14 h-14 rounded-full flex items-center justify-center relative z-10"
+                            style={{ background: 'linear-gradient(135deg, #2f9c85, #1a7a65)', boxShadow: '0 8px 24px rgba(47,156,133,0.35)' }}
+                          >
+                            <Bot className="w-7 h-7 text-white" />
+                          </div>
+                        </div>
+                        {/* Step label with animated swap */}
+                        <AnimatePresence mode="wait">
+                          <motion.p
+                            key={formatLabel}
+                            initial={{ opacity: 0, y: 6 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -4 }}
+                            transition={{ duration: 0.28 }}
+                            className="font-heading text-xl text-text-primary"
+                          >
+                            {formatLabel}
+                          </motion.p>
+                        </AnimatePresence>
+                        {/* Progress dots */}
+                        <div className="flex gap-2">
+                          {[0, 1, 2].map(i => (
+                            <motion.div
+                              key={i}
+                              className="w-1.5 h-1.5 rounded-full"
+                              style={{ background: '#2f9c85' }}
+                              animate={{ opacity: [0.25, 1, 0.25] }}
+                              transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.35 }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
                 <div className="mb-3 flex items-center justify-between">
                   <span className="text-sm text-text-secondary font-medium">{firstName} · {hora}</span>
                   <span className="text-xs text-text-secondary font-mono">{textoLivre.length} car.</span>
@@ -423,16 +499,41 @@ export function ConsultaClient({
                 key="saved"
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="flex flex-col items-center justify-center h-full gap-4"
+                className="flex flex-col items-center justify-center h-full gap-6"
               >
-                <div className="w-16 h-16 rounded-full flex items-center justify-center"
-                  style={{ background: '#2f9c85', boxShadow: '0 8px 24px rgba(47,156,133,0.35)' }}>
+                <motion.div
+                  className="w-16 h-16 rounded-full flex items-center justify-center"
+                  style={{ background: '#2f9c85', boxShadow: '0 8px 24px rgba(47,156,133,0.35)' }}
+                  animate={{ scale: [1, 1.08, 1] }}
+                  transition={{ duration: 0.5, delay: 0.1 }}
+                >
                   <Check className="w-8 h-8 text-white" />
-                </div>
+                </motion.div>
                 <div className="text-center">
                   <p className="font-heading text-2xl text-text-primary mb-1">Ficha salva!</p>
-                  <p className="text-sm text-text-secondary">Redirecionando para o perfil de {firstName}...</p>
+                  <p className="text-sm text-text-secondary">
+                    {showSignature ? 'Coletando assinatura...' : `Redirecionando em ${saveCountdown}s`}
+                  </p>
                 </div>
+                {!showSignature && savedFichaId && (
+                  <motion.button
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                    onClick={() => {
+                      if (countdownRef.current) {
+                        clearInterval(countdownRef.current);
+                        countdownRef.current = null;
+                      }
+                      setShowSignature(true);
+                    }}
+                    className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold border transition-colors"
+                    style={{ borderColor: 'rgba(47,156,133,0.30)', color: '#2f9c85' }}
+                  >
+                    <PenLine className="w-4 h-4" />
+                    Solicitar assinatura do paciente
+                  </motion.button>
+                )}
               </motion.div>
             )}
 
@@ -637,6 +738,18 @@ export function ConsultaClient({
         elapsedSeconds={elapsedSeconds}
         onStop={() => void handleVoice()}
       />
+
+      {/* ── Assinatura do paciente (Item 3) ── */}
+      {showSignature && savedFichaId && (
+        <ConsultaAssinaturaModal
+          open={showSignature}
+          onClose={() => router.push(`/dashboard/pacientes/${paciente.id}`)}
+          fichaId={savedFichaId}
+          pacienteId={paciente.id}
+          pacienteNome={paciente.nome}
+          onSigned={() => router.push(`/dashboard/pacientes/${paciente.id}`)}
+        />
+      )}
     </div>
   );
 }

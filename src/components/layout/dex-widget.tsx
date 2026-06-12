@@ -230,6 +230,7 @@ export function DexWidget({ nome, dentistaId, hideTrigger }: DexWidgetProps) {
                       consultaCtx={consultaCtx}
                       onInsightClick={handleInsightClick}
                       onClose={handleClose}
+                      onNavigate={handleNavigate}
                       isDark={isDark}
                       bg={bg}
                       textMain={textMain}
@@ -676,6 +677,7 @@ interface HomeViewProps {
   consultaCtx: DexConsultationContext | null;
   onInsightClick: (insight: InsightItem) => void;
   onClose: () => void;
+  onNavigate: (href: string) => void;
   isDark: boolean;
   bg: string;
   textMain: string;
@@ -686,7 +688,7 @@ interface HomeViewProps {
 function HomeView({
   ctx, firstName, isPatientPage, patientHasAlert, patientCtx,
   isConsultaPage, consultaCtx,
-  onInsightClick, onClose,
+  onInsightClick, onClose, onNavigate,
   isDark, bg, textMain, textMuted, rowBg,
 }: HomeViewProps) {
   const hora      = new Date().getHours();
@@ -807,6 +809,63 @@ function HomeView({
               </p>
             </div>
           </div>
+        )}
+
+        {/* ── Resumo matinal (antes das 11h) ─────────────────────────────────── */}
+        {ctx && hora < 11 && ctx.agendamentosHoje > 0 && (
+          <div
+            className="rounded-xl px-3.5 py-3 space-y-1"
+            style={{ background: 'rgba(47,156,133,0.08)', border: '1px solid rgba(47,156,133,0.22)' }}
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-[0.22em] font-mono" style={{ color: '#2f9c85' }}>
+                Resumo do dia
+              </span>
+              <span className="ml-auto text-[10px] font-mono" style={{ color: textMuted }}>
+                {hora}h
+              </span>
+            </div>
+            <p className="text-sm font-semibold leading-snug" style={{ color: textMain }}>
+              {ctx.agendamentosHoje} consulta{ctx.agendamentosHoje > 1 ? 's' : ''} agendada{ctx.agendamentosHoje > 1 ? 's' : ''}
+              {ctx.receitaProjetadaHoje > 0 && (
+                <span className="font-normal" style={{ color: textMuted }}>
+                  {' '}· R$ {ctx.receitaProjetadaHoje.toLocaleString('pt-BR')} projetados
+                </span>
+              )}
+            </p>
+            {ctx.proximoPaciente && ctx.proximoHorario && (
+              <p className="text-xs" style={{ color: textMuted }}>
+                Início: <span className="font-semibold" style={{ color: textMain }}>
+                  {ctx.proximoPaciente.split(' ')[0]}
+                </span> às {ctx.proximoHorario}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* ── Próxima consulta com contexto ───────────────────────────────────── */}
+        {ctx && ctx.proximoAgendamentoId && ctx.proximoPaciente && !isConsultaPage && (
+          <button
+            onClick={() => onNavigate(`/consulta/${ctx.proximoAgendamentoId!}`)}
+            className="w-full rounded-xl px-3.5 py-3 flex items-center gap-3 text-left transition-all hover:brightness-105 active:scale-[0.985]"
+            style={{ background: 'rgba(47,156,133,0.07)', border: '1px solid rgba(47,156,133,0.20)' }}
+          >
+            <div
+              className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-sm font-bold text-white"
+              style={{ background: 'linear-gradient(135deg, #2f9c85, #1a7a65)' }}
+            >
+              {ctx.proximoPaciente.charAt(0).toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold leading-snug" style={{ color: textMain }}>
+                {ctx.proximoPaciente.split(' ')[0]}
+              </p>
+              <p className="text-[11px] mt-0.5" style={{ color: textMuted }}>
+                {ctx.proximoHorario && `às ${ctx.proximoHorario} · `}Modo Consulta
+              </p>
+            </div>
+            <ChevronRight className="w-3.5 h-3.5 shrink-0" style={{ color: '#2f9c85', opacity: 0.7 }} />
+          </button>
         )}
 
         {/* ── Clínica Score + KPI grid ────────────────────────────────────────── */}

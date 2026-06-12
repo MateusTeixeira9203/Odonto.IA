@@ -119,18 +119,38 @@ export async function DentistaDashboard({ dentista }: { dentista: DentistaCache 
   const allConcluded =
     atendimentosHoje.length > 0 && atendimentosHoje.every((a) => DONE.has(a.status));
 
-  // Última ficha — executa apenas se houver próximo atendimento com paciente
+  // Contexto do próximo paciente — executa apenas se houver próximo atendimento
   let ultimaFichaQueixa: string | null = null;
+  let orcamentosAbertos = 0;
+  let planejamentoAtivo: string | null = null;
   if (nextApt?.paciente?.id) {
-    const { data: ficha } = await supabase
-      .from('fichas')
-      .select('queixa_principal')
-      .eq('paciente_id', nextApt.paciente.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const [{ data: ficha }, { count: orcCount }, { data: planData }] = await Promise.all([
+      supabase
+        .from('fichas')
+        .select('queixa_principal')
+        .eq('paciente_id', nextApt.paciente.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from('orcamentos')
+        .select('*', { count: 'exact', head: true })
+        .eq('clinica_id', dentista.clinica_id)
+        .eq('paciente_id', nextApt.paciente.id)
+        .in('status', ['rascunho', 'enviado']),
+      supabase
+        .from('tratamentos')
+        .select('nome')
+        .eq('clinica_id', dentista.clinica_id)
+        .eq('paciente_id', nextApt.paciente.id)
+        .not('status', 'in', '(concluido,cancelado)')
+        .limit(1)
+        .maybeSingle(),
+    ]);
     ultimaFichaQueixa =
       (ficha as { queixa_principal: string | null } | null)?.queixa_principal ?? null;
+    orcamentosAbertos = orcCount ?? 0;
+    planejamentoAtivo = (planData as { nome: string | null } | null)?.nome ?? null;
   }
 
   const heroAgendamento = nextApt
@@ -162,6 +182,8 @@ export async function DentistaDashboard({ dentista }: { dentista: DentistaCache 
         agendamento={heroAgendamento}
         now={now}
         allConcluded={allConcluded}
+        orcamentosAbertos={orcamentosAbertos}
+        planejamentoAtivo={planejamentoAtivo}
       />
 
       <AttentionPanel
