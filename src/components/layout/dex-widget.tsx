@@ -973,48 +973,6 @@ function HomeView({
           </div>
         )}
 
-        {/* ── Agenda de hoje ─────────────────────────────────────────────────── */}
-        {ctx && (
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2">
-              <div className="h-px flex-1" style={{ background: divider }} />
-              <span className="text-[9px] font-bold uppercase tracking-[0.2em] px-1 font-mono" style={{ color: textMuted }}>Agenda</span>
-              <div className="h-px flex-1" style={{ background: divider }} />
-            </div>
-
-            {(ctx.agendamentosHojeList ?? []).length > 0 ? (
-              <div className="rounded-xl overflow-hidden"
-                style={{ border: `1px solid ${cardBrd}` }}>
-                {(ctx.agendamentosHojeList ?? []).slice(0, 4).map((ag, i) => (
-                  <div key={i} className="flex items-center justify-between px-3.5 py-2.5"
-                    style={{
-                      background: i % 2 === 0 ? rowBg : 'transparent',
-                      borderTop: i > 0 ? `1px solid ${isDark ? 'rgba(255,255,255,0.04)' : '#f0f5f4'}` : 'none',
-                    }}>
-                    <span className="text-xs font-mono font-semibold shrink-0" style={{ color: '#2f9c85', minWidth: 36 }}>{ag.hora}</span>
-                    <span className="flex-1 text-xs font-medium mx-3 truncate" style={{ color: textMain }}>{ag.paciente}</span>
-                    <span className="flex items-center gap-1 shrink-0">
-                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: STATUS_DOT[ag.status] ?? '#94a3b8' }} />
-                      <span className="text-[9px] font-mono" style={{ color: textMuted }}>{STATUS_LABEL[ag.status] ?? ag.status}</span>
-                    </span>
-                  </div>
-                ))}
-                {(ctx.agendamentosHojeList ?? []).length > 4 && (
-                  <div className="px-3.5 py-2 text-[10px]" style={{ color: textMuted, background: rowBg }}>
-                    +{ctx.agendamentosHojeList.length - 4} mais
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="px-3.5 py-3 rounded-xl text-xs text-center flex items-center justify-center gap-1.5"
-                style={{ background: rowBg, color: textMuted, border: `1px solid ${cardBrd}` }}>
-                <CalendarDays className="w-3.5 h-3.5" style={{ color: textMuted }} />
-                Sem consultas agendadas hoje
-              </div>
-            )}
-          </div>
-        )}
-
         {/* ── Insights positivos ──────────────────────────────────────────────── */}
         {positiveInsights.length > 0 && (
           <div className="space-y-1.5">
