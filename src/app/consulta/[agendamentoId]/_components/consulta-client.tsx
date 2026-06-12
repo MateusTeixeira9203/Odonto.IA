@@ -137,10 +137,11 @@ export function ConsultaClient({
 
   const { status: micStatus, startRecording, stopRecording } = useAudioRecorder();
 
-  // Fix: cleanup timer ao desmontar para evitar memory leak se usuário sair durante gravação
+  // Cleanup de timers ao desmontar
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      if (countdownRef.current) clearInterval(countdownRef.current);
     };
   }, []);
 
