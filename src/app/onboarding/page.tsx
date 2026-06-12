@@ -3,14 +3,15 @@ import type { PlanoClinica } from './actions';
 
 const PLANOS_VALIDOS: PlanoClinica[] = ['SOLO', 'CLINICA'];
 
-export default function OnboardingPage({
+export default async function OnboardingPage({
   searchParams,
 }: {
-  searchParams: { plano?: string };
-}): React.JSX.Element {
-  const plano = PLANOS_VALIDOS.includes(searchParams.plano as PlanoClinica)
-    ? (searchParams.plano as PlanoClinica)
-    : 'CLINICA';
+  searchParams: Promise<{ plano?: string }>;
+}): Promise<React.JSX.Element> {
+  const params = await searchParams;
+  const plano = PLANOS_VALIDOS.includes(params.plano as PlanoClinica)
+    ? (params.plano as PlanoClinica)
+    : 'SOLO';
 
   return <OnboardingClient plano={plano} />;
 }

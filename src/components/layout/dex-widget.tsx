@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter, usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Bot, ArrowLeft, Stethoscope, AlertTriangle, AlertCircle, Mail, CalendarX, UserMinus, TrendingUp, CalendarDays, DollarSign, ChevronRight } from 'lucide-react';
+import { X, Bot, ArrowLeft, Stethoscope, AlertTriangle, AlertCircle, Mail, CalendarX, UserMinus, TrendingUp, CalendarDays, ChevronRight } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { DentistaRole } from '@/types/database';
 import type { PlanoId } from '@/lib/planos';
@@ -636,8 +636,11 @@ function HomeView({
 }: HomeViewProps) {
   const hora = new Date().getHours();
   const saudacao = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite';
-  const receita = ctx?.receitaProjetadaHoje ?? 0;
   const divider = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(47,156,133,0.12)';
+
+  const insights = ctx ? gerarInsights(ctx) : [];
+  const urgentInsights  = insights.filter(i => i.accent === 'red' || i.accent === 'amber');
+  const positiveInsights = insights.filter(i => i.accent === 'teal' || i.accent === 'blue');
 
   return (
     <motion.div
@@ -656,7 +659,6 @@ function HomeView({
                 style={{ background: 'linear-gradient(135deg, #2f9c85, #1a7a65)' }}>
                 <Bot className="w-4.5 h-4.5 text-white" />
               </div>
-              {/* dot online */}
               <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2"
                 style={{ borderColor: bg }} />
             </div>
@@ -665,7 +667,7 @@ function HomeView({
                 {saudacao}, {firstName}
               </p>
               <p className="text-[10px] font-mono uppercase tracking-widest mt-0.5" style={{ color: '#2f9c85' }}>
-                DEX · assistente
+                DEX · copiloto operacional
               </p>
             </div>
           </div>
@@ -682,7 +684,7 @@ function HomeView({
 
       {/* ── Conteúdo scrollável ─────────────────────────────────────────────── */}
       <div
-        className="flex-1 overflow-y-auto px-5 pb-4 space-y-4"
+        className="flex-1 overflow-y-auto px-5 pb-4 space-y-3"
         style={{
           scrollbarWidth: 'thin',
           scrollbarColor: isDark ? 'rgba(255,255,255,0.08) transparent' : 'rgba(47,156,133,0.12) transparent',
@@ -691,14 +693,11 @@ function HomeView({
 
         {/* Skeletons enquanto ctx carrega */}
         {!ctx && (
-          <>
-            <div className="rounded-xl animate-pulse" style={{ background: rowBg, height: 40 }} />
-            <div className="grid grid-cols-3 gap-2">
-              {[0, 1, 2].map(i => (
-                <div key={i} className="rounded-xl animate-pulse" style={{ background: rowBg, height: 76 }} />
-              ))}
-            </div>
-          </>
+          <div className="space-y-2 pt-1">
+            {[56, 48, 56, 48].map((h, i) => (
+              <div key={i} className="rounded-xl animate-pulse" style={{ background: rowBg, height: h }} />
+            ))}
+          </div>
         )}
 
         {/* Consulta ativa */}
@@ -730,23 +729,57 @@ function HomeView({
           </div>
         )}
 
+        {/* ── Ações prioritárias ─────────────────────────────────────────────── */}
+        {ctx && urgentInsights.length > 0 && (
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <div className="h-px flex-1" style={{ background: divider }} />
+              <span className="text-[10px] font-bold uppercase tracking-widest px-1" style={{ color: textMuted }}>
+                Ações
+              </span>
+              <div className="h-px flex-1" style={{ background: divider }} />
+            </div>
+            {urgentInsights.map((insight) => {
+              const colors = INSIGHT_COLORS[insight.accent];
+              const Icon = insight.Icon;
+              return (
+                <button
+                  key={insight.id}
+                  onClick={() => onInsightClick(insight)}
+                  className="w-full rounded-xl px-3.5 py-3 flex items-center gap-3 transition-all hover:brightness-105 active:scale-[0.985] text-left"
+                  style={{ background: colors.bg, border: `1px solid ${colors.border}` }}
+                >
+                  <div className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center" style={{ background: colors.border }}>
+                    <Icon className="w-3.5 h-3.5" style={{ color: colors.icon }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold leading-snug" style={{ color: textMain }}>{insight.label}</p>
+                    <p className="text-[10px] mt-0.5 truncate" style={{ color: textMuted }}>{insight.sublabel}</p>
+                  </div>
+                  <ChevronRight className="w-3.5 h-3.5 shrink-0" style={{ color: colors.icon, opacity: 0.7 }} />
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {/* Aniversariantes do dia */}
         {(ctx?.aniversariantesHoje ?? []).length > 0 && (
-          <div className="rounded-xl px-4 py-3 flex items-center gap-3"
+          <div className="rounded-xl px-4 py-2.5 flex items-center gap-3"
             style={{ background: isDark ? 'rgba(251,191,36,0.08)' : 'rgba(253,224,71,0.15)', border: '1px solid rgba(251,191,36,0.25)' }}>
-            <span className="text-lg shrink-0">🎂</span>
+            <span className="text-base shrink-0">🎂</span>
             <div className="min-w-0">
               <p className="text-xs font-bold" style={{ color: isDark ? '#fbbf24' : '#92400e' }}>
                 {ctx!.aniversariantesHoje.length === 1 ? 'Aniversariante hoje' : `${ctx!.aniversariantesHoje.length} aniversariantes hoje`}
               </p>
-              <p className="text-[11px] mt-0.5 truncate" style={{ color: textMuted }}>
+              <p className="text-[10px] mt-0.5 truncate" style={{ color: textMuted }}>
                 {ctx!.aniversariantesHoje.map(a => a.nome.split(' ')[0]).join(', ')}
               </p>
             </div>
           </div>
         )}
 
-        {/* Agenda do dia */}
+        {/* ── Agenda de hoje ─────────────────────────────────────────────────── */}
         {ctx && (
           <div className="space-y-2">
             <div className="flex items-center gap-2">
@@ -758,7 +791,7 @@ function HomeView({
             {(ctx.agendamentosHojeList ?? []).length > 0 ? (
               <div className="rounded-xl overflow-hidden"
                 style={{ border: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : '#e8f0ef'}` }}>
-                {(ctx.agendamentosHojeList ?? []).slice(0, 5).map((ag, i) => (
+                {(ctx.agendamentosHojeList ?? []).slice(0, 4).map((ag, i) => (
                   <div key={i} className="flex items-center justify-between px-3.5 py-2.5"
                     style={{
                       background: i % 2 === 0 ? rowBg : 'transparent',
@@ -772,9 +805,9 @@ function HomeView({
                     </span>
                   </div>
                 ))}
-                {(ctx.agendamentosHojeList ?? []).length > 5 && (
+                {(ctx.agendamentosHojeList ?? []).length > 4 && (
                   <div className="px-3.5 py-2 text-[10px]" style={{ color: textMuted, background: rowBg }}>
-                    +{ctx.agendamentosHojeList.length - 5} mais
+                    +{ctx.agendamentosHojeList.length - 4} mais
                   </div>
                 )}
               </div>
@@ -786,76 +819,50 @@ function HomeView({
           </div>
         )}
 
-        {/* Métricas — 3 cards */}
+        {/* ── Stats compactos ─────────────────────────────────────────────────── */}
         {ctx && (
-          <div className="grid grid-cols-3 gap-2">
-            <div className="rounded-xl px-3 py-3 flex flex-col gap-1" style={{ background: rowBg, border: `1px solid ${divider}` }}>
-              <CalendarDays className="w-3.5 h-3.5 mb-0.5" style={{ color: textMuted }} />
-              <p className="text-xl font-bold font-mono leading-none" style={{ color: textMain }}>{ctx.agendamentosHoje}</p>
-              <p className="text-[10px] leading-tight" style={{ color: textMuted }}>consultas<br />hoje</p>
-            </div>
-            <div className="rounded-xl px-3 py-3 flex flex-col gap-1" style={{ background: rowBg, border: `1px solid ${divider}` }}>
-              <DollarSign className="w-3.5 h-3.5 mb-0.5" style={{ color: '#2f9c85' }} />
-              <p className="text-xl font-bold font-mono leading-none" style={{ color: textMain }}>
-                {receita >= 1000
-                  ? `R$${(receita / 1000).toFixed(1)}k`
-                  : `R$${receita.toFixed(0)}`}
-              </p>
-              <p className="text-[10px] leading-tight" style={{ color: textMuted }}>receita<br />hoje</p>
-            </div>
-            <div className="rounded-xl px-3 py-3 flex flex-col gap-1" style={{ background: rowBg, border: `1px solid ${divider}` }}>
-              <TrendingUp className="w-3.5 h-3.5 mb-0.5" style={{ color: textMuted }} />
-              <p className="text-xl font-bold font-mono leading-none" style={{ color: textMain }}>{ctx.consultasSemana}</p>
-              <p className="text-[10px] leading-tight" style={{ color: textMuted }}>consultas<br />semana</p>
-            </div>
+          <div className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl" style={{ background: rowBg, border: `1px solid ${divider}` }}>
+            <CalendarDays className="w-3.5 h-3.5 shrink-0" style={{ color: textMuted }} />
+            <span className="text-xs" style={{ color: textMuted }}>
+              <span className="font-bold" style={{ color: textMain }}>{ctx.agendamentosHoje}</span> hoje
+            </span>
+            <span className="text-[10px]" style={{ color: divider }}>·</span>
+            <span className="text-xs" style={{ color: textMuted }}>
+              <span className="font-bold" style={{ color: textMain }}>{ctx.agendamentosAmanha}</span> amanhã
+            </span>
+            <span className="text-[10px]" style={{ color: divider }}>·</span>
+            <span className="text-xs" style={{ color: textMuted }}>
+              <span className="font-bold" style={{ color: textMain }}>{ctx.consultasSemana}</span> semana
+            </span>
           </div>
         )}
 
-        {/* ── Radar Dex — insights proativos ─────────────────────────────────── */}
-        {ctx && (() => {
-          const insights = gerarInsights(ctx);
-          if (insights.length === 0) return null;
-          return (
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2 mb-0.5">
-                <div className="h-px flex-1" style={{ background: divider }} />
-                <span className="text-[10px] font-bold uppercase tracking-widest px-1" style={{ color: textMuted }}>
-                  Radar Dex
-                </span>
-                <div className="h-px flex-1" style={{ background: divider }} />
-              </div>
-
-              {insights.map((insight) => {
-                const colors = INSIGHT_COLORS[insight.accent];
-                const Icon = insight.Icon;
-                return (
-                  <button
-                    key={insight.id}
-                    onClick={() => onInsightClick(insight)}
-                    className="w-full rounded-xl px-3.5 py-3 flex items-center gap-3 transition-all hover:brightness-105 active:scale-[0.985] text-left"
-                    style={{ background: colors.bg, border: `1px solid ${colors.border}` }}
-                  >
-                    <div
-                      className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center"
-                      style={{ background: colors.border }}
-                    >
-                      <Icon className="w-3.5 h-3.5" style={{ color: colors.icon }} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold leading-snug" style={{ color: textMain }}>
-                        {insight.label}
-                      </p>
-                      <p className="text-[10px] mt-0.5 truncate" style={{ color: textMuted }}>
-                        {insight.sublabel}
-                      </p>
-                    </div>
-                    <ChevronRight className="w-3.5 h-3.5 shrink-0" style={{ color: colors.icon, opacity: insight.items.length > 0 ? 0.7 : 0.35 }} />
-                  </button>
-                );
-              })}
-            </div>
-          );
-        })()}
+        {/* ── Insights positivos ──────────────────────────────────────────────── */}
+        {positiveInsights.length > 0 && (
+          <div className="space-y-1.5">
+            {positiveInsights.map((insight) => {
+              const colors = INSIGHT_COLORS[insight.accent];
+              const Icon = insight.Icon;
+              return (
+                <button
+                  key={insight.id}
+                  onClick={() => onInsightClick(insight)}
+                  className="w-full rounded-xl px-3.5 py-3 flex items-center gap-3 transition-all hover:brightness-105 active:scale-[0.985] text-left"
+                  style={{ background: colors.bg, border: `1px solid ${colors.border}` }}
+                >
+                  <div className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center" style={{ background: colors.border }}>
+                    <Icon className="w-3.5 h-3.5" style={{ color: colors.icon }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold leading-snug" style={{ color: textMain }}>{insight.label}</p>
+                    <p className="text-[10px] mt-0.5 truncate" style={{ color: textMuted }}>{insight.sublabel}</p>
+                  </div>
+                  <ChevronRight className="w-3.5 h-3.5 shrink-0" style={{ color: colors.icon, opacity: insight.items.length > 0 ? 0.7 : 0.35 }} />
+                </button>
+              );
+            })}
+          </div>
+        )}
 
       </div>
 

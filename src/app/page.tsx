@@ -24,7 +24,6 @@ const fadeIn = {
 } as const;
 
 // ── Hero rotating words ───────────────────────────────────────────────────────
-const WORDS = ['Inteligência.', 'Velocidade.', 'Qualidade.'];
 
 // ── Plans ─────────────────────────────────────────────────────────────────────
 const PLANOS = [
@@ -181,7 +180,6 @@ function DexCard() {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function LandingPage() {
-  const [wordIndex,  setWordIndex]  = useState(0);
   const [openFaq,    setOpenFaq]    = useState<number | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled,   setScrolled]   = useState(false);
@@ -198,10 +196,6 @@ export default function LandingPage() {
 
   useEffect(() => { setMounted(true); }, []);
 
-  useEffect(() => {
-    const id = setInterval(() => setWordIndex(p => (p + 1) % WORDS.length), 3000);
-    return () => clearInterval(id);
-  }, []);
 
   useEffect(() => {
     document.body.style.overflow = mobileOpen ? 'hidden' : '';
@@ -382,44 +376,27 @@ export default function LandingPage() {
               }}
             >
               <Sparkles className="w-3.5 h-3.5" />
-              Sistema Clínico Inteligente · Documentação em Tempo Real
+              O sistema operacional da sua clínica
             </motion.div>
 
-            <div className="text-5xl md:text-7xl lg:text-8xl font-[family-name:var(--font-dm-serif)] leading-[1.1] tracking-tight mb-8">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6 }}
-              >
-                A Odontologia na <br />
-                <span className="italic text-teal">Era da </span>
-                <span className="inline-block relative italic text-teal">
-                  <AnimatePresence mode="wait">
-                    <motion.span
-                      key={WORDS[wordIndex]}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -20 }}
-                      transition={{ duration: 0.5 }}
-                      className="absolute left-0 whitespace-nowrap"
-                    >
-                      {WORDS[wordIndex]}
-                    </motion.span>
-                  </AnimatePresence>
-                  <span className="invisible whitespace-nowrap">{WORDS[0]}</span>
-                </span>
-              </motion.div>
-            </div>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              className="text-5xl md:text-7xl lg:text-8xl font-[family-name:var(--font-dm-serif)] leading-[1.08] tracking-tight mb-8"
+            >
+              Você atende.<br />
+              <span className="italic text-teal">A IA documenta.</span>
+            </motion.div>
 
             <motion.p
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.2 }}
-              className="max-w-3xl mx-auto text-lg md:text-xl text-gray-500 dark:text-gray-300 mb-12 leading-relaxed"
+              className="max-w-2xl mx-auto text-lg md:text-xl text-gray-500 dark:text-gray-300 mb-12 leading-relaxed"
             >
-              Você fala. O Dex transcreve, estrutura a ficha clínica e prepara o orçamento.
-              <br className="hidden md:block" />
-              Do atendimento ao planejamento em segundos — sem digitar nada.
+              O Odonto.IA transcreve a consulta, estrutura a ficha clínica e prepara
+              o orçamento automaticamente — sem digitar nada.
             </motion.p>
 
             <motion.div

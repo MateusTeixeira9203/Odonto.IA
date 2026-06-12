@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Calendar, Users, Settings, CheckCircle2, Loader2, ChevronRight,
+  Stethoscope, Building2, Check, ArrowLeft,
 } from 'lucide-react';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -27,10 +28,39 @@ const ESPECIALIDADES = [
   'Outro',
 ] as const;
 
-const PLANO_LABELS: Record<PlanoClinica, string> = {
-  SOLO:    'Solo',
-  CLINICA: 'Clínica',
-};
+const PLANOS_CONFIG = [
+  {
+    id: 'SOLO' as PlanoClinica,
+    label: 'Solo',
+    tagline: 'Para você e sua equipe',
+    preco: 'R$249',
+    periodo: '/mês',
+    minimo: null,
+    icon: Stethoscope,
+    features: [
+      '1 Dentista + 1 Secretária',
+      'IA, fichas e planejamento',
+      'Agenda e financeiro',
+      'Orçamentos e tratamentos',
+    ],
+  },
+  {
+    id: 'CLINICA' as PlanoClinica,
+    label: 'Clínica',
+    tagline: 'Para múltiplos dentistas',
+    preco: 'R$179',
+    periodo: '/dentista/mês',
+    minimo: 'Mín. 3 dentistas · R$537/mês',
+    badge: 'Popular',
+    icon: Building2,
+    features: [
+      'A partir de 3 dentistas',
+      'Secretária com visão unificada',
+      'WhatsApp integrado',
+      'Relatórios gerenciais',
+    ],
+  },
+] as const;
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
@@ -38,50 +68,45 @@ const schema = z.object({
   nome:            z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
   cro:             z.string().min(1, 'Informe o CRO'),
   especialidade:   z.enum(ESPECIALIDADES),
-  nomeConsultorio: z.string().min(2, 'Informe o nome do consultório'),
+  nomeConsultorio: z.string().min(2, 'Informe o nome'),
 });
 
 type FormData = z.infer<typeof schema>;
 
-// ── Próximos passos (tela de sucesso) ─────────────────────────────────────────
+// ── Próximos passos ───────────────────────────────────────────────────────────
 
 const PROXIMOS_PASSOS = [
   {
     icon: Calendar,
-    label:  'Primeira consulta',
-    desc:   'Agende sua primeira consulta e veja o modo de atendimento em ação.',
-    href:   '/dashboard/agendamentos',
-    color:  'var(--color-teal)',
+    label: 'Primeira consulta',
+    desc:  'Agende sua primeira consulta e veja o modo de atendimento em ação.',
+    href:  '/dashboard/agendamentos',
   },
   {
     icon: Users,
-    label:  'Adicionar paciente',
-    desc:   'Cadastre um paciente e comece a montar a ficha clínica.',
-    href:   '/dashboard/pacientes',
-    color:  'var(--color-teal)',
+    label: 'Adicionar paciente',
+    desc:  'Cadastre um paciente e comece a montar a ficha clínica.',
+    href:  '/dashboard/pacientes',
   },
   {
     icon: Settings,
-    label:  'Configurar clínica',
-    desc:   'Complete o endereço, horários e procedimentos da sua clínica.',
-    href:   '/dashboard/configuracoes',
-    color:  'var(--color-teal)',
+    label: 'Configurações',
+    desc:  'Complete o endereço, horários e procedimentos.',
+    href:  '/dashboard/configuracoes',
   },
 ] as const;
 
-// ── Props ─────────────────────────────────────────────────────────────────────
-
-interface OnboardingClientProps {
-  plano: PlanoClinica;
-}
-
 // ── Componente ────────────────────────────────────────────────────────────────
 
-export function OnboardingClient({ plano }: OnboardingClientProps) {
-  const [step, setStep]           = useState<'form' | 'sucesso'>('form');
-  const [nomeConfirmado, setNome] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const isSubmittingRef           = useRef(false);
+export function OnboardingClient({ plano }: { plano: PlanoClinica }) {
+  const [step, setStep]                     = useState<'plano' | 'form' | 'sucesso'>('plano');
+  const [planoSelecionado, setPlano]        = useState<PlanoClinica>(plano);
+  const [nomeConfirmado, setNome]           = useState('');
+  const [isLoading, setIsLoading]           = useState(false);
+  const isSubmittingRef                     = useRef(false);
+
+  const isClinica  = planoSelecionado === 'CLINICA';
+  const labelLocal = isClinica ? 'clínica' : 'consultório';
 
   const {
     register,
@@ -105,7 +130,7 @@ export function OnboardingClient({ plano }: OnboardingClientProps) {
     setIsLoading(true);
     try {
       const result = await completeOnboarding({
-        plano,
+        plano:           planoSelecionado,
         nome:            data.nome,
         cro:             data.cro,
         especialidade:   data.especialidade,
@@ -130,6 +155,144 @@ export function OnboardingClient({ plano }: OnboardingClientProps) {
     <div className="w-full max-w-lg">
       <AnimatePresence mode="wait">
 
+        {/* ── ETAPA 0 — Seleção de plano ── */}
+        {step === 'plano' && (
+          <motion.div
+            key="plano"
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -16 }}
+            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+          >
+            {/* Header */}
+            <div className="text-center mb-8">
+              <div
+                className="inline-flex w-14 h-14 rounded-2xl items-center justify-center mb-5"
+                style={{ background: 'color-mix(in srgb, var(--color-teal) 12%, transparent)' }}
+              >
+                <Stethoscope className="w-7 h-7" style={{ color: 'var(--color-teal)' }} />
+              </div>
+              <h1 className="font-heading text-3xl text-text-primary mb-2">
+                Como você vai usar o Odonto.IA?
+              </h1>
+              <p className="text-text-secondary text-sm">
+                Escolha o plano que melhor se encaixa no seu perfil.
+              </p>
+            </div>
+
+            {/* Cards de plano */}
+            <div className="grid grid-cols-2 gap-3 mb-6">
+              {PLANOS_CONFIG.map((p) => {
+                const Icon      = p.icon;
+                const selected  = planoSelecionado === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setPlano(p.id)}
+                    className={[
+                      'relative p-5 rounded-3xl border text-left transition-all duration-200 group',
+                      selected
+                        ? 'border-teal/40 bg-teal/5 ring-1 ring-teal/20 shadow-sm'
+                        : 'border-border bg-surface hover:border-teal/20 hover:bg-teal/[0.02]',
+                    ].join(' ')}
+                  >
+                    {/* Badge "Popular" */}
+                    {'badge' in p && p.badge && (
+                      <span
+                        className="absolute top-3.5 right-3.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider"
+                        style={{
+                          background: 'color-mix(in srgb, var(--color-teal) 15%, transparent)',
+                          color: 'var(--color-teal)',
+                        }}
+                      >
+                        {p.badge}
+                      </span>
+                    )}
+
+                    {/* Checkmark quando selecionado */}
+                    {selected && (
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        className="absolute top-3.5 right-3.5 w-5 h-5 rounded-full flex items-center justify-center"
+                        style={{ background: 'var(--color-teal)' }}
+                      >
+                        <Check className="w-3 h-3 text-white stroke-[3]" />
+                      </motion.div>
+                    )}
+
+                    {/* Ícone */}
+                    <div
+                      className="w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors"
+                      style={{ background: 'color-mix(in srgb, var(--color-teal) 12%, transparent)' }}
+                    >
+                      <Icon className="w-5 h-5" style={{ color: 'var(--color-teal)' }} />
+                    </div>
+
+                    {/* Nome + tagline */}
+                    <p className="font-heading text-lg text-text-primary mb-0.5">{p.label}</p>
+                    <p className="text-[11px] text-text-secondary mb-4 leading-relaxed">{p.tagline}</p>
+
+                    {/* Preço */}
+                    <div className="mb-1">
+                      <span className="font-mono text-2xl font-bold text-text-primary">{p.preco}</span>
+                      <span className="text-[11px] text-text-secondary ml-1">{p.periodo}</span>
+                    </div>
+
+                    {/* Mínimo de cobrança */}
+                    {p.minimo && (
+                      <p className="text-[10px] font-bold text-amber-500/80 mb-4">{p.minimo}</p>
+                    )}
+                    {!p.minimo && <div className="mb-4" />}
+
+                    {/* Features */}
+                    <ul className="space-y-1.5">
+                      {p.features.map((f) => (
+                        <li key={f} className="flex items-start gap-2 text-[11px] text-text-secondary">
+                          <div
+                            className="w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0 mt-0.5"
+                            style={{ background: 'color-mix(in srgb, var(--color-teal) 12%, transparent)' }}
+                          >
+                            <Check className="w-2 h-2 stroke-[3]" style={{ color: 'var(--color-teal)' }} />
+                          </div>
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Nota */}
+            {isClinica && (
+              <motion.p
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="text-center text-[11px] text-text-secondary mb-4"
+              >
+                Mínimo 3 dentistas · Cada dentista assina individualmente
+              </motion.p>
+            )}
+
+            {/* CTA */}
+            <button
+              type="button"
+              onClick={() => setStep('form')}
+              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-teal to-teal-lt text-white py-3.5 rounded-xl font-bold text-sm transition-all shadow-[0_6px_20px_rgba(47,156,133,0.35)] hover:-translate-y-0.5 hover:shadow-[0_10px_28px_rgba(47,156,133,0.45)]"
+            >
+              Continuar com plano {planoSelecionado === 'SOLO' ? 'Solo' : 'Clínica'}
+              <ChevronRight className="w-4 h-4" />
+            </button>
+
+            <p className="text-center text-[11px] text-text-secondary mt-4">
+              Você pode mudar de plano a qualquer momento
+            </p>
+          </motion.div>
+        )}
+
         {/* ── ETAPA 1 — Formulário ── */}
         {step === 'form' && (
           <motion.div
@@ -141,18 +304,21 @@ export function OnboardingClient({ plano }: OnboardingClientProps) {
           >
             {/* Header */}
             <div className="text-center mb-8">
-              {/* Badge de plano */}
-              <span
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold mb-4"
+              {/* Badge de plano clicável (volta) */}
+              <button
+                type="button"
+                onClick={() => setStep('plano')}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold mb-4 transition-opacity hover:opacity-70"
                 style={{
                   background: 'color-mix(in srgb, var(--color-teal) 12%, transparent)',
                   color: 'var(--color-teal)',
                 }}
               >
-                Plano {PLANO_LABELS[plano]}
-              </span>
+                <ArrowLeft className="w-3 h-3" />
+                Plano {planoSelecionado === 'SOLO' ? 'Solo' : 'Clínica'}
+              </button>
               <h1 className="font-heading text-3xl text-text-primary mb-2">
-                Configure seu consultório
+                Configure {isClinica ? 'sua clínica' : 'seu consultório'}
               </h1>
               <p className="text-text-secondary text-sm">
                 Menos de 2 minutos para começar.
@@ -186,7 +352,7 @@ export function OnboardingClient({ plano }: OnboardingClientProps) {
                       <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest">
                         CRO
                       </label>
-                        <input
+                      <input
                         placeholder="CRO-SP 12345"
                         disabled={isLoading}
                         className={inputClass}
@@ -223,13 +389,13 @@ export function OnboardingClient({ plano }: OnboardingClientProps) {
                     </div>
                   </div>
 
-                  {/* Nome do consultório */}
+                  {/* Nome do consultório / clínica */}
                   <div className="space-y-1.5">
                     <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest">
-                      Nome do consultório
+                      Nome {isClinica ? 'da clínica' : 'do consultório'}
                     </label>
                     <input
-                      placeholder="Ex: Clínica Oral Health"
+                      placeholder={`Ex: ${isClinica ? 'Clínica' : 'Consultório'} Oral Health`}
                       disabled={isLoading}
                       className={inputClass}
                       {...register('nomeConsultorio')}
@@ -284,19 +450,73 @@ export function OnboardingClient({ plano }: OnboardingClientProps) {
               <h1 className="font-heading text-3xl text-text-primary mb-2">
                 Tudo configurado{nomeConfirmado ? `, Dr. ${nomeConfirmado}` : ''}!
               </h1>
-              <p className="text-text-secondary text-sm mb-10">
-                Seu consultório está pronto para receber os primeiros pacientes.
+              <p className="text-text-secondary text-sm mb-8">
+                {isClinica
+                  ? 'Sua clínica foi criada. Agora convide sua equipe.'
+                  : 'Seu consultório está pronto para receber os primeiros pacientes.'}
               </p>
             </motion.div>
 
-            {/* Próximos passos */}
+            {/* Card "Monte sua equipe" — apenas Clínica */}
+            {isClinica && (
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.32 }}
+                className="mb-6 rounded-3xl border border-amber-500/25 bg-amber-500/5 p-6 text-left"
+              >
+                {/* Header do card */}
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <p className="text-xs font-bold text-amber-500 uppercase tracking-widest mb-1">
+                      Ação necessária
+                    </p>
+                    <p className="font-heading text-lg text-text-primary">Monte sua equipe</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {[1, 2, 3].map((n) => (
+                      <div
+                        key={n}
+                        className={[
+                          'w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-colors',
+                          n === 1
+                            ? 'border-teal bg-teal/10 text-teal'
+                            : 'border-border bg-surface-alt text-text-secondary',
+                        ].join(' ')}
+                      >
+                        {n === 1 ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : n}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Explicação */}
+                <p className="text-sm text-text-secondary mb-1">
+                  O plano Clínica exige <span className="font-bold text-text-primary">mínimo 3 dentistas</span>. Você é o dentista 1.
+                </p>
+                <p className="text-sm text-text-secondary mb-5">
+                  A cobrança mínima será <span className="font-bold text-text-primary">R$537/mês</span> (3 × R$179). Cada colega assina individualmente com o próprio cartão.
+                </p>
+
+                {/* CTA de convite */}
+                <a
+                  href="/dashboard/configuracoes?aba=equipe"
+                  className="inline-flex items-center gap-2 bg-gradient-to-r from-teal to-teal-lt text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-[0_4px_14px_rgba(47,156,133,0.3)] hover:-translate-y-0.5 transition-all"
+                >
+                  <Users className="w-4 h-4" />
+                  Convidar colegas agora
+                </a>
+              </motion.div>
+            )}
+
+            {/* Próximos passos — Solo ou complementar para Clínica */}
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.35 }}
-              className="grid grid-cols-3 gap-3 mb-8"
+              transition={{ delay: 0.4 }}
+              className={isClinica ? 'grid grid-cols-2 gap-3 mb-8' : 'grid grid-cols-3 gap-3 mb-8'}
             >
-              {PROXIMOS_PASSOS.map((item) => {
+              {(isClinica ? PROXIMOS_PASSOS.slice(0, 2) : PROXIMOS_PASSOS).map((item) => {
                 const Icon = item.icon;
                 return (
                   <a
@@ -333,6 +553,7 @@ export function OnboardingClient({ plano }: OnboardingClientProps) {
             </motion.div>
           </motion.div>
         )}
+
       </AnimatePresence>
     </div>
   );

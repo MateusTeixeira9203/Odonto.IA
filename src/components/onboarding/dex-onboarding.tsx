@@ -9,6 +9,7 @@ import { SimOrcamento }       from './sim-orcamento';
 import { SimPerfilPaciente }  from './sim-perfil-paciente';
 import { SimBot }             from './sim-bot';
 import { SimFinanceiro }      from './sim-financeiro';
+import { SimModoConsulta }    from './sim-modo-consulta';
 import type { PlanoId }   from '@/lib/planos';
 
 // Chaves escopadas por dentista
@@ -23,7 +24,7 @@ const DEX_FAB_SIZE = 56;
 const BUBBLE_W     = 320;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type StepId = 'INTRO' | 'AGENDA' | 'PACIENTES' | 'PERFIL_PACIENTE' | 'ORCAMENTOS' | 'FINANCEIRO' | 'WHATSAPP' | 'CONFIG_EQUIPE' | 'CONFIG_CLINICA' | 'FINALE';
+type StepId = 'INTRO' | 'MODO_CONSULTA' | 'AGENDA' | 'PACIENTES' | 'PERFIL_PACIENTE' | 'ORCAMENTOS' | 'FINANCEIRO' | 'WHATSAPP' | 'CONFIG_EQUIPE' | 'CONFIG_CLINICA' | 'FINALE';
 
 interface TourStep {
   id: StepId;
@@ -31,7 +32,7 @@ interface TourStep {
   title: string;
   description: string;
   targetId?: string;
-  simulacao?: 'agendamento' | 'perfilPaciente' | 'orcamento' | 'bot' | 'financeiro';
+  simulacao?: 'agendamento' | 'perfilPaciente' | 'orcamento' | 'bot' | 'financeiro' | 'modoConsulta';
   details?: string;
   bullets?: string[];
 }
@@ -248,6 +249,20 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
       ],
     };
 
+    const modoConsultaStep: TourStep = {
+      id: 'MODO_CONSULTA',
+      path: '/dashboard',
+      title: 'A IA que escreve enquanto você trata',
+      description: 'Fale normalmente durante a consulta. O Odonto.IA transcreve, identifica os dentes, estrutura a ficha e prepara o orçamento — antes de você terminar de atender.',
+      bullets: [
+        'Sem digitar — você fala, a IA registra',
+        'Dentes marcados automaticamente no odontograma',
+        'Ficha estruturada: diagnóstico, procedimentos, observações',
+        'Orçamento gerado direto da ficha, em segundos',
+      ],
+      simulacao: 'modoConsulta' as const,
+    };
+
     if (role === 'secretaria') {
       return [
         {
@@ -301,8 +316,9 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
           id: 'INTRO',
           path: '/dashboard',
           title: '',
-          description: `Olá, Doutor(a) ${firstName}! Eu sou o DEX. Em 2 minutos você vai ver como atender mais, escrever menos e receber mais rápido — tudo com IA. Vamos lá?`,
+          description: `Olá, Doutor(a) ${firstName}! Eu sou o DEX. Vou te mostrar como você nunca mais vai precisar digitar uma ficha. Você fala — eu transcrevo, estruturo e preparo o orçamento. Em tempo real. Vamos ver?`,
         },
+        modoConsultaStep,
         {
           id: 'AGENDA',
           path: '/dashboard/agendamentos',
@@ -330,8 +346,9 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
         id: 'INTRO',
         path: '/dashboard',
         title: '',
-        description: `Olá, Doutor(a) ${firstName}! Eu sou o DEX, a IA do Odonto.IA. Em 2 minutos você vai ver como sua clínica vai rodar no piloto automático — agenda, fichas, orçamentos, financeiro e bot WhatsApp. Vamos?`,
+        description: `Olá, Doutor(a) ${firstName}! Eu sou o DEX. Vou te mostrar como você nunca mais vai precisar digitar uma ficha. Você fala — eu transcrevo, estruturo e preparo o orçamento. Em tempo real. Vamos ver?`,
       },
+      modoConsultaStep,
       {
         id: 'AGENDA',
         path: '/dashboard/agendamentos',
@@ -810,6 +827,7 @@ export function DexOnboarding({ nome, dentistaId, role = 'owner', plano }: DexOn
           }} />
 
           <AnimatePresence mode="wait">
+            {step.simulacao === 'modoConsulta'   && <SimModoConsulta   key="sim-mc" />}
             {step.simulacao === 'agendamento'    && <SimAgendamento    key="sim-ag" />}
             {step.simulacao === 'perfilPaciente' && <SimPerfilPaciente key="sim-perfil" />}
             {step.simulacao === 'orcamento'      && <SimOrcamento      key="sim-or" />}

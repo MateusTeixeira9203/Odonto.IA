@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Building2, Clock, Stethoscope, Check, Plus, Loader2, Pencil, X, Users, UserCircle, LogOut, AlertTriangle, ImageIcon, FileUp, CreditCard, Gift, Copy, ArrowUpRight, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { ImportarProcedimentosModal } from './importar-procedimentos-modal';
+import { MigrarClinicaModal } from './migrar-clinica-modal';
 import { createClient } from '@/lib/supabase/client';
 import { getLabelContexto, getPlano } from '@/lib/planos';
 import type { PlanoId } from '@/lib/planos';
@@ -84,7 +85,9 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // --- Plano e Indicação ---
-  const [copiouLink, setCopiouLink] = useState(false);
+  const [migrarOpen, setMigrarOpen]   = useState(false);
+  const dentistasAtivos = (equipe?.usuarios ?? []).filter((u) => u.role !== 'secretaria' && u.ativo).length;
+  const [copiouLink, setCopiouLink]   = useState(false);
   const codigoIndicacao = (clinicId ?? '').replace(/-/g, '').slice(0, 8).toUpperCase();
   const baseUrl = appUrl ?? 'https://dentia.app.br';
   const linkIndicacao = `${baseUrl}/cadastro?ref=${codigoIndicacao}`;
@@ -328,6 +331,7 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
   const categorias = Array.from(new Set(procedimentos.map((p) => p.categoria)));
 
   return (
+    <>
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto w-full">
       <motion.header
         initial={{ opacity: 0, y: -20 }}
@@ -1011,13 +1015,13 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
                     </p>
                   </div>
                   {isSolo && (
-                    <Link
-                      href="/planos"
+                    <button
+                      onClick={() => setMigrarOpen(true)}
                       className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-teal bg-teal/10 border border-teal/20 hover:bg-teal/20 transition-colors shrink-0"
                     >
-                      Fazer upgrade
+                      Criar Clínica
                       <ArrowUpRight className="w-3.5 h-3.5" />
-                    </Link>
+                    </button>
                   )}
                 </div>
 
@@ -1048,6 +1052,53 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
                   </div>
                 )}
               </div>
+
+              {/* Card: Progresso de Migração (Solo com convites enviados) */}
+              {isSolo && dentistasAtivos > 1 && (
+                <div className="bg-surface p-6 rounded-3xl border border-amber-400/25 shadow-sm">
+                  <div className="flex items-start justify-between gap-4 mb-5">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-500 font-mono mb-1">Em progresso</p>
+                      <h3 className="font-heading text-lg text-text-primary">Migração para Clínica</h3>
+                      <p className="text-sm text-text-secondary mt-1">
+                        Confirme mais {Math.max(0, 3 - dentistasAtivos)} dentista{3 - dentistasAtivos !== 1 ? 's' : ''} para ativar o plano.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {[1, 2, 3].map((n) => {
+                        const ativo = n <= dentistasAtivos;
+                        return (
+                          <div
+                            key={n}
+                            className={[
+                              'w-9 h-9 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all',
+                              ativo ? 'border-teal bg-teal/10 text-teal' : 'border-border bg-surface-alt text-text-secondary',
+                            ].join(' ')}
+                          >
+                            {ativo ? <Check className="w-4 h-4 stroke-[3]" /> : n}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  {dentistasAtivos >= 3 ? (
+                    <button
+                      onClick={() => setMigrarOpen(true)}
+                      className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-bold text-white transition-all hover:-translate-y-0.5"
+                      style={{ background: 'linear-gradient(135deg, #2f9c85, #1e7a67)', boxShadow: '0 4px 16px rgba(47,156,133,0.35)' }}
+                    >
+                      <Sparkles className="w-4 h-4" /> Ativar Plano Clínica agora
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setMigrarOpen(true)}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-teal bg-teal/10 border border-teal/20 hover:bg-teal/20 transition-colors"
+                    >
+                      Convidar mais colegas <ArrowUpRight className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              )}
 
               {/* Card: Programa de Indicação */}
               <div
@@ -1190,5 +1241,13 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
         </div>
       )}
     </div>
+
+    <MigrarClinicaModal
+      open={migrarOpen}
+      onClose={() => setMigrarOpen(false)}
+      dentistasAtivos={dentistasAtivos}
+      onPlanoAtivado={() => router.refresh()}
+    />
+    </>
   );
 }

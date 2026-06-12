@@ -370,7 +370,7 @@ export function FinanceiroClient({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="p-8 max-w-5xl mx-auto w-full"
+      className="p-4 md:p-8 max-w-5xl mx-auto w-full"
     >
       {/* ── Cabeçalho ──────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
@@ -566,9 +566,9 @@ export function FinanceiroClient({
           {/* ── Zona 3: Extrato do Mês ──────────────────────────────────────── */}
           <div className="bg-surface rounded-3xl border border-border overflow-hidden">
             {/* Header do extrato */}
-            <div className="flex items-center gap-3 px-6 py-4 border-b border-border">
+            <div className="flex flex-wrap items-center gap-2 px-4 md:px-6 py-4 border-b border-border">
               <h2 className="font-semibold text-text-primary">Extrato do Mês</h2>
-              <span className="font-mono text-xs text-text-secondary ml-1">
+              <span className="font-mono text-xs text-text-secondary">
                 {lancamentos.length} {lancamentos.length !== 1 ? 'lançamentos' : 'lançamento'}
               </span>
               <div className="ml-auto flex items-center gap-2">
@@ -791,7 +791,7 @@ export function FinanceiroClient({
 
       {/* ── Sheet: formulário de lançamento ──────────────────────────────────── */}
       <Sheet open={sheetMode !== null} onOpenChange={open => { if (!open) setSheetMode(null); }}>
-        <SheetContent side="right" className="w-full sm:max-w-md bg-surface border-l border-border p-0 flex flex-col">
+        <SheetContent side="right" className="!w-full sm:!max-w-md bg-surface border-l border-border p-0 flex flex-col">
           <SheetHeader className="px-6 pt-6 pb-4 border-b border-border">
             <SheetTitle className="flex items-center gap-2 text-base font-semibold">
               {sheetMode === 'saida' ? (
