@@ -911,6 +911,43 @@ function HomeView({
           </>
         )}
 
+        {/* ── DEX atividade — background work ────────────────────────────────── */}
+        {ctx && (
+          <div className="rounded-xl overflow-hidden"
+            style={{ background: cardBg, border: `1px solid ${cardBrd}` }}>
+            <div className="px-3.5 py-2.5 flex items-center gap-2"
+              style={{ borderBottom: `1px solid ${divider}` }}>
+              <motion.span
+                className="w-1.5 h-1.5 rounded-full shrink-0"
+                style={{ background: '#22c55e' }}
+                animate={{ opacity: [1, 0.35, 1] }}
+                transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+              />
+              <span className="text-[8px] font-bold uppercase tracking-[0.2em] font-mono" style={{ color: '#2f9c85' }}>
+                DEX · esta semana
+              </span>
+              <span className="ml-auto text-[7px] font-mono uppercase tracking-widest px-1.5 py-0.5 rounded"
+                style={{ background: 'rgba(251,191,36,0.12)', color: 'rgba(251,191,36,0.6)', border: '1px solid rgba(251,191,36,0.2)' }}>
+                demo
+              </span>
+            </div>
+            <div className="px-3.5 py-2.5 space-y-2">
+              {([
+                { n: ctx.consultasSemana || 5, label: `consulta${(ctx.consultasSemana || 5) !== 1 ? 's' : ''} agendada${(ctx.consultasSemana || 5) !== 1 ? 's' : ''}`, color: '#2f9c85' },
+                { n: 3,                        label: 'confirmações enviadas via WhatsApp',            color: '#2f9c85' },
+                { n: 2,                        label: 'lembretes de retorno disparados',               color: textMuted },
+              ] as const).map((item, i) => (
+                <div key={i} className="flex items-center gap-2.5">
+                  <span className="text-xs font-bold font-mono w-4 text-right shrink-0" style={{ color: item.color }}>
+                    {item.n}
+                  </span>
+                  <span className="text-[10px]" style={{ color: textMuted }}>{item.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* ── Ações urgentes ──────────────────────────────────────────────────── */}
         {ctx && urgentInsights.length > 0 && (
           <div className="space-y-1.5">
