@@ -186,8 +186,8 @@ export function DexWidget({ nome, dentistaId, hideTrigger }: DexWidgetProps) {
                   position: 'fixed',
                   top: '50%',
                   left: '50%',
-                  width: '65vw',
-                  height: '75vh',
+                  width: '75vw',
+                  height: '90vh',
                   zIndex: 999,
                   borderRadius: '1.5rem',
                   display: 'flex',
@@ -817,7 +817,7 @@ function HomeView({
               style={{ background: 'rgba(47,156,133,0.07)', border: '1px solid rgba(47,156,133,0.18)' }}>
               <ScoreRing score={MOCK_OPS.clinicaScore} />
               <div className="flex-1 min-w-0">
-                <p className="text-[8px] font-bold uppercase tracking-[0.22em] font-mono mb-1" style={{ color: '#2f9c85' }}>
+                <p className="text-[10px] font-bold uppercase tracking-[0.22em] font-mono mb-1" style={{ color: '#2f9c85' }}>
                   Clínica Score
                 </p>
                 <div className="flex items-baseline gap-1.5 mb-1.5">
@@ -842,7 +842,7 @@ function HomeView({
               {/* Conversão */}
               <div className="rounded-xl p-3 flex flex-col gap-1.5"
                 style={{ background: cardBg, border: `1px solid ${cardBrd}` }}>
-                <p className="text-[8px] font-bold uppercase tracking-[0.18em] font-mono" style={{ color: textMuted }}>Conversão</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] font-mono" style={{ color: textMuted }}>Conversão</p>
                 <div className="flex items-baseline gap-1">
                   <span className="text-xl font-bold font-mono leading-none" style={{ color: textMain }}>
                     {conversao}%
@@ -861,7 +861,7 @@ function HomeView({
               {/* Ticket médio */}
               <div className="rounded-xl p-3 flex flex-col gap-1.5"
                 style={{ background: cardBg, border: `1px solid ${cardBrd}` }}>
-                <p className="text-[8px] font-bold uppercase tracking-[0.18em] font-mono" style={{ color: textMuted }}>Ticket Médio</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] font-mono" style={{ color: textMuted }}>Ticket Médio</p>
                 <div className="flex items-baseline gap-1">
                   <span className="text-xl font-bold font-mono leading-none" style={{ color: textMain }}>
                     R${MOCK_OPS.ticketMedio}
@@ -877,7 +877,7 @@ function HomeView({
               {/* Comparecimento */}
               <div className="rounded-xl p-3 flex flex-col gap-1.5"
                 style={{ background: cardBg, border: `1px solid ${cardBrd}` }}>
-                <p className="text-[8px] font-bold uppercase tracking-[0.18em] font-mono" style={{ color: textMuted }}>Comparecimento</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] font-mono" style={{ color: textMuted }}>Comparecimento</p>
                 <div className="flex items-baseline gap-1">
                   <span className="text-xl font-bold font-mono leading-none" style={{ color: textMain }}>
                     {MOCK_OPS.comparecimento}%
@@ -894,7 +894,7 @@ function HomeView({
               {/* Consultas */}
               <div className="rounded-xl p-3 flex flex-col gap-1.5"
                 style={{ background: cardBg, border: `1px solid ${cardBrd}` }}>
-                <p className="text-[8px] font-bold uppercase tracking-[0.18em] font-mono" style={{ color: textMuted }}>Consultas</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] font-mono" style={{ color: textMuted }}>Consultas</p>
                 <div className="flex items-baseline gap-1">
                   <span className="text-xl font-bold font-mono leading-none" style={{ color: textMain }}>
                     {ctx.consultasSemana}
@@ -911,49 +911,12 @@ function HomeView({
           </>
         )}
 
-        {/* ── DEX atividade — background work ────────────────────────────────── */}
-        {ctx && (
-          <div className="rounded-xl overflow-hidden"
-            style={{ background: cardBg, border: `1px solid ${cardBrd}` }}>
-            <div className="px-3.5 py-2.5 flex items-center gap-2"
-              style={{ borderBottom: `1px solid ${divider}` }}>
-              <motion.span
-                className="w-1.5 h-1.5 rounded-full shrink-0"
-                style={{ background: '#22c55e' }}
-                animate={{ opacity: [1, 0.35, 1] }}
-                transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
-              />
-              <span className="text-[8px] font-bold uppercase tracking-[0.2em] font-mono" style={{ color: '#2f9c85' }}>
-                DEX · esta semana
-              </span>
-              <span className="ml-auto text-[7px] font-mono uppercase tracking-widest px-1.5 py-0.5 rounded"
-                style={{ background: 'rgba(251,191,36,0.12)', color: 'rgba(251,191,36,0.6)', border: '1px solid rgba(251,191,36,0.2)' }}>
-                demo
-              </span>
-            </div>
-            <div className="px-3.5 py-2.5 space-y-2">
-              {([
-                { n: ctx.consultasSemana || 5, label: `consulta${(ctx.consultasSemana || 5) !== 1 ? 's' : ''} agendada${(ctx.consultasSemana || 5) !== 1 ? 's' : ''}`, color: '#2f9c85' },
-                { n: 3,                        label: 'confirmações enviadas via WhatsApp',            color: '#2f9c85' },
-                { n: 2,                        label: 'lembretes de retorno disparados',               color: textMuted },
-              ] as const).map((item, i) => (
-                <div key={i} className="flex items-center gap-2.5">
-                  <span className="text-xs font-bold font-mono w-4 text-right shrink-0" style={{ color: item.color }}>
-                    {item.n}
-                  </span>
-                  <span className="text-[10px]" style={{ color: textMuted }}>{item.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* ── Ações urgentes ──────────────────────────────────────────────────── */}
         {ctx && urgentInsights.length > 0 && (
           <div className="space-y-1.5">
             <div className="flex items-center gap-2">
               <div className="h-px flex-1" style={{ background: divider }} />
-              <span className="text-[9px] font-bold uppercase tracking-[0.2em] px-1 font-mono" style={{ color: textMuted }}>
+              <span className="text-[11px] font-bold uppercase tracking-[0.2em] px-1 font-mono" style={{ color: textMuted }}>
                 Ações
               </span>
               <div className="h-px flex-1" style={{ background: divider }} />
@@ -972,8 +935,8 @@ function HomeView({
                     <Icon className="w-3.5 h-3.5" style={{ color: colors.icon }} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold leading-snug" style={{ color: textMain }}>{insight.label}</p>
-                    <p className="text-[10px] mt-0.5 truncate" style={{ color: textMuted }}>{insight.sublabel}</p>
+                    <p className="text-sm font-bold leading-snug" style={{ color: textMain }}>{insight.label}</p>
+                    <p className="text-xs mt-0.5 truncate" style={{ color: textMuted }}>{insight.sublabel}</p>
                   </div>
                   <ChevronRight className="w-3.5 h-3.5 shrink-0" style={{ color: colors.icon, opacity: 0.7 }} />
                 </button>
@@ -984,12 +947,49 @@ function HomeView({
             <div className="rounded-xl px-3.5 py-2.5 flex items-start gap-2"
               style={{ background: 'rgba(47,156,133,0.05)', border: '1px solid rgba(47,156,133,0.13)' }}>
               <Bot className="w-3 h-3 shrink-0 mt-0.5" style={{ color: '#2f9c85' }} />
-              <p className="text-[10px] leading-relaxed" style={{ color: textMuted }}>
+              <p className="text-xs leading-relaxed" style={{ color: textMuted }}>
                 {urgentInsights[0].items.length > 0
                   ? `${urgentInsights[0].items.slice(0, 2).map(i => i.label.split(' ')[0]).join(' e ')} aguardam. Resolva as ações acima para manter o fluxo operacional.`
                   : 'Resolva as ações acima para manter o fluxo operacional da clínica.'
                 }
               </p>
+            </div>
+          </div>
+        )}
+
+        {/* ── DEX atividade — background work ────────────────────────────────── */}
+        {ctx && (
+          <div className="rounded-xl overflow-hidden"
+            style={{ background: cardBg, border: `1px solid ${cardBrd}` }}>
+            <div className="px-3.5 py-2.5 flex items-center gap-2"
+              style={{ borderBottom: `1px solid ${divider}` }}>
+              <motion.span
+                className="w-1.5 h-1.5 rounded-full shrink-0"
+                style={{ background: '#22c55e' }}
+                animate={{ opacity: [1, 0.35, 1] }}
+                transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+              />
+              <span className="text-[11px] font-bold uppercase tracking-[0.2em] font-mono" style={{ color: '#2f9c85' }}>
+                DEX · esta semana
+              </span>
+              <span className="ml-auto text-[9px] font-mono uppercase tracking-widest px-1.5 py-0.5 rounded"
+                style={{ background: 'rgba(251,191,36,0.12)', color: 'rgba(251,191,36,0.6)', border: '1px solid rgba(251,191,36,0.2)' }}>
+                demo
+              </span>
+            </div>
+            <div className="px-3.5 py-3 space-y-2.5">
+              {([
+                { n: ctx.consultasSemana || 5, label: `consulta${(ctx.consultasSemana || 5) !== 1 ? 's' : ''} agendada${(ctx.consultasSemana || 5) !== 1 ? 's' : ''}`, color: '#2f9c85' },
+                { n: 3,                        label: 'confirmações enviadas via WhatsApp',            color: '#2f9c85' },
+                { n: 2,                        label: 'lembretes de retorno disparados',               color: textMuted },
+              ] as const).map((item, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <span className="text-sm font-bold font-mono w-5 text-right shrink-0" style={{ color: item.color }}>
+                    {item.n}
+                  </span>
+                  <span className="text-xs" style={{ color: textMuted }}>{item.label}</span>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -1003,7 +1003,7 @@ function HomeView({
               <p className="text-xs font-bold" style={{ color: isDark ? '#fbbf24' : '#92400e' }}>
                 {ctx!.aniversariantesHoje.length === 1 ? 'Aniversariante hoje' : `${ctx!.aniversariantesHoje.length} aniversariantes hoje`}
               </p>
-              <p className="text-[10px] mt-0.5 truncate" style={{ color: textMuted }}>
+              <p className="text-xs mt-0.5 truncate" style={{ color: textMuted }}>
                 {ctx!.aniversariantesHoje.map(a => a.nome.split(' ')[0]).join(', ')}
               </p>
             </div>
@@ -1028,7 +1028,7 @@ function HomeView({
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold leading-snug" style={{ color: textMain }}>{insight.label}</p>
-                    <p className="text-[9px] mt-0.5 truncate" style={{ color: textMuted }}>{insight.sublabel}</p>
+                    <p className="text-xs mt-0.5 truncate" style={{ color: textMuted }}>{insight.sublabel}</p>
                   </div>
                   <ChevronRight className="w-3 h-3 shrink-0" style={{ color: colors.icon, opacity: 0.5 }} />
                 </button>
