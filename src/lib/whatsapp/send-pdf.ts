@@ -5,7 +5,7 @@
 
 import { createServiceClient } from '@/lib/supabase/service';
 import { gerarPDFOrcamento, type OrcamentoData } from '@/lib/pdf/orcamento';
-import { sendWhatsAppFile } from './evolution';
+import { sendFile } from './provider';
 
 const BRT_OFFSET_H = 3;
 
@@ -101,10 +101,18 @@ export async function sendOrcamentoWhatsApp(
   pacienteId: string | null,
   clinicaId: string,
 ): Promise<string> {
-  const instance = process.env.EVOLUTION_DEFAULT_INSTANCE;
-  if (!instance) return 'Serviço de envio não configurado. Fale com nossa equipe.';
-
   const db = createServiceClient();
+  const { data: clinicaRow } = await db
+    .from('clinicas')
+    .select('whatsapp_phone_number_id')
+    .eq('id', clinicaId)
+    .maybeSingle();
+
+  const phoneNumberId =
+    (clinicaRow?.whatsapp_phone_number_id as string | null) ??
+    process.env.WHATSAPP_PHONE_NUMBER_ID;
+
+  if (!phoneNumberId) return 'Serviço de envio não configurado. Fale com nossa equipe.';
 
   // Se não há paciente_id vinculado, tenta encontrar pelo WhatsApp
   let resolvedPacienteId = pacienteId;
@@ -163,10 +171,10 @@ export async function sendOrcamentoWhatsApp(
   const caption  = `Orçamento nº ${data.numero} — emitido em ${dataFormatada}`;
 
   try {
-    await sendWhatsAppFile(instance, numero, base64, filename, caption);
+    await sendFile(phoneNumberId, numero, base64, filename, caption, 'application/pdf');
     return `✅ Seu orçamento (nº ${data.numero}) foi enviado como arquivo acima! 📄`;
   } catch (err) {
-    console.error('[send-pdf] Erro ao enviar via Evolution API:', err);
+    console.error('[send-pdf] Erro ao enviar PDF via WhatsApp:', err);
     return 'Tive um problema ao enviar o arquivo. Fale com nossa equipe.';
   }
 }

@@ -7,8 +7,6 @@ import {
   Mic,
   MicOff,
   Trash2,
-  MoreVertical,
-  Edit2,
   FileText,
   Download,
   Upload,
@@ -18,8 +16,9 @@ import {
   Sparkles,
   Lock,
   PenLine,
-  ChevronDown,
   Clock,
+  Circle,
+  ChevronRight,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { DexLoader } from "@/components/ui/dex-loader";
@@ -33,13 +32,6 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
 import { createClient } from "@/lib/supabase/client";
 import { HelpTooltip } from "@/components/ui/help-tooltip";
 import { criarOrcamento } from "@/app/dashboard/orcamentos/actions";
@@ -48,16 +40,7 @@ import { temFeature, type PlanoId } from "@/lib/planos";
 import { Odontograma } from "@/components/odontograma/Odontograma";
 import dynamic from 'next/dynamic';
 import type SignaturePadLib from 'signature_pad';
-import { format as fmtDate, parseISO } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import {
-  buscarTratamentoAtivo,
-  buscarHistoricoTratamentos,
-  criarTratamento,
-  vincularFichasAoTratamento,
-  encerrarTratamento,
-  type Tratamento,
-} from '@/app/dashboard/pacientes/[id]/tratamento-actions';
+import { ApresentarPaciente } from '@/components/pacientes/ApresentarPaciente';
 const SignaturePad = dynamic(
   () => import('@/components/fichas/SignaturePad').then(m => m.SignaturePad),
   { ssr: false }
@@ -81,6 +64,8 @@ const ARCH_LABELS: Record<number, string> = {
 };
 
 
+type ProcStatus = 'planejado' | 'agendado' | 'concluido';
+
 interface Evolution {
   id: string;
   date: string;
@@ -90,6 +75,7 @@ interface Evolution {
   professional: string;
   files: string[];
   procedimentosConcluidos: string[];
+  procedimentosStatus: Record<string, ProcStatus>;
   procedimentos: string[];
   conduta: string | null;
   retornoSugerido: string | null;
@@ -108,6 +94,7 @@ type FichaDB = {
   status: string;
   dentista?: { nome: string } | null;
   procedimentos_concluidos: string[];
+  procedimentos_status: Record<string, ProcStatus> | null;
   procedimentos: string[] | null;
   conduta: string | null;
   retorno_sugerido: string | null;
@@ -147,6 +134,15 @@ const mapFichaToEvolution = (f: FichaDB): Evolution => ({
   professional: f.dentista?.nome ?? "Profissional",
   files: [],
   procedimentosConcluidos: f.procedimentos_concluidos ?? [],
+  procedimentosStatus: (() => {
+    if (f.procedimentos_status && Object.keys(f.procedimentos_status).length > 0) {
+      return f.procedimentos_status;
+    }
+    // Migra modelo antigo: procedimentos_concluidos → concluido
+    const s: Record<string, ProcStatus> = {};
+    (f.procedimentos_concluidos ?? []).forEach((k) => { s[k] = 'concluido'; });
+    return s;
+  })(),
   procedimentos: f.procedimentos ?? [],
   conduta: f.conduta || null,
   retornoSugerido: f.retorno_sugerido ?? null,
@@ -160,10 +156,11 @@ interface FichasTabProps {
   clinicaId: string;
   dentistaId: string;
   plano?: PlanoId;
+  patientName?: string;
   canWrite?: boolean;
 }
 
-export function FichasTab({ patientId, clinicaId, dentistaId, plano, canWrite = true }: FichasTabProps) {
+export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName, canWrite = true }: FichasTabProps) {
   const router = useRouter();
   const [evolutions, setEvolutions] = React.useState<Evolution[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -188,21 +185,9 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, canWrite = 
   >([]);
   const [isUploading, setIsUploading] = React.useState(false);
 
-  // ── Episódios de Tratamento ──────────────────────────────────────────────
-  const [tratamentoAtivo, setTratamentoAtivo] = React.useState<Tratamento | null>(null);
-  const [historicoTratamentos, setHistoricoTratamentos] = React.useState<Tratamento[]>([]);
-  const [loadingTratamento, setLoadingTratamento] = React.useState(true);
-  const [historicoAberto, setHistoricoAberto] = React.useState(false);
-  const [modalIniciarOpen, setModalIniciarOpen] = React.useState(false);
-  const [novoTratNome, setNovoTratNome] = React.useState('');
-  const [novoTratFichasSelecionadas, setNovoTratFichasSelecionadas] = React.useState<Set<string>>(new Set());
-  const [salvandoTratamento, setSalvandoTratamento] = React.useState(false);
-  const [tratamentoError, setTratamentoError] = React.useState<string | null>(null);
-  const [modalAdicionarOpen, setModalAdicionarOpen] = React.useState(false);
-  const [adicionarFichasSelecionadas, setAdicionarFichasSelecionadas] = React.useState<Set<string>>(new Set());
-  const [adicionandoFichas, setAdicionandoFichas] = React.useState(false);
-  const [encerrando, setEncerrando] = React.useState(false);
-  const [confirmarEncerramentoOpen, setConfirmarEncerramentoOpen] = React.useState(false);
+  // ── Modo de visualização da ficha ─────────────────────────────────────────
+  const [viewingEvo, setViewingEvo] = React.useState<Evolution | null>(null);
+  const [filterTooth, setFilterTooth] = React.useState<number | null>(null);
 
   const [formData, setFormData] = React.useState({
     type: "Evolução",
@@ -275,7 +260,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, canWrite = 
       const supabase = createClient();
       const { data, error } = await supabase
         .from("fichas")
-        .select("id, created_at, queixa_principal, anotacoes, dentes_afetados, dentes_observacoes, status, procedimentos_concluidos, procedimentos, conduta, retorno_sugerido, assinatura_url, assinado_em, tratamento_id, dentista:dentistas(nome)")
+        .select("id, created_at, queixa_principal, anotacoes, dentes_afetados, dentes_observacoes, status, procedimentos_concluidos, procedimentos_status, procedimentos, conduta, retorno_sugerido, assinatura_url, assinado_em, tratamento_id, dentista:dentistas(nome)")
         .eq("paciente_id", patientId)
         .eq("clinica_id", clinicaId)
         .order("created_at", { ascending: false });
@@ -295,19 +280,6 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, canWrite = 
     }
   }, [patientId, clinicaId, fetchFichas]);
 
-  React.useEffect(() => {
-    if (!patientId || !clinicaId) return;
-    void (async () => {
-      setLoadingTratamento(true);
-      const [ativo, historico] = await Promise.all([
-        buscarTratamentoAtivo(patientId),
-        buscarHistoricoTratamentos(patientId),
-      ]);
-      setTratamentoAtivo(ativo.tratamento);
-      setHistoricoTratamentos(historico.tratamentos);
-      setLoadingTratamento(false);
-    })();
-  }, [patientId, clinicaId]);
 
   // Dentes mencionados em fichas anteriores — usados pelo odontograma premium
   const historicalTeeth = React.useMemo(() => {
@@ -626,6 +598,19 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, canWrite = 
     setUploadedFiles([]);
   };
 
+  const updateProcStatus = async (fichaId: string, currentStatus: Record<string, ProcStatus>, procKey: string, newStatus: ProcStatus) => {
+    const updatedStatus = { ...currentStatus, [procKey]: newStatus };
+    setEvolutions((prev) => prev.map((e) => e.id === fichaId ? { ...e, procedimentosStatus: updatedStatus } : e));
+    setViewingEvo((prev) => prev?.id === fichaId ? { ...prev, procedimentosStatus: updatedStatus } : prev);
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('fichas')
+      .update({ procedimentos_status: updatedStatus })
+      .eq('id', fichaId)
+      .eq('clinica_id', clinicaId);
+    if (error) console.error('[proc-status]', error);
+  };
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -753,80 +738,11 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, canWrite = 
     }
   };
 
-  // ── Handlers de Tratamento ───────────────────────────────────────────────
-
-  const handleIniciarTratamento = async (): Promise<void> => {
-    setSalvandoTratamento(true);
-    setTratamentoError(null);
-    const result = await criarTratamento(
-      patientId,
-      novoTratNome.trim() || null,
-      Array.from(novoTratFichasSelecionadas)
-    );
-    if (result.error) {
-      setTratamentoError(result.error);
-      setSalvandoTratamento(false);
-      return;
-    }
-    const [ativo, historico] = await Promise.all([
-      buscarTratamentoAtivo(patientId),
-      buscarHistoricoTratamentos(patientId),
-    ]);
-    setTratamentoAtivo(ativo.tratamento);
-    setHistoricoTratamentos(historico.tratamentos);
-    await fetchFichas();
-    setModalIniciarOpen(false);
-    setNovoTratNome('');
-    setNovoTratFichasSelecionadas(new Set());
-    setSalvandoTratamento(false);
-  };
-
-  const handleEncerrarTratamento = async (): Promise<void> => {
-    if (!tratamentoAtivo) return;
-    setEncerrando(true);
-    const result = await encerrarTratamento(tratamentoAtivo.id, patientId);
-    if (result.error) {
-      setEncerrando(false);
-      return;
-    }
-    const [ativo, historico] = await Promise.all([
-      buscarTratamentoAtivo(patientId),
-      buscarHistoricoTratamentos(patientId),
-    ]);
-    setTratamentoAtivo(ativo.tratamento);
-    setHistoricoTratamentos(historico.tratamentos);
-    setConfirmarEncerramentoOpen(false);
-    setEncerrando(false);
-  };
-
-  const handleAdicionarFichasAoTratamento = async (): Promise<void> => {
-    if (!tratamentoAtivo) return;
-    setAdicionandoFichas(true);
-    await vincularFichasAoTratamento(
-      tratamentoAtivo.id,
-      Array.from(adicionarFichasSelecionadas),
-      patientId
-    );
-    await fetchFichas();
-    setModalAdicionarOpen(false);
-    setAdicionarFichasSelecionadas(new Set());
-    setAdicionandoFichas(false);
-  };
-
   if (isLoading) {
     return (
       <DexLoader className="p-20" />
     );
   }
-
-  // ── Computed: fichas agrupadas por episódio ──────────────────────────────
-  const fichasDoTratamentoAtivo = tratamentoAtivo
-    ? evolutions.filter(e => e.tratamentoId === tratamentoAtivo.id)
-    : [];
-  const fichasAvulsas = evolutions.filter(e => e.tratamentoId === null);
-  const fichasPorTratamento = (tratId: string) =>
-    evolutions.filter(e => e.tratamentoId === tratId);
-  const fichasDisponiveis = evolutions.filter(e => e.tratamentoId === null);
 
   return (
     <div className="space-y-6">
@@ -1230,60 +1146,8 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, canWrite = 
         )}
       </AnimatePresence>
 
-      {/* ── EPISÓDIO DE TRATAMENTO ───────────────────────────────── */}
-      {!loadingTratamento && (
-        <div className="mb-6 space-y-4">
-          {tratamentoAtivo ? (
-            <div className="rounded-2xl border border-teal/20 bg-teal/5 overflow-hidden">
-              <div className="flex items-center justify-between px-5 py-3.5 border-b border-teal/10">
-                <div className="flex items-center gap-2.5">
-                  <span className="w-2 h-2 rounded-full bg-teal animate-pulse shrink-0" />
-                  <div>
-                    <p className="text-sm font-bold text-teal leading-tight">
-                      {tratamentoAtivo.nome ?? 'Tratamento ativo'}
-                    </p>
-                    <p className="text-[10px] text-teal/70 font-medium">
-                      Desde {fmtDate(parseISO(tratamentoAtivo.created_at), "dd 'de' MMM yyyy", { locale: ptBR })}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setConfirmarEncerramentoOpen(true)}
-                  disabled={encerrando}
-                  className="text-xs font-bold text-teal/70 hover:text-teal transition-colors flex items-center gap-1 disabled:opacity-40"
-                >
-                  {encerrando ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
-                  Encerrar
-                </button>
-              </div>
-              <div className="px-5 py-4">
-                {fichasDoTratamentoAtivo.length === 0 ? (
-                  <p className="text-xs text-teal/60 italic">Nenhuma ficha vinculada ainda</p>
-                ) : (
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {fichasDoTratamentoAtivo.map(f => (
-                      <span
-                        key={f.id}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-surface border border-teal/20 text-text-primary"
-                      >
-                        <FileText className="w-3 h-3 text-teal/60" />
-                        {f.type} · {f.date.split(' ')[0]}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <button
-                  onClick={() => { setAdicionarFichasSelecionadas(new Set()); setModalAdicionarOpen(true); }}
-                  className="text-xs font-semibold text-teal hover:text-teal-lt transition-colors flex items-center gap-1"
-                >
-                  <Plus className="w-3 h-3" />
-                  Adicionar ficha existente
-                </button>
-              </div>
-            </div>
-          ) : null}
-        </div>
-      )}
+      {/* Episódio de tratamento removido na Fase 3 (1 ficha = 1 tratamento).
+          Estado/handlers/modais órfãos do subsistema serão limpos no passo 1b. */}
 
       {/* Timeline */}
       {evolutions.length === 0 && !isPanelOpen && (
@@ -1296,21 +1160,22 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, canWrite = 
       )}
 
       <div className="relative space-y-14 before:absolute before:left-[19px] before:top-4 before:bottom-4 before:w-px before:bg-border/40">
-        {/* Fichas avulsas */}
-        {fichasAvulsas.length > 0 && (
+        {/* Lista cronológica plana — todas as fichas (modelo 1 ficha = 1 tratamento) */}
+        {evolutions.length > 0 && (
           <div className="space-y-14">
-            {tratamentoAtivo && (
-              <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary/50 mb-3">
-                Fichas avulsas
-              </p>
-            )}
-            {fichasAvulsas.map((evo, idx) => {
+            {evolutions.map((evo, idx) => {
+              const isExpanded = viewingEvo?.id === evo.id;
               const validKeys = evo.teethNotes.flatMap((tn) =>
                 tn.notes.filter(Boolean).map((_, i) => `${tn.tooth}_${i}`)
               );
               const totalProcs = validKeys.length;
-              const doneProcs = evo.procedimentosConcluidos.filter((k) => validKeys.includes(k)).length;
+              const doneProcs = validKeys.filter((k) => evo.procedimentosStatus[k] === 'concluido').length;
               const allDone = totalProcs > 0 && doneProcs === totalProcs;
+              const pct = totalProcs > 0 ? Math.round((doneProcs / totalProcs) * 100) : 0;
+              const affectedTeeth = new Set(evo.teethNotes.filter((tn) => tn.tooth < 90).map((tn) => tn.tooth));
+              const filteredTeethNotes = isExpanded && filterTooth
+                ? evo.teethNotes.filter((tn) => tn.tooth === filterTooth)
+                : evo.teethNotes;
 
               return (
               <motion.div
@@ -1320,7 +1185,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, canWrite = 
                 transition={{ delay: idx * 0.05 }}
                 className="relative pl-10 sm:pl-12 group"
               >
-                <div className={`absolute left-0 top-1 w-10 h-10 rounded-full bg-surface border-2 flex items-center justify-center z-10 shadow-sm group-hover:scale-110 transition-transform ${allDone ? 'border-emerald-500' : 'border-teal'}`}>
+                <div className={`absolute left-0 top-1 w-10 h-10 rounded-full bg-surface border-2 flex items-center justify-center z-10 shadow-sm transition-all ${allDone ? 'border-emerald-500' : 'border-teal'} ${isExpanded ? 'scale-110' : 'group-hover:scale-110'}`}>
                   {allDone
                     ? <Check className="w-4 h-4 text-emerald-500" />
                     : <div className="w-2 h-2 rounded-full bg-teal" />
@@ -1328,302 +1193,304 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, canWrite = 
                 </div>
 
                 <div
-                  className="bg-surface rounded-2xl border border-border/60 shadow-sm p-6 hover:shadow-md transition-all"
-                  style={allDone ? { boxShadow: '-3px 0 0 0 #10b981, 0 1px 3px rgba(0,0,0,0.06)' } : undefined}
+                  className={`bg-surface rounded-2xl border transition-all duration-200 ${isExpanded ? 'border-teal/50 shadow-lg' : 'border-border/60 shadow-sm'}`}
+                  style={allDone && !isExpanded ? { boxShadow: '-3px 0 0 0 #10b981, 0 1px 3px rgba(0,0,0,0.06)' } : undefined}
                 >
-                  <div className="flex flex-wrap justify-between items-start mb-4 gap-2">
-                    <div className="space-y-1 min-w-0">
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <span className="bg-teal/10 text-teal px-2.5 py-1 rounded-md text-[9px] font-bold uppercase tracking-widest">
-                          {evo.type}
-                        </span>
-                        <h4 className="text-sm font-bold text-text-primary">{evo.date}</h4>
-                        {totalProcs > 0 && (
-                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold border ${allDone ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/20'}`}>
-                            {allDone ? '✓ Concluído' : `${doneProcs}/${totalProcs} realizados`}
+                  {/* Header — sempre visível, clicável para expandir */}
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => { setFilterTooth(null); setViewingEvo(isExpanded ? null : evo); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFilterTooth(null); setViewingEvo(isExpanded ? null : evo); } }}
+                    className="p-6 cursor-pointer hover:bg-surface-alt/30 rounded-t-2xl transition-colors"
+                  >
+                    <div className="flex flex-wrap justify-between items-start gap-2">
+                      <div className="space-y-1 min-w-0">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <span className="bg-teal/10 text-teal px-2.5 py-1 rounded-md text-[9px] font-bold uppercase tracking-widest">
+                            {evo.type}
                           </span>
-                        )}
+                          <h4 className="text-sm font-bold text-text-primary">{evo.date}</h4>
+                          {totalProcs > 0 && (
+                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold border ${allDone ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/20'}`}>
+                              {allDone ? '✓ Concluído' : `${doneProcs}/${totalProcs} realizados`}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] text-text-secondary font-medium">
+                          <User className="w-3 h-3" /> {evo.professional}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 text-[10px] text-text-secondary font-medium">
-                        <User className="w-3 h-3" /> {evo.professional}
-                      </div>
-                    </div>
 
-                    <div className="flex items-center gap-2">
-                      {evo.assinadoEm ? (
-                        <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[9px] font-bold">
-                          <Check className="w-3 h-3" />
-                          Assinado em {new Date(evo.assinadoEm).toLocaleDateString('pt-BR')}
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => setSigningFichaId(evo.id)}
-                          className="flex items-center gap-1.5 px-2.5 py-1.5 min-h-[36px] rounded-lg text-[10px] font-bold border border-border text-text-secondary hover:border-teal hover:text-teal transition-colors"
-                        >
-                          <PenLine className="w-3 h-3" />
-                          Assinar
-                        </button>
-                      )}
-
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button className="p-2 hover:bg-surface-alt rounded-lg transition-colors text-text-secondary hover:text-text-primary">
-                            <MoreVertical className="w-4 h-4" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEdit(evo)}>
-                            <Edit2 className="w-3 h-3" /> Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => window.open(`/api/fichas/${evo.id}/pdf`, '_blank')}>
-                            <Download className="w-3 h-3" /> Imprimir Ficha
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={() => setShowDeleteConfirm(evo.id)}
-                            className="text-red-500 focus:text-red-500"
+                      <div className="flex items-center gap-2">
+                        {evo.assinadoEm ? (
+                          <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[9px] font-bold">
+                            <Check className="w-3 h-3" />
+                            Assinado em {new Date(evo.assinadoEm).toLocaleDateString('pt-BR')}
+                          </span>
+                        ) : (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setSigningFichaId(evo.id); }}
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 min-h-[36px] rounded-lg text-[10px] font-bold border border-border text-text-secondary hover:border-teal hover:text-teal transition-colors"
                           >
-                            <Trash2 className="w-3 h-3" /> Excluir
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                            <PenLine className="w-3 h-3" />
+                            Assinar
+                          </button>
+                        )}
+
+                        {canWrite && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleEdit(evo); }}
+                            title="Editar"
+                            className="p-2 hover:bg-surface-alt rounded-lg transition-colors text-text-secondary hover:text-teal"
+                          >
+                            <PenLine className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); window.open(`/api/fichas/${evo.id}/pdf`, '_blank'); }}
+                          title="Imprimir"
+                          className="p-2 hover:bg-surface-alt rounded-lg transition-colors text-text-secondary hover:text-text-primary"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(evo.id); }}
+                          title="Excluir"
+                          className="p-2 hover:bg-surface-alt rounded-lg transition-colors text-text-secondary hover:text-red-500"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+
+                        <div className={`p-1 text-text-secondary/40 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
+                          <ChevronRight className="w-4 h-4 -rotate-90" />
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Procedimentos realizados — salvos pelo Modo Consulta */}
-                  {evo.procedimentos.length > 0 && (
-                    <div className="mb-4">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary/60 mb-2">Procedimentos realizados</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {evo.procedimentos.map((proc, i) => (
-                          <span
-                            key={i}
-                            className="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-medium border"
-                            style={{
-                              background: 'color-mix(in srgb, var(--color-teal) 8%, transparent)',
-                              color: 'var(--color-teal)',
-                              borderColor: 'color-mix(in srgb, var(--color-teal) 18%, var(--color-border))',
-                            }}
-                          >
-                            {proc}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Conduta clínica e retorno sugerido */}
-                  {(evo.conduta || evo.retornoSugerido) && (
-                    <div className="mb-4 space-y-2">
-                      {evo.conduta && (
-                        <div className="rounded-xl border border-border/50 px-3 py-2.5 bg-surface-alt/60">
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary/60 mb-1">Conduta</p>
-                          <p className="text-xs text-text-secondary leading-relaxed">{evo.conduta}</p>
-                        </div>
-                      )}
-                      {evo.retornoSugerido && (
-                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border border-border/50 bg-surface-alt text-text-secondary">
-                          <Clock className="w-3 h-3" />
-                          Retorno em {evo.retornoSugerido}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {evo.observation && (
-                    <p className="text-sm text-text-secondary leading-relaxed mb-4">
-                      {evo.observation}
-                    </p>
-                  )}
-
-                  {evo.teethNotes.length > 0 && (
-                    <div className="flex flex-col gap-2 mb-4">
-                      {evo.teethNotes.map((tn) => (
-                        <div
-                          key={tn.tooth}
-                          className="bg-surface-alt rounded-lg border border-border/40 px-3 py-2"
-                        >
-                          <span className="font-mono text-[10px] font-bold text-teal block mb-1.5">
-                            {tn.tooth in ARCH_LABELS ? ARCH_LABELS[tn.tooth] : `D${tn.tooth}`}
-                          </span>
-                          <div className="flex flex-col gap-1.5">
-                            {tn.notes.filter(Boolean).map((n, i) => {
-                              const procKey = `${tn.tooth}_${i}`;
-                              const done = evo.procedimentosConcluidos.includes(procKey);
-                              return (
-                                <div key={i} className="flex items-center gap-2">
-                                  <div className={`w-4 h-4 rounded border shrink-0 flex items-center justify-center ${done ? 'bg-emerald-500 border-emerald-500' : 'border-border/60'}`}>
-                                    {done && <Check className="w-2.5 h-2.5 text-white" />}
-                                  </div>
-                                  <span className={`text-[11px] font-medium ${done ? 'line-through text-text-secondary' : 'text-text-primary'}`}>
-                                    {n}
-                                  </span>
-                                </div>
-                              );
-                            })}
+                  {/* Preview — visível quando recolhido */}
+                  {!isExpanded && (
+                    <div className="px-6 pb-6">
+                      {evo.procedimentos.length > 0 && (
+                        <div className="mb-4">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary/60 mb-2">Procedimentos realizados</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {evo.procedimentos.map((proc, i) => (
+                              <span
+                                key={i}
+                                className="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-medium border"
+                                style={{
+                                  background: 'color-mix(in srgb, var(--color-teal) 8%, transparent)',
+                                  color: 'var(--color-teal)',
+                                  borderColor: 'color-mix(in srgb, var(--color-teal) 18%, var(--color-border))',
+                                }}
+                              >
+                                {proc}
+                              </span>
+                            ))}
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {evo.files.length > 0 && (
-                    <div className="flex gap-2">
-                      {evo.files.map((f, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center gap-2 px-3 py-2 bg-surface-alt rounded-xl border border-border/40 text-[10px] font-bold text-text-primary"
-                        >
-                          <FileText className="w-3 h-3 text-teal" /> {f}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Fichas do tratamento ativo */}
-        {fichasDoTratamentoAtivo.length > 0 && (
-          <div className="space-y-14">
-            {fichasDoTratamentoAtivo.map((evo, idx) => {
-              const validKeys = evo.teethNotes.flatMap((tn) =>
-                tn.notes.filter(Boolean).map((_, i) => `${tn.tooth}_${i}`)
-              );
-              const totalProcs = validKeys.length;
-              const doneProcs = evo.procedimentosConcluidos.filter((k) => validKeys.includes(k)).length;
-              const allDone = totalProcs > 0 && doneProcs === totalProcs;
-
-              return (
-              <motion.div
-                key={evo.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: idx * 0.05 }}
-                className="relative pl-10 sm:pl-12 group"
-              >
-                <div className={`absolute left-0 top-1 w-10 h-10 rounded-full bg-surface border-2 flex items-center justify-center z-10 shadow-sm group-hover:scale-110 transition-transform ${allDone ? 'border-emerald-500' : 'border-teal'}`}>
-                  {allDone
-                    ? <Check className="w-4 h-4 text-emerald-500" />
-                    : <div className="w-2 h-2 rounded-full bg-teal" />
-                  }
-                </div>
-
-                <div
-                  className="bg-surface rounded-2xl border border-border/60 shadow-sm p-6 hover:shadow-md transition-all"
-                  style={allDone ? { boxShadow: '-3px 0 0 0 #10b981, 0 1px 3px rgba(0,0,0,0.06)' } : undefined}
-                >
-                  <div className="flex flex-wrap justify-between items-start mb-4 gap-2">
-                    <div className="space-y-1 min-w-0">
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <span className="bg-teal/10 text-teal px-2.5 py-1 rounded-md text-[9px] font-bold uppercase tracking-widest">
-                          {evo.type}
-                        </span>
-                        <h4 className="text-sm font-bold text-text-primary">{evo.date}</h4>
-                        {totalProcs > 0 && (
-                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold border ${allDone ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/20'}`}>
-                            {allDone ? '✓ Concluído' : `${doneProcs}/${totalProcs} realizados`}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 text-[10px] text-text-secondary font-medium">
-                        <User className="w-3 h-3" /> {evo.professional}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {evo.assinadoEm ? (
-                        <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[9px] font-bold">
-                          <Check className="w-3 h-3" />
-                          Assinado em {new Date(evo.assinadoEm).toLocaleDateString('pt-BR')}
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => setSigningFichaId(evo.id)}
-                          className="flex items-center gap-1.5 px-2.5 py-1.5 min-h-[36px] rounded-lg text-[10px] font-bold border border-border text-text-secondary hover:border-teal hover:text-teal transition-colors"
-                        >
-                          <PenLine className="w-3 h-3" />
-                          Assinar
-                        </button>
                       )}
 
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button className="p-2 hover:bg-surface-alt rounded-lg transition-colors text-text-secondary hover:text-text-primary">
-                            <MoreVertical className="w-4 h-4" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEdit(evo)}>
-                            <Edit2 className="w-3 h-3" /> Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => window.open(`/api/fichas/${evo.id}/pdf`, '_blank')}>
-                            <Download className="w-3 h-3" /> Imprimir Ficha
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={() => setShowDeleteConfirm(evo.id)}
-                            className="text-red-500 focus:text-red-500"
-                          >
-                            <Trash2 className="w-3 h-3" /> Excluir
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
+                      {(evo.conduta || evo.retornoSugerido) && (
+                        <div className="mb-4 space-y-2">
+                          {evo.conduta && (
+                            <div className="rounded-xl border border-border/50 px-3 py-2.5 bg-surface-alt/60">
+                              <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary/60 mb-1">Conduta</p>
+                              <p className="text-xs text-text-secondary leading-relaxed">{evo.conduta}</p>
+                            </div>
+                          )}
+                          {evo.retornoSugerido && (
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border border-border/50 bg-surface-alt text-text-secondary">
+                              <Clock className="w-3 h-3" />
+                              Retorno em {evo.retornoSugerido}
+                            </div>
+                          )}
+                        </div>
+                      )}
 
-                  {evo.observation && (
-                    <p className="text-sm text-text-secondary leading-relaxed mb-4">
-                      {evo.observation}
-                    </p>
+                      {evo.observation && (
+                        <p className="text-sm text-text-secondary leading-relaxed mb-4">{evo.observation}</p>
+                      )}
+
+                      {evo.teethNotes.length > 0 && (
+                        <div className="flex flex-col gap-2 mb-4">
+                          {evo.teethNotes.map((tn) => (
+                            <div key={tn.tooth} className="bg-surface-alt rounded-lg border border-border/40 px-3 py-2">
+                              <span className="font-mono text-[10px] font-bold text-teal block mb-1.5">
+                                {tn.tooth in ARCH_LABELS ? ARCH_LABELS[tn.tooth] : `D${tn.tooth}`}
+                              </span>
+                              <div className="flex flex-col gap-1.5">
+                                {tn.notes.filter(Boolean).map((n, i) => {
+                                  const procKey = `${tn.tooth}_${i}`;
+                                  const done = evo.procedimentosStatus[procKey] === 'concluido';
+                                  return (
+                                    <div key={i} className="flex items-center gap-2">
+                                      <div className={`w-4 h-4 rounded border shrink-0 flex items-center justify-center ${done ? 'bg-emerald-500 border-emerald-500' : 'border-border/60'}`}>
+                                        {done && <Check className="w-2.5 h-2.5 text-white" />}
+                                      </div>
+                                      <span className={`text-[11px] font-medium ${done ? 'line-through text-text-secondary' : 'text-text-primary'}`}>{n}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {evo.files.length > 0 && (
+                        <div className="flex gap-2">
+                          {evo.files.map((f, i) => (
+                            <div key={i} className="flex items-center gap-2 px-3 py-2 bg-surface-alt rounded-xl border border-border/40 text-[10px] font-bold text-text-primary">
+                              <FileText className="w-3 h-3 text-teal" /> {f}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
 
-                  {evo.teethNotes.length > 0 && (
-                    <div className="flex flex-col gap-2 mb-4">
-                      {evo.teethNotes.map((tn) => (
-                        <div
-                          key={tn.tooth}
-                          className="bg-surface-alt rounded-lg border border-border/40 px-3 py-2"
-                        >
-                          <span className="font-mono text-[10px] font-bold text-teal block mb-1.5">
-                            {tn.tooth in ARCH_LABELS ? ARCH_LABELS[tn.tooth] : `D${tn.tooth}`}
-                          </span>
-                          <div className="flex flex-col gap-1.5">
-                            {tn.notes.filter(Boolean).map((n, i) => {
-                              const procKey = `${tn.tooth}_${i}`;
-                              const done = evo.procedimentosConcluidos.includes(procKey);
-                              return (
-                                <div key={i} className="flex items-center gap-2">
-                                  <div className={`w-4 h-4 rounded border shrink-0 flex items-center justify-center ${done ? 'bg-emerald-500 border-emerald-500' : 'border-border/60'}`}>
-                                    {done && <Check className="w-2.5 h-2.5 text-white" />}
-                                  </div>
-                                  <span className={`text-[11px] font-medium ${done ? 'line-through text-text-secondary' : 'text-text-primary'}`}>
-                                    {n}
-                                  </span>
-                                </div>
-                              );
-                            })}
+                  {/* Expansão inline — tratamento completo */}
+                  <AnimatePresence initial={false}>
+                    {isExpanded && (
+                      <motion.div
+                        key="expanded"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+                        className="overflow-hidden"
+                      >
+                        <div className="border-t border-border/40 px-6 pb-6 pt-5 space-y-6">
+
+                          {/* Progresso + Apresentar */}
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary/70">Progresso do tratamento</p>
+                              <span className="text-xs text-text-secondary">{doneProcs} de {totalProcs} concluídos</span>
+                            </div>
+                            <div className="h-2 w-full rounded-full bg-surface-alt border border-border/40 overflow-hidden">
+                              <div className="h-2 rounded-full bg-teal transition-all duration-500" style={{ width: `${pct}%` }} />
+                            </div>
+                            <div className="flex items-center justify-between mt-2">
+                              <div className="flex items-baseline gap-2">
+                                <span className="text-2xl font-bold text-teal">{pct}%</span>
+                                <span className="text-sm text-text-secondary">concluído</span>
+                              </div>
+                              <ApresentarPaciente
+                                patientId={patientId}
+                                clinicaId={clinicaId}
+                                patientName={patientName ?? ''}
+                                fichaId={evo.id}
+                                compact
+                              />
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
 
-                  {evo.files.length > 0 && (
-                    <div className="flex gap-2">
-                      {evo.files.map((f, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center gap-2 px-3 py-2 bg-surface-alt rounded-xl border border-border/40 text-[10px] font-bold text-text-primary"
-                        >
-                          <FileText className="w-3 h-3 text-teal" /> {f}
+                          {/* Odontograma */}
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary/70 mb-3">Odontograma</p>
+                            <div className="bg-surface-alt rounded-2xl border border-border/40 px-6 py-5">
+                              <p className="text-[11px] text-text-secondary/60 text-center mb-4 flex items-center justify-center gap-1.5">
+                                <ChevronRight className="w-3 h-3" />
+                                Clique em um dente para filtrar os procedimentos
+                              </p>
+                              <Odontograma
+                                selectedTeeth={filterTooth ? [filterTooth] : []}
+                                historicalTeeth={affectedTeeth}
+                                onToothToggle={(tooth) => setFilterTooth((prev) => prev === tooth ? null : tooth)}
+                                hideFilters
+                              />
+                              {filterTooth && (
+                                <button
+                                  onClick={() => setFilterTooth(null)}
+                                  className="mt-4 w-full text-center text-xs text-teal hover:underline flex items-center justify-center gap-1"
+                                >
+                                  <X className="w-3 h-3" /> Limpar filtro (D{filterTooth})
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Observações — sempre visível */}
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary/70 mb-2">Observações gerais</p>
+                            <div className="bg-surface-alt rounded-xl border border-border/40 px-4 py-3 flex flex-wrap items-start gap-x-6 gap-y-2">
+                              <p className="text-sm leading-relaxed flex-1 min-w-[200px] text-text-secondary">
+                                {evo.observation || <span className="italic text-text-secondary/40">Sem observações registradas.</span>}
+                              </p>
+                              {(evo.conduta || evo.retornoSugerido) && (
+                                <div className="flex items-center gap-4 flex-wrap flex-shrink-0">
+                                  {evo.conduta && (
+                                    <div className="flex items-center gap-1.5 text-sm text-text-secondary">
+                                      <FileText className="w-3.5 h-3.5 text-teal flex-shrink-0" />
+                                      <span><span className="font-bold text-text-primary">Conduta:</span> {evo.conduta}</span>
+                                    </div>
+                                  )}
+                                  {evo.retornoSugerido && (
+                                    <div className="flex items-center gap-1.5 text-sm text-text-secondary">
+                                      <Clock className="w-3.5 h-3.5 text-teal flex-shrink-0" />
+                                      <span><span className="font-bold text-text-primary">Retorno:</span> {evo.retornoSugerido}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Procedimentos com status toggle */}
+                          <div>
+                            <div className="flex items-center justify-between mb-3">
+                              <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary/70">
+                                Procedimentos
+                                {filterTooth && <span className="ml-2 text-teal normal-case font-normal">— D{filterTooth}</span>}
+                              </p>
+                              <p className="text-[10px] text-text-secondary/60">Clique no status para avançar</p>
+                            </div>
+                            {filteredTeethNotes.length === 0 ? (
+                              <p className="text-sm text-text-secondary/50 italic">Nenhum procedimento registrado.</p>
+                            ) : (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                                {filteredTeethNotes.map((tn) => {
+                                  const label = tn.tooth in ARCH_LABELS ? ARCH_LABELS[tn.tooth] : `D${tn.tooth}`;
+                                  return (
+                                    <div key={tn.tooth} className="bg-surface-alt rounded-xl border border-border/40 p-4">
+                                      <p className="font-mono text-[10px] font-bold text-teal mb-3">{label}</p>
+                                      <div className="space-y-2">
+                                        {tn.notes.filter(Boolean).map((note, i) => {
+                                          const procKey = `${tn.tooth}_${i}`;
+                                          const done = (evo.procedimentosStatus[procKey] ?? 'planejado') === 'concluido';
+                                          return (
+                                            <div key={i} className="flex items-center gap-2">
+                                              <button
+                                                onClick={() => void updateProcStatus(evo.id, evo.procedimentosStatus, procKey, done ? 'planejado' : 'concluido')}
+                                                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold flex-shrink-0 transition-all border ${
+                                                  done
+                                                    ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20'
+                                                    : 'bg-surface border-border text-text-secondary hover:border-teal hover:text-teal'
+                                                }`}
+                                              >
+                                                {done ? <Check className="w-3 h-3" /> : <Circle className="w-3 h-3" />}
+                                                {done ? 'Concluído' : 'Planejado'}
+                                              </button>
+                                              <span className={`text-xs leading-tight ${done ? 'line-through text-text-secondary' : 'text-text-primary'}`}>{note}</span>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+
                         </div>
-                      ))}
-                    </div>
-                  )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               </motion.div>
               );
@@ -1833,171 +1700,6 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, canWrite = 
         )}
       </AnimatePresence>
 
-      {/* ── MODAL INICIAR TRATAMENTO ────────────────────────────── */}
-      <Dialog open={modalIniciarOpen} onOpenChange={setModalIniciarOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Iniciar Tratamento</DialogTitle>
-            <DialogDescription>
-              Crie um episódio de tratamento e vincule as fichas existentes.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-text-secondary">
-                Nome do tratamento <span className="font-normal text-text-muted">(opcional)</span>
-              </label>
-              <input
-                type="text"
-                value={novoTratNome}
-                onChange={e => setNovoTratNome(e.target.value)}
-                placeholder="Ex: Faceta de Porcelana, Ortodontia…"
-                maxLength={80}
-                className="w-full text-sm border border-border rounded-xl px-3 py-2 bg-surface-alt text-text-primary placeholder:text-text-muted outline-none focus:ring-1 focus:ring-teal/40"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-text-secondary">
-                Fichas deste tratamento <span className="font-normal text-text-muted">(opcional)</span>
-              </label>
-              {fichasDisponiveis.length === 0 ? (
-                <p className="text-xs text-text-muted italic">Nenhuma ficha avulsa disponível</p>
-              ) : (
-                <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
-                  {fichasDisponiveis.map(f => {
-                    const sel = novoTratFichasSelecionadas.has(f.id);
-                    return (
-                      <button
-                        key={f.id}
-                        onClick={() => {
-                          setNovoTratFichasSelecionadas(prev => {
-                            const next = new Set(prev);
-                            sel ? next.delete(f.id) : next.add(f.id);
-                            return next;
-                          });
-                        }}
-                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl border text-left transition-all ${sel ? 'border-teal/40 bg-teal/5' : 'border-border/50 hover:border-teal/20'}`}
-                      >
-                        <div className={`w-4 h-4 rounded border shrink-0 flex items-center justify-center transition-all ${sel ? 'bg-teal border-teal' : 'border-border'}`}>
-                          {sel && <Check className="w-2.5 h-2.5 text-white" />}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold text-text-primary truncate">{f.type}</p>
-                          <p className="text-[10px] text-text-secondary">{f.date}</p>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {tratamentoError && (
-              <p className="text-xs text-coral font-medium">{tratamentoError}</p>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setModalIniciarOpen(false)} disabled={salvandoTratamento}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={() => void handleIniciarTratamento()}
-              disabled={salvandoTratamento}
-              className="bg-teal hover:bg-teal-lt text-white"
-            >
-              {salvandoTratamento ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
-              Iniciar Tratamento
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── MODAL ADICIONAR FICHAS AO TRATAMENTO ATIVO ──────────── */}
-      <Dialog open={modalAdicionarOpen} onOpenChange={setModalAdicionarOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Adicionar fichas ao tratamento</DialogTitle>
-          </DialogHeader>
-
-          <div className="py-2">
-            {fichasDisponiveis.length === 0 ? (
-              <p className="text-sm text-text-muted italic">Nenhuma ficha avulsa disponível para vincular</p>
-            ) : (
-              <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
-                {fichasDisponiveis.map(f => {
-                  const sel = adicionarFichasSelecionadas.has(f.id);
-                  return (
-                    <button
-                      key={f.id}
-                      onClick={() => {
-                        setAdicionarFichasSelecionadas(prev => {
-                          const next = new Set(prev);
-                          sel ? next.delete(f.id) : next.add(f.id);
-                          return next;
-                        });
-                      }}
-                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl border text-left transition-all ${sel ? 'border-teal/40 bg-teal/5' : 'border-border/50 hover:border-teal/20'}`}
-                    >
-                      <div className={`w-4 h-4 rounded border shrink-0 flex items-center justify-center transition-all ${sel ? 'bg-teal border-teal' : 'border-border'}`}>
-                        {sel && <Check className="w-2.5 h-2.5 text-white" />}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold text-text-primary truncate">{f.type}</p>
-                        <p className="text-[10px] text-text-secondary">{f.date}</p>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setModalAdicionarOpen(false)} disabled={adicionandoFichas}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={() => void handleAdicionarFichasAoTratamento()}
-              disabled={adicionandoFichas || adicionarFichasSelecionadas.size === 0}
-              className="bg-teal hover:bg-teal-lt text-white"
-            >
-              {adicionandoFichas ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
-              Vincular {adicionarFichasSelecionadas.size > 0 ? `(${adicionarFichasSelecionadas.size})` : ''}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── DIALOG CONFIRMAR ENCERRAMENTO ───────────────────────── */}
-      <Dialog open={confirmarEncerramentoOpen} onOpenChange={setConfirmarEncerramentoOpen}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Encerrar tratamento?</DialogTitle>
-            <DialogDescription>
-              {tratamentoAtivo?.nome
-                ? `Encerrar "${tratamentoAtivo.nome}"? `
-                : 'Encerrar este tratamento? '}
-              As fichas vinculadas serão mantidas no histórico.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmarEncerramentoOpen(false)} disabled={encerrando}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={() => void handleEncerrarTratamento()}
-              disabled={encerrando}
-              variant="destructive"
-            >
-              {encerrando ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
-              Encerrar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

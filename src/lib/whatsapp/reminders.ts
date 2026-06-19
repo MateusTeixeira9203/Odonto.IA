@@ -6,11 +6,11 @@
  *  2. Para cada clínica, busca agendamentos dentro do intervalo configurado (reminder_hours)
  *     com whatsapp_reminder_sent = false
  *  3. Formata a mensagem usando o template da clínica (substitui {data} e {hora})
- *  4. Envia via Evolution API e marca whatsapp_reminder_sent = true
+ *  4. Envia via WhatsApp e marca whatsapp_reminder_sent = true
  */
 
 import { createServiceClient } from '@/lib/supabase/service';
-import { sendWhatsAppText } from './evolution';
+import { sendText } from './provider';
 
 const BRT_OFFSET_H = 3;
 
@@ -39,7 +39,6 @@ interface AgendamentoComRelacoes {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Retorna { data, hora } em horário BRT para usar no template. */
 function extrairDataHoraBRT(iso: string): { data: string; hora: string } {
   const d    = new Date(new Date(iso).getTime() - BRT_OFFSET_H * 3_600_000);
   const data = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -50,6 +49,20 @@ function extrairDataHoraBRT(iso: string): { data: string; hora: string } {
 function montarMensagem(template: string, ag: AgendamentoComRelacoes): string {
   const { data, hora } = extrairDataHoraBRT(ag.data_hora);
   return template.replace(/\{data\}/g, data).replace(/\{hora\}/g, hora);
+}
+
+/** Retorna o phone_number_id configurado para a clínica (multi-tenant futuro). */
+async function resolverPhoneNumberId(clinicaId: string): Promise<string | null> {
+  const db = createServiceClient();
+  const { data } = await db
+    .from('clinicas')
+    .select('whatsapp_phone_number_id')
+    .eq('id', clinicaId)
+    .maybeSingle();
+
+  return (data?.whatsapp_phone_number_id as string | null)
+    ?? process.env.WHATSAPP_PHONE_NUMBER_ID
+    ?? null;
 }
 
 // ─── Resultado ────────────────────────────────────────────────────────────────
@@ -63,18 +76,10 @@ export interface ReminderResult {
 
 // ─── Função principal ─────────────────────────────────────────────────────────
 
-/**
- * Busca agendamentos pendentes de lembrete por clínica e envia mensagens WhatsApp.
- * Deve ser chamada por cron job (ex: a cada hora via /api/whatsapp/run-reminders).
- */
 export async function sendReminders(): Promise<ReminderResult> {
-  const instance = process.env.EVOLUTION_DEFAULT_INSTANCE;
-  if (!instance) throw new Error('EVOLUTION_DEFAULT_INSTANCE não definida');
-
   const db  = createServiceClient();
   const now = new Date();
 
-  // Carrega configs de clínicas com lembrete habilitado
   const { data: configs, error: configError } = await db
     .from('bot_config')
     .select('clinica_id, reminder_hours, reminder_message')
@@ -83,13 +88,18 @@ export async function sendReminders(): Promise<ReminderResult> {
   if (configError) throw new Error(`Erro ao carregar bot_config: ${configError.message}`);
 
   const resultado: ReminderResult = { total: 0, enviados: 0, erros: 0, detalhes: [] };
-
   if (!configs || configs.length === 0) return resultado;
 
   for (const config of configs as BotConfigRow[]) {
     const hours    = config.reminder_hours ?? 24;
     const template = config.reminder_message ?? DEFAULT_REMINDER_MESSAGE;
-    const em = new Date(now.getTime() + hours * 3_600_000);
+    const em       = new Date(now.getTime() + hours * 3_600_000);
+
+    const phoneNumberId = await resolverPhoneNumberId(config.clinica_id);
+    if (!phoneNumberId) {
+      console.warn(`[reminders] phone_number_id não configurado para clínica ${config.clinica_id}`);
+      continue;
+    }
 
     const { data: agendamentos, error } = await db
       .from('agendamentos')
@@ -123,7 +133,7 @@ export async function sendReminders(): Promise<ReminderResult> {
 
       try {
         const mensagem = montarMensagem(template, ag);
-        await sendWhatsAppText(instance, numero, mensagem);
+        await sendText(phoneNumberId, numero, mensagem);
 
         await db
           .from('agendamentos')

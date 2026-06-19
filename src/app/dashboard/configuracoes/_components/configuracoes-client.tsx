@@ -61,11 +61,12 @@ interface Props {
     status: 'trial' | 'ativo' | 'inativo';
     trialEndsAt: string | null;
   };
+  procedimentosPendente?: boolean;
   clinicId?: string;
   appUrl?: string;
 }
 
-export function ConfiguracoesClient({ plano, dentista, config, horarios, procedimentos: procedimentosIniciais, abaInicial, equipe, assinatura, clinicId, appUrl }: Props) {
+export function ConfiguracoesClient({ plano, dentista, config, horarios, procedimentos: procedimentosIniciais, abaInicial, equipe, assinatura, procedimentosPendente = false, clinicId, appUrl }: Props) {
   const labelContexto = getLabelContexto(plano); // "Consultório" (SOLO) ou "Clínica" (CLINICA)
   const isSolo = !plano || plano === 'SOLO' || (plano as string) === 'BASICO';
   const planoConfig = getPlano(plano);
@@ -360,7 +361,7 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
           <div id="dex-tour-procedimentos" className="bg-surface rounded-3xl border border-border shadow-sm p-2 space-y-1">
             {ABAS.map(({ id, label, icon: Icon }) => {
               if (id === 'equipe' && !equipe) return null;
-              const showBadge = id === 'perfil' && !dentista.cro;
+              const showBadge = (id === 'perfil' && !dentista.cro) || (id === 'procedimentos' && procedimentosPendente);
               const isActive = abaAtiva === id;
               return (
                 <button

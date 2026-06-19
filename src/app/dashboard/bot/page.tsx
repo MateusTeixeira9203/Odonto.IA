@@ -35,8 +35,8 @@ export default async function BotPage() {
     <PageTransition>
       <BotPageClient
         initialStatus={instancia?.status ?? 'disconnected'}
-        initialQrcode={instancia?.qrcode ?? null}
-        initialInstanceName={instancia?.instanceName ?? null}
+        initialQrcode={null}
+        initialInstanceName={null}
         initialMensagens={mensagens}
         role={dentista!.role}
         clinicaNome={dentista!.clinica}

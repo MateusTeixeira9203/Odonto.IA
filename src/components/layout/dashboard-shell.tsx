@@ -6,7 +6,7 @@ import { FloatingDock } from "@/components/layout/floating-dock";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { MobileDrawer } from "@/components/layout/mobile-drawer";
 import { DexWidget } from "@/components/layout/dex-widget";
-import { DexWelcome } from "@/components/onboarding/dex-welcome";
+import { DexGuide } from "@/components/onboarding/dex-guide";
 import ParticleNetwork from "@/components/ParticleNetwork";
 import { CommandPalette } from "@/components/command-palette/command-palette";
 import { useSessionGuard } from "@/hooks/use-session-guard";
@@ -138,7 +138,7 @@ export function DashboardShell({ children, nome, clinicaNome, activeClinicId, ro
         plano={plano}
       />
 
-      <DexWelcome nome={nome.split(' ')[0]} dentistaId={dentistaId} />
+      {role !== 'secretaria' && <DexGuide nome={nome} dentistaId={dentistaId} />}
 
       {role !== 'secretaria' && (
         <DexWidget

@@ -4,6 +4,7 @@ import './globals.css';
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { PostHogProvider } from './providers/PostHogProvider';
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-geist' });
 
@@ -33,16 +34,18 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR" className={cn(dmSerif.variable, outfit.variable, dmMono.variable, "font-sans", geist.variable)} suppressHydrationWarning>
-      <body className="bg-bg text-text-primary font-sans antialiased min-h-screen flex flex-col">
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          {children}
-          <Toaster />
-        </ThemeProvider>
+      <body className="bg-bg text-text-primary font-sans antialiased min-h-screen flex flex-col" suppressHydrationWarning>
+        <PostHogProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            {children}
+            <Toaster />
+          </ThemeProvider>
+        </PostHogProvider>
       </body>
     </html>
   );

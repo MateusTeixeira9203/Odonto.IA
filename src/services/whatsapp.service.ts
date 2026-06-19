@@ -1,19 +1,10 @@
 /**
- * Camada de abstração para a Evolution API — uso exclusivo server-side.
- * Toda lógica de chamada HTTP para a Evolution API passa por aqui.
- * Nunca importar evolution.ts / evolution-admin.ts diretamente nas páginas.
+ * Camada de negócio WhatsApp — uso exclusivo server-side.
+ * Toda lógica de negócio (listas interativas, agendamento, etc.) passa por aqui.
+ * O envio usa o provider abstrato — nunca importar evolution.ts diretamente.
  */
 
-import {
-  sendWhatsAppText,
-  sendWhatsAppFile,
-  sendWhatsAppList,
-} from '@/lib/whatsapp/evolution';
-import {
-  getInstanceStatus,
-  getQRCode as fetchQRCode,
-  mapEvolutionStatus,
-} from '@/lib/whatsapp/evolution-admin';
+import { sendText, sendInteractiveList, type ListSection } from '@/lib/whatsapp/provider';
 import { getBotMensagens, parseTemplate, type TemplateVars } from '@/lib/whatsapp/template';
 import { createServiceClient } from '@/lib/supabase/service';
 
@@ -22,9 +13,8 @@ import { createServiceClient } from '@/lib/supabase/service';
 export type WhatsAppStatus = 'connected' | 'connecting' | 'disconnected' | 'error';
 
 export interface WhatsAppInstanceInfo {
-  instanceName: string;
+  phoneNumberId: string;
   status: WhatsAppStatus;
-  qrcode: string | null;
 }
 
 export interface DentistListItem {
@@ -40,124 +30,65 @@ export interface SlotInfo {
   label: string;
 }
 
+export interface HoraListResult {
+  slots: SlotInfo[];
+  duracaoMinutos: number;
+}
+
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
-/** Row ID especial para opção "Falar com atendente" nas listas */
 export const ROW_HUMANO = '__humano__';
 
 const BRT_OFFSET_H = 3;
 
-// ─── Funções de instância ─────────────────────────────────────────────────────
+// ─── Funções de instância (compatibilidade multi-tenant) ──────────────────────
 
 /**
- * Busca a instância de uma clínica no banco (sem chamar a Evolution API).
+ * Busca o phone_number_id configurado para a clínica.
+ * Usado pelo dashboard de configurações para exibir status.
  */
 export async function getInstanceForClinica(
   clinicaId: string,
 ): Promise<WhatsAppInstanceInfo | null> {
   const db = createServiceClient();
   const { data } = await db
-    .from('instancias_whatsapp')
-    .select('instance_name, status, qrcode')
-    .eq('clinica_id', clinicaId)
+    .from('clinicas')
+    .select('whatsapp_phone_number_id')
+    .eq('id', clinicaId)
     .maybeSingle();
 
-  if (!data) return null;
+  const phoneNumberId =
+    (data?.whatsapp_phone_number_id as string | null) ??
+    process.env.WHATSAPP_PHONE_NUMBER_ID ??
+    null;
 
-  return {
-    instanceName: data.instance_name as string,
-    status:       normalizeStatus(data.status as string),
-    qrcode:       (data.qrcode as string | null) ?? null,
-  };
-}
+  if (!phoneNumberId) return null;
 
-/**
- * Consulta o status ao vivo na Evolution API e atualiza o banco.
- */
-export async function getLiveStatus(
-  clinicaId: string,
-): Promise<WhatsAppInstanceInfo | null> {
-  const db = createServiceClient();
-
-  const { data: instancia } = await db
-    .from('instancias_whatsapp')
-    .select('id, instance_name, qrcode')
-    .eq('clinica_id', clinicaId)
-    .maybeSingle();
-
-  if (!instancia) return null;
-
-  const instanceName = instancia.instance_name as string;
-  const rawState     = await getInstanceStatus(instanceName);
-  const novoStatus   = mapEvolutionStatus(rawState);
-
-  let qrcode = instancia.qrcode as string | null;
-  if (novoStatus === 'connecting') {
-    const novoQr = await fetchQRCode(instanceName);
-    if (novoQr) qrcode = novoQr;
-  } else if (novoStatus === 'connected') {
-    qrcode = null;
-  }
-
-  await db
-    .from('instancias_whatsapp')
-    .update({ status: novoStatus, qrcode, updated_at: new Date().toISOString() })
-    .eq('id', instancia.id as string);
-
-  return {
-    instanceName,
-    status: normalizeStatus(novoStatus),
-    qrcode,
-  };
+  // TODO: chamar Graph API para verificar status real da conexão quando credenciais estiverem prontas
+  return { phoneNumberId, status: 'disconnected' };
 }
 
 // ─── Funções de envio ─────────────────────────────────────────────────────────
 
-/**
- * Envia uma mensagem de texto para um número WhatsApp.
- */
 export async function sendMessage(
-  instanceName: string,
+  phoneNumberId: string,
   to: string,
   text: string,
 ): Promise<void> {
-  await sendWhatsAppText(instanceName, to, text);
-}
-
-/**
- * Envia um arquivo (PDF) para um número WhatsApp via base64.
- */
-export async function sendFile(
-  instanceName: string,
-  to: string,
-  base64: string,
-  filename: string,
-  caption?: string,
-): Promise<void> {
-  await sendWhatsAppFile(instanceName, to, base64, filename, caption);
+  await sendText(phoneNumberId, to, text);
 }
 
 // ─── Funções de List Messages ─────────────────────────────────────────────────
 
-/**
- * Envia a lista interativa de dentistas para o paciente escolher.
- * Usa as mensagens personalizadas da clínica (ou defaults) como título e descrição.
- * Inclui uma opção "Falar com atendente" (rowId = ROW_HUMANO).
- * Retorna os dentistas enviados, para persistir no contexto da conversa.
- *
- * @param isNovoPaciente  true = primeiro contato; usa msg_novo_paciente
- *                        false = paciente já cadastrado; usa msg_paciente_antigo
- */
 export async function sendDentistList(
-  instanceName: string,
+  phoneNumberId: string,
   to: string,
   clinicaId: string,
   pacienteNome: string,
-  isNovoPaciente: boolean = false,
+  isNovoPaciente = false,
 ): Promise<DentistListItem[]> {
   const db = createServiceClient();
 
-  // Busca dentistas, nome da clínica e mensagens configuradas em paralelo
   const [{ data: dentistasRaw }, { data: clinicaRaw }, mensagens] = await Promise.all([
     db.from('dentistas')
       .select('id, nome, especialidade')
@@ -174,8 +105,8 @@ export async function sendDentistList(
   const primeiroNome = pacienteNome.split(' ')[0];
 
   if (!dentistas.length) {
-    await sendWhatsAppText(
-      instanceName,
+    await sendText(
+      phoneNumberId,
       to,
       'No momento não há dentistas disponíveis para agendamento.\n' +
       'Por favor, entre em contato diretamente conosco.',
@@ -185,48 +116,44 @@ export async function sendDentistList(
 
   const vars: TemplateVars = { nome: primeiroNome, clinica: clinicaNome };
 
-  const titulo   = parseTemplate(mensagens.titulo_menu_principal, vars);
+  const titulo    = parseTemplate(mensagens.titulo_menu_principal, vars);
   const descricao = parseTemplate(
     isNovoPaciente ? mensagens.msg_novo_paciente : mensagens.msg_paciente_antigo,
     vars,
   );
 
-  await sendWhatsAppList(
-    instanceName,
-    to,
-    `Olá, ${primeiroNome}! 👋`,
-    descricao,
-    titulo,
-    [
-      {
-        title: 'Dentistas Disponíveis',
-        rows: dentistas.map(d => ({
-          rowId:       d.id,
-          title:       d.nome,
-          description: d.especialidade ?? 'Clínico Geral',
-        })),
-      },
-      {
-        title: 'Outras Opções',
-        rows: [{
-          rowId:       ROW_HUMANO,
-          title:       'Falar com Atendente',
-          description: 'Transferir para um humano',
-        }],
-      },
-    ],
-    'Odonto.IA — Assistente Virtual',
-  );
+  const sections: ListSection[] = [
+    {
+      title: 'Dentistas Disponíveis',
+      rows: dentistas.map(d => ({
+        rowId:       d.id,
+        title:       d.nome,
+        description: d.especialidade ?? 'Clínico Geral',
+      })),
+    },
+    {
+      title: 'Outras Opções',
+      rows: [{
+        rowId:       ROW_HUMANO,
+        title:       'Falar com Atendente',
+        description: 'Transferir para um humano',
+      }],
+    },
+  ];
+
+  await sendInteractiveList(phoneNumberId, to, {
+    title:       `Olá, ${primeiroNome}! 👋`,
+    description: descricao,
+    buttonText:  titulo,
+    sections,
+    footer:      'Odonto.IA — Assistente Virtual',
+  });
 
   return dentistas;
 }
 
-/**
- * Envia a lista interativa com os próximos dias úteis disponíveis para o dentista.
- * Retorna as datas enviadas como strings "YYYY-MM-DD".
- */
 export async function sendDateList(
-  instanceName: string,
+  phoneNumberId: string,
   to: string,
   clinicaId: string,
   dentistaId: string,
@@ -234,7 +161,6 @@ export async function sendDateList(
 ): Promise<string[]> {
   const db = createServiceClient();
 
-  // Dias da semana em que o dentista atende
   const { data: grade } = await db
     .from('horarios_disponiveis')
     .select('dia_semana')
@@ -245,8 +171,8 @@ export async function sendDateList(
   const diasAtivos = new Set((grade ?? []).map(g => g.dia_semana as number));
 
   if (!diasAtivos.size) {
-    await sendWhatsAppText(
-      instanceName,
+    await sendText(
+      phoneNumberId,
       to,
       `${dentistaNome} não tem horários cadastrados no momento.\n` +
       'Por favor, entre em contato diretamente com nossa equipe.',
@@ -254,33 +180,29 @@ export async function sendDateList(
     return [];
   }
 
-  const DIAS_PT  = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
-  const hoje     = utcToBRT(new Date());
-  const amanha   = new Date(hoje);
+  const DIAS_PT = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+  const hoje    = utcToBRT(new Date());
+  const amanha  = new Date(hoje);
   amanha.setDate(amanha.getDate() + 1);
   amanha.setHours(0, 0, 0, 0);
 
   const datas: { iso: string; label: string }[] = [];
   const cursor = new Date(amanha);
 
-  // Máximo 30 iterações para evitar loop infinito se dentista não tiver dias cadastrados
   for (let i = 0; i < 30 && datas.length < 5; i++) {
     const diaSemana = cursor.getDay();
     if (diasAtivos.has(diaSemana)) {
       const d = String(cursor.getDate()).padStart(2, '0');
       const m = String(cursor.getMonth() + 1).padStart(2, '0');
       const y = cursor.getFullYear();
-      datas.push({
-        iso:   `${y}-${m}-${d}`,
-        label: `${DIAS_PT[diaSemana]}, ${d}/${m}`,
-      });
+      datas.push({ iso: `${y}-${m}-${d}`, label: `${DIAS_PT[diaSemana]}, ${d}/${m}` });
     }
     cursor.setDate(cursor.getDate() + 1);
   }
 
   if (!datas.length) {
-    await sendWhatsAppText(
-      instanceName,
+    await sendText(
+      phoneNumberId,
       to,
       `Não encontrei datas disponíveis para ${dentistaNome} nos próximos 30 dias.\n` +
       'Por favor, entre em contato com nossa equipe.',
@@ -288,34 +210,22 @@ export async function sendDateList(
     return [];
   }
 
-  await sendWhatsAppList(
-    instanceName,
-    to,
-    '📅 Escolha uma Data',
-    `Quais datas estão disponíveis para consultar com ${dentistaNome}?`,
-    'Ver Datas',
-    [{
+  await sendInteractiveList(phoneNumberId, to, {
+    title:       '📅 Escolha uma Data',
+    description: `Quais datas estão disponíveis para consultar com ${dentistaNome}?`,
+    buttonText:  'Ver Datas',
+    sections: [{
       title: 'Próximas Datas Disponíveis',
       rows:  datas.map(d => ({ rowId: d.iso, title: d.label })),
     }],
-    'Odonto.IA — Assistente Virtual',
-  );
+    footer: 'Odonto.IA — Assistente Virtual',
+  });
 
   return datas.map(d => d.iso);
 }
 
-export interface HoraListResult {
-  slots: SlotInfo[];
-  /** Duração real de cada consulta em minutos, lida do horario_disponivel do dentista. */
-  duracaoMinutos: number;
-}
-
-/**
- * Envia a lista interativa com os horários disponíveis para a data selecionada.
- * Retorna os slots enviados e a duração real da consulta, para persistir no contexto.
- */
 export async function sendHoraList(
-  instanceName: string,
+  phoneNumberId: string,
   to: string,
   clinicaId: string,
   dentistaId: string,
@@ -335,17 +245,12 @@ export async function sendHoraList(
     .eq('ativo', true);
 
   if (!grade?.length) {
-    await sendWhatsAppText(
-      instanceName,
-      to,
-      'Não encontrei horários para essa data. Por favor, escolha outra data.',
-    );
+    await sendText(phoneNumberId, to, 'Não encontrei horários para essa data. Por favor, escolha outra data.');
     return { slots: [], duracaoMinutos: 30 };
   }
 
   const duracaoMinutos = (grade[0].intervalo_minutos as number | null) ?? 30;
 
-  // Janela UTC do dia selecionado em horário de Brasília
   const diaStartUTC = new Date(Date.UTC(year, month - 1, day, BRT_OFFSET_H, 0));
   const diaEndUTC   = new Date(Date.UTC(year, month - 1, day + 1, BRT_OFFSET_H, 0));
 
@@ -386,43 +291,30 @@ export async function sendHoraList(
   }
 
   if (!slots.length) {
-    await sendWhatsAppText(
-      instanceName,
-      to,
-      'Não há horários disponíveis para essa data. Por favor, escolha outra data.',
-    );
+    await sendText(phoneNumberId, to, 'Não há horários disponíveis para essa data. Por favor, escolha outra data.');
     return { slots: [], duracaoMinutos };
   }
 
-  const DIAS_PT   = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
-  const dLabel    = String(day).padStart(2, '0');
-  const mLabel    = String(month).padStart(2, '0');
-  const diaLabel  = DIAS_PT[diaSemana];
+  const DIAS_PT  = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+  const dLabel   = String(day).padStart(2, '0');
+  const mLabel   = String(month).padStart(2, '0');
+  const diaLabel = DIAS_PT[diaSemana];
 
-  await sendWhatsAppList(
-    instanceName,
-    to,
-    `⏰ Horários — ${diaLabel}, ${dLabel}/${mLabel}`,
-    'Qual horário você prefere?',
-    'Ver Horários',
-    [{
+  await sendInteractiveList(phoneNumberId, to, {
+    title:       `⏰ Horários — ${diaLabel}, ${dLabel}/${mLabel}`,
+    description: 'Qual horário você prefere?',
+    buttonText:  'Ver Horários',
+    sections: [{
       title: 'Horários Disponíveis',
       rows:  slots.map(s => ({ rowId: s.iso, title: s.label })),
     }],
-    'Odonto.IA — Assistente Virtual',
-  );
+    footer: 'Odonto.IA — Assistente Virtual',
+  });
 
   return { slots, duracaoMinutos };
 }
 
 // ─── Helper interno ───────────────────────────────────────────────────────────
-
-function normalizeStatus(raw: string): WhatsAppStatus {
-  if (raw === 'connected' || raw === 'open')                              return 'connected';
-  if (raw === 'connecting')                                                return 'connecting';
-  if (raw === 'inactive' || raw === 'close' || raw === 'disconnected')   return 'disconnected';
-  return 'error';
-}
 
 function utcToBRT(d: Date): Date {
   return new Date(d.getTime() - BRT_OFFSET_H * 3_600_000);

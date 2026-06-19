@@ -115,7 +115,7 @@ export function CadastroForm({ plano }: CadastroFormProps) {
           <h1 className="font-heading font-bold text-4xl text-text-primary mb-2">Crie sua conta</h1>
           <p className="text-text-secondary text-sm font-medium">
             Plano <strong className="text-text-primary">{plano === 'SOLO' ? 'Solo' : 'Clínica'}</strong>
-            {plano === 'CLINICA' && ' · 7 dias grátis'}
+            {plano === 'CLINICA' && ' · 14 dias grátis'}
           </p>
         </div>
 

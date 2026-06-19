@@ -4,6 +4,7 @@ const nextConfig: NextConfig = {
   // tsc --noEmit roda separadamente no CI (script "typecheck").
   // Desabilitar a checagem redundante do next build evita OOM em máquinas com menos RAM.
   typescript: { ignoreBuildErrors: true },
+  turbopack: {},
   images: {
     remotePatterns: [
       {

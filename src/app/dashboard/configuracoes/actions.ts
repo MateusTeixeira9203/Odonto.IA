@@ -151,6 +151,9 @@ export async function atualizarProcedimento(
     return { error: error.message };
   }
 
+  // Configurou procedimentos → limpa a pendência (some o alerta âmbar)
+  await supabase.from("clinicas").update({ procedimentos_pendente: false }).eq("id", clinicId);
+
   return {};
 }
 
@@ -195,6 +198,9 @@ export async function criarProcedimento(
     console.error("Erro ao criar procedimento:", error);
     return { error: error.message };
   }
+
+  // Configurou procedimentos → limpa a pendência (some o alerta âmbar)
+  await supabase.from("clinicas").update({ procedimentos_pendente: false }).eq("id", clinicId);
 
   return {};
 }

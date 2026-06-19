@@ -28,11 +28,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const instancia = await getInstanceForClinica(dentista.clinica_id);
-  if (!instancia || instancia.status !== 'connected') {
-    return NextResponse.json({ error: 'WhatsApp não está conectado' }, { status: 400 });
-  }
-  if (!instancia.instanceName) {
-    return NextResponse.json({ error: 'Instância sem nome configurado' }, { status: 500 });
+  if (!instancia) {
+    return NextResponse.json({ error: 'WhatsApp não configurado — adicione WHATSAPP_PHONE_NUMBER_ID no ambiente' }, { status: 400 });
   }
 
   const db = createServiceClient();
@@ -63,7 +60,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    await processMessage(novaConversa as ConversaBot, 'oi', instancia.instanceName);
+    await processMessage(novaConversa as ConversaBot, 'oi', instancia.phoneNumberId);
   } catch (err) {
     console.error('[testar-fluxo] Erro ao iniciar fluxo:', err);
     return NextResponse.json({ error: 'Erro ao iniciar fluxo de teste' }, { status: 500 });

@@ -1,7 +1,9 @@
 "use server";
 
 import { requireUser } from "@/server/auth/user";
+import { requireClinicContext } from "@/server/auth/clinic";
 import { redirect } from "next/navigation";
+import { enviarEmailD0 } from "@/server/services/onboarding-emails";
 
 const ESPECIALIDADES = [
   "Clínico Geral",
@@ -76,5 +78,32 @@ export async function completeOnboarding(
     };
   }
 
+  if (user.email) {
+    void enviarEmailD0({
+      email: user.email,
+      nomeDentista: data.nome.trim().split(' ')[0],
+    });
+  }
+
   return { success: true };
+}
+
+/**
+ * Marca/limpa a pendência de configuração de procedimentos.
+ * "Configurar depois" no onboarding → pendente=true (mostra alerta âmbar nas configs).
+ * "Usar tabela padrão" / "Importar" → pendente=false.
+ */
+export async function definirProcedimentosPendente(
+  pendente: boolean,
+): Promise<{ error?: string }> {
+  const { supabase, clinicId } = await requireClinicContext();
+  const { error } = await supabase
+    .from("clinicas")
+    .update({ procedimentos_pendente: pendente })
+    .eq("id", clinicId);
+  if (error) {
+    console.error("[definirProcedimentosPendente]", error.message);
+    return { error: error.message };
+  }
+  return {};
 }

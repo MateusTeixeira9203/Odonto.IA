@@ -1,15 +1,18 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowLeft,
   Loader2,
-  Check, Edit2, Mic, MicOff, Bot, Play, X, AlertTriangle, PenLine,
+  Check, Edit2, Mic, MicOff, Bot, X, AlertTriangle, PenLine,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
+import { useDexGuide } from '@/hooks/useDexGuide';
+import { DexFace } from '@/components/onboarding/dex-mascot';
+import { DexAvatar } from '@/components/ui/dex-avatar';
 import { salvarFichaConsulta, iniciarAtendimentoConsulta } from '../actions';
 import { ConsultaAssinaturaModal } from './consulta-assinatura-modal';
 import type { EvolucaoFormatada } from '@/app/api/dex/formatar-evolucao/route';
@@ -44,6 +47,8 @@ interface Paciente {
 
 interface ConsultaClientProps {
   agendamentoId: string;
+  isDemo?: boolean;
+  dentistaId?: string;
   paciente: Paciente;
   hora: string;
   observacoesAgendamento: string | null;
@@ -102,6 +107,8 @@ const FORMATAR_ETAPAS = [
 
 export function ConsultaClient({
   agendamentoId,
+  isDemo = false,
+  dentistaId,
   paciente,
   hora,
   observacoesAgendamento,
@@ -128,14 +135,54 @@ export function ConsultaClient({
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [aptStatus, setAptStatus] = useState(agendamentoStatus);
-  const [isIniciando, setIsIniciando] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [liveTranscript, setLiveTranscript] = useState('');
   const [confirmedTeeth, setConfirmedTeeth] = useState<number[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // ── Detecção ao vivo (copiloto) ──
+  // Dentes: regex FDI client-side, instantâneo e grátis.
+  const detectedTeeth = useMemo(() => {
+    const matches = textoLivre.match(/\b[1-4][1-8]\b/g) ?? [];
+    return [...new Set(matches.map(Number))].sort((a, b) => a - b);
+  }, [textoLivre]);
+  // Procedimentos: debounce ~2s reaproveitando /api/sugerir-orcamento (mesmo padrão do FichasTab).
+  const [detectedProcs, setDetectedProcs] = useState<string[]>([]);
+  const [isDetecting, setIsDetecting] = useState(false);
+  const detectDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const { status: micStatus, startRecording, stopRecording } = useAudioRecorder();
+
+  // Detecção ao vivo de procedimentos enquanto o dentista escreve (só na fase de captura).
+  useEffect(() => {
+    // Não roda em demo (sem clínica real) nem após a evolução já estar montada.
+    if (isDemo || evolucao || saved) { setDetectedProcs([]); setIsDetecting(false); return; }
+
+    const texto = textoLivre.trim();
+    if (detectDebounceRef.current) clearTimeout(detectDebounceRef.current);
+    if (texto.length < 20) { setDetectedProcs([]); setIsDetecting(false); return; }
+
+    setIsDetecting(true);
+    detectDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch('/api/sugerir-orcamento', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ texto }),
+        });
+        if (!res.ok) return;
+        const data = await res.json() as { itens?: { descricao: string }[] };
+        setDetectedProcs((data.itens ?? []).map(i => i.descricao).filter(Boolean).slice(0, 6));
+      } catch (err) {
+        console.error('[consulta] detecção ao vivo:', err);
+      } finally {
+        setIsDetecting(false);
+      }
+    }, 2000);
+
+    return () => { if (detectDebounceRef.current) clearTimeout(detectDebounceRef.current); };
+  }, [textoLivre, isDemo, evolucao, saved]);
 
   // Cleanup de timers ao desmontar
   useEffect(() => {
@@ -145,7 +192,37 @@ export function ConsultaClient({
     };
   }, []);
 
+  // Auto-inicia o atendimento ao entrar no Modo Consulta (sem precisar de clique)
+  useEffect(() => {
+    if (isDemo) return;
+    if (['in_progress', 'completed', 'cancelled', 'no_show'].includes(aptStatus)) return;
+    void iniciarAtendimentoConsulta(agendamentoId).then(result => {
+      if (!result.error) setAptStatus('in_progress');
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const firstName = paciente.nome.split(' ')[0];
+
+  // ── Coach do onboarding (só relevante em modo demo) ──
+  const guideId = dentistaId ?? 'guide';
+  const { phase: guidePhase, setPhase: setGuidePhase } = useDexGuide(guideId);
+  const [valuePhrase, setValuePhrase] = useState(false);
+
+  useEffect(() => {
+    if (!isDemo) return;
+    if (aptStatus === 'in_progress' && !valuePhrase && !evolucao && !saved) {
+      setValuePhrase(true);
+      const t = setTimeout(() => setValuePhrase(false), 6000);
+      return () => clearTimeout(t);
+    }
+  }, [isDemo, aptStatus, valuePhrase, evolucao, saved]);
+
+  const coachText = !evolucao
+    ? (aptStatus === 'in_progress'
+        ? 'Fale a queixa do João — ou digite. Ex: "dor no molar inferior direito ao mastigar". Depois clique em Organizar com DEX.'
+        : 'Clique em Iniciar Atendimento pra ativar o Modo Consulta.')
+    : (saved ? 'Pronto! Montei a ficha sozinho.' : 'Viu? Estruturei tudo. Confira e salve.');
 
   const handleVoice = useCallback(async () => {
     if (micStatus === 'recording') {
@@ -223,6 +300,18 @@ export function ConsultaClient({
     if (!evolucao) return;
     setIsSaving(true);
 
+    if (isDemo) {
+      await new Promise(r => setTimeout(r, 800));
+      setSaved(true);
+      setSavedFichaId('demo');
+      setIsSaving(false);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`dex_demo_done_v1_${guideId}`, '1');
+      }
+      setGuidePhase('done');
+      return;
+    }
+
     // Fix #2: usa só dentes confirmados pelo dentista (não union com IA)
     // Dentista DEVE confirmar clicando — amber não confirmado = não salvo
     const dentesConfirmados = confirmedTeeth;
@@ -261,18 +350,6 @@ export function ConsultaClient({
     }, 1000);
   };
 
-  const handleIniciarAtendimento = async () => {
-    setIsIniciando(true);
-    const result = await iniciarAtendimentoConsulta(agendamentoId);
-    if (result.error) {
-      toast.error(result.error);
-    } else {
-      setAptStatus('in_progress');
-      toast.success('Atendimento iniciado!');
-    }
-    setIsIniciando(false);
-  };
-
   return (
     <div className="min-h-screen bg-bg flex flex-col">
       {/* Header */}
@@ -294,36 +371,26 @@ export function ConsultaClient({
           <span className="font-heading text-lg text-text-primary">
             Modo Consulta — {firstName}
           </span>
-          <span className="font-mono text-xs text-text-secondary bg-surface-alt px-2 py-0.5 rounded-md">{hora}</span>
+          {isDemo ? (
+            <span
+              className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider"
+              style={{ background: 'color-mix(in srgb, var(--color-teal) 15%, transparent)', color: 'var(--color-teal)' }}
+            >
+              Demonstração
+            </span>
+          ) : (
+            <span className="font-mono text-xs text-text-secondary bg-surface-alt px-2 py-0.5 rounded-md">{hora}</span>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Iniciar Atendimento — dentista/admin only, only when not yet in_progress */}
-          {aptStatus !== 'in_progress' && aptStatus !== 'completed' && (
-            <button
-              onClick={() => void handleIniciarAtendimento()}
-              disabled={isIniciando}
-              className="px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all flex items-center gap-2"
-              style={{ background: '#2f9c85', boxShadow: '0 2px 12px rgba(47,156,133,0.25)' }}
-            >
-              {isIniciando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-              Iniciar Atendimento
-            </button>
-          )}
-          {aptStatus === 'in_progress' && (
-            <span className="text-[11px] font-bold px-3 py-1.5 rounded-full bg-teal text-white uppercase tracking-wider">
-              Em Atendimento
-            </span>
-          )}
-          {(aptStatus === 'in_progress' || aptStatus === 'completed') && (
-            <BotaoMensagemIA
-              variant="icon"
-              pacienteNome={paciente.nome}
-              dentistaNome=""
-              dataHora={hora}
-              defaultTipo="follow_up"
-            />
-          )}
+          <BotaoMensagemIA
+            variant="icon"
+            pacienteNome={paciente.nome}
+            dentistaNome=""
+            dataHora={hora}
+            defaultTipo="follow_up"
+          />
           <div className="w-4" />
         </div>
       </header>
@@ -418,84 +485,175 @@ export function ConsultaClient({
                     </motion.div>
                   )}
                 </AnimatePresence>
-                <div className="mb-3 flex items-center justify-between">
-                  <span className="text-sm text-text-secondary font-medium">{firstName} · {hora}</span>
-                  <span className="text-xs text-text-secondary font-mono">{textoLivre.length} car.</span>
-                </div>
+                {/* ── Card de escrita unificado ── */}
+                <div className="flex-1 flex flex-col bg-surface border border-border rounded-2xl overflow-hidden shadow-sm focus-within:border-teal transition-colors">
 
-                <div className="relative flex-1 flex flex-col">
-                  <textarea
-                    ref={textareaRef}
-                    value={textoLivre}
-                    onChange={e => setTextoLivre(e.target.value)}
-                    placeholder={`Ex: Realizei extração do elemento 36 com anestesia local. Paciente sem intercorrências. Orientado sobre cuidados pós-operatórios. Retorno em 7 dias para remoção dos pontos.`}
-                    className="flex-1 w-full rounded-2xl p-5 text-sm leading-relaxed resize-none outline-none bg-surface border border-border focus:border-teal transition-colors text-text-primary placeholder:text-text-secondary"
-                    style={{ minHeight: '300px' }}
-                    autoFocus
-                    readOnly={micStatus === 'recording' || isTranscribing}
-                  />
+                  {/* Header do card: DEX + contador */}
+                  <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-border/50">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <DexAvatar size={32} />
+                      <div className="leading-tight min-w-0">
+                        <p className="text-sm font-semibold text-text-primary">Dex · Copiloto</p>
+                        <p className="text-xs text-text-secondary truncate">Fale ou digite — eu monto a ficha</p>
+                      </div>
+                    </div>
+                    <span className="text-xs text-text-secondary font-mono shrink-0">{textoLivre.length} car.</span>
+                  </div>
 
-                  {/* Indicador de gravação */}
-                  <AnimatePresence>
-                    {(micStatus === 'recording' || isTranscribing) && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0 }}
-                        className="absolute top-4 right-4 flex items-center gap-2 px-3 py-1.5 rounded-xl"
-                        style={{ background: micStatus === 'recording' ? 'rgba(239,68,68,0.1)' : 'rgba(47,156,133,0.1)', border: `1px solid ${micStatus === 'recording' ? 'rgba(239,68,68,0.3)' : 'rgba(47,156,133,0.3)'}` }}
-                      >
+                {/* ── Detecção ao vivo (chips) ── */}
+                <AnimatePresence>
+                  {textoLivre.length > 20 && (detectedTeeth.length > 0 || detectedProcs.length > 0 || isDetecting) && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="border-b border-border/50 bg-surface-alt/40 px-5 py-3">
+                        <div className="flex items-center gap-1.5 mb-2">
+                          <DexAvatar size={16} animated={isDetecting} />
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">
+                            Detectando ao vivo{isDetecting ? '…' : ''}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {detectedTeeth.map(d => (
+                            <span
+                              key={`t${d}`}
+                              className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold font-mono border"
+                              style={{ background: 'rgba(47,156,133,0.08)', borderColor: 'rgba(47,156,133,0.25)', color: '#2f9c85' }}
+                            >
+                              dente {d}
+                            </span>
+                          ))}
+                          {detectedProcs.map((p, i) => (
+                            <span
+                              key={`p${i}`}
+                              className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium border"
+                              style={{ background: 'rgba(47,156,133,0.08)', borderColor: 'rgba(47,156,133,0.22)', color: '#2f9c85' }}
+                            >
+                              {p}
+                            </span>
+                          ))}
+                          {detectedTeeth.length === 0 && detectedProcs.length === 0 && isDetecting && (
+                            <span className="text-[11px] text-text-secondary italic">Analisando o relato…</span>
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                  {/* Textarea — transparente dentro do card */}
+                  <div className="relative flex-1 flex flex-col">
+                    <textarea
+                      ref={textareaRef}
+                      value={textoLivre}
+                      onChange={e => setTextoLivre(e.target.value)}
+                      placeholder="Ex: Realizei extração do elemento 36 com anestesia local. Paciente sem intercorrências. Orientado sobre cuidados pós-operatórios. Retorno em 7 dias para remoção dos pontos."
+                      className="flex-1 w-full px-5 py-4 text-sm leading-relaxed resize-none outline-none bg-transparent text-text-primary placeholder:text-text-secondary/50"
+                      style={{ minHeight: '260px' }}
+                      autoFocus
+                      readOnly={micStatus === 'recording' || isTranscribing}
+                    />
+
+                    {/* Indicador de gravação */}
+                    <AnimatePresence>
+                      {(micStatus === 'recording' || isTranscribing) && (
                         <motion.div
-                          className="w-2 h-2 rounded-full"
-                          style={{ background: micStatus === 'recording' ? '#ef4444' : '#2f9c85' }}
-                          animate={{ opacity: [1, 0.3, 1] }}
-                          transition={{ duration: 0.8, repeat: Infinity }}
-                        />
-                        <span className="text-xs font-semibold" style={{ color: micStatus === 'recording' ? '#ef4444' : '#2f9c85' }}>
-                          {isTranscribing ? 'Transcrevendo...' : 'Gravando...'}
-                        </span>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
+                          initial={{ opacity: 0, y: 4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0 }}
+                          className="absolute top-3 right-4 flex items-center gap-2 px-3 py-1.5 rounded-xl"
+                          style={{ background: micStatus === 'recording' ? 'rgba(239,68,68,0.1)' : 'rgba(47,156,133,0.1)', border: `1px solid ${micStatus === 'recording' ? 'rgba(239,68,68,0.3)' : 'rgba(47,156,133,0.3)'}` }}
+                        >
+                          <motion.div
+                            className="w-2 h-2 rounded-full"
+                            style={{ background: micStatus === 'recording' ? '#ef4444' : '#2f9c85' }}
+                            animate={{ opacity: [1, 0.3, 1] }}
+                            transition={{ duration: 0.8, repeat: Infinity }}
+                          />
+                          <span className="text-xs font-semibold" style={{ color: micStatus === 'recording' ? '#ef4444' : '#2f9c85' }}>
+                            {isTranscribing ? 'Transcrevendo...' : 'Gravando...'}
+                          </span>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
 
-                <div className="flex items-center justify-between mt-4">
-                  <div className="flex items-center gap-3">
-                    {/* Botão de voz */}
+                  {/* Footer do card: Ditar + Organizar */}
+                  <div className="flex items-center justify-between px-5 py-3 border-t border-border/50 bg-surface-alt/30">
                     <button
                       onClick={() => void handleVoice()}
                       disabled={isTranscribing}
-                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-40"
-                      style={{
-                        background: micStatus === 'recording' ? 'rgba(239,68,68,0.1)' : '#f5f3ef',
-                        color: micStatus === 'recording' ? '#ef4444' : '#8a8a8a',
-                        border: `1px solid ${micStatus === 'recording' ? 'rgba(239,68,68,0.4)' : '#d4d1ca'}`,
-                      }}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all disabled:opacity-40 border ${
+                        micStatus === 'recording'
+                          ? 'bg-red-500/10 text-red-500 border-red-500/30'
+                          : 'bg-surface border-border text-text-secondary hover:text-text-primary'
+                      }`}
                     >
                       {micStatus === 'recording'
                         ? <><MicOff className="w-4 h-4" /> Parar</>
                         : <><Mic className="w-4 h-4" /> Ditar</>
                       }
                     </button>
-                  </div>
 
-                  <button
-                    onClick={() => void handleFormatar()}
-                    disabled={!textoLivre.trim() || isFormatando || micStatus === 'recording'}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-40"
-                    style={{ background: '#2f9c85', color: '#fff', boxShadow: '0 2px 12px rgba(47,156,133,0.30)' }}
-                  >
-                    {isFormatando
-                      ? <><Loader2 className="w-4 h-4 animate-spin" /> {formatLabel}</>
-                      : <><Bot className="w-4 h-4" /> Organizar com DEX</>
-                    }
-                  </button>
+                    <button
+                      onClick={() => void handleFormatar()}
+                      disabled={!textoLivre.trim() || isFormatando || micStatus === 'recording'}
+                      className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold transition-all disabled:opacity-40"
+                      style={{ background: '#2f9c85', color: '#fff', boxShadow: '0 2px 12px rgba(47,156,133,0.30)' }}
+                    >
+                      {isFormatando
+                        ? <><Loader2 className="w-4 h-4 animate-spin" /> {formatLabel}</>
+                        : <><Bot className="w-4 h-4" /> Organizar com DEX</>
+                      }
+                    </button>
+                  </div>
                 </div>
               </motion.div>
             )}
 
-            {/* ── Salvo ── */}
-            {saved && (
+            {/* ── Salvo — Demo ── */}
+            {saved && isDemo && (
+              <motion.div
+                key="saved-demo"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex flex-col items-center justify-center h-full gap-6 text-center px-4"
+              >
+                <motion.div
+                  className="w-16 h-16 rounded-full flex items-center justify-center"
+                  style={{ background: '#2f9c85', boxShadow: '0 8px 24px rgba(47,156,133,0.35)' }}
+                  animate={{ scale: [1, 1.08, 1] }}
+                  transition={{ duration: 0.5, delay: 0.1 }}
+                >
+                  <Check className="w-8 h-8 text-white" />
+                </motion.div>
+                <div>
+                  <p className="font-heading text-2xl text-text-primary mb-2">Você viu o DEX em ação.</p>
+                  <p className="text-sm text-text-secondary leading-relaxed max-w-xs mx-auto">
+                    A ficha foi estruturada automaticamente. Na prática, ela seria salva no prontuário do paciente.
+                  </p>
+                </div>
+                <motion.a
+                  href="/dashboard/agendamentos"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="inline-flex items-center gap-2 bg-gradient-to-r from-teal to-teal-lt text-white px-6 py-3 rounded-xl font-bold text-sm shadow-[0_4px_14px_rgba(47,156,133,0.3)] hover:-translate-y-0.5 transition-all"
+                >
+                  Fazer minha primeira consulta real
+                </motion.a>
+                <p className="text-xs text-text-secondary">
+                  Ou{' '}
+                  <a href="/dashboard" className="underline underline-offset-2">ir para o dashboard</a>
+                </p>
+              </motion.div>
+            )}
+
+            {/* ── Salvo — Normal ── */}
+            {saved && !isDemo && (
               <motion.div
                 key="saved"
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -750,6 +908,22 @@ export function ConsultaClient({
           pacienteNome={paciente.nome}
           onSigned={() => router.push(`/dashboard/pacientes/${paciente.id}`)}
         />
+      )}
+
+      {/* ── Coach do DEX guiando a demo ── */}
+      {isDemo && guidePhase !== 'done' && (
+        <div
+          className="fixed bottom-7 right-7 z-[120] flex items-end gap-2.5 max-w-[360px]"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="bg-surface border-[1.5px] border-teal rounded-2xl px-4 py-3 shadow-xl">
+            <p className="text-[13px] text-text-primary leading-relaxed">
+              {valuePhrase ? 'Deixa que eu cuido do resto. Foque no paciente.' : coachText}
+            </p>
+          </div>
+          <DexFace size={52} />
+        </div>
       )}
     </div>
   );

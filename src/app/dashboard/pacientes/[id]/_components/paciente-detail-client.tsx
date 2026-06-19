@@ -19,11 +19,9 @@ import {
   AlertCircle,
   FileText,
   Loader2,
-  Lock,
-  Stethoscope,
-  MoreHorizontal,
   Activity,
   Bell,
+  Paperclip,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -56,7 +54,6 @@ const TabSkeleton = () => (
 );
 
 const DocumentosTab   = dynamic(() => import('@/components/pacientes/DocumentosTab').then(m => m.DocumentosTab),     { ssr: false, loading: () => <TabSkeleton /> });
-const PlanejamentoTab = dynamic(() => import('@/components/pacientes/PlanejamentoTab').then(m => m.PlanejamentoTab), { ssr: false, loading: () => <TabSkeleton /> });
 const FichasTab       = dynamic(() => import('@/components/pacientes/FichasTab').then(m => m.FichasTab),             { ssr: false, loading: () => <TabSkeleton /> });
 import { createClient } from '@/lib/supabase/client';
 import { saveRecentPatient } from '@/components/command-palette/command-palette';
@@ -64,7 +61,6 @@ import { marcarFollowUp, limparFollowUp, snoozeFollowUp } from '../../followup-a
 import { atualizarPaciente } from '../actions';
 import type { DentistaRole } from '@/types/database';
 import type { PlanoId } from '@/lib/planos';
-import { temFeature } from '@/lib/planos';
 import {
   atualizarStatusOrcamento,
   registrarPagamento,
@@ -170,8 +166,8 @@ export function PacienteDetailClient({
   const canViewClinical  = true;
   const canWriteClinical = role === 'admin' || role === 'dentista';
 
-  const [activeTab, setActiveTab] = useState('resumo');
-  const [mountedTabs, setMountedTabs] = useState<Set<string>>(() => new Set(['resumo']));
+  const [activeTab, setActiveTab] = useState('ficha-clinica');
+  const [mountedTabs, setMountedTabs] = useState<Set<string>>(() => new Set(['ficha-clinica']));
 
   // Lê ?tab= da URL para navegar direto à aba correta (ex: vindo do AttentionPanel)
   useEffect(() => {
@@ -248,7 +244,6 @@ export function PacienteDetailClient({
   const [orcDeleteError, setOrcDeleteError] = useState<string | null>(null);
 
   // Contato dropdown (⋯)
-  const [showContato, setShowContato] = useState(false);
 
   // Nova Consulta
   const [isNovaConsultaOpen, setIsNovaConsultaOpen] = useState(false);
@@ -844,105 +839,98 @@ export function PacienteDetailClient({
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
 
-      {/* ── HEADER (Task 6) ─────────────────────────────────────────── */}
+      {/* ── NAV + PATIENT CARD ──────────────────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between gap-4 mb-6"
+        className="mb-6 space-y-3"
       >
-        <div className="flex items-center gap-3 min-w-0">
+        {/* Breadcrumb nav */}
+        <div className="flex items-center justify-between">
           <button
             onClick={() => router.push('/dashboard/pacientes')}
-            className="p-2 hover:bg-surface rounded-xl transition-colors border border-transparent hover:border-border/40 shrink-0"
+            className="flex items-center gap-1.5 text-text-secondary hover:text-text-primary transition-colors text-sm font-medium"
           >
-            <ArrowLeft className="w-5 h-5 text-text-secondary" />
+            <ArrowLeft className="w-4 h-4" />
+            Pacientes
           </button>
-          <div className="w-11 h-11 rounded-xl bg-teal flex items-center justify-center text-white font-bold text-base shadow-md shrink-0">
-            {iniciais}
-          </div>
-          <div className="min-w-0">
-            <h1 className="font-heading font-bold text-2xl md:text-3xl text-text-primary leading-none truncate">{displayNome}</h1>
-            <p className="text-text-secondary text-sm font-medium mt-0.5">
-              {idade !== null ? `${idade} anos · ` : ''}Paciente desde {membroDesde}
-            </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsEditModalOpen(true)}
+              className="p-2 rounded-xl border border-border/60 text-text-secondary hover:text-teal hover:border-teal/40 bg-surface transition-colors"
+              title="Editar paciente"
+            >
+              <Edit2 className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => window.open(`/api/pacientes/${paciente.id}/prontuario`, '_blank')}
+              className="p-2 rounded-xl border border-border/60 text-text-secondary hover:text-text-primary bg-surface transition-colors"
+              title="Exportar prontuário"
+            >
+              <FileDown className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => { setConsultaError(null); setIsNovaConsultaOpen(true); }}
+              className="flex items-center gap-2 px-4 py-2.5 bg-teal text-white rounded-xl text-xs font-bold hover:bg-teal-lt transition-colors shadow-md"
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Nova Consulta</span>
+            </button>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={() => { setConsultaError(null); setIsNovaConsultaOpen(true); }}
-            className="flex items-center gap-2 px-4 py-2.5 bg-teal text-white rounded-xl text-xs font-bold hover:bg-teal-lt transition-colors shadow-md"
-          >
-            <Calendar className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Nova Consulta</span>
-          </button>
+        {/* Patient info card */}
+        <div className="bg-surface rounded-2xl border border-border/60 shadow-sm p-5">
+          <div className="flex items-start gap-4">
+            {/* Avatar */}
+            <div className="w-14 h-14 rounded-2xl bg-teal flex items-center justify-center text-white font-bold text-xl shadow-md shrink-0">
+              {iniciais}
+            </div>
 
-          {/* ⋯ dropdown — contato + editar + exportar */}
-          <div className="relative">
-            {showContato && (
-              <div className="fixed inset-0 z-20" onClick={() => setShowContato(false)} />
-            )}
-            <button
-              onClick={() => setShowContato(v => !v)}
-              className="flex items-center gap-2 px-3 py-2.5 bg-surface-alt rounded-xl text-xs font-bold text-text-primary hover:bg-surface-alt/70 transition-colors border border-border/40"
-              title="Mais opções"
-            >
-              <MoreHorizontal className="w-4 h-4" />
-            </button>
-            <AnimatePresence>
-              {showContato && (
-                <motion.div
-                  initial={{ opacity: 0, y: 4, scale: 0.97 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 4, scale: 0.97 }}
-                  transition={{ duration: 0.12 }}
-                  className="absolute right-0 top-full mt-2 z-30 bg-surface border border-border/60 rounded-2xl shadow-lg p-4 min-w-[220px]"
-                >
-                  {(displayTelefone || displayEmail || endereco) && (
-                    <>
-                      <p className="text-xs font-bold uppercase tracking-widest text-text-secondary mb-3">Contato</p>
-                      <div className="space-y-2 mb-3">
-                        {displayTelefone && (
-                          <div className="flex items-center gap-2 text-sm text-text-primary">
-                            <Phone className="w-3.5 h-3.5 text-teal shrink-0" />
-                            {displayTelefone}
-                          </div>
-                        )}
-                        {displayEmail && (
-                          <div className="flex items-center gap-2 text-sm text-text-primary">
-                            <Mail className="w-3.5 h-3.5 text-teal shrink-0" />
-                            <span className="truncate">{displayEmail}</span>
-                          </div>
-                        )}
-                        {endereco && (
-                          <div className="flex items-start gap-2 text-sm text-text-primary">
-                            <MapPin className="w-3.5 h-3.5 text-teal shrink-0 mt-0.5" />
-                            <span className="leading-snug">{endereco}</span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="h-px bg-border/40 mb-3" />
-                    </>
+            {/* Info block */}
+            <div className="flex-1 min-w-0">
+              <h1 className="font-heading font-bold text-2xl text-text-primary leading-none">{displayNome}</h1>
+              <p className="text-text-secondary text-sm mt-1 flex items-center gap-2 flex-wrap">
+                {idade !== null && <span>{idade} anos</span>}
+                {dataNascimento && <span className="text-text-secondary/60">· {dataNascimento}</span>}
+                <span className="text-text-secondary/60">· Paciente desde {membroDesde}</span>
+              </p>
+
+              {/* Contact row */}
+              {(displayTelefone || displayEmail || endereco) && (
+                <div className="flex flex-wrap gap-x-5 gap-y-1.5 mt-3">
+                  {displayTelefone && (
+                    <div className="flex items-center gap-1.5 text-sm text-text-secondary">
+                      <Phone className="w-3.5 h-3.5 text-teal shrink-0" />
+                      {displayTelefone}
+                    </div>
                   )}
-                  <div className="space-y-0.5">
-                    <button
-                      onClick={() => { setIsEditModalOpen(true); setShowContato(false); }}
-                      className="flex items-center gap-2.5 px-3 py-2 w-full hover:bg-surface-alt rounded-xl text-xs font-semibold text-text-primary transition-colors"
-                    >
-                      <Edit2 className="w-3.5 h-3.5 text-text-secondary" />
-                      Editar Paciente
-                    </button>
-                    <button
-                      onClick={() => { window.open(`/api/pacientes/${paciente.id}/prontuario`, '_blank'); setShowContato(false); }}
-                      className="flex items-center gap-2.5 px-3 py-2 w-full hover:bg-surface-alt rounded-xl text-xs font-semibold text-text-primary transition-colors"
-                    >
-                      <FileDown className="w-3.5 h-3.5 text-text-secondary" />
-                      Exportar prontuário
-                    </button>
-                  </div>
-                </motion.div>
+                  {displayEmail && (
+                    <div className="flex items-center gap-1.5 text-sm text-text-secondary">
+                      <Mail className="w-3.5 h-3.5 text-teal shrink-0" />
+                      <span className="truncate max-w-[220px]">{displayEmail}</span>
+                    </div>
+                  )}
+                  {endereco && (
+                    <div className="flex items-center gap-1.5 text-sm text-text-secondary">
+                      <MapPin className="w-3.5 h-3.5 text-teal shrink-0" />
+                      <span>{endereco}</span>
+                    </div>
+                  )}
+                </div>
               )}
-            </AnimatePresence>
+
+              {/* Observações / Alertas */}
+              {paciente.observacoes && (
+                <div className="mt-3 px-3 py-2.5 rounded-xl bg-amber-500/6 border border-amber-500/20 flex items-start gap-2">
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-600 mb-0.5">Observações</p>
+                    <p className="text-sm text-text-secondary leading-relaxed">{paciente.observacoes}</p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </motion.div>
@@ -958,24 +946,23 @@ export function PacienteDetailClient({
 
           {/* Tabs — IDs usados pelo tour DEX */}
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-            <TabsList className="bg-surface p-1.5 rounded-2xl border border-border/60 shadow-sm mb-6 flex-wrap h-auto gap-1">
+            <TabsList className="flex flex-wrap gap-2 mb-6 h-auto bg-transparent p-0">
               {(
                 [
-                  ['resumo',        'Resumo',       undefined],
-                  ...(canWriteClinical ? [['tratamento',   'Tratamento',   'tab-apresentacao'] as const] : []),
-                  ...(canViewClinical  ? [['ficha-clinica','Ficha Clínica','tab-fichas'      ] as const] : []),
-                  ['agenda',        'Agenda',        undefined],
-                  ['orcamentos',    'Orçamentos',   'tab-orcamento'   ],
-                  ['arquivos',      'Arquivos',     'tab-documentos'  ],
-                ] as [string, string, string | undefined][]
-              ).map(([val, label, tourId]) => (
+                  ...(canViewClinical  ? [['ficha-clinica','Prontuário','tab-fichas',       FileText]] : []),
+                  ['agenda',        'Agenda',        undefined,          Calendar],
+                  ['orcamentos',    'Orçamentos',   'tab-orcamento',    CreditCard],
+                  ['arquivos',      'Arquivos',     'tab-documentos',   Paperclip],
+                ] as [string, string, string | undefined, React.ComponentType<{ className?: string }>][]
+              ).map(([val, label, tourId, Icon]) => (
                 <TabsTrigger
                   key={val}
                   id={tourId}
                   value={val}
-                  className={`rounded-xl px-5 py-2.5 text-sm font-bold text-text-secondary transition-all duration-300 data-[state=active]:bg-teal/10 data-[state=active]:text-teal data-[state=active]:border data-[state=active]:border-teal/20 data-[state=active]:shadow-none hover:text-text-primary${tourId && highlightedTab === tourId ? ' ring-2 ring-teal/60 shadow-[0_0_14px_theme(colors.teal/0.45)]' : ''}`}
+                  className={`flex-1 min-w-[110px] flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold border transition-all duration-300 border-border/60 bg-surface text-text-secondary hover:text-text-primary hover:border-teal/30 data-[state=active]:bg-teal data-[state=active]:text-white data-[state=active]:border-teal data-[state=active]:shadow-[0_4px_14px_rgba(47,156,133,0.3)]${tourId && highlightedTab === tourId ? ' ring-2 ring-teal/60' : ''}`}
                 >
-                  {label}
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span>{label}</span>
                 </TabsTrigger>
               ))}
             </TabsList>
@@ -1148,28 +1135,9 @@ export function PacienteDetailClient({
                         clinicaId={clinicaId}
                         dentistaId={dentistaId}
                         plano={plano}
+                        patientName={displayNome}
                         canWrite={canWriteClinical}
                       />
-                    )}
-                  </TabsContent>
-                )}
-
-                {canWriteClinical && (
-                  <TabsContent value="tratamento" className="mt-0">
-                    {mountedTabs.has('tratamento') && (
-                      temFeature(plano, 'planejamentoIA') ? (
-                        <PlanejamentoTab patientId={paciente.id} clinicaId={clinicaId} patientName={displayNome} />
-                      ) : (
-                        <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
-                          <div className="w-14 h-14 rounded-2xl bg-teal/10 border border-teal/20 flex items-center justify-center">
-                            <Lock className="w-6 h-6 text-teal" />
-                          </div>
-                          <div>
-                            <p className="font-bold text-text-primary mb-1">Disponível no Plano Básico</p>
-                            <p className="text-sm text-text-secondary max-w-xs">Faça upgrade para acessar o Planejamento com IA — apresentações visuais e planos de tratamento completos.</p>
-                          </div>
-                        </div>
-                      )
                     )}
                   </TabsContent>
                 )}

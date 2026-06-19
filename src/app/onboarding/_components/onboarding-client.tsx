@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { motion, AnimatePresence } from 'motion/react';
+import { useRouter } from 'next/navigation';
 import {
   Calendar, Users, Settings, CheckCircle2, Loader2, ChevronRight,
   Stethoscope, Building2, Check, ArrowLeft,
@@ -12,7 +13,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { completeOnboarding, type PlanoClinica } from '../actions';
+import { completeOnboarding, definirProcedimentosPendente, type PlanoClinica } from '../actions';
 import { toast } from 'sonner';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
@@ -99,7 +100,8 @@ const PROXIMOS_PASSOS = [
 // ── Componente ────────────────────────────────────────────────────────────────
 
 export function OnboardingClient({ plano }: { plano: PlanoClinica }) {
-  const [step, setStep]                     = useState<'plano' | 'form' | 'sucesso'>('plano');
+  const [step, setStep]                     = useState<'plano' | 'form' | 'procedimentos' | 'sucesso'>('plano');
+  const router = useRouter();
   const [planoSelecionado, setPlano]        = useState<PlanoClinica>(plano);
   const [nomeConfirmado, setNome]           = useState('');
   const [isLoading, setIsLoading]           = useState(false);
@@ -139,7 +141,7 @@ export function OnboardingClient({ plano }: { plano: PlanoClinica }) {
 
       if (result.success) {
         setNome(data.nome.split(' ')[0]);
-        setStep('sucesso');
+        setStep('procedimentos');
       } else {
         toast.error(result.error ?? 'Erro ao salvar. Tente novamente.');
       }
@@ -418,6 +420,79 @@ export function OnboardingClient({ plano }: { plano: PlanoClinica }) {
                   </button>
                 </form>
               </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ── ETAPA 1.5 — Procedimentos ── */}
+        {step === 'procedimentos' && (
+          <motion.div
+            key="procedimentos"
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -16 }}
+            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <div className="text-center mb-8">
+              <div
+                className="inline-flex w-14 h-14 rounded-2xl items-center justify-center mb-5"
+                style={{ background: 'color-mix(in srgb, var(--color-teal) 12%, transparent)' }}
+              >
+                <Settings className="w-7 h-7" style={{ color: 'var(--color-teal)' }} />
+              </div>
+              <h1 className="font-heading text-3xl text-text-primary mb-2">
+                Seus procedimentos
+              </h1>
+              <p className="text-text-secondary text-sm leading-relaxed max-w-sm mx-auto">
+                Já incluímos uma tabela padrão com os procedimentos mais comuns. Use agora e ajuste depois, ou importe sua própria tabela.
+              </p>
+            </div>
+
+            <div className="bg-surface rounded-3xl border border-border shadow-sm p-6 mb-4">
+              <div className="flex items-start gap-3 mb-4">
+                <div
+                  className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
+                  style={{ background: 'color-mix(in srgb, var(--color-teal) 12%, transparent)' }}
+                >
+                  <Check className="w-4 h-4" style={{ color: 'var(--color-teal)' }} />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-text-primary mb-0.5">Tabela padrão incluída</p>
+                  <p className="text-xs text-text-secondary leading-relaxed">
+                    Restaurações, exodontias, implantes, limpeza e mais 20 procedimentos prontos para uso.
+                  </p>
+                </div>
+              </div>
+              <p className="text-xs text-text-secondary leading-relaxed">
+                Você pode adicionar, editar ou remover procedimentos a qualquer momento em{' '}
+                <span className="font-semibold text-text-primary">Configurações → Procedimentos</span>.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={async () => { await definirProcedimentosPendente(false); setStep('sucesso'); }}
+                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-teal to-teal-lt text-white py-3.5 rounded-xl font-bold text-sm transition-all shadow-[0_6px_20px_rgba(47,156,133,0.35)] hover:-translate-y-0.5 hover:shadow-[0_10px_28px_rgba(47,156,133,0.45)]"
+              >
+                Usar tabela padrão <ChevronRight className="w-4 h-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => router.push('/dashboard/configuracoes?aba=procedimentos')}
+                className="w-full flex items-center justify-center gap-2 border border-border bg-surface hover:bg-surface-alt text-text-primary py-3.5 rounded-xl font-bold text-sm transition-all"
+              >
+                Importar minha tabela
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => { await definirProcedimentosPendente(true); setStep('sucesso'); }}
+                className="w-full text-center text-sm font-semibold text-text-secondary hover:text-text-primary py-2 transition-colors"
+              >
+                Configurar depois
+              </button>
             </div>
           </motion.div>
         )}

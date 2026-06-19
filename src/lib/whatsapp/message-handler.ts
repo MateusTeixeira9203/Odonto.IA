@@ -13,7 +13,7 @@
 
 import { createServiceClient } from '@/lib/supabase/service';
 import { STATES, type BotState } from './states';
-import { sendWhatsAppText } from './evolution';
+import { sendText } from './provider';
 import {
   sendDentistList,
   sendDateList,
@@ -163,7 +163,7 @@ export async function processMessage(
     /^(humano|atendente|pessoa|ajuda|falar com atendente)$/i.test(input)
   ) {
     const msg = `Certo! Vou chamar a equipe da clínica. Um momento... 👩‍⚕️`;
-    await sendWhatsAppText(instancia, conversa.telefone, msg);
+    await sendText(instancia, conversa.telefone, msg);
     await salvarMensagem(conversa, 'saida', msg);
     await transferirParaHumano(conversa.id);
     await atualizarConversa(conversa.id, STATES.HUMANO, {});
@@ -195,7 +195,7 @@ export async function processMessage(
       if (!dentista) {
         // Texto inválido ou rowId desconhecido → avisa e reenvia a lista de dentistas
         const nudge = 'Não entendi. 🤔 Por favor, use as opções da lista abaixo:';
-        await sendWhatsAppText(instancia, conversa.telefone, nudge);
+        await sendText(instancia, conversa.telefone, nudge);
         await salvarMensagem(conversa, 'saida', nudge);
         await sendDentistList(
           instancia,
@@ -228,7 +228,7 @@ export async function processMessage(
 
       if (!datas.length) {
         const semHorario = parseTemplate(config.msg_sem_horario, { dentista: dentista.nome as string, assistente: config.nome_assistente });
-        await sendWhatsAppText(instancia, conversa.telefone, semHorario);
+        await sendText(instancia, conversa.telefone, semHorario);
         await salvarMensagem(conversa, 'saida', semHorario);
         await atualizarConversa(conversa.id, STATES.INICIO, {});
         return { texto: '', novoEstado: STATES.INICIO };
@@ -246,7 +246,7 @@ export async function processMessage(
       if (!datas.includes(input)) {
         // Texto inválido → avisa e reenvia a lista de datas
         const nudge = 'Não entendi. 🤔 Por favor, use as opções da lista abaixo:';
-        await sendWhatsAppText(instancia, conversa.telefone, nudge);
+        await sendText(instancia, conversa.telefone, nudge);
         await salvarMensagem(conversa, 'saida', nudge);
         await sendDateList(
           instancia,
@@ -311,7 +311,7 @@ export async function processMessage(
       if (!slots.includes(input)) {
         // Texto inválido → avisa e reenvia a lista de horários
         const nudge = 'Não entendi. 🤔 Por favor, use as opções da lista abaixo:';
-        await sendWhatsAppText(instancia, conversa.telefone, nudge);
+        await sendText(instancia, conversa.telefone, nudge);
         await salvarMensagem(conversa, 'saida', nudge);
         await sendHoraList(
           instancia,
@@ -393,7 +393,7 @@ export async function processMessage(
         const dentistaNome = ctx.dentista_nome as string | undefined;
         const resumo = dataHora ? formatarSlotParaConfirmacao(dataHora) : 'o horário agendado';
         const msg = `✅ Presença confirmada para ${resumo}${dentistaNome ? ` com ${dentistaNome}` : ''}! Te esperamos lá. 😊`;
-        await sendWhatsAppText(instancia, conversa.telefone, msg);
+        await sendText(instancia, conversa.telefone, msg);
         await salvarMensagem(conversa, 'saida', msg);
         await atualizarConversa(conversa.id, STATES.CONFIRMADO, {});
         return { texto: '', novoEstado: STATES.CONFIRMADO };
@@ -412,7 +412,7 @@ export async function processMessage(
         });
 
         const msg = `Entendido! Nossa equipe vai entrar em contato para reagendar. 📞`;
-        await sendWhatsAppText(instancia, conversa.telefone, msg);
+        await sendText(instancia, conversa.telefone, msg);
         await salvarMensagem(conversa, 'saida', msg);
         await atualizarConversa(conversa.id, STATES.HUMANO, {});
         return { texto: '', novoEstado: STATES.HUMANO };
@@ -420,7 +420,7 @@ export async function processMessage(
 
       // Resposta não reconhecida — pede de novo
       const nudge = `Não entendi. 🤔 Responda *CONFIRMO* para confirmar sua presença ou *NÃO* para cancelar.`;
-      await sendWhatsAppText(instancia, conversa.telefone, nudge);
+      await sendText(instancia, conversa.telefone, nudge);
       await salvarMensagem(conversa, 'saida', nudge);
       await atualizarConversa(conversa.id, STATES.AGUARDANDO_CONFIRMACAO_24H, ctx as Record<string, unknown>);
       return { texto: '', novoEstado: STATES.AGUARDANDO_CONFIRMACAO_24H };
@@ -442,14 +442,14 @@ export async function processMessage(
       const cpfLimpo = input.replace(/\D/g, '');
       if (cpfLimpo.length !== 11) {
         const erro = 'CPF inválido. 😕 Por favor, informe os *11 dígitos* do CPF (sem pontos ou traços):';
-        await sendWhatsAppText(instancia, conversa.telefone, erro);
+        await sendText(instancia, conversa.telefone, erro);
         await salvarMensagem(conversa, 'saida', erro);
         await atualizarConversa(conversa.id, etapa, ctx as Record<string, unknown>);
         return { texto: '', novoEstado: etapa };
       }
       const novoCtx: BotContexto = { ...ctx, cpf: cpfLimpo };
       const pergunta = 'Ótimo! 📋 Agora informe sua *data de nascimento* (formato DD/MM/AAAA):';
-      await sendWhatsAppText(instancia, conversa.telefone, pergunta);
+      await sendText(instancia, conversa.telefone, pergunta);
       await salvarMensagem(conversa, 'saida', pergunta);
       await atualizarConversa(conversa.id, STATES.COLETANDO_DATA_NASC, novoCtx as Record<string, unknown>);
       return { texto: '', novoEstado: STATES.COLETANDO_DATA_NASC };
@@ -460,7 +460,7 @@ export async function processMessage(
       const match = input.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
       if (!match) {
         const erro = 'Data inválida. 😕 Use o formato *DD/MM/AAAA* (ex: 15/03/1990):';
-        await sendWhatsAppText(instancia, conversa.telefone, erro);
+        await sendText(instancia, conversa.telefone, erro);
         await salvarMensagem(conversa, 'saida', erro);
         await atualizarConversa(conversa.id, etapa, ctx as Record<string, unknown>);
         return { texto: '', novoEstado: etapa };
@@ -520,7 +520,7 @@ async function iniciarFluxo(
       `Sou o *${config.nome_assistente}*, assistente virtual da clínica.\n\n` +
       'Para agendar sua consulta, preciso de alguns dados rápidos.\n\n' +
       'Por favor, informe seu *CPF* (apenas os números):';
-    await sendWhatsAppText(instancia, conversa.telefone, saudacao);
+    await sendText(instancia, conversa.telefone, saudacao);
     await salvarMensagem(conversa, 'saida', saudacao);
     await atualizarConversa(
       conversa.id,
@@ -542,7 +542,7 @@ async function iniciarFluxo(
 
   if (!dentistas.length) {
     const semHorario = parseTemplate(config.msg_sem_horario, { assistente: config.nome_assistente });
-    await sendWhatsAppText(instancia, conversa.telefone, semHorario);
+    await sendText(instancia, conversa.telefone, semHorario);
     await salvarMensagem(conversa, 'saida', semHorario);
     await atualizarConversa(conversa.id, STATES.INICIO, {});
     return { texto: '', novoEstado: STATES.INICIO };

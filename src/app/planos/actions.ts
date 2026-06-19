@@ -39,7 +39,7 @@ export async function activateTrial(): Promise<{ error?: string }> {
   }
 
   const trialEndsAt = new Date();
-  trialEndsAt.setDate(trialEndsAt.getDate() + 7);
+  trialEndsAt.setDate(trialEndsAt.getDate() + 14);
 
   const { error: updateError } = await service
     .from('clinicas')

@@ -46,6 +46,7 @@ export async function salvarFichaConsulta(params: {
     ...(params.retorno_sugerido !== undefined && { retorno_sugerido: params.retorno_sugerido }),
     ...(params.alerta_novo != null && { alerta_novo: params.alerta_novo }),
     status:              'concluida',
+    origem:              'modo_consulta',
   }).select('id').single();
 
   if (fichaError) {

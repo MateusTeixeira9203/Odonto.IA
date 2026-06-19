@@ -13,7 +13,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { sendWhatsAppText } from './evolution';
+import { sendText } from './provider';
 
 // ─── Constantes ────────────────────────────────────────────────────────────────
 
@@ -340,7 +340,7 @@ export async function handleDexMessage(
       ativo:      true,
     });
 
-    await sendWhatsAppText(instancia, numero, buildBoasVindas(dentista.nome));
+    await sendText(instancia, numero, buildBoasVindas(dentista.nome));
     return;
   }
 
@@ -352,5 +352,5 @@ export async function handleDexMessage(
 
   // Processa o comando e responde
   const resposta = await processarComando(texto, clinicaId, db);
-  await sendWhatsAppText(instancia, numero, resposta);
+  await sendText(instancia, numero, resposta);
 }

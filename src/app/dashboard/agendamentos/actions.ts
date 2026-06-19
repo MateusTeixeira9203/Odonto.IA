@@ -31,14 +31,13 @@ export async function criarAgendamento(dados: {
 }): Promise<{ error?: string; id?: string }> {
   const { supabase, user, clinicId, role } = await requireClinicContext();
 
-  const { data: dentistaPerfil } = await supabase
-    .from("dentistas")
-    .select("id, nome")
-    .eq("user_id", user.id)
-    .eq("clinica_id", clinicId)
-    .maybeSingle();
+  const [{ data: dentistaPerfil }, { count: pacCount }] = await Promise.all([
+    supabase.from("dentistas").select("id, nome").eq("user_id", user.id).eq("clinica_id", clinicId).maybeSingle(),
+    supabase.from('pacientes').select('id', { count: 'exact', head: true }).eq('id', dados.pacienteId).eq('clinica_id', clinicId),
+  ]);
 
   if (!dentistaPerfil) redirect("/onboarding");
+  if ((pacCount ?? 0) === 0) return { error: 'Paciente não encontrado.' };
 
   const dentistaAlvo = dados.dentistaId ?? dentistaPerfil.id;
 
@@ -50,13 +49,6 @@ export async function criarAgendamento(dados: {
       .eq('clinica_id', clinicId);
     if ((dentCount ?? 0) === 0) return { error: 'Dentista não encontrado.' };
   }
-
-  const { count: pacCount } = await supabase
-    .from('pacientes')
-    .select('id', { count: 'exact', head: true })
-    .eq('id', dados.pacienteId)
-    .eq('clinica_id', clinicId);
-  if ((pacCount ?? 0) === 0) return { error: 'Paciente não encontrado.' };
 
   const novoInicioMs = new Date(dados.dataHora).getTime();
   const novoFimMs = novoInicioMs + dados.duracaoMinutos * 60_000;

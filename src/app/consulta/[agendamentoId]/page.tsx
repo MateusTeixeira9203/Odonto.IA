@@ -10,6 +10,22 @@ export default async function ConsultaPage({ params }: Props) {
   const { agendamentoId } = await params;
   const { supabase, clinicId } = await requireClinicContext();
 
+  // Bloquear acesso ao Modo Consulta quando trial expirou
+  const { data: clinica } = await supabase
+    .from('clinicas')
+    .select('status_assinatura, trial_ends_at')
+    .eq('id', clinicId)
+    .maybeSingle<{ status_assinatura: string; trial_ends_at: string | null }>();
+
+  const trialExpirou =
+    clinica?.status_assinatura === 'trial' &&
+    clinica?.trial_ends_at != null &&
+    new Date(clinica.trial_ends_at) < new Date();
+
+  if (trialExpirou || clinica?.status_assinatura === 'inativo') {
+    redirect('/dashboard?bloqueado=modo-consulta');
+  }
+
   const { data: ag } = await supabase
     .from('agendamentos')
     .select('id, data_hora, observacoes, status, paciente:pacientes(id, nome, data_nascimento, telefone, observacoes)')

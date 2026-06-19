@@ -2,7 +2,7 @@
 
 import { requireRole } from '@/server/auth/roles';
 import { createServiceClient } from '@/lib/supabase/service';
-import { sendWhatsAppText } from '@/lib/whatsapp/evolution';
+import { sendText } from '@/lib/whatsapp/provider';
 import { STATES } from '@/lib/whatsapp/states';
 
 export interface ConversaItem {
@@ -94,13 +94,23 @@ export async function enviarMensagemManual(
     tipo:        'texto',
   });
 
-  const instance = process.env.EVOLUTION_DEFAULT_INSTANCE;
-  if (!instance) {
-    return { ok: true, aviso: 'EVOLUTION_DEFAULT_INSTANCE não configurada — mensagem salva apenas no histórico.' };
+  // Resolve phone_number_id da clínica
+  const { data: clinicaRow } = await db
+    .from('clinicas')
+    .select('whatsapp_phone_number_id')
+    .eq('id', clinicId)
+    .maybeSingle();
+
+  const phoneNumberId =
+    (clinicaRow?.whatsapp_phone_number_id as string | null) ??
+    process.env.WHATSAPP_PHONE_NUMBER_ID;
+
+  if (!phoneNumberId) {
+    return { ok: true, aviso: 'WHATSAPP_PHONE_NUMBER_ID não configurada — mensagem salva apenas no histórico.' };
   }
 
   try {
-    await sendWhatsAppText(instance, telefone, conteudo);
+    await sendText(phoneNumberId, telefone, conteudo);
     return { ok: true };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

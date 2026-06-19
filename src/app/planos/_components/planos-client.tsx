@@ -186,7 +186,7 @@ export function PlanosClient({
                     <div className="absolute -top-3.5 right-6">
                       <span className="inline-flex items-center gap-1 bg-surface border border-teal/25 text-teal text-[10px] font-bold px-3 py-1 rounded-full">
                         <Sparkles className="w-3 h-3" />
-                        7 dias grátis
+                        14 dias grátis
                       </span>
                     </div>
                   )}
@@ -244,7 +244,7 @@ export function PlanosClient({
                     >
                       {isLoading
                         ? <><Loader2 className="w-4 h-4 animate-spin" /> Ativando…</>
-                        : <><Sparkles className="w-4 h-4" /> Começar 7 dias grátis</>
+                        : <><Sparkles className="w-4 h-4" /> Começar 14 dias grátis</>
                       }
                     </button>
                   ) : (

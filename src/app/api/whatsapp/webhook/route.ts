@@ -1,95 +1,232 @@
 /**
- * POST /api/whatsapp/webhook
+ * GET  /api/whatsapp/webhook  — verificação do webhook Meta
+ * POST /api/whatsapp/webhook  — recebimento de mensagens Meta Cloud API
  *
- * Recebe eventos da Evolution API, processa mensagens recebidas e
- * responde via WhatsApp usando o fluxo de List Messages.
+ * Multi-tenant: o phone_number_id presente em cada mensagem é cruzado com
+ * clinicas.whatsapp_phone_number_id para identificar a clínica destino.
  *
- * Segurança: valida o header `apikey` contra EVOLUTION_API_KEY.
+ * Segurança: valida assinatura HMAC-SHA256 via X-Hub-Signature-256.
  *
- * Fluxo por mensagem:
- *   1. Valida autenticação e filtra eventos irrelevantes.
- *   2. Extrai número + texto (texto OU selectedRowId da list message).
- *   3. Localiza a clínica via instância ou variável de ambiente.
- *   4. Identifica/cria paciente em `pacientes` usando pushName.
- *   5. Localiza/cria conversa em `conversas_bot`.
- *   6. Chama processMessage (que envia list messages diretamente quando necessário).
- *   7. Se processMessage retornar texto, envia via WhatsApp texto.
+ * Fluxo por mensagem de texto/interactive:
+ *   1. Valida assinatura e parseia payload com MetaProvider.
+ *   2. Roteia para a clínica pelo phone_number_id.
+ *   3. Verifica se é dentista (DEX) → handleDexMessage.
+ *   4. Identifica/cria paciente, localiza/cria conversa.
+ *   5. processMessage → sendText com resposta.
+ *
+ * Fluxo por imagem (comprovante PIX):
+ *   1. downloadMedia(mediaId) → base64.
+ *   2. analyzeReceipt → matchReceiptToOrcamento.
+ *   3. Responde com resultado.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
-import { sendWhatsAppText } from '@/lib/whatsapp/evolution';
-import { mapEvolutionStatus } from '@/lib/whatsapp/evolution-admin';
+import { getProvider, sendText } from '@/lib/whatsapp/provider';
+import { MetaProvider } from '@/lib/whatsapp/providers/meta';
 import { processMessage, type ConversaBot } from '@/lib/whatsapp/message-handler';
 import { STATES } from '@/lib/whatsapp/states';
 import { verificarDexUser, handleDexMessage } from '@/lib/whatsapp/dex-handler';
 import { analyzeReceipt, matchReceiptToOrcamento } from '@/lib/whatsapp/receipt-handler';
 
-// ─── Tipos do payload Evolution API ──────────────────────────────────────────
+// ─── GET — verificação do webhook (Meta chama isso ao configurar) ──────────────
 
-interface EvolutionWebhookPayload {
-  event: string;
-  instance: string;
-  data: {
-    key: {
-      remoteJid: string;
-      fromMe?: boolean;
-      id?: string;
-    };
-    pushName?: string;
-    messageType?: string;
-    message?: {
-      conversation?: string;
-      extendedTextMessage?: { text: string };
-      listResponseMessage?: {
-        title?: string;
-        singleSelectReply?: { selectedRowId: string };
-      };
-      /** Mensagem de imagem (ex: comprovante PIX) */
-      imageMessage?: {
-        url?: string;
-        /** Base64 da imagem, quando disponível via webhook */
-        base64?: string;
-        mimetype?: string;
-        caption?: string;
-      };
-    };
-    /** Base64 da mídia, presente em alguns modos de webhook da Evolution API */
-    mediaBase64?: string;
-    /** MIME type da mídia */
-    mediaMimetype?: string;
-  };
+export async function GET(req: NextRequest): Promise<NextResponse> {
+  const params = Object.fromEntries(req.nextUrl.searchParams.entries());
+  const meta = getProvider() as MetaProvider;
+  const challenge = meta.verifyWebhook(params);
+
+  if (challenge) {
+    return new NextResponse(challenge, { status: 200 });
+  }
+
+  return NextResponse.json({ error: 'Verificação inválida' }, { status: 403 });
+}
+
+// ─── POST — mensagens recebidas ────────────────────────────────────────────────
+
+export async function POST(req: NextRequest): Promise<NextResponse> {
+  // Lê o corpo como texto para validar assinatura antes de parsear
+  const rawBody = await req.text();
+
+  // Valida assinatura HMAC-SHA256 (ativa quando WHATSAPP_APP_SECRET estiver definida)
+  const signature = req.headers.get('x-hub-signature-256') ?? '';
+  const meta = getProvider() as MetaProvider;
+  if (!meta.validateSignature(rawBody, signature)) {
+    return NextResponse.json({ error: 'Assinatura inválida' }, { status: 401 });
+  }
+
+  let body: unknown;
+  try {
+    body = JSON.parse(rawBody);
+  } catch {
+    return NextResponse.json({ error: 'Payload inválido' }, { status: 400 });
+  }
+
+  // A Meta exige resposta 200 imediata — processa em background
+  // (em produção, use queue/background job para mensagens pesadas)
+  const mensagens = meta.parseInbound(body);
+
+  for (const msg of mensagens) {
+    try {
+      await processarMensagem(msg.phoneNumberId, msg);
+    } catch (err) {
+      console.error('[webhook] Erro ao processar mensagem:', err);
+      // Não lança — Meta reenviaria o webhook
+    }
+  }
+
+  return NextResponse.json({ ok: true });
+}
+
+// ─── Lógica principal ──────────────────────────────────────────────────────────
+
+async function processarMensagem(
+  phoneNumberId: string,
+  msg: Awaited<ReturnType<MetaProvider['parseInbound']>>[number],
+): Promise<void> {
+  const numero   = msg.from;
+  const pushName = msg.pushName ?? null;
+
+  // ── Imagem → tenta analisar como comprovante PIX ──────────────────────────
+  if (msg.type === 'image' && msg.mediaId) {
+    const clinicaId = await resolverClinicaPorPhone(phoneNumberId);
+    if (!clinicaId) return;
+
+    try {
+      const { base64, mimeType } = await getProvider().downloadMedia(msg.mediaId);
+      const analysis = await analyzeReceipt(base64, mimeType);
+      const db = createServiceClient();
+      const result = await matchReceiptToOrcamento(clinicaId, numero, analysis, db);
+      await sendText(phoneNumberId, numero, result.mensagem);
+    } catch (err) {
+      console.error('[webhook/pix] Erro ao processar comprovante:', err);
+      // Silencia — não confunde o paciente com erro técnico
+    }
+    return;
+  }
+
+  // ── Extrai texto (texto digitado ou resposta de lista interativa) ──────────
+  const texto = msg.type === 'text'
+    ? (msg.text ?? '').trim()
+    : msg.type === 'interactive_reply'
+      ? (msg.selectedRowId ?? '').trim()
+      : '';
+
+  if (!texto) return;
+
+  // ── Localiza a clínica pelo phone_number_id ────────────────────────────────
+  const clinicaId = await resolverClinicaPorPhone(phoneNumberId);
+  if (!clinicaId) {
+    console.error(`[webhook] Clínica não encontrada para phone_number_id=${phoneNumberId}`);
+    return;
+  }
+
+  const db = createServiceClient();
+
+  // ── Modo DEX: intercepta mensagens de dentistas/admins ────────────────────
+  const dexDentista = await verificarDexUser(clinicaId, numero, db);
+  if (dexDentista) {
+    await handleDexMessage(dexDentista, clinicaId, numero, texto, phoneNumberId, db);
+    return;
+  }
+
+  // ── Dentista principal (para vincular pacientes criados pelo bot) ──────────
+  const { data: dentistaPrincipal } = await db
+    .from('dentistas')
+    .select('id')
+    .eq('clinica_id', clinicaId)
+    .neq('role', 'secretaria')
+    .eq('ativo', true)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  // ── Identifica ou cria paciente ────────────────────────────────────────────
+  const { pacienteId, nome: pacienteNome, isNovo: isNovoPaciente } =
+    await identificarOuCriarPaciente(clinicaId, numero, pushName, dentistaPrincipal?.id ?? null);
+
+  // ── Localiza ou cria conversa ──────────────────────────────────────────────
+  const { data: conversaExistente } = await db
+    .from('conversas_bot')
+    .select('*')
+    .eq('clinica_id', clinicaId)
+    .eq('telefone', numero)
+    .order('ultimo_contato', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let conversa: ConversaBot;
+
+  if (conversaExistente) {
+    conversa = conversaExistente as ConversaBot;
+    if (!conversa.paciente_id && pacienteId) {
+      await db.from('conversas_bot').update({ paciente_id: pacienteId }).eq('id', conversa.id);
+      conversa = { ...conversa, paciente_id: pacienteId };
+    }
+  } else {
+    const { data: nova, error } = await db
+      .from('conversas_bot')
+      .insert({
+        clinica_id:  clinicaId,
+        telefone:    numero,
+        etapa:       STATES.INICIO,
+        contexto:    { paciente_nome: pacienteNome, is_novo_paciente: isNovoPaciente },
+        paciente_id: pacienteId || null,
+        ativo:       true,
+      })
+      .select()
+      .single();
+
+    if (error || !nova) {
+      console.error('[webhook] Erro ao criar conversa:', error);
+      return;
+    }
+    conversa = nova as ConversaBot;
+  }
+
+  // Bot silencia se transferido para humano
+  if (!conversa.ativo) return;
+
+  if (!conversa.contexto?.paciente_nome && pacienteNome) {
+    conversa = { ...conversa, contexto: { ...conversa.contexto, paciente_nome: pacienteNome } };
+  }
+
+  const resposta = await processMessage(conversa, texto, phoneNumberId);
+  if (resposta.texto) {
+    await sendText(phoneNumberId, numero, resposta.texto);
+  }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function extrairNumero(remoteJid: string): string {
-  return remoteJid.replace('@s.whatsapp.net', '').replace('@g.us', '');
+/**
+ * Resolve o clinica_id a partir do phone_number_id da Meta.
+ * Busca na coluna whatsapp_phone_number_id da tabela clinicas.
+ *
+ * TODO: quando múltiplas clínicas tiverem números registrados,
+ *       garantir que a coluna existe e tem index único.
+ */
+async function resolverClinicaPorPhone(phoneNumberId: string): Promise<string | null> {
+  // Fallback para desenvolvimento com number ID único no .env
+  const envPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const envClinicaId = process.env.WHATSAPP_DEFAULT_CLINICA_ID;
+
+  if (envPhoneId && envClinicaId && phoneNumberId === envPhoneId) {
+    return envClinicaId;
+  }
+
+  // Multi-tenant: busca pelo phone_number_id na tabela clinicas
+  const db = createServiceClient();
+  const { data } = await db
+    .from('clinicas')
+    .select('id')
+    .eq('whatsapp_phone_number_id', phoneNumberId)
+    .maybeSingle();
+
+  return (data?.id as string | null) ?? null;
 }
 
-/**
- * Extrai o texto da mensagem.
- * Para list responses, retorna o selectedRowId (tratado como input pela máquina de estados).
- */
-function extrairTexto(payload: EvolutionWebhookPayload): string | null {
-  const msg = payload.data?.message;
-  if (!msg) return null;
-
-  // List response — retorna o rowId selecionado
-  const rowId = msg.listResponseMessage?.singleSelectReply?.selectedRowId;
-  if (rowId) return rowId;
-
-  // Texto simples
-  return msg.conversation ?? msg.extendedTextMessage?.text ?? null;
-}
-
-// ─── Identificação de paciente ────────────────────────────────────────────────
-
-/**
- * Localiza o paciente pelo número de WhatsApp.
- * Se não existir, cria com o pushName fornecido e vincula ao dentista principal da clínica.
- * Retorna nome, id e se o paciente é novo (isNovo = true → msg_novo_paciente).
- */
 async function identificarOuCriarPaciente(
   clinicaId: string,
   telefone: string,
@@ -123,206 +260,4 @@ async function identificarOuCriarPaciente(
   }
 
   return { pacienteId: novo.id as string, nome, isNovo: true };
-}
-
-// ─── Handler principal ────────────────────────────────────────────────────────
-
-export async function POST(req: NextRequest): Promise<NextResponse> {
-  // Valida autenticação do webhook
-  const apiKey = req.headers.get('apikey');
-  if (apiKey !== process.env.EVOLUTION_API_KEY) {
-    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-  }
-
-  let payload: EvolutionWebhookPayload;
-  try {
-    payload = await req.json() as EvolutionWebhookPayload;
-  } catch {
-    return NextResponse.json({ error: 'Payload inválido' }, { status: 400 });
-  }
-
-  const evento = payload.event?.toLowerCase().replace('.', '_');
-
-  // ── connection.update → atualiza status da instância no banco ──────────────
-  if (evento === 'connection_update') {
-    const rawState =
-      (payload.data as Record<string, unknown>).state as string | undefined ??
-      (payload.data as Record<string, unknown>).connection as string | undefined;
-
-    if (rawState && payload.instance) {
-      const db  = createServiceClient();
-      const status = mapEvolutionStatus(rawState);
-      await db
-        .from('instancias_whatsapp')
-        .update({ status, updated_at: new Date().toISOString() })
-        .eq('instance_name', payload.instance);
-    }
-    return NextResponse.json({ ok: true });
-  }
-
-  // Processa apenas mensagens recebidas
-  if (evento !== 'messages_upsert' || payload.data?.key?.fromMe) {
-    return NextResponse.json({ ok: true });
-  }
-
-  const numero   = extrairNumero(payload.data.key.remoteJid);
-  const instance = payload.instance;
-  const pushName = payload.data.pushName ?? null;
-
-  // ── Imagem recebida → tenta analisar como comprovante PIX ─────────────────
-  if (payload.data.messageType === 'imageMessage') {
-    // A Evolution API pode entregar a mídia como base64 em campos distintos
-    const imageBase64 =
-      payload.data.mediaBase64 ??
-      payload.data.message?.imageMessage?.base64 ??
-      null;
-
-    const mimeType =
-      payload.data.mediaMimetype ??
-      payload.data.message?.imageMessage?.mimetype ??
-      'image/jpeg';
-
-    const clinicaId = process.env.EVOLUTION_DEFAULT_CLINICA_ID;
-
-    if (imageBase64 && clinicaId) {
-      try {
-        const analysis = await analyzeReceipt(imageBase64, mimeType);
-        const db = createServiceClient();
-        const result = await matchReceiptToOrcamento(clinicaId, numero, analysis, db);
-        await sendWhatsAppText(instance, numero, result.mensagem);
-        console.log(
-          `[webhook/receipt] Comprovante processado — matched=${result.matched}, numero=${numero}`,
-        );
-      } catch (err) {
-        console.error('[webhook/receipt] Erro ao processar comprovante:', err);
-        // Não envia mensagem de erro para não confundir o paciente
-      }
-    } else {
-      // Sem base64 disponível — apenas acusa recebimento
-      await sendWhatsAppText(
-        instance,
-        numero,
-        '✅ Imagem recebida! Nossa equipe irá verificar o comprovante em breve. Obrigado!',
-      );
-    }
-    return NextResponse.json({ ok: true });
-  }
-  // ─────────────────────────────────────────────────────────────────────────
-
-  const texto = extrairTexto(payload);
-  if (!texto?.trim()) {
-    return NextResponse.json({ ok: true });
-  }
-
-  // Localiza a clínica — MVP usa variável de ambiente
-  const clinicaId = process.env.EVOLUTION_DEFAULT_CLINICA_ID;
-  if (!clinicaId) {
-    console.error('[webhook] EVOLUTION_DEFAULT_CLINICA_ID não definida');
-    return NextResponse.json({ error: 'Clínica não configurada' }, { status: 500 });
-  }
-
-  const db = createServiceClient();
-
-  // ── Modo DEX: intercepta mensagens de dentistas/admins ────────────────────
-  const dexDentista = await verificarDexUser(clinicaId, numero, db);
-  if (dexDentista) {
-    try {
-      await handleDexMessage(dexDentista, clinicaId, numero, texto, instance, db);
-    } catch (err) {
-      console.error('[webhook/dex] Erro ao processar mensagem DEX:', err);
-    }
-    return NextResponse.json({ ok: true });
-  }
-  // ─────────────────────────────────────────────────────────────────────────
-
-  // Dentista principal da clínica (o mais antigo que não seja secretária)
-  // usado para vincular pacientes criados automaticamente pelo bot
-  const { data: dentistaPrincipal } = await db
-    .from('dentistas')
-    .select('id')
-    .eq('clinica_id', clinicaId)
-    .neq('role', 'secretaria')
-    .eq('ativo', true)
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  // Identifica ou cria o paciente pelo número de WhatsApp
-  const { pacienteId, nome: pacienteNome, isNovo: isNovoPaciente } = await identificarOuCriarPaciente(
-    clinicaId,
-    numero,
-    pushName,
-    dentistaPrincipal?.id ?? null,
-  );
-
-  // Localiza conversa ativa ou cria nova
-  const { data: conversaExistente } = await db
-    .from('conversas_bot')
-    .select('*')
-    .eq('clinica_id', clinicaId)
-    .eq('telefone', numero)
-    .order('ultimo_contato', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  let conversa: ConversaBot;
-
-  if (conversaExistente) {
-    conversa = conversaExistente as ConversaBot;
-
-    // Atualiza paciente_id se ainda não vinculado
-    if (!conversa.paciente_id && pacienteId) {
-      await db
-        .from('conversas_bot')
-        .update({ paciente_id: pacienteId })
-        .eq('id', conversa.id);
-      conversa = { ...conversa, paciente_id: pacienteId };
-    }
-  } else {
-    const { data: nova, error } = await db
-      .from('conversas_bot')
-      .insert({
-        clinica_id:  clinicaId,
-        telefone:    numero,
-        etapa:       STATES.INICIO,
-        contexto:    { paciente_nome: pacienteNome, is_novo_paciente: isNovoPaciente },
-        paciente_id: pacienteId || null,
-        ativo:       true,
-      })
-      .select()
-      .single();
-
-    if (error || !nova) {
-      console.error('[webhook] Erro ao criar conversa:', error);
-      return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
-    }
-    conversa = nova as ConversaBot;
-  }
-
-  // Conversa transferida para humano — bot silencia
-  if (!conversa.ativo) {
-    return NextResponse.json({ ok: true });
-  }
-
-  // Garante que o nome do paciente esteja no contexto para saudações
-  if (!conversa.contexto?.paciente_nome && pacienteNome) {
-    conversa = {
-      ...conversa,
-      contexto: { ...conversa.contexto, paciente_nome: pacienteNome },
-    };
-  }
-
-  try {
-    const resposta = await processMessage(conversa, texto, instance);
-
-    // Texto não vazio = processMessage não enviou diretamente (ex: confirmação)
-    if (resposta.texto) {
-      await sendWhatsAppText(instance, numero, resposta.texto);
-    }
-  } catch (err) {
-    console.error('[webhook] Erro ao processar/enviar mensagem:', err);
-    // Retorna 200 para Evolution API não reenviar o webhook
-  }
-
-  return NextResponse.json({ ok: true });
 }

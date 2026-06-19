@@ -36,9 +36,9 @@ const PLANOS = [
       'Planejamento visual e orçamentos',
       'Transcrição de voz por IA',
       'Agenda e financeiro completo',
-      '7 dias grátis para testar',
+      '14 dias grátis para testar',
     ],
-    popular: false, cta: '7 dias grátis',
+    popular: false, cta: '14 dias grátis',
   },
   {
     id: 'CLINICA', nome: 'Clínica', preco: '179', precoSuffix: '/dentista/mês',
@@ -48,9 +48,9 @@ const PLANOS = [
       'Secretária gerencia todos os dentistas',
       'WhatsApp com bot e lembretes',
       'Gestão de funções (admin/dentista)',
-      '7 dias grátis para testar',
+      '14 dias grátis para testar',
     ],
-    popular: true, cta: '7 dias grátis',
+    popular: true, cta: '14 dias grátis',
   },
 ];
 
@@ -669,7 +669,7 @@ export default function LandingPage() {
               </h2>
               <p className="text-gray-500 dark:text-gray-300">
                 Sem taxa de setup. Sem contratos. Todos os planos incluem{' '}
-                <strong className="text-teal">7 dias de teste gratuito.</strong>
+                <strong className="text-teal">14 dias de teste gratuito.</strong>
               </p>
             </motion.div>
 

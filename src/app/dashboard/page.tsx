@@ -6,6 +6,8 @@ import { PageTransition } from '@/components/layout/page-transition';
 import { DentistaDashboard, DashboardSkeleton } from './_components/dentista-dashboard';
 import { SecretariaDashboard } from './_components/secretaria-dashboard';
 import type { AgendamentoHoje, DentistaItem, PendenciaItem } from './_components/secretaria-dashboard';
+import { getOnboardingProgresso } from '@/lib/onboarding-progress';
+import { PrimeirosPassosCard } from '@/components/dashboard/primeiros-passos-card';
 
 // ── Dashboard para Secretária ─────────────────────────────────────────────────
 
@@ -170,7 +172,11 @@ async function SecretaryDashboardServer({
 
 // ── Page principal ────────────────────────────────────────────────────────────
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ bloqueado?: string }>;
+}) {
   const dentista = await getDentistaCached();
   if (!dentista) redirect('/login');
 
@@ -183,9 +189,35 @@ export default async function DashboardPage() {
     );
   }
 
+  const sp = await searchParams;
+  const bloqueadoModoConsulta = sp.bloqueado === 'modo-consulta';
+  const progresso = await getOnboardingProgresso(dentista.clinica_id);
+
   return (
     <PageTransition>
       <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto w-full">
+        <PrimeirosPassosCard progresso={progresso} dentistaId={dentista.id} />
+        {bloqueadoModoConsulta && (
+          <div className="mb-6 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-5 flex items-start gap-4">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/15 flex items-center justify-center shrink-0">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-500">
+                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/>
+              </svg>
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-bold text-text-primary mb-0.5">Período de trial encerrado</p>
+              <p className="text-xs text-text-secondary leading-relaxed">
+                O Modo Consulta está disponível somente nos planos pagos. Suas fichas e histórico continuam acessíveis.
+              </p>
+            </div>
+            <a
+              href="/dashboard/configuracoes?aba=plano"
+              className="shrink-0 px-4 py-2 rounded-xl bg-gradient-to-r from-teal to-teal-lt text-white text-xs font-bold shadow-[0_4px_14px_rgba(47,156,133,0.3)] hover:-translate-y-0.5 transition-all whitespace-nowrap"
+            >
+              Assinar agora
+            </a>
+          </div>
+        )}
         <Suspense fallback={<DashboardSkeleton />}>
           <DentistaDashboard dentista={dentista} />
         </Suspense>

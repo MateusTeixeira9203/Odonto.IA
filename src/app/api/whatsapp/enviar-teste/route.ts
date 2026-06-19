@@ -61,15 +61,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const instancia = await getInstanceForClinica(auth.clinicaId);
-  if (!instancia || instancia.status !== 'connected') {
+  if (!instancia) {
     return NextResponse.json(
-      { error: 'WhatsApp não está conectado. Conecte primeiro antes de enviar.' },
+      { error: 'WhatsApp não configurado. Adicione o WHATSAPP_PHONE_NUMBER_ID no ambiente.' },
       { status: 409 },
     );
   }
 
   try {
-    await sendMessage(instancia.instanceName, numero, mensagem);
+    await sendMessage(instancia.phoneNumberId, numero, mensagem);
     return NextResponse.json({ ok: true });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

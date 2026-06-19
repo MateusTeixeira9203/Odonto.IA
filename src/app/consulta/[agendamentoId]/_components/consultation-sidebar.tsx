@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ChevronDown, ChevronUp, AlertTriangle,
-  CheckCircle2, History, ClipboardList, Pill,
+  CheckCircle2, History, Pill,
   StickyNote, Clock, Activity,
 } from 'lucide-react';
 
@@ -138,9 +138,13 @@ export function ConsultationSidebar({
   const { alergias, medicamentos, historico } = parseAlertas(alertasClinicos);
   const temAlertas = alertasClinicos.length > 0;
 
-  // Etapas pendentes do plano de tratamento
-  const etapasPendentes = planejamento?.etapas.filter(e => e.status !== 'concluido') ?? [];
-  const temPendencias = etapasPendentes.length > 0;
+  // Progresso do tratamento (a ficha É o tratamento e evolui)
+  const etapas = planejamento?.etapas ?? [];
+  const etapasFalta = etapas.filter(e => e.status !== 'concluido');
+  const etapasFeito = etapas.filter(e => e.status === 'concluido');
+  const totalEtapas = etapas.length;
+  const progresso = totalEtapas > 0 ? Math.round((etapasFeito.length / totalEtapas) * 100) : 0;
+  const temPlanejamento = totalEtapas > 0;
 
   const temUltimaVisita =
     !!(ultimaQueixa || ultimasAnotacoes ||
@@ -148,7 +152,7 @@ export function ConsultationSidebar({
       (fichas[0]?.procedimentos?.length ?? 0) > 0);
 
   return (
-    <aside className="w-full md:w-80 shrink-0 border-b border-border md:border-b-0 md:border-r bg-surface overflow-y-auto flex flex-col max-h-64 md:max-h-none">
+    <aside className="w-full md:w-[360px] shrink-0 border-b border-border md:border-b-0 md:border-r bg-surface overflow-y-auto flex flex-col max-h-[320px] md:max-h-none">
 
       {/* ── 1. Identificação ─────────────────────────────────────────── */}
       <div className="p-4 border-b border-border/50">
@@ -192,7 +196,7 @@ export function ConsultationSidebar({
               borderLeftColor: 'rgba(47,156,133,0.30)',
             }}
           >
-            "{observacoesAgendamento}"
+            &quot;{observacoesAgendamento}&quot;
           </div>
         )}
 
@@ -256,49 +260,97 @@ export function ConsultationSidebar({
         </SidebarSection>
       )}
 
-      {/* ── 3. Pendências do tratamento ───────────────────────────────── */}
-      {temPendencias && (
-        <SidebarSection accent="amber">
-          <SectionTitle icon={ClipboardList} label="Pendências" color="text-amber-600 dark:text-amber-400" />
-          <div className="space-y-1.5">
-            {etapasPendentes.slice(0, 4).map((etapa, idx) => {
-              const isPrimeira = idx === 0;
-              return (
-                <div key={etapa.id} className="flex items-center gap-2">
-                  {isPrimeira ? (
-                    <motion.div
-                      className="w-3.5 h-3.5 rounded-full border-2 shrink-0"
-                      style={{ borderColor: '#f59e0b' }}
-                      animate={{ scale: [1, 1.2, 1] }}
-                      transition={{ duration: 1.4, repeat: Infinity }}
-                    />
-                  ) : (
-                    <div className="w-3.5 h-3.5 rounded-full border-2 border-border/50 shrink-0" />
-                  )}
-                  <span className={`text-[11px] leading-tight flex-1 ${
-                    isPrimeira ? 'font-semibold text-text-primary' : 'text-text-secondary'
-                  }`}>
-                    {etapa.titulo}{etapa.dente ? ` · ${etapa.dente}` : ''}
-                  </span>
-                  {isPrimeira && (
-                    <span
-                      className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md shrink-0"
-                      style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b' }}
-                    >
-                      HOJE
-                    </span>
+      {/* ── 3. Progresso do tratamento ────────────────────────────────── */}
+      <SidebarSection accent="teal">
+        <SectionTitle icon={Activity} label="Tratamento" color="text-teal/70" />
+        {temPlanejamento ? (
+          <>
+            {/* Barra de progresso */}
+            <div className="flex items-center gap-2 mb-3">
+              <div className="flex-1 h-1.5 rounded-full bg-border/50 overflow-hidden">
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{ background: '#2f9c85' }}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${progresso}%` }}
+                  transition={{ duration: 0.6, ease: 'easeOut' }}
+                />
+              </div>
+              <span className="text-[10px] font-bold font-mono text-teal shrink-0">
+                {etapasFeito.length}/{totalEtapas}
+              </span>
+            </div>
+
+            {/* Falta */}
+            {etapasFalta.length > 0 && (
+              <div className="mb-2.5">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-amber-600/70 dark:text-amber-400/70 mb-1.5">Falta</p>
+                <div className="space-y-1.5">
+                  {etapasFalta.slice(0, 4).map((etapa, idx) => {
+                    const isPrimeira = idx === 0;
+                    return (
+                      <div key={etapa.id} className="flex items-center gap-2">
+                        {isPrimeira ? (
+                          <motion.div
+                            className="w-3.5 h-3.5 rounded-full border-2 shrink-0"
+                            style={{ borderColor: '#f59e0b' }}
+                            animate={{ scale: [1, 1.2, 1] }}
+                            transition={{ duration: 1.4, repeat: Infinity }}
+                          />
+                        ) : (
+                          <div className="w-3.5 h-3.5 rounded-full border-2 border-border/50 shrink-0" />
+                        )}
+                        <span className={`text-xs leading-tight flex-1 ${
+                          isPrimeira ? 'font-semibold text-text-primary' : 'text-text-secondary'
+                        }`}>
+                          {etapa.titulo}{etapa.dente ? ` · ${etapa.dente}` : ''}
+                        </span>
+                        {isPrimeira && (
+                          <span
+                            className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md shrink-0"
+                            style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b' }}
+                          >
+                            HOJE
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {etapasFalta.length > 4 && (
+                    <p className="text-[10px] text-text-secondary/50 pl-5">
+                      +{etapasFalta.length - 4} restantes
+                    </p>
                   )}
                 </div>
-              );
-            })}
-            {etapasPendentes.length > 4 && (
-              <p className="text-[10px] text-text-secondary/50 pl-5">
-                +{etapasPendentes.length - 4} pendências restantes
-              </p>
+              </div>
             )}
-          </div>
-        </SidebarSection>
-      )}
+
+            {/* Feito */}
+            {etapasFeito.length > 0 && (
+              <div>
+                <p className="text-[9px] font-bold uppercase tracking-widest text-text-secondary/50 mb-1.5">Feito</p>
+                <div className="space-y-1">
+                  {etapasFeito.slice(0, 4).map(etapa => (
+                    <div key={etapa.id} className="flex items-center gap-2">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-teal shrink-0" />
+                      <span className="text-xs leading-tight flex-1 line-through text-text-secondary/70">
+                        {etapa.titulo}{etapa.dente ? ` · ${etapa.dente}` : ''}
+                      </span>
+                    </div>
+                  ))}
+                  {etapasFeito.length > 4 && (
+                    <p className="text-[10px] text-text-secondary/50 pl-5">
+                      +{etapasFeito.length - 4} concluídas
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <p className="text-[11px] text-text-secondary/60 italic">Tratamento ainda não iniciado.</p>
+        )}
+      </SidebarSection>
 
       {/* ── 4. Última visita ──────────────────────────────────────────── */}
       {temUltimaVisita && (
@@ -311,7 +363,7 @@ export function ConsultationSidebar({
 
           {/* Queixa principal */}
           {ultimaQueixa && (
-            <p className="text-xs font-semibold text-text-primary mb-2 leading-tight">{ultimaQueixa}</p>
+            <p className="text-sm font-semibold text-text-primary mb-2 leading-snug">{ultimaQueixa}</p>
           )}
 
           {/* Procedimentos realizados */}
@@ -320,7 +372,7 @@ export function ConsultationSidebar({
               {fichas[0].procedimentos.map((p, i) => (
                 <span
                   key={i}
-                  className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium border"
+                  className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium border"
                   style={{
                     background: 'rgba(47,156,133,0.08)',
                     borderColor: 'rgba(47,156,133,0.22)',
@@ -335,7 +387,7 @@ export function ConsultationSidebar({
 
           {/* Anotações */}
           {ultimasAnotacoes && (
-            <p className="text-[11px] text-text-secondary leading-relaxed line-clamp-3 mb-2">
+            <p className="text-xs text-text-secondary leading-relaxed line-clamp-4 mb-2">
               {ultimasAnotacoes}
             </p>
           )}
