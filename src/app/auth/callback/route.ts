@@ -79,6 +79,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       .from("convites")
       .select("id, role, clinica_id")
       .eq("email", user.email)
+      .eq("status", "pendente")
       .gt("expires_at", new Date().toISOString())
       .order("created_at", { ascending: false })
       .limit(1)
@@ -91,11 +92,21 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       // Todo convidado entra diretamente com status aceito
       const status_convite = "aceito";
 
-      // Cria o dentista apenas se ainda não existe (proteção contra dupla execução)
+      // ── Registro canônico em public.users + clínica ativa ──────────────────────
+      // Sem isso, requireClinicContext/getDentistaCached redirecionam para
+      // /onboarding (exigem users.active_clinica_id). Mesmo estado que aceitarConvite.
+      await service.from("users").upsert(
+        { id: user.id, email: user.email, active_clinica_id: clinica_id },
+        { onConflict: "id" },
+      );
+
+      // Cria o dentista apenas se ainda não existe NESTA clínica (proteção contra
+      // dupla execução e suporte multi-clínica — escopo igual ao getDentistaCached).
       const { data: existing } = await service
         .from("dentistas")
         .select("id, clinica_id")
         .eq("user_id", user.id)
+        .eq("clinica_id", clinica_id)
         .maybeSingle();
 
       if (!existing) {
@@ -116,7 +127,31 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         }
       }
 
-      // Marca convite como aceito (mantém histórico em vez de deletar)
+      // ── Membership canônica em clinica_usuarios — fonte da verdade ─────────────
+      // Sem isso o convidado fica fora da clínica e é jogado para /onboarding.
+      const { data: jaMembro } = await service
+        .from("clinica_usuarios")
+        .select("id")
+        .eq("usuario_id", user.id)
+        .eq("clinica_id", clinica_id)
+        .eq("status", "ativo")
+        .maybeSingle();
+
+      if (!jaMembro) {
+        const { error: membroError } = await service.from("clinica_usuarios").insert({
+          usuario_id: user.id,
+          clinica_id,
+          role,
+          status:     "ativo",
+          joined_at:  new Date().toISOString(),
+        });
+
+        if (membroError) {
+          console.error("[callback] erro ao criar membership:", membroError.message);
+        }
+      }
+
+      // Marca convite como aceito — só depois do estado canônico criado
       if (convite?.id) {
         await service
           .from("convites")
