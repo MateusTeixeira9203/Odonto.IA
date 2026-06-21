@@ -59,5 +59,5 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
-  return NextResponse.json({ success: true, link: result.link });
+  return NextResponse.json({ success: true, link: result.link, emailEnviado: result.emailEnviado });
 }

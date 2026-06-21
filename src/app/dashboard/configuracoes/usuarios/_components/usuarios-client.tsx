@@ -63,7 +63,7 @@ interface Props {
 // ── Tipos de tab ──────────────────────────────────────────────────────────────
 
 type DialogTab = 'dentista' | 'secretaria';
-type DialogStep = 'form' | 'sucesso';
+type DialogStep = 'form' | 'sucesso' | 'convite-link';
 
 // ── Componente principal ──────────────────────────────────────────────────────
 
@@ -82,6 +82,9 @@ export function UsuariosClient({
   // Dentista — convite por link
   const [emailConvite, setEmailConvite]   = useState('');
   const [isSending, setIsSending]         = useState(false);
+  const [conviteLink, setConviteLink]     = useState('');
+  const [conviteEmailEnviado, setConviteEmailEnviado] = useState(false);
+  const [copiedLink, setCopiedLink]       = useState(false);
 
   // Secretária — criação direta
   const [secNome, setSecNome]             = useState('');
@@ -105,11 +108,20 @@ export function UsuariosClient({
     setTab('dentista');
     setStep('form');
     setEmailConvite('');
+    setConviteLink('');
+    setConviteEmailEnviado(false);
+    setCopiedLink(false);
     setSecNome('');
     setSecEmail('');
     setSecSenha('');
     setShowSenha(false);
     setCopiedSenha(false);
+  }
+
+  async function copiarLinkConvite() {
+    await navigator.clipboard.writeText(conviteLink);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
   }
 
   function handleCloseDialog() {
@@ -143,14 +155,12 @@ export function UsuariosClient({
         body:    JSON.stringify({ email: emailConvite.trim(), role: 'dentista' }),
       });
 
-      const data = (await res.json()) as { error?: string };
+      const data = (await res.json()) as { error?: string; link?: string; emailEnviado?: boolean };
 
       if (!res.ok) {
         toast.error(data.error ?? 'Erro ao enviar convite');
         return;
       }
-
-      toast.success(`Convite enviado para ${emailConvite}`);
 
       // Atualiza lista local sem reload
       const novoConvite: ConvitePendente = {
@@ -161,7 +171,12 @@ export function UsuariosClient({
         created_at: new Date().toISOString(),
       };
       setPendentes(prev => [novoConvite, ...prev]);
-      handleCloseDialog();
+
+      // Tela de sucesso com link copiável — garante o compartilhamento mesmo
+      // se o e-mail não tiver sido entregue.
+      setConviteLink(data.link ?? '');
+      setConviteEmailEnviado(data.emailEnviado ?? false);
+      setStep('convite-link');
     } catch {
       toast.error('Erro de conexão');
     } finally {
@@ -497,6 +512,66 @@ export function UsuariosClient({
                   Concluir
                 </Button>
               </motion.div>
+            ) : step === 'convite-link' ? (
+
+              /* ── TELA DE SUCESSO — Convite criado (link copiável) ── */
+              <motion.div
+                key="convite-link"
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.96 }}
+                className="py-2"
+              >
+                <div className="flex flex-col items-center gap-3 mb-6">
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
+                    style={{ background: 'color-mix(in srgb, var(--color-teal) 12%, transparent)' }}>
+                    <CheckCircle2 className="w-7 h-7 text-teal" />
+                  </div>
+                  <div className="text-center">
+                    <h3 className="font-heading font-bold text-xl text-text-primary">
+                      Convite criado!
+                    </h3>
+                    <p className="text-sm text-text-secondary mt-1">
+                      {conviteEmailEnviado
+                        ? <>Enviamos um e-mail para <span className="font-medium text-text-primary">{emailConvite}</span>. Você também pode compartilhar o link direto.</>
+                        : 'Copie o link abaixo e envie para o dentista (ex: WhatsApp). O convite expira em 7 dias.'}
+                    </p>
+                  </div>
+                </div>
+
+                {!conviteEmailEnviado && (
+                  <div className="rounded-xl border border-amber-300/60 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10 px-4 py-3 text-xs text-amber-700 dark:text-amber-300 mb-4">
+                    O e-mail automático não foi entregue agora. Use o link abaixo para compartilhar manualmente.
+                  </div>
+                )}
+
+                {/* Link do convite */}
+                <div className="rounded-2xl border border-border bg-surface-alt p-4 mb-6">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary mb-1.5">Link do convite</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium text-text-primary font-mono truncate">
+                      {conviteLink}
+                    </p>
+                    <button
+                      onClick={() => void copiarLinkConvite()}
+                      className="p-1.5 rounded-lg text-text-secondary hover:text-teal hover:bg-teal/10 transition-colors shrink-0"
+                      title="Copiar link"
+                    >
+                      {copiedLink
+                        ? <Check className="w-4 h-4 text-teal" />
+                        : <Copy className="w-4 h-4" />
+                      }
+                    </button>
+                  </div>
+                </div>
+
+                <Button
+                  onClick={handleCloseDialog}
+                  className="w-full bg-teal hover:bg-teal-dark text-white rounded-xl"
+                >
+                  Concluir
+                </Button>
+              </motion.div>
             ) : (
 
               /* ── TELA DE FORMULÁRIO ── */
@@ -546,7 +621,7 @@ export function UsuariosClient({
                       className="space-y-4"
                     >
                       <div className="rounded-xl border border-border bg-surface-alt px-4 py-3 text-sm text-text-secondary">
-                        O dentista recebe um <span className="font-medium text-text-primary">link por email</span> e cria a própria conta. O convite expira em 7 dias.
+                        O dentista recebe um <span className="font-medium text-text-primary">link por email</span> (que você também pode copiar e enviar) e cria a própria conta. O convite expira em 7 dias.
                       </div>
 
                       <div>

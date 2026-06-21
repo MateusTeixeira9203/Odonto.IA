@@ -6,7 +6,7 @@ import { conviteEmailHtml } from '@/lib/email/templates/convite';
 export type CriarConviteInput = { email: string };
 
 export type CriarConviteResult =
-  | { ok: true; inviteId: string; token: string; link: string }
+  | { ok: true; inviteId: string; token: string; link: string; emailEnviado: boolean }
   | { ok: false; error: string };
 
 export async function criarConvite(
@@ -17,7 +17,9 @@ export async function criarConvite(
     return { ok: false, error: 'Apenas administradores podem convidar dentistas.' };
   }
 
-  const { email } = input;
+  // Normaliza o e-mail — evita tratar usuário existente como "sem conta" por
+  // diferença de maiúsculas/espaços. O aceite compara case-insensitive.
+  const email = input.email.trim().toLowerCase();
   const db = createServiceClient();
 
   // Convite pendente ativo?
@@ -95,7 +97,9 @@ export async function criarConvite(
   const base = process.env.NEXT_PUBLIC_SITE_URL ?? '';
   const inviteLink = `${base}/convite/${token}`;
 
-  // Envio de e-mail — falha silenciosa para não bloquear a criação do convite
+  // Envio de e-mail — falha não bloqueia a criação do convite, mas o status é
+  // propagado para a UI mostrar o link copiável como plano B.
+  let emailEnviado = false;
   try {
     const { data: clinicaForEmail } = await db
       .from('clinicas')
@@ -112,32 +116,45 @@ export async function criarConvite(
         link: inviteLink,
       }),
     });
+    emailEnviado = true;
   } catch (err) {
     console.error('[convite] email falhou:', err);
   }
 
-  // Notificação in-app — só se o convidado já tem conta e tem uma clínica ativa
+  // Notificação in-app — só se o convidado já tem conta com clínica ativa.
+  // O alvo precisa casar com o filtro de /api/dex/alerts: para_dentista_id é a
+  // PK da tabela `dentistas` (não o id de auth/users) e para_role é o role real
+  // do convidado naquela clínica (um solo é 'admin' do próprio consultório).
   if (userRow?.active_clinica_id) {
-    const { data: clinicaData } = await db
-      .from('clinicas')
-      .select('nome')
-      .eq('id', ctx.clinicId)
-      .maybeSingle<{ nome: string }>();
+    const { data: dentistaConvidado } = await db
+      .from('dentistas')
+      .select('id, role')
+      .eq('user_id', userRow.id)
+      .eq('clinica_id', userRow.active_clinica_id)
+      .maybeSingle<{ id: string; role: string }>();
 
-    const nomeDaClinica = clinicaData?.nome ?? 'uma clínica';
+    if (dentistaConvidado) {
+      const { data: clinicaData } = await db
+        .from('clinicas')
+        .select('nome')
+        .eq('id', ctx.clinicId)
+        .maybeSingle<{ nome: string }>();
 
-    await inserirNotificacao(db, {
-      clinicaId:      userRow.active_clinica_id,
-      paraRole:       'dentista',
-      paraDentistaId: userRow.id,
-      tipo:           'convite_clinica',
-      titulo:         `Convite — ${nomeDaClinica}`,
-      mensagem:       `Você foi convidado para fazer parte da equipe. Clique para aceitar.`,
-      href:           inviteLink,
-    });
+      const nomeDaClinica = clinicaData?.nome ?? 'uma clínica';
+
+      await inserirNotificacao(db, {
+        clinicaId:      userRow.active_clinica_id,
+        paraRole:       dentistaConvidado.role,
+        paraDentistaId: dentistaConvidado.id,
+        tipo:           'convite_clinica',
+        titulo:         `Convite — ${nomeDaClinica}`,
+        mensagem:       `Você foi convidado para fazer parte da equipe. Clique para aceitar.`,
+        href:           inviteLink,
+      });
+    }
   }
 
-  return { ok: true, inviteId: convite.id, token, link: inviteLink };
+  return { ok: true, inviteId: convite.id, token, link: inviteLink, emailEnviado };
 }
 
 export async function cancelarConvite(
