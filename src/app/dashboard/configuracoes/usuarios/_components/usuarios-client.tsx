@@ -514,7 +514,7 @@ export function UsuariosClient({
               </motion.div>
             ) : step === 'convite-link' ? (
 
-              /* ── TELA DE SUCESSO — Convite criado (link copiável) ── */
+              /* ── TELA DE SUCESSO — Convite enviado ── */
               <motion.div
                 key="convite-link"
                 initial={{ opacity: 0, scale: 0.96 }}
@@ -522,48 +522,71 @@ export function UsuariosClient({
                 exit={{ opacity: 0, scale: 0.96 }}
                 className="py-2"
               >
-                <div className="flex flex-col items-center gap-3 mb-6">
-                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
-                    style={{ background: 'color-mix(in srgb, var(--color-teal) 12%, transparent)' }}>
-                    <CheckCircle2 className="w-7 h-7 text-teal" />
+                {/* Hero */}
+                <div className="flex flex-col items-center gap-3.5 mb-5">
+                  <div
+                    className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
+                      conviteEmailEnviado ? '' : 'bg-amber-100 dark:bg-amber-500/15'
+                    }`}
+                    style={conviteEmailEnviado ? { background: 'color-mix(in srgb, var(--color-teal) 12%, transparent)' } : undefined}
+                  >
+                    {conviteEmailEnviado
+                      ? <CheckCircle2 className="w-7 h-7 text-teal" />
+                      : <Mail className="w-7 h-7 text-amber-600 dark:text-amber-400" />}
                   </div>
-                  <div className="text-center">
+                  <div className="text-center px-2">
                     <h3 className="font-heading font-bold text-xl text-text-primary">
-                      Convite criado!
+                      {conviteEmailEnviado ? 'Convite enviado!' : 'Convite criado'}
                     </h3>
-                    <p className="text-sm text-text-secondary mt-1">
+                    <p className="text-sm text-text-secondary mt-1.5 leading-relaxed">
                       {conviteEmailEnviado
-                        ? <>Enviamos um e-mail para <span className="font-medium text-text-primary">{emailConvite}</span>. Você também pode compartilhar o link direto.</>
-                        : 'Copie o link abaixo e envie para o dentista (ex: WhatsApp). O convite expira em 7 dias.'}
+                        ? <>Um e-mail com o link de acesso foi enviado para{' '}<span className="font-medium text-text-primary">{emailConvite}</span>. O convite expira em 7 dias.</>
+                        : <>Não conseguimos enviar o e-mail agora. Copie o link e envie para{' '}<span className="font-medium text-text-primary">{emailConvite}</span> (ex: WhatsApp).</>}
                     </p>
                   </div>
                 </div>
 
-                {!conviteEmailEnviado && (
-                  <div className="rounded-xl border border-amber-300/60 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10 px-4 py-3 text-xs text-amber-700 dark:text-amber-300 mb-4">
-                    O e-mail automático não foi entregue agora. Use o link abaixo para compartilhar manualmente.
-                  </div>
-                )}
+                {conviteEmailEnviado ? (
+                  <>
+                    {/* Reforço do envio automático */}
+                    <div className="flex items-start gap-2.5 rounded-xl border border-teal/20 bg-teal/[0.06] px-4 py-3 mb-4">
+                      <Mail className="w-4 h-4 text-teal shrink-0 mt-0.5" />
+                      <p className="text-xs text-text-secondary leading-relaxed">
+                        O dentista recebe o convite na caixa de entrada e cria a conta pelo link. Você não precisa enviar nada manualmente.
+                      </p>
+                    </div>
 
-                {/* Link do convite */}
-                <div className="rounded-2xl border border-border bg-surface-alt p-4 mb-6">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary mb-1.5">Link do convite</p>
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-medium text-text-primary font-mono truncate">
-                      {conviteLink}
-                    </p>
+                    {/* Link secundário, discreto */}
                     <button
                       onClick={() => void copiarLinkConvite()}
-                      className="p-1.5 rounded-lg text-text-secondary hover:text-teal hover:bg-teal/10 transition-colors shrink-0"
-                      title="Copiar link"
+                      className="w-full flex items-center justify-center gap-2 py-2 text-xs font-medium text-text-secondary hover:text-teal transition-colors mb-5"
                     >
                       {copiedLink
-                        ? <Check className="w-4 h-4 text-teal" />
-                        : <Copy className="w-4 h-4" />
-                      }
+                        ? <><Check className="w-3.5 h-3.5 text-teal" /> Link copiado</>
+                        : <><Copy className="w-3.5 h-3.5" /> Copiar link do convite</>}
                     </button>
+                  </>
+                ) : (
+                  /* E-mail falhou → link em destaque */
+                  <div className="rounded-2xl border border-border bg-surface-alt p-4 mb-5">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary mb-1.5">Link do convite</p>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-medium text-text-primary font-mono truncate">
+                        {conviteLink}
+                      </p>
+                      <button
+                        onClick={() => void copiarLinkConvite()}
+                        className="p-1.5 rounded-lg text-text-secondary hover:text-teal hover:bg-teal/10 transition-colors shrink-0"
+                        title="Copiar link"
+                      >
+                        {copiedLink
+                          ? <Check className="w-4 h-4 text-teal" />
+                          : <Copy className="w-4 h-4" />
+                        }
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <Button
                   onClick={handleCloseDialog}
