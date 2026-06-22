@@ -17,6 +17,10 @@ export async function emitirDocumento(params: {
   const modelo = getModelo(params.tipo, params.modeloId);
   if (!modelo) return { error: 'Modelo de documento inválido.' };
 
+  // Revalida campos obrigatórios no servidor (server action é exposta).
+  const faltandoObrigatorio = modelo.campos.some((c) => c.obrigatorio && !params.valores[c.id]?.trim());
+  if (faltandoObrigatorio) return { error: 'Preencha os campos obrigatórios.' };
+
   const [{ data: paciente }, { data: dentista }, { data: clinica }] = await Promise.all([
     supabase.from('pacientes').select('nome, cpf').eq('id', params.pacienteId).eq('clinica_id', clinicId).maybeSingle(),
     supabase.from('dentistas').select('nome, cro').eq('id', dentistaId).maybeSingle(),
@@ -71,7 +75,11 @@ export async function emitirDocumento(params: {
     origem: 'emitido',
     tipo_documento: params.tipo,
   }).select('id').single();
-  if (dbErr) { console.error('[emitirDocumento] insert:', dbErr.message); return { error: 'Erro ao registrar o documento.' }; }
+  if (dbErr) {
+    console.error('[emitirDocumento] insert:', dbErr.message);
+    await supabase.storage.from('fichas').remove([storagePath]); // evita PDF órfão no storage
+    return { error: 'Erro ao registrar o documento.' };
+  }
 
   const { data: signed } = await supabase.storage.from('fichas').createSignedUrl(storagePath, 3600);
 

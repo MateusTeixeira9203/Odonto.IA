@@ -190,8 +190,7 @@ export function EmitirDocumentoModal({ open, onClose, patientId, patientName, on
 
                 <button
                   onClick={() => void gerar()} disabled={!podeGerar || isSaving}
-                  className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-40"
-                  style={{ background: '#2f9c85' }}
+                  className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-sm font-bold text-white bg-teal hover:bg-teal-lt transition-all disabled:opacity-40"
                 >
                   {isSaving ? <><Loader2 className="w-4 h-4 animate-spin" /> Gerando...</> : <><FileText className="w-4 h-4" /> Gerar documento</>}
                 </button>

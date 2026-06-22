@@ -108,6 +108,7 @@ export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
         .from('paciente_documentos')
         .select('*')
         .eq('paciente_id', patientId)
+        .eq('clinica_id', clinicaId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -154,7 +155,7 @@ export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
     } finally {
       setLoading(false);
     }
-  }, [patientId]);
+  }, [patientId, clinicaId]);
 
   useEffect(() => {
     if (patientId) {
