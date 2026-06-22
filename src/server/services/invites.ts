@@ -107,7 +107,9 @@ export async function criarConvite(
       .eq('id', ctx.clinicId)
       .maybeSingle<{ nome: string }>();
 
-    await getResend().emails.send({
+    // O SDK do Resend NÃO lança em erro de API — retorna { data, error }.
+    // Precisamos checar `error` explicitamente, senão marcamos "enviado" à toa.
+    const { error: sendError } = await getResend().emails.send({
       from: 'Odonto.IA <equipe@dentia.app.br>',
       to: email,
       subject: `Convite para ${clinicaForEmail?.nome ?? 'clínica'} — Odonto.IA`,
@@ -120,9 +122,13 @@ export async function criarConvite(
         link: inviteLink,
       }),
     });
-    emailEnviado = true;
+    if (sendError) {
+      console.error('[convite] Resend recusou o envio:', JSON.stringify(sendError));
+    } else {
+      emailEnviado = true;
+    }
   } catch (err) {
-    console.error('[convite] email falhou:', err);
+    console.error('[convite] email falhou (exceção):', err);
   }
 
   // Notificação in-app — só se o convidado já tem conta com clínica ativa.
