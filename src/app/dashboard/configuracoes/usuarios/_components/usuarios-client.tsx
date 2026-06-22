@@ -155,16 +155,17 @@ export function UsuariosClient({
         body:    JSON.stringify({ email: emailConvite.trim(), role: 'dentista' }),
       });
 
-      const data = (await res.json()) as { error?: string; link?: string; emailEnviado?: boolean };
+      const data = (await res.json()) as { error?: string; inviteId?: string; link?: string; emailEnviado?: boolean };
 
       if (!res.ok) {
         toast.error(data.error ?? 'Erro ao enviar convite');
         return;
       }
 
-      // Atualiza lista local sem reload
+      // Atualiza lista local sem reload — usa o id REAL do convite para que o
+      // cancelamento na mesma sessão acerte a linha certa no banco.
       const novoConvite: ConvitePendente = {
-        id:         crypto.randomUUID(),
+        id:         data.inviteId ?? crypto.randomUUID(),
         email:      emailConvite.trim(),
         role:       'dentista' as DentistaRole,
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),

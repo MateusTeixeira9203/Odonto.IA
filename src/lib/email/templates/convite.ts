@@ -1,3 +1,29 @@
+/**
+ * Versão texto puro do e-mail de convite.
+ * Enviar junto com o HTML melhora a entregabilidade — e-mails só-HTML são um
+ * gatilho comum de filtros de spam.
+ */
+export function conviteEmailText({
+  clinicaNome,
+  link,
+}: {
+  clinicaNome: string;
+  link: string;
+}): string {
+  return [
+    `Você foi convidado para a equipe da clínica ${clinicaNome} no Odonto.IA.`,
+    ``,
+    `Acesse o link abaixo para aceitar o convite e configurar seu acesso.`,
+    `Este link é válido por 7 dias.`,
+    ``,
+    link,
+    ``,
+    `Se você não esperava este convite, pode ignorar este e-mail com segurança.`,
+    ``,
+    `Equipe Odonto.IA`,
+  ].join('\n');
+}
+
 export function conviteEmailHtml({
   clinicaNome,
   link,

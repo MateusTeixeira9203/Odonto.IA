@@ -39,6 +39,7 @@ export default async function UsuariosPage() {
         .from('convites')
         .select('id, email, role, expires_at, created_at')
         .eq('clinica_id', clinicId)
+        .eq('status', 'pendente')
         .gt('expires_at', new Date().toISOString())
         .order('created_at', { ascending: false }),
       supabase

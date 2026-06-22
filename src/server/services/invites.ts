@@ -1,7 +1,7 @@
 import { createServiceClient } from '@/lib/supabase/service';
 import { inserirNotificacao } from '@/lib/notificacoes';
 import { getResend } from '@/lib/email/resend';
-import { conviteEmailHtml } from '@/lib/email/templates/convite';
+import { conviteEmailHtml, conviteEmailText } from '@/lib/email/templates/convite';
 
 export type CriarConviteInput = { email: string };
 
@@ -112,6 +112,10 @@ export async function criarConvite(
       to: email,
       subject: `Convite para ${clinicaForEmail?.nome ?? 'clínica'} — Odonto.IA`,
       html: conviteEmailHtml({
+        clinicaNome: clinicaForEmail?.nome ?? 'sua clínica',
+        link: inviteLink,
+      }),
+      text: conviteEmailText({
         clinicaNome: clinicaForEmail?.nome ?? 'sua clínica',
         link: inviteLink,
       }),
@@ -240,6 +244,10 @@ export async function renovarConvite(
       to: convite.email as string,
       subject: `Convite renovado para ${clinicaForEmail?.nome ?? 'clínica'} — Odonto.IA`,
       html: conviteEmailHtml({
+        clinicaNome: clinicaForEmail?.nome ?? 'sua clínica',
+        link: renewedLink,
+      }),
+      text: conviteEmailText({
         clinicaNome: clinicaForEmail?.nome ?? 'sua clínica',
         link: renewedLink,
       }),
