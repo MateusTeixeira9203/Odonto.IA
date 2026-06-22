@@ -108,7 +108,7 @@ export async function criarConvite(
       .maybeSingle<{ nome: string }>();
 
     await getResend().emails.send({
-      from: 'Odonto.IA <no-reply@dentia.app.br>',
+      from: 'Odonto.IA <equipe@dentia.app.br>',
       to: email,
       subject: `Convite para ${clinicaForEmail?.nome ?? 'clínica'} — Odonto.IA`,
       html: conviteEmailHtml({
@@ -240,7 +240,7 @@ export async function renovarConvite(
       .maybeSingle<{ nome: string }>();
 
     await getResend().emails.send({
-      from: 'Odonto.IA <no-reply@dentia.app.br>',
+      from: 'Odonto.IA <equipe@dentia.app.br>',
       to: convite.email as string,
       subject: `Convite renovado para ${clinicaForEmail?.nome ?? 'clínica'} — Odonto.IA`,
       html: conviteEmailHtml({

@@ -7,7 +7,7 @@ import {
   onboardingD7Html,
 } from '@/lib/email/templates/onboarding';
 
-const FROM = 'Odonto.IA <no-reply@dentia.app.br>';
+const FROM = 'Odonto.IA <equipe@dentia.app.br>';
 
 export async function enviarEmailD0({
   email,
