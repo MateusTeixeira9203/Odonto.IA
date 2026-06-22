@@ -15,6 +15,7 @@ import { DexFace } from '@/components/onboarding/dex-mascot';
 import { DexAvatar } from '@/components/ui/dex-avatar';
 import { salvarFichaConsulta, iniciarAtendimentoConsulta } from '../actions';
 import { ConsultaAssinaturaModal } from './consulta-assinatura-modal';
+import { EmitirDocumentoModal } from '@/components/pacientes/EmitirDocumentoModal';
 import type { EvolucaoFormatada } from '@/app/api/dex/formatar-evolucao/route';
 import { ConsultationSidebar } from './consultation-sidebar';
 import { BotaoMensagemIA } from '@/components/orcamentos/botao-mensagem-ia';
@@ -132,6 +133,7 @@ export function ConsultaClient({
   const [savedFichaId, setSavedFichaId] = useState<string | null>(null);
   const [saveCountdown, setSaveCountdown] = useState(5);
   const [showSignature, setShowSignature] = useState(false);
+  const [showEmitir, setShowEmitir] = useState(false);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [aptStatus, setAptStatus] = useState(agendamentoStatus);
@@ -693,6 +695,17 @@ export function ConsultaClient({
                     Solicitar assinatura do paciente
                   </motion.button>
                 )}
+                {!showSignature && (
+                  <button
+                    onClick={() => {
+                      if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null; }
+                      setShowEmitir(true);
+                    }}
+                    className="text-xs text-text-secondary underline underline-offset-2 hover:text-text-primary transition-colors"
+                  >
+                    Emitir documento (receita, atestado, pedido)
+                  </button>
+                )}
               </motion.div>
             )}
 
@@ -909,6 +922,13 @@ export function ConsultaClient({
           onSigned={() => router.push(`/dashboard/pacientes/${paciente.id}`)}
         />
       )}
+
+      <EmitirDocumentoModal
+        open={showEmitir}
+        onClose={() => setShowEmitir(false)}
+        patientId={paciente.id}
+        patientName={paciente.nome}
+      />
 
       {/* ── Coach do DEX guiando a demo ── */}
       {isDemo && guidePhase !== 'done' && (

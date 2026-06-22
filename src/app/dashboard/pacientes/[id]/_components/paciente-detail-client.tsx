@@ -18,6 +18,7 @@ import {
   XCircle,
   AlertCircle,
   FileText,
+  FilePlus,
   Loader2,
   Activity,
   Bell,
@@ -82,6 +83,7 @@ import { EditarPacienteModal } from './modals/editar-paciente-modal';
 import { DetalheOrcamentoModal } from './modals/detalhe-orcamento-modal';
 import { ConfirmarDeleteOrcModal } from './modals/confirmar-delete-orc-modal';
 import { NovaConsultaModal } from './modals/nova-consulta-modal';
+import { EmitirDocumentoModal } from '@/components/pacientes/EmitirDocumentoModal';
 import { NovoOrcamentoModal } from './modals/novo-orcamento-modal';
 
 type FichaRecente = {
@@ -247,6 +249,7 @@ export function PacienteDetailClient({
 
   // Nova Consulta
   const [isNovaConsultaOpen, setIsNovaConsultaOpen] = useState(false);
+  const [isEmitirOpen, setIsEmitirOpen] = useState(false);
   const [consultaForm, setConsultaForm] = useState({
     data: '',
     hora: '',
@@ -869,6 +872,15 @@ export function PacienteDetailClient({
             >
               <FileDown className="w-4 h-4" />
             </button>
+            {canWriteClinical && (
+              <button
+                onClick={() => setIsEmitirOpen(true)}
+                className="p-2 rounded-xl border border-border/60 text-text-secondary hover:text-teal hover:border-teal/40 bg-surface transition-colors"
+                title="Emitir documento (receita, atestado, pedido de exame)"
+              >
+                <FilePlus className="w-4 h-4" />
+              </button>
+            )}
             <button
               onClick={() => { setConsultaError(null); setIsNovaConsultaOpen(true); }}
               className="flex items-center gap-2 px-4 py-2.5 bg-teal text-white rounded-xl text-xs font-bold hover:bg-teal-lt transition-colors shadow-md"
@@ -1461,6 +1473,13 @@ export function PacienteDetailClient({
         consultaError={consultaError}
         consultaSaving={consultaSaving}
         onNovaConsulta={handleNovaConsulta}
+      />
+
+      <EmitirDocumentoModal
+        open={isEmitirOpen}
+        onClose={() => setIsEmitirOpen(false)}
+        patientId={paciente.id}
+        patientName={displayNome}
       />
 
       <NovoOrcamentoModal

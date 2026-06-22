@@ -89,6 +89,7 @@ export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
   const [selecionados, setSelecionados] = useState<string[]>([]);
   const [modoSelecao, setModoSelecao] = useState(false);
+  const [soEmitidos, setSoEmitidos] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -274,6 +275,7 @@ export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
   const filteredDocs = documents.filter(doc => {
     if (filterMonth && !doc.date.includes(filterMonth)) return false;
     if (filterYear && !doc.date.includes(filterYear)) return false;
+    if (soEmitidos && doc.source !== 'emitido') return false;
     if (debouncedSearch && !doc.name.toLowerCase().includes(debouncedSearch.toLowerCase())) return false;
     return true;
   });
@@ -331,6 +333,17 @@ export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
 
         <div className="flex items-center gap-3">
           {/* Botão de modo seleção */}
+          <button
+            onClick={() => setSoEmitidos((s) => !s)}
+            className={`text-xs px-3 py-1.5 rounded-lg font-bold transition-colors ${
+              soEmitidos
+                ? 'bg-teal text-white'
+                : 'bg-surface-alt text-text-secondary hover:bg-border'
+            }`}
+          >
+            Emitidos
+          </button>
+
           <button
             onClick={() => { setModoSelecao(!modoSelecao); if (modoSelecao) setSelecionados([]); }}
             className={`text-xs px-3 py-1.5 rounded-lg font-bold transition-colors ${
