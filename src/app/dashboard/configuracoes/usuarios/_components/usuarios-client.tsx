@@ -569,10 +569,10 @@ export function UsuariosClient({
                   </>
                 ) : (
                   /* E-mail falhou → link em destaque */
-                  <div className="rounded-2xl border border-border bg-surface-alt p-4 mb-5">
+                  <div className="rounded-2xl border border-border bg-surface-alt p-4 mb-5 overflow-hidden">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary mb-1.5">Link do convite</p>
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-medium text-text-primary font-mono truncate">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <p className="flex-1 min-w-0 text-xs font-medium text-text-primary font-mono truncate">
                         {conviteLink}
                       </p>
                       <button

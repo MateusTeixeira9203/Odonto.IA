@@ -1,74 +1,74 @@
-# Backlog — DentIA
+# Backlog — Odonto.IA
 
 Documento vivo de organização do que precisa ser feito, refinado ou corrigido.
-Atualizado em: 2026-05-05
+**Atualizado em: 2026-06-22**
 
 ---
-relatorio final do mes
 
-## 🔴 Prioridade Alta — Completar antes de ir a produção
+## 🔴 Prioridade Alta
 
-### DEX — Assistente IA
-- [x] **Reativar o DEX** — widget ativo para dentista/admin; tour de onboarding ativo para todos os roles.
-- [x] **Modo Consulta** — `/consulta/[agendamentoId]` funcional: guard de role, cálculo de idade, server action para salvar ficha, botão "Iniciar consulta" na agenda.
-- [ ] **Contexto do paciente** — rota `/api/dex/patient-context` com mudanças pendentes (unstaged). Revisar e commitar.
+### Migrations WhatsApp pendentes (bloqueiam Task 6 de Documentos)
+- [ ] Aplicar migrations **069 (whatsapp_official_api)** e **076 (clinicas_whatsapp_meta)** — commitadas mas nunca aplicadas ao banco. `send-pdf.ts` já referencia colunas inexistentes (`whatsapp_phone_number_id`) → envio de orçamento por WhatsApp está quebrado em prod. Ambas são aditivas/idempotentes (`ADD COLUMN IF NOT EXISTS`), seguras de aplicar.
+- [ ] Após aplicar: implementar **Task 6 do plano de documentos** — botão "Enviar por WhatsApp" no `EmitirDocumentoModal` + `enviarDocumentoWhatsApp` na server action. Código já planejado em `docs/superpowers/plans/2026-06-22-emitir-documentos-clinicos.md`.
 
-### Fluxo da Secretária
-- [ ] **Confirmação de agendamentos** — agendamentos criados pela secretária ficam com status `agendado`. Falta fluxo de confirmação pelo dentista ou pelo paciente.
-- [ ] **Auditoria de ações** — campo `created_by` existe em `agendamentos` mas não é exibido em nenhuma tela. Mostrar "criado por [secretária]" nos cards de agendamento e nos registros financeiros.
+### Upstash Redis expirado
+- [ ] Plano gratuito expirou (`frank-sponge-87179.upstash.io` → `ENOTFOUND`). Rate-limit rodando em fallback em memória (por-instância). Criar novo Redis no Upstash e atualizar `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` na Vercel e `.env.local`.
 
 ### Fluxo do Dentista Convidado
-- [ ] **Lembrete de perfil incompleto** — dentista convidado vai direto ao dashboard sem preencher nome, CRO ou especialidade. Implementar uma das duas abordagens: (a) ícone de engrenagem na sidebar pulsando em âmbar com tooltip "Complete seu perfil" enquanto `cro` ou `especialidade` estiverem nulos; (b) notificação no sino ao entrar pela primeira vez (`status_convite === 'aceito'` + perfil incompleto). Redirecionar para `/dashboard/perfil`.
-- [ ] **Dentista com conta existente sendo convidado** — atualmente `inviteUserByEmail` rejeita emails já cadastrados. Suportar esse caso exige arquitetura many-to-many: tabela `dentistas_clinicas` (dentista_id, clinica_id, role) substituindo o `clinica_id` direto em `dentistas`, lógica de troca de contexto de clínica no dashboard e ajuste em todas as queries que usam `get_my_clinica_id()`.
+- [ ] **Perfil incompleto** — dentista convidado vai direto ao dashboard sem preencher nome, CRO ou especialidade. Implementar ícone de engrenagem na sidebar pulsando em âmbar com tooltip "Complete seu perfil" enquanto `cro` ou `especialidade` estiverem nulos.
+- [ ] **Dentista com conta existente sendo convidado** — `inviteUserByEmail` rejeita e-mails já cadastrados. Exige arquitetura many-to-many (`dentistas_clinicas`) e troca de contexto de clínica no dashboard. Decisão: adiar ou implementar já?
 
 ---
 
-## 🟡 Prioridade Média — Refinamentos importantes
+## 🟡 Prioridade Média
+
+### Modo Consulta — Refinamentos UI (plano: `2026-06-07-modo-consulta-refinamentos.md`)
+- [ ] Fix borda dupla no Hero do Dashboard (`next-appointment-hero.tsx` — remover spread `0 0 0 4px`)
+- [ ] Redesign Hero Strip do paciente — 3 colunas com cards de status com personalidade
+- [ ] Feedback progressivo no "Formatar com IA" — etapas animadas enquanto Gemini processa
+- [ ] Redesign sidebar do modo consulta — `w-64` → `w-80`, cards internos, avatar com anel
+- [ ] Ficha clínica — buscar e exibir `procedimentos`, `conduta`, `retorno_sugerido` (salvos mas nunca exibidos); múltiplos procedimentos por dente via `\n` no prompt da IA
+
+### Documentos Clínicos — Follow-up
+- [ ] `onEmitted` callback no `EmitirDocumentoModal` para recarregar aba Arquivos automaticamente após emitir (hoje precisa refresh manual de página)
+
+### Secretaria — Fluxos Pendentes
+- [ ] **Confirmação de agendamentos** — agendamentos criados pela secretária ficam com status `agendado`. Falta fluxo de confirmação pelo dentista ou pelo paciente.
+- [ ] **Auditoria de ações** — campo `created_by` existe em `agendamentos` mas não exibido. Mostrar "criado por [secretária]" nos cards.
 
 ### Fichas Clínicas
-- [x] **Export do prontuário completo** — botão "Exportar" no perfil do paciente abre `/api/pacientes/[id]/prontuario` (HTML estilizado, Ctrl+P para PDF). Fichas, orçamentos e agendamentos em um arquivo só.
-- [x] **PDF da ficha** — item "Imprimir Ficha" no dropdown da evolução abre `/api/fichas/[id]/pdf` (HTML→Print).
 - [ ] **Extração de imagem com IA** — rota `/api/extrair-imagem` existe mas não tem botão na interface. Adicionar ação nas fotos de raio-x.
 
-### Orçamentos
-- [x] **PDF do orçamento** — `BotaoDownloadPDF` abre `/api/orcamentos/[id]/pdf` (HTML→Print, sem dependência binária). Rota usa `buildOrcamentoHTML` de `prontuario-html.ts`.
-- [ ] **Envio por WhatsApp** — deep link `wa.me` existe, mas envio automático com PDF anexado não está implementado.
-
 ### Agendamentos
-- [x] **Detecção de conflito de horário no front** — `conflitoNovo` e `conflitoEdicao` (useMemo local, sem roundtrip) exibem aviso âmbar no modal de novo agendamento e no modo edição.
-- [ ] **Notificação de lembrete** — tabela `agendamentos` tem coluna `whatsapp_reminder_sent`. Falta o job que dispara o lembrete.
-- [ ] **Integração Google Calendar** — OAuth2 implementado (`google-provider.ts`), sync bidirecional parcial. Testar fluxo completo de import/export.
+- [ ] **Notificação de lembrete** — `agendamentos.whatsapp_reminder_sent` existe. Falta o job que dispara o lembrete.
+- [ ] **Google Calendar** — OAuth2 implementado (`google-provider.ts`), sync bidirecional parcial. Testar fluxo completo. Adicionar `https://dentia.app.br/api/calendar/auth/callback` nas redirect URIs do Google Console se usar no domínio de prod.
 
 ### WhatsApp / Bot
 - [ ] **Integração Evolution API** — tabelas `conversas_bot` e `mensagens_bot` existem. Webhook `/api/whatsapp/webhook` planejado mas não implementado.
 - [ ] **Envio ativo de mensagens** — rota `/api/whatsapp/enviar` planejada. Útil para confirmações e lembretes.
-- [ ] **Bot de agendamento automático** — fluxo de estados em `src/lib/whatsapp/states.ts` com mudanças pendentes. Revisar e completar.
+- [ ] **Bot de agendamento automático** — fluxo de estados em `src/lib/whatsapp/states.ts` com mudanças unstaged. Revisar e completar.
 
 ---
 
-## 🟢 Prioridade Baixa — Melhorias e polimento
+## 🟢 Prioridade Baixa
 
 ### UX / Interface
-- [ ] **Responsividade mobile** — ajustes feitos para tablet (768–1024px), mas mobile puro (<768px) tem pontos críticos na FichasTab e no calendário de agendamentos.
-- [ ] **Dark mode** — implementado, mas alguns componentes novos (SignaturePad, odontograma) não testados em dark.
-- [ ] **Feedback de erros** — muitos `alert()` e `console.error()` espalhados. Padronizar uso do `toast` da Sonner em todo o projeto.
-- [ ] **Loading states** — algumas telas não têm skeleton enquanto carregam dados. Padronizar com o `Skeleton` do shadcn.
+- [ ] **Responsividade mobile** — ajustes feitos para tablet (768–1024px), mas mobile puro (<768px) tem pontos críticos na FichasTab e no calendário.
+- [ ] **Dark mode** — alguns componentes (SignaturePad, odontograma, EmitirDocumentoModal) não testados em dark.
+- [ ] **Feedback de erros** — padronizar uso do `toast` da Sonner em todo o projeto (muitos `alert()` e `console.error()` ainda espalhados).
+- [ ] **Loading states** — padronizar skeleton em telas sem loading state explícito.
 
 ### Configurações
-- [ ] **Planos e limites** — `temFeature()` e `limite_dentistas` estão implementados mas não testados com múltiplos usuários em produção.
-- [ ] **Chave PIX** — campo `chave_pix` adicionado em dentistas (migration 042). Não está sendo exibida em nenhuma tela relevante de pagamento.
-- [ ] **Dentista pode migrar de clínica** — dentista autenticado consegue sair de uma clínica e aceitar convite de outra sem criar nova conta. Dados clínicos (pacientes, fichas, orçamentos) seguem o dentista. Uma clínica ativa por vez; opção de operar solo permitida. Requer: fluxo de convite revisado, tela de "Minhas Clínicas" no perfil, e migração controlada de `clinica_id` nas tabelas relevantes.
+- [ ] **Planos e limites** — `temFeature()` e `limite_dentistas` implementados mas não testados com múltiplos usuários em produção.
+- [ ] **Chave PIX** — campo `chave_pix` em `dentistas` (migration 042). Não exibida em nenhuma tela de pagamento.
 
 ### Infraestrutura
 - [ ] **Stripe** — billing, planos e upgrade não implementados. Necessário antes de cobrar clientes.
-- [ ] **Versionar buckets do Storage** — buckets (`audios`, `fichas`, `radiografias`, `documentos`, `avatars`) criados manualmente. Adicionar migration de storage policies para não depender de setup manual.
-- [ ] **Variáveis de ambiente** — validar que todas as envs críticas (`GEMINI_API_KEY`, `EVOLUTION_API_KEY`, `GOOGLE_*`) têm fallback seguro em produção.
+- [ ] **Versionar buckets do Storage** — buckets criados manualmente. Adicionar migration de storage policies.
+- [ ] **`searchParams` async** — `(auth)/cadastro/page.tsx` e `planos/page.tsx` precisam de `searchParams` como `Promise` para Next 16 (build passa com `ignoreBuildErrors:true`, mas deve ser corrigido).
 
 ### Comunicação Interna
-- [ ] **Chat interno da clínica** — canal de mensagens entre dentista e demais membros (secretárias). Mensagens em tempo real via Supabase Realtime. Fio por clínica, notificação no bell. Sem exposição de dados de pacientes no chat.
-
-### Visão de Futuro
-- [ ] **Rede social para dentistas** — feed de cases clínicos (anonimizados), grupos por especialidade, troca de dicas de gestão. Produto separado ou extensão do DentIA para criar network entre profissionais.
+- [ ] **Chat interno da clínica** — mensagens em tempo real via Supabase Realtime entre dentista e secretária.
 
 ---
 
@@ -76,73 +76,44 @@ relatorio final do mes
 
 | Item | Arquivo | Descrição |
 |---|---|---|
-| `any` no código | Vários | Alguns casts `as unknown as X` ainda existem. Revisar e tipar corretamente. |
-| Estados do bot desatualizados | `lib/whatsapp/states.ts` | Mudanças unstaged. Revisar antes de reativar o bot. |
+| `any` no código | Vários | Alguns casts `as unknown as X` ainda existem. |
+| Bot states | `lib/whatsapp/states.ts` | Mudanças unstaged. Revisar antes de reativar. |
 | Contexto DEX | `api/dex/patient-context/route.ts` | Mudanças unstaged. Revisar e commitar ou descartar. |
+| Testes de isolamento | `scripts/test-isolation.sql` | Tabelas adicionadas após Mar/2026 (`clinica_usuarios`, `paciente_documentos`) não foram testadas. |
 
 ---
 
-## ✅ Feito recentemente (referência)
+## ✅ Feito (referência cronológica)
 
-### Exportações HTML→Print + Conflito de Horário (2026-05-05)
-- **Prontuário completo** — rota `GET /api/pacientes/[id]/prontuario` retorna HTML estilizado com fichas, orçamentos e agendamentos. Botão "Exportar" no perfil do paciente.
-- **PDF da ficha** — rota `GET /api/fichas/[id]/pdf` retorna HTML da evolução clínica. Item "Imprimir Ficha" no dropdown da FichasTab.
-- **PDF do orçamento** — rota `GET /api/orcamentos/[id]/pdf` reescrita com `buildOrcamentoHTML` (HTML→Print). `BotaoDownloadPDF` simplificado para `window.open()`.
-- **Conflito de horário** — `conflitoNovo` e `conflitoEdicao` em `agendamentos-client.tsx` detectam sobreposição localmente (sem chamada ao servidor) e exibem aviso âmbar tanto no modal "Novo Agendamento" quanto no modo edição.
+### Documentos Clínicos + Correções (Jun/2026)
+- **Emitir documentos clínicos** — registry de modelos (receita, atestado, pedido de exame), gerador PDF com 2 vias, server action `emitirDocumento`, `EmitirDocumentoModal`, botão no header do paciente, filtro "Emitidos" na aba Arquivos, link pós-consulta. Migration 078 aplicada. Em produção.
+- **Fluxo de convite ponta a ponta** — 6 bugs corrigidos: notificação in-app (PK + role corretos), callback `/auth/callback` cria estado canônico completo, tela de sucesso honesta, cancelamento persistente, `emailEnviado` falso-positivo, anti-spam (texto puro + remetente único). Domínio Resend verificado. Em produção.
+- **Infra de produção** — domínio `dentia.app.br` na Vercel, env vars, Supabase redirect URLs, git remote `Odonto.IA`.
 
-### DEX + Tour de Onboarding (2026-05-05)
-- **Tour ativado para todos os roles** — `DexOnboarding` renderizado para dentista, admin e secretaria; `DexWidget` gateado para dentista/admin apenas.
-- **Secretaria sem FINALE** — tour da secretaria encerra com "Concluir" no último passo (Financeiro), sem animação do widget que ela não tem.
-- **SimFinanceiro (novo)** — simulação do painel financeiro: cards animados com counter (Receita/Despesas/Lucro), gráfico de barras 6 meses, transações recentes deslizando.
-- **SimOrcamento redesenhado** — dark panel com lista de 3 orçamentos; badge animado `enviado → aprovado`; botão "Registrar Pagamento" que confirma pagamento; botão "Enviar pelo WhatsApp".
-- **SimAgendamento corrigido** — removido `fixed inset-0` que cobria o painel esquerdo do DEX; campo "Procedimento" substituído por "Observações" (alinhado com o modal real).
-- **FINANCEIRO virou simulação** — passo antes era spotlight; agora exibe `SimFinanceiro` no painel direito para admin, dentista e secretaria.
-- **Textos de todos os passos revisados** — descrições e bullets mais específicos e didáticos para cada role.
+### Modo Consulta + Transcrição (Jun/2026)
+- **Groq Whisper** — migração de Gemini → `whisper-large-v3-turbo` para transcrição. Latência 1–2s vs 6–10s anterior. Prompt odontológico configurado.
+- **GROQ_API_KEY** — configurada em `.env.local` e Vercel.
 
-### Fixes de Segurança (2026-05-04)
-- **REVOKE EXECUTE anon** — `get_my_clinica_id`, `get_my_role` e `get_my_dentista_id` eram chamáveis sem autenticação via REST. Revogado acesso para `anon`; `get_convite_by_token` mantido acessível (necessário para validar links de convite).
-- **`clinicas_insert_policy`** — `WITH CHECK (true)` substituído por verificação de que o usuário não tem dentista registrado, bloqueando secretárias e dentistas convidados de criarem clínicas via API.
-- **`update_updated_at` search_path** — função criada sem `SET search_path = public`; corrigida via migration 051.
+### Planejamento + Agenda + Módulo Secretária (Mai/2026)
+- **Block 10 parcial** — Week view, view toggle Mês/Semana, no-show button, cancel-com-motivo dialog, walk-in/encaixe, contexto do paciente expandido na consulta (alergias, tratamento ativo, etapas).
+- **PlanejamentoTab B+C** — barra de progresso, sincronização com fichas, badges de status clicáveis, data estimada por seção.
+- **Modal Novo Agendamento** — redesenhado 2 colunas, campo Procedimento removido, card resumo visual.
+- **Módulo Secretária completo (Blocos 1–5)** — dashboard com métricas, agenda multi-dentista, assinatura na recepção, data de vencimento em pagamentos, perfil do paciente restrito.
+- **DEX + Tour de Onboarding** — tour ativado para todos os roles, SimFinanceiro novo, SimOrcamento redesenhado, textos revisados.
+- **Exportações HTML→Print** — prontuário completo, PDF da ficha, PDF do orçamento.
+- **Conflito de horário** — detecção local (sem roundtrip ao servidor).
 
-### Fluxo de Convites (2026-05-04)
-- **Auditoria completa** — mapeados todos os problemas do fluxo: metadados ausentes no JWT, redirect sem distinção de role, convite deletado em vez de marcado, contador de vagas não descontava convites pendentes.
-- **`inviteUserByEmail` com metadados** — `role`, `clinica_id` e `convidado_por` agora passados no `data` do convite como fallback caso a tabela `convites` falhe.
-- **Redirect unificado** — qualquer convidado (secretaria ou dentista) vai para `/dashboard?welcome=true`; perfil é editado em `/dashboard/perfil` que já adapta os campos por role.
-- **Histórico de convites** — callback faz `UPDATE { status: 'aceito' }` em vez de deletar o registro; migration 050 adicionou colunas `status` e `convidado_por` na tabela `convites`.
-- **Contador de vagas correto** — `convitesRestantes` desconta convites de dentistas pendentes mas ignora convites de secretaria (sem limite).
+### Segurança (Mai/2026)
+- REVOKE EXECUTE anon em `get_my_clinica_id`, `get_my_role`, `get_my_dentista_id`.
+- `clinicas_insert_policy` com check de dentista existente.
+- `update_updated_at` com `SET search_path = public`.
+- Fix de performance RLS — `(select auth.uid())` em 17 políticas.
+- 8 índices criados em FKs; 3 índices duplicados removidos.
 
-### PlanejamentoTab + Agendamentos (2026-05-03)
-- **PlanejamentoTab B+C** — barra de progresso com contagem de procedimentos e total do orçamento; seção colapsável sincroniza procedimentos das fichas (`dentes_observacoes`) para `planejamento_procedimentos` (migration 048); cada procedimento tem badge de status clicável (pendente → agendado → concluído); cabeçalho de seção ganhou select de status e input de data estimada (migration 049); image picker renomeado para "Buscar da aba Documentos".
-- **Modal Novo Agendamento redesenhado** — layout dois colunas (`max-w-2xl`); campo "Procedimento" removido; coluna esquerda com busca de paciente, seletor de dentista (secretária) e observações; coluna direita com data, hora, duração e card resumo visual.
-- **Notificações secretária ↔ dentista auditadas** — fluxos de `orcamentos/actions.ts`, `financeiro/actions.ts` e `whatsapp/message-handler.ts` verificados; `para_dentista_id` e `para_role` funcionando corretamente em todos os caminhos.
+### Fluxo de Convites v1 (Mai/2026)
+- Metadados no JWT, redirect unificado, histórico de convites com `status`, contador de vagas correto.
 
-### Módulo Secretária — Blocos 1–5 (2026-04-30)
-- **Bloco 1** — Dashboard da secretária: métricas do dia, agenda de hoje com filtro por dentista, ações rápidas, resumo por dentista.
-- **Bloco 2** — Agenda multi-dentista: filtro por dentista como tabs/pills em agendamentos e no dashboard; botão "Chegou!" para check-in rápido; status `na_recepcao` e `em_atendimento` adicionados ao `StatusAgendamento`.
-- **Bloco 3** — Assinatura na recepção: `AssinaturaRecepcaoModal` com pad de assinatura (signature_pad), `assinatura-actions.ts` (service role, busca ficha + upload PNG), botão "Assinar" nos cards do dashboard e da agenda.
-- **Bloco 4** — Data de vencimento nos pagamentos: campo `data_vencimento` no formulário; parcelas futuras → `status=pendente`; display Pago/Pendente/Vencido + datas; alerta âmbar de vencimentos no dashboard da secretária.
-- **Bloco 5** — Perfil do paciente restrito para secretária: abas Fichas Clínicas e Planejamento ocultas; queries de fichas puladas; "Atividade Recente" e "Iniciar consulta" gateados por `showClinicalTabs`.
-- Bugs secretária resolvidos: paciente órfão, dois links WhatsApp na sidebar, criar orçamentos, seletor de dentista em orçamentos, notificação ao dentista em lançamentos financeiros, filtro de dentista, permissões de fichas clínicas, persistência de seletor no financeiro.
-- Pagamentos: geração automática ao aprovar orçamento; conciliação básica com `marcado_por_id` (migration 046).
-- WhatsApp connect Sheet na sidebar para secretária conectar instância Evolution API.
-
-### Anteriores
-- Fix PGRST201 — agendamentos não apareciam por FK ambígua com `created_by`
-- DEX desativado temporariamente (widget + onboarding comentados)
-- Assinatura digital do paciente na FichasTab (`signature_pad`)
-- Migration `045_fichas_assinatura` — colunas `assinatura_url` e `assinado_em`
-- Fix de performance RLS — `(select auth.uid())` em 17 políticas
-- 8 índices criados em FKs sem cobertura; 3 índices duplicados removidos
-
-
-Rota /api/dex/chat:                                                                                                                                                                                    
-  - Modelo: gemini-2.0-flash → gemini-2.5-flash (consistente com briefing e formatar-evolucao que funcionam)                                                                                             
-  - systemInstruction: agora passa como { parts: [{ text: systemPrompt }] } em vez de string nua — formato explícito que o SDK v1.x aceita sem ambiguidade                                               
-  - Erro do catch: agora retorna a mensagem real do erro em vez de texto genérico                                                                                                                        
-                                                            
-  Widget dex-widget.tsx:                                                                                                                                                                                 
-  - Agora checa res.ok — se a API retornar status 4xx/5xx, o erro real aparece no chat em vez de silenciosamente mostrar o fallback "Não consegui gerar..."                                              
-  - Isso também facilita diagnosticar problemas futuros (você vai ver a mensagem de erro exata do Gemini direto no chat)                                                                                 
-                                                                                                                                                                                                         
-  Se ainda não funcionar após isso, o próximo passo seria ver a mensagem de erro que vai aparecer no chat — ela vai dizer exatamente o que está falhando (ex: chave de API inválida, modelo sem acesso,
-  quota esgotada etc.)
+### Assinatura Digital + Outros (Abr/Mai 2026)
+- Assinatura digital do paciente na FichasTab.
+- Fix PGRST201 (FK ambígua em `agendamentos`).
+- Odontograma premium, floating dock nav, ficha clínica timeline.

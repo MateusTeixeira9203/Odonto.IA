@@ -1,8 +1,8 @@
-# Segurança — DentAI
+# Segurança — Odonto.IA
 
 ## Arquitetura Multi-tenant via RLS
 
-O DentAI usa **Row Level Security (RLS) do PostgreSQL** como camada principal de isolamento entre clínicas. Cada tabela de negócio possui a coluna `clinica_id` (FK para `clinicas.id`) e políticas RLS que garantem que um usuário autenticado acesse apenas dados da sua própria clínica.
+O Odonto.IA usa **Row Level Security (RLS) do PostgreSQL** como camada principal de isolamento entre clínicas. Cada tabela de negócio possui a coluna `clinica_id` (FK para `clinicas.id`) e políticas RLS que garantem que um usuário autenticado acesse apenas dados da sua própria clínica.
 
 ### Fluxo de autenticação e autorização
 
@@ -35,6 +35,8 @@ Funções SQL auxiliares usadas nas políticas:
 |---|---|---|---|---|
 | `clinicas` | próprio `id` | ✅ | SELECT (própria), INSERT (auth), UPDATE (própria) | — |
 | `dentistas` | ✅ | ✅ | ALL (mesma clínica), INSERT (próprio user_id) | — |
+| `clinica_usuarios` | ✅ | ✅ | ALL (mesma clínica) | — |
+| `users` | — | ✅ | SELECT/UPDATE (próprio auth.uid()) | — |
 | `pacientes` | ✅ | ✅ | ALL | — |
 | `fichas` | ✅ | ✅ | ALL | admin, dentista |
 | `ficha_arquivos` | ✅ | ✅ | ALL | — |
@@ -59,43 +61,45 @@ Funções SQL auxiliares usadas nas políticas:
 | `procedimentos_padrao` | ❌ | ✅ | SELECT (authenticated) | Catálogo público de referência; apenas service role escreve |
 | `procedimentos` | ✅ | ✅ | ALL | Cópia por clínica durante onboarding |
 
+> **Nota sobre `clinica_usuarios`:** tabela de membership muitos-para-muitos criada/ajustada durante o refactor do fluxo de convite (Jun/2026). Garante que convidados sejam corretamente associados à clínica em todos os caminhos de aceite (link de e-mail, callback OAuth, botão in-app).
+
+> **Nota sobre `users`:** tabela custom que armazena `active_clinica_id` do usuário. Cada usuário lê/atualiza apenas o próprio registro (`WHERE auth.uid() = id`). Não tem `clinica_id` pois é por usuário, não por clínica.
+
 ---
 
 ## Detalhamento das Políticas
 
 ### `clinicas`
 ```sql
--- Cada dentista vê apenas sua clínica
 SELECT: id = get_my_clinica_id()
--- Qualquer autenticado pode criar clínica (onboarding)
 INSERT: true (WITH CHECK)
--- Dentista atualiza apenas sua própria clínica
 UPDATE: id = get_my_clinica_id()
 ```
 
 ### `dentistas`
 ```sql
--- Acesso completo a membros da mesma clínica
 ALL: clinica_id = get_my_clinica_id()
--- No INSERT, user_id deve ser o próprio usuário
 INSERT (adicional): user_id = auth.uid()
 ```
 
 ### `fichas` e `configuracoes_clinica`
 ```sql
--- Restrito a roles admin e dentista (secretaria não escreve fichas clínicas)
 ALL: clinica_id = get_my_clinica_id() AND get_my_role() IN ('admin','dentista')
 ```
 
 ### `convites`
 ```sql
--- Apenas admin e dentista podem gerenciar convites
 ALL: clinica_id = get_my_clinica_id() AND get_my_role() IN ('admin','dentista')
+```
+
+### `users`
+```sql
+SELECT: id = auth.uid()
+UPDATE: id = auth.uid()
 ```
 
 ### Demais tabelas de negócio
 ```sql
--- Padrão: qualquer membro da clínica tem acesso total
 ALL: clinica_id IN (
   SELECT clinica_id FROM dentistas WHERE user_id = auth.uid()
 )
@@ -103,7 +107,6 @@ ALL: clinica_id IN (
 
 ### `procedimentos_padrao`
 ```sql
--- Leitura pública para autenticados (catálogo de referência)
 SELECT TO authenticated: true
 -- Escrita: bloqueada para usuários regulares (apenas service role)
 ```
@@ -117,10 +120,11 @@ SELECT TO authenticated: true
 | `NEXT_PUBLIC_SUPABASE_URL` | Pública (cliente) | URL do projeto Supabase |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Pública (cliente) | Chave anônima — opera sob RLS |
 | `SUPABASE_SERVICE_ROLE_KEY` | **Somente servidor** | Bypassa RLS — nunca expor no cliente |
-| `NEXT_PUBLIC_GEMINI_API_KEY` | Somente servidor* | Transcrição e IA |
-| `OPENAI_API_KEY` | **Somente servidor** | Processamento de documentos |
+| `GEMINI_API_KEY` | **Somente servidor** | Transcrição e IA (sem prefixo NEXT_PUBLIC_) |
+| `GROQ_API_KEY` | **Somente servidor** | Transcrição via Whisper (migrado Jun/2026) |
+| `RESEND_API_KEY` | **Somente servidor** | Envio de e-mails de convite |
 
-> *`NEXT_PUBLIC_` é exposta ao bundle do cliente — revisar se essa chave deve ser apenas server-side.
+> ⚠️ **ATENÇÃO:** Se houver qualquer variável com prefixo `NEXT_PUBLIC_GEMINI_API_KEY` no projeto, ela está exposta ao bundle do cliente. Deve ser renomeada para `GEMINI_API_KEY` (somente servidor).
 
 ---
 
@@ -128,11 +132,15 @@ SELECT TO authenticated: true
 
 O arquivo `src/lib/rate-limit.ts` implementa rate limiting nas API routes sensíveis.
 
+> ⚠️ **Estado atual (Jun/2026):** o Upstash Redis do plano gratuito expirou (`frank-sponge-87179.upstash.io` retorna `ENOTFOUND`). O código caiu no **fallback em memória** — rate-limit funciona mas é por-instância (não persiste entre restarts nem entre instâncias paralelas da Vercel). Não é urgente, mas reduz a eficácia do rate-limit em produção com múltiplas instâncias.
+>
+> **Ação pendente:** criar novo Redis no Upstash e atualizar `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` nas env vars da Vercel e no `.env.local`.
+
 ### Endpoints protegidos
 
 | Endpoint | Limite sugerido | Motivo |
 |---|---|---|
-| `/api/transcrever` | 10 req/min por IP | Custo de IA |
+| `/api/transcrever` | 10 req/min por IP | Custo de IA (Groq Whisper) |
 | `/api/processar-documento` | 5 req/min por IP | Custo de IA |
 | `/api/extrair-imagem` | 10 req/min por IP | Custo de IA |
 | `/api/convite` | 5 req/min por usuário | Prevenção de spam |
@@ -146,21 +154,27 @@ O arquivo `src/lib/rate-limit.ts` implementa rate limiting nas API routes sensí
 - [x] RLS habilitada em todas as tabelas de negócio
 - [x] Nenhuma query no código usa `clinica_id` vindo do cliente — sempre via `getDentistaCached()`
 - [x] `procedimentos_padrao` (tabela compartilhada) tem RLS com SELECT-only para usuários regulares
-- [x] Testes de isolamento executados em 2026-03-28 — todos passaram (ver seção abaixo)
+- [x] `clinica_usuarios` e `users` com RLS — fluxo de convite refatorado (Jun/2026)
+- [x] Testes de isolamento executados em 2026-03-28 — todos passaram
 
 ### Autenticação
 - [x] Rotas protegidas por middleware Supabase Auth
 - [x] Refresh de sessão automático via middleware
 - [x] Fluxo de recuperação de senha com PKCE
+- [x] Callback `/auth/callback` cria estado canônico completo ao aceitar convite (Jun/2026)
 
 ### Secrets e exposição
 - [x] `SUPABASE_SERVICE_ROLE_KEY` nunca usada no cliente
-- [x] Chaves de IA usadas apenas em Route Handlers (server-side)
-- [ ] Auditar se `NEXT_PUBLIC_GEMINI_API_KEY` pode ser movida para server-only
-
-### Dados sensíveis
+- [x] `GEMINI_API_KEY` sem prefixo `NEXT_PUBLIC_` — somente servidor
+- [x] `GROQ_API_KEY` sem prefixo `NEXT_PUBLIC_` — somente servidor
+- [ ] Auditar se há alguma chave de IA remanescente com prefixo `NEXT_PUBLIC_` no codebase
 - [ ] CPF de pacientes: avaliar criptografia em repouso
 - [ ] Logs de IA não persistem dados de pacientes além do necessário
+
+### Funções SQL
+- [x] `get_my_clinica_id`, `get_my_role`, `get_my_dentista_id` — REVOKE EXECUTE para `anon` (Mai/2026)
+- [x] `get_convite_by_token` — mantido acessível para `anon` (necessário para validar links)
+- [x] `update_updated_at` com `SET search_path = public` (migration 051)
 
 ---
 
@@ -188,7 +202,7 @@ O arquivo `src/lib/rate-limit.ts` implementa rate limiting nas API routes sensí
      WITH CHECK (clinica_id = get_my_clinica_id() AND get_my_role() IN ('admin','dentista'));
    ```
 5. **Nunca usar role `{public}`** nas políticas — sempre `TO authenticated`.
-6. **Testar isolamento** antes de fazer deploy: criar dois usuários em clínicas diferentes e verificar que cada um vê apenas seus dados.
+6. **Testar isolamento** antes de fazer deploy.
 
 ### Ao adicionar query no código
 
@@ -205,54 +219,30 @@ O arquivo `src/lib/rate-limit.ts` implementa rate limiting nas API routes sensí
 
 ## Testes de Isolamento Executados
 
-**Data:** 2026-03-28
-**Método:** SQL via Supabase SQL Editor com `SET LOCAL role = 'authenticated'` e `SET LOCAL "request.jwt.claims"` para simular usuários reais.
+**Data:** 2026-03-28  
 **Script reutilizável:** `scripts/test-isolation.sql`
 
-### Clínicas usadas nos testes
-
-| | Clínica A | Clínica B |
+| # | Cenário | Resultado |
 |---|---|---|
-| Nome | Mateus Teixeira | Clindent |
-| `clinica_id` | `60fdd3b1-...` | `615a1c53-...` |
-| `user_id` | `5f16b64a-...` | `dac2587e-...` |
+| T01 | User A lê `pacientes` | ✅ PASS — retornou apenas da clínica A |
+| T02 | User A lê paciente específico da clínica B | ✅ PASS — 0 rows |
+| T03–T05 | Cross-clinic em `fichas` | ✅ PASS |
+| T06 | User A insere paciente com `clinica_id` da clínica B | ✅ PASS — erro 42501 |
+| T07 | User A atualiza orçamento da clínica B | ✅ PASS — 0 rows |
+| T08 | User A lê `orcamentos` | ✅ PASS — apenas clínica A |
+| T09 | Usuário anônimo lê `pacientes` | ✅ PASS — 0 rows |
+| T10 | User A deleta ficha da clínica B | ✅ PASS — 0 rows |
+| T11 | Qualquer autenticado lê `procedimentos_padrao` | ✅ PASS — catálogo completo |
+| T12 | User A insere em `procedimentos_padrao` | ✅ PASS — erro 42501 |
 
-### Resultados
-
-| # | Cenário | Operação | Resultado |
-|---|---|---|---|
-| T01 | User A lê `pacientes` | SELECT | ✅ PASS — retornou 1 row, apenas da clínica A |
-| T02 | User A lê paciente específico da clínica B | SELECT por ID | ✅ PASS — 0 rows (bloqueado) |
-| T03 | User A lê `fichas` | SELECT | ✅ PASS — retornou 1 row, apenas da clínica A |
-| T04 | User B lê `fichas` | SELECT | ✅ PASS — retornou 2 rows, apenas da clínica B |
-| T05 | User B lê ficha específica da clínica A | SELECT por ID | ✅ PASS — 0 rows (bloqueado) |
-| T06 | User A insere paciente com `clinica_id` da clínica B | INSERT | ✅ PASS — erro `42501` (RLS violation) |
-| T07 | User A atualiza orçamento da clínica B | UPDATE | ✅ PASS — 0 rows afetados (silencioso) |
-| T08 | User A lê `orcamentos` | SELECT | ✅ PASS — retornou 1 row, apenas da clínica A |
-| T09 | Usuário anônimo (`anon`) lê `pacientes` | SELECT | ✅ PASS — 0 rows (sem política para anon) |
-| T10 | User A deleta ficha da clínica B | DELETE | ✅ PASS — 0 rows afetados, ficha intacta |
-| T11 | Qualquer autenticado lê `procedimentos_padrao` | SELECT | ✅ PASS — 23 rows (catálogo compartilhado) |
-| T12 | User A insere em `procedimentos_padrao` | INSERT | ✅ PASS — erro `42501` (RLS violation) |
-
-### Comportamentos confirmados
-
-- **SELECT cross-clinic** → retorna 0 rows silenciosamente (sem erro, sem vazar dados)
-- **INSERT cross-clinic** → lança `ERROR 42501: new row violates row-level security policy` — impede inserção com `clinica_id` errado
-- **UPDATE/DELETE cross-clinic** → afeta 0 rows silenciosamente — a query executa mas não encontra nada visível
-- **Usuário anônimo** → sem políticas para `anon`, todas as queries retornam vazio
-- **`procedimentos_padrao`** → leitura liberada para autenticados; escrita bloqueada por RLS
-
-### Como re-executar
-
-1. Abrir o Supabase SQL Editor do projeto DentAI
-2. Copiar o conteúdo de `scripts/test-isolation.sql`
-3. Substituir os placeholders (`CLINICA_A_USER_ID`, etc.) pelos UUIDs reais
-4. Executar cada bloco e verificar se `resultado = 'PASS'`
+> Testes cobrem tabelas do estado de Mar/2026. Tabelas adicionadas depois (`clinica_usuarios`, `paciente_documentos`) devem ser re-testadas.
 
 ---
 
 ## Histórico de Correções
 
-| Data | Migração | Descrição |
+| Data | Migração / Commit | Descrição |
 |---|---|---|
-| 2026-03-28 | `020_security_rls_fixes` | Habilitou RLS em `procedimentos_padrao`; removeu escrita aberta; removeu políticas `{public}` redundantes em `planejamentos` e `planejamento_etapas`; adicionou UPDATE policy em `clinicas` |
+| 2026-03-28 | `020_security_rls_fixes` | Habilitou RLS em `procedimentos_padrao`; removeu políticas `{public}` redundantes; adicionou UPDATE policy em `clinicas` |
+| 2026-05-04 | migrations 050, 051 | REVOKE EXECUTE anon em funções auxiliares; `clinicas_insert_policy` com check de dentista existente; `update_updated_at` search_path |
+| 2026-06-22 | commits `444cb09`, `f11d7d8` | Fluxo de convite: callback cria estado canônico completo (`clinica_usuarios` + `users.active_clinica_id`); notificação in-app usa PK correta de `dentistas`; `emailEnviado` deixou de ser falso-positivo |
