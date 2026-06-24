@@ -42,3 +42,8 @@ yarn-error.log*
 next-env.d.ts
 .worktrees/
 .env.local
+
+# dev environment (setup_ia)
+.claude/
+.mcp.json
+plans/
