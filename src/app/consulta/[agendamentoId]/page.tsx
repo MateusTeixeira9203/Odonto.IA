@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { requireClinicContext } from '@/server/auth/clinic';
+import { getDentistaCached } from '@/lib/get-dentista';
 import { ConsultaClient } from './_components/consulta-client';
 
 interface Props {
@@ -9,6 +10,7 @@ interface Props {
 export default async function ConsultaPage({ params }: Props) {
   const { agendamentoId } = await params;
   const { supabase, clinicId } = await requireClinicContext();
+  const dentista = await getDentistaCached();
 
   // Bloquear acesso ao Modo Consulta quando trial expirou
   const { data: clinica } = await supabase
@@ -119,6 +121,7 @@ export default async function ConsultaPage({ params }: Props) {
   return (
     <ConsultaClient
       agendamentoId={agendamentoId}
+      dentistaFoco={dentista?.foco_principal ?? null}
       paciente={{ ...paciente, idadeStr }}
       hora={hora}
       observacoesAgendamento={(ag.observacoes as string | null) ?? null}

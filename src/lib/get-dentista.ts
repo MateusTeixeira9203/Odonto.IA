@@ -2,6 +2,7 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { DentistaRole } from "@/types/database";
 import type { PlanoId } from "@/lib/planos";
+import type { FocoPrincipal } from "@/lib/persona";
 
 export interface DentistaCache {
   id: string;
@@ -13,6 +14,8 @@ export interface DentistaCache {
   role: DentistaRole;
   avatar_url: string | null;
   status_convite: "pendente" | "aceito" | null;
+  /** Persona escolhida no onboarding (Workstream E). null = sem diferenciação. */
+  foco_principal: FocoPrincipal | null;
   plano: PlanoId;
   status_assinatura: "trial" | "ativo" | "inativo";
   trial_ends_at: string | null;
@@ -55,7 +58,7 @@ export const getDentistaCached = cache(async (): Promise<DentistaCache | null> =
   const { data, error } = await supabase
     .from("dentistas")
     .select(
-      "id, nome, cro, clinica_id, especialidade, role, avatar_url, status_convite," +
+      "id, nome, cro, clinica_id, especialidade, role, avatar_url, status_convite, foco_principal," +
         " clinicas(nome, plano, status_assinatura, trial_ends_at, limite_dentistas)",
     )
     .eq("user_id", user.id)
@@ -76,6 +79,7 @@ export const getDentistaCached = cache(async (): Promise<DentistaCache | null> =
     role: string;
     avatar_url: string | null;
     status_convite: string | null;
+    foco_principal: string | null;
     clinicas: unknown;
   };
 
@@ -107,6 +111,7 @@ export const getDentistaCached = cache(async (): Promise<DentistaCache | null> =
     role: (row.role ?? "dentista") as DentistaRole,
     avatar_url: row.avatar_url,
     status_convite: row.status_convite as "pendente" | "aceito" | null,
+    foco_principal: (row.foco_principal as FocoPrincipal | null) ?? null,
     plano: (clinica?.plano as PlanoId) ?? "CLINICA",
     status_assinatura:
       (clinica?.status_assinatura as "trial" | "ativo" | "inativo") ?? "trial",

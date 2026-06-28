@@ -11,14 +11,25 @@ export default async function OnboardingLayout({
 }): Promise<React.JSX.Element> {
   const { supabase, user } = await requireUser();
 
-  const { data: dentista } = await supabase
-    .from("dentistas")
-    .select("id")
-    .eq("user_id", user.id)
+  // Guard: redireciona pro dashboard só quando o onboarding está CONCLUÍDO.
+  // No fluxo novo o dentista é criado no meio (pra demo rodar), então "dentista
+  // existe" não significa "concluído" — a fonte de verdade é clinicas.onboarding_completo.
+  const { data: u } = await supabase
+    .from("users")
+    .select("active_clinica_id")
+    .eq("id", user.id)
     .maybeSingle();
 
-  if (dentista) {
-    redirect("/dashboard");
+  if (u?.active_clinica_id) {
+    const { data: clinica } = await supabase
+      .from("clinicas")
+      .select("onboarding_completo")
+      .eq("id", u.active_clinica_id)
+      .maybeSingle();
+
+    if (clinica?.onboarding_completo) {
+      redirect("/dashboard");
+    }
   }
 
   return (

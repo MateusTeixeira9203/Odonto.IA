@@ -1,17 +1,23 @@
-import { OnboardingClient } from './_components/onboarding-client';
-import type { PlanoClinica } from './actions';
-
-const PLANOS_VALIDOS: PlanoClinica[] = ['SOLO', 'CLINICA'];
+import { OnboardingClient, type OnboardingStep } from './_components/onboarding-client';
+import { getDentistaCached } from '@/lib/get-dentista';
 
 export default async function OnboardingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ plano?: string }>;
+  searchParams: Promise<{ step?: string }>;
 }): Promise<React.JSX.Element> {
   const params = await searchParams;
-  const plano = PLANOS_VALIDOS.includes(params.plano as PlanoClinica)
-    ? (params.plano as PlanoClinica)
-    : 'SOLO';
+  const dentista = await getDentistaCached();
 
-  return <OnboardingClient plano={plano} />;
+  // Resume no passo 'plano' (volta da demo) só se já existe dentista — senão começa do início.
+  const initialStep: OnboardingStep =
+    params.step === 'plano' && dentista ? 'plano' : 'identidade';
+
+  return (
+    <OnboardingClient
+      initialStep={initialStep}
+      focoInicial={dentista?.foco_principal ?? null}
+      nomeInicial={dentista?.nome ? dentista.nome.split(' ')[0] : ''}
+    />
+  );
 }

@@ -10,7 +10,6 @@ import { ArrowRight, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { OdontoIALogo } from '@/components/ui/dent-ia-logo';
-import type { PlanoClinica } from '@/app/onboarding/actions';
 
 const cadastroSchema = z
   .object({
@@ -26,11 +25,7 @@ const cadastroSchema = z
 
 type CadastroFormData = z.infer<typeof cadastroSchema>;
 
-interface CadastroFormProps {
-  plano: PlanoClinica;
-}
-
-export function CadastroForm({ plano }: CadastroFormProps) {
+export function CadastroForm() {
   const [isLoading, setIsLoading]               = useState(false);
   const [showPassword, setShowPassword]         = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -49,8 +44,7 @@ export function CadastroForm({ plano }: CadastroFormProps) {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        // Passa o plano via `next` para o callback redirecionar ao onboarding correto
-        redirectTo: `${window.location.origin}/auth/callback?next=/onboarding?plano=${plano}`,
+        redirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
       },
     });
     if (error) {
@@ -84,11 +78,9 @@ export function CadastroForm({ plano }: CadastroFormProps) {
 
       if (authData.session) {
         toast.success('Conta criada com sucesso!');
-        // Passa o plano para o onboarding
-        window.location.href = `/onboarding?plano=${plano}`;
+        window.location.href = '/onboarding';
       } else {
-        // Confirmação de email pendente — armazena plano para usar após confirmação
-        sessionStorage.setItem('onboarding_plano', plano);
+        // Confirmação de email pendente
         window.location.href = `/verifique-email?email=${encodeURIComponent(data.email)}`;
       }
     } catch {
@@ -114,8 +106,7 @@ export function CadastroForm({ plano }: CadastroFormProps) {
           </div>
           <h1 className="font-heading font-bold text-4xl text-text-primary mb-2">Crie sua conta</h1>
           <p className="text-text-secondary text-sm font-medium">
-            Plano <strong className="text-text-primary">{plano === 'SOLO' ? 'Solo' : 'Clínica'}</strong>
-            {plano === 'CLINICA' && ' · 14 dias grátis'}
+            Comece grátis · sem cartão de crédito
           </p>
         </div>
 

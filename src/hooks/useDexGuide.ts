@@ -31,7 +31,10 @@ export function useDexGuide(dentistaId: string) {
       const jaConcluiuAntigo =
         localStorage.getItem(LEGACY_DONE_KEY(dentistaId)) ||
         localStorage.getItem(LEGACY_WELCOME_KEY(dentistaId));
-      setPhaseState(jaConcluiuAntigo ? 'done' : 'welcome');
+      // Novos usuários começam apontando pra demo (não na cena de welcome) — a
+      // apresentação do DEX migrou pro passo `aha` do onboarding, então a cena
+      // preta de boas-vindas no dashboard ficou redundante (Workstream F).
+      setPhaseState(jaConcluiuAntigo ? 'done' : 'point_demo');
     }
 
     const handler = (e: Event) => {

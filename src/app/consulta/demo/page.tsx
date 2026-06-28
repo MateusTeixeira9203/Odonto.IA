@@ -2,13 +2,21 @@ import { redirect } from 'next/navigation';
 import { getDentistaCached } from '@/lib/get-dentista';
 import { ConsultaClient } from '../[agendamentoId]/_components/consulta-client';
 
-export default async function ConsultaDemoPage() {
+export default async function ConsultaDemoPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string }>;
+}) {
   const dentista = await getDentistaCached();
   if (!dentista) redirect('/login');
+
+  const { from } = await searchParams;
 
   return (
     <ConsultaClient
       isDemo
+      retornoOnboarding={from === 'onboarding'}
+      dentistaFoco={dentista.foco_principal}
       dentistaId={dentista.id}
       agendamentoId="demo"
       paciente={{

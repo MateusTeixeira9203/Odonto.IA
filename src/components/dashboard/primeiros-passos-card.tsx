@@ -59,8 +59,11 @@ export function PrimeirosPassosCard({ progresso, dentistaId }: Props) {
       animate={{ opacity: 1, y: 0 }}
       className="mb-6 rounded-3xl border border-teal/20 bg-teal/[0.04] p-5"
     >
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-sm font-bold text-text-primary">Primeiros passos</span>
+      <div className="flex items-start justify-between mb-3">
+        <div>
+          <span className="text-sm font-bold text-text-primary">Primeiros passos</span>
+          <p className="text-[11px] text-text-secondary mt-0.5">Cada passo deixa o sistema mais seu.</p>
+        </div>
         <div className="flex items-center gap-3">
           <span className="text-xs text-teal font-bold">{completos} de {progresso.total}</span>
           <button

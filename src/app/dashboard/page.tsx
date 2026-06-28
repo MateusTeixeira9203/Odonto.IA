@@ -191,7 +191,7 @@ export default async function DashboardPage({
 
   const sp = await searchParams;
   const bloqueadoModoConsulta = sp.bloqueado === 'modo-consulta';
-  const progresso = await getOnboardingProgresso(dentista.clinica_id);
+  const progresso = await getOnboardingProgresso(dentista.clinica_id, dentista.foco_principal);
 
   return (
     <PageTransition>

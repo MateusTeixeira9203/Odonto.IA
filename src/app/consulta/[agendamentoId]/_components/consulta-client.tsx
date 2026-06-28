@@ -17,6 +17,7 @@ import { salvarFichaConsulta, iniciarAtendimentoConsulta } from '../actions';
 import { ConsultaAssinaturaModal } from './consulta-assinatura-modal';
 import { EmitirDocumentoModal } from '@/components/pacientes/EmitirDocumentoModal';
 import type { EvolucaoFormatada } from '@/app/api/dex/formatar-evolucao/route';
+import type { FocoPrincipal } from '@/lib/persona';
 import { ConsultationSidebar } from './consultation-sidebar';
 import { BotaoMensagemIA } from '@/components/orcamentos/botao-mensagem-ia';
 import { VoiceUX } from './voice-ux';
@@ -65,6 +66,10 @@ interface ConsultaClientProps {
     titulo: string;
     etapas: { id: string; titulo: string; dente: string | null; descricao_simples: string | null; status: string; ordem: number }[];
   } | null;
+  /** Demo dentro do onboarding (?from=onboarding) — troca o CTA final por "voltar pro plano". */
+  retornoOnboarding?: boolean;
+  /** Persona do dentista — calibra a recompensa pós-ficha (Workstream B1). */
+  dentistaFoco?: FocoPrincipal | null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -121,6 +126,8 @@ export function ConsultaClient({
   alertasClinicos,
   procedimentosClinica,
   planejamento,
+  retornoOnboarding = false,
+  dentistaFoco = null,
 }: ConsultaClientProps) {
   const router = useRouter();
   const [textoLivre, setTextoLivre] = useState('');
@@ -351,6 +358,23 @@ export function ConsultaClient({
       });
     }, 1000);
   };
+
+  // Recompensa pós-ficha por persona (Workstream B1). Heurística: ~180 caracteres
+  // estruturados ≈ 1 min que o dentista não precisou digitar.
+  const fichaChars = evolucao
+    ? [
+        evolucao.queixa_principal,
+        evolucao.anotacoes,
+        evolucao.conduta,
+        ...(evolucao.procedimentos ?? []),
+        ...Object.values(evolucao.dentes_observacoes ?? {}),
+      ].join(' ').length
+    : 0;
+  const minutosEconomizados = Math.max(1, Math.round(fichaChars / 180));
+  const recompensaPersona =
+    dentistaFoco === 'crescer'
+      ? 'Pronto pra apresentar ao paciente.'
+      : `≈ ${minutosEconomizados} min que você não digitou.`;
 
   return (
     <div className="min-h-screen bg-bg flex flex-col">
@@ -638,19 +662,39 @@ export function ConsultaClient({
                     A ficha foi estruturada automaticamente. Na prática, ela seria salva no prontuário do paciente.
                   </p>
                 </div>
-                <motion.a
-                  href="/dashboard/agendamentos"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3 }}
-                  className="inline-flex items-center gap-2 bg-gradient-to-r from-teal to-teal-lt text-white px-6 py-3 rounded-xl font-bold text-sm shadow-[0_4px_14px_rgba(47,156,133,0.3)] hover:-translate-y-0.5 transition-all"
-                >
-                  Fazer minha primeira consulta real
-                </motion.a>
-                <p className="text-xs text-text-secondary">
-                  Ou{' '}
-                  <a href="/dashboard" className="underline underline-offset-2">ir para o dashboard</a>
-                </p>
+                {retornoOnboarding ? (
+                  <>
+                    <motion.button
+                      type="button"
+                      onClick={() => router.push('/onboarding?step=plano')}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 }}
+                      className="inline-flex items-center gap-2 bg-gradient-to-r from-teal to-teal-lt text-white px-6 py-3 rounded-xl font-bold text-sm shadow-[0_4px_14px_rgba(47,156,133,0.3)] hover:-translate-y-0.5 transition-all"
+                    >
+                      Continuar configuração
+                    </motion.button>
+                    <p className="text-xs text-text-secondary">
+                      Falta pouco pra terminar seu cadastro.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <motion.a
+                      href="/dashboard/agendamentos"
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 }}
+                      className="inline-flex items-center gap-2 bg-gradient-to-r from-teal to-teal-lt text-white px-6 py-3 rounded-xl font-bold text-sm shadow-[0_4px_14px_rgba(47,156,133,0.3)] hover:-translate-y-0.5 transition-all"
+                    >
+                      Fazer minha primeira consulta real
+                    </motion.a>
+                    <p className="text-xs text-text-secondary">
+                      Ou{' '}
+                      <a href="/dashboard" className="underline underline-offset-2">ir para o dashboard</a>
+                    </p>
+                  </>
+                )}
               </motion.div>
             )}
 
@@ -672,6 +716,15 @@ export function ConsultaClient({
                 </motion.div>
                 <div className="text-center">
                   <p className="font-heading text-2xl text-text-primary mb-1">Ficha salva!</p>
+                  <motion.p
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                    className="text-sm font-semibold mb-1"
+                    style={{ color: '#2f9c85' }}
+                  >
+                    {recompensaPersona}
+                  </motion.p>
                   <p className="text-sm text-text-secondary">
                     {showSignature ? 'Coletando assinatura...' : `Redirecionando em ${saveCountdown}s`}
                   </p>
