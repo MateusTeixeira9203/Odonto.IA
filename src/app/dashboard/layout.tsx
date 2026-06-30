@@ -9,12 +9,22 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { clinicId } = await requireClinicContext();
+  const { clinicId, user, supabase } = await requireClinicContext();
 
   const dentista = await getDentistaCached();
 
   if (!dentista) {
     redirect("/onboarding");
+  }
+
+  // Guard: secretária com must_change_password = true deve definir senha antes de entrar.
+  if (dentista.role === "secretaria") {
+    const { data: sec } = await supabase
+      .from("secretarias")
+      .select("must_change_password")
+      .eq("usuario_id", user.id)
+      .maybeSingle();
+    if (sec?.must_change_password) redirect("/primeiro-acesso");
   }
 
   if (

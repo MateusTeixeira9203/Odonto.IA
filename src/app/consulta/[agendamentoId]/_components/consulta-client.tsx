@@ -11,7 +11,6 @@ import {
 import { toast } from 'sonner';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useDexGuide } from '@/hooks/useDexGuide';
-import { DexFace } from '@/components/onboarding/dex-mascot';
 import { DexAvatar } from '@/components/ui/dex-avatar';
 import { salvarFichaConsulta, iniciarAtendimentoConsulta } from '../actions';
 import { ConsultaAssinaturaModal } from './consulta-assinatura-modal';
@@ -213,25 +212,11 @@ export function ConsultaClient({
 
   const firstName = paciente.nome.split(' ')[0];
 
-  // ── Coach do onboarding (só relevante em modo demo) ──
+  // Marca a conclusão da demo pro DexWidget (libera o FAB e carrega contexto).
+  // A orientação do DEX vive no header do card ("Dex · Copiloto") — não há mais
+  // balão flutuante: ele duplicava o mascote e cobria o botão "Organizar com DEX".
   const guideId = dentistaId ?? 'guide';
-  const { phase: guidePhase, setPhase: setGuidePhase } = useDexGuide(guideId);
-  const [valuePhrase, setValuePhrase] = useState(false);
-
-  useEffect(() => {
-    if (!isDemo) return;
-    if (aptStatus === 'in_progress' && !valuePhrase && !evolucao && !saved) {
-      setValuePhrase(true);
-      const t = setTimeout(() => setValuePhrase(false), 6000);
-      return () => clearTimeout(t);
-    }
-  }, [isDemo, aptStatus, valuePhrase, evolucao, saved]);
-
-  const coachText = !evolucao
-    ? (aptStatus === 'in_progress'
-        ? 'Fale a queixa do João — ou digite. Ex: "dor no molar inferior direito ao mastigar". Depois clique em Organizar com DEX.'
-        : 'Clique em Iniciar Atendimento pra ativar o Modo Consulta.')
-    : (saved ? 'Pronto! Montei a ficha sozinho.' : 'Viu? Estruturei tudo. Confira e salve.');
+  const { setPhase: setGuidePhase } = useDexGuide(guideId);
 
   const handleVoice = useCallback(async () => {
     if (micStatus === 'recording') {
@@ -982,22 +967,6 @@ export function ConsultaClient({
         patientId={paciente.id}
         patientName={paciente.nome}
       />
-
-      {/* ── Coach do DEX guiando a demo ── */}
-      {isDemo && guidePhase !== 'done' && (
-        <div
-          className="fixed bottom-7 right-7 z-[120] flex items-end gap-2.5 max-w-[360px]"
-          role="status"
-          aria-live="polite"
-        >
-          <div className="bg-surface border-[1.5px] border-teal rounded-2xl px-4 py-3 shadow-xl">
-            <p className="text-[13px] text-text-primary leading-relaxed">
-              {valuePhrase ? 'Deixa que eu cuido do resto. Foque no paciente.' : coachText}
-            </p>
-          </div>
-          <DexFace size={52} />
-        </div>
-      )}
     </div>
   );
 }
