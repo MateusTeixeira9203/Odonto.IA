@@ -38,6 +38,7 @@ import { criarOrcamento } from "@/app/dashboard/orcamentos/actions";
 import { toast } from 'sonner';
 import { temFeature, type PlanoId } from "@/lib/planos";
 import { Odontograma } from "@/components/odontograma/Odontograma";
+import { ARCH_SUPERIOR, ARCH_INFERIOR, ARCH_COMPLETA, ARCH_LABELS } from "@/lib/arcadas";
 import dynamic from 'next/dynamic';
 import type SignaturePadLib from 'signature_pad';
 import { ApresentarPaciente } from '@/components/pacientes/ApresentarPaciente';
@@ -52,16 +53,6 @@ interface ToothNote {
 }
 
 type SelectionMode = 'single' | 'multiple' | 'arch';
-
-const ARCH_SUPERIOR = 97;
-const ARCH_INFERIOR = 98;
-const ARCH_COMPLETA = 99;
-
-const ARCH_LABELS: Record<number, string> = {
-  [ARCH_SUPERIOR]: 'Arcada Superior',
-  [ARCH_INFERIOR]: 'Arcada Inferior',
-  [ARCH_COMPLETA]: 'Boca Toda',
-};
 
 
 type ProcStatus = 'planejado' | 'agendado' | 'concluido';
@@ -150,6 +141,29 @@ const mapFichaToEvolution = (f: FichaDB): Evolution => ({
   assinadoEm: f.assinado_em ?? null,
   tratamentoId: f.tratamento_id ?? null,
 });
+
+// Ficha enlatada do perfil demo (K · spec 3.3) — coerente com o seed da consulta demo (João Silva, dente 46).
+const DEMO_EVOLUTION: Evolution = {
+  id: 'demo-ficha',
+  date: new Date().toLocaleString('pt-BR', {
+    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  }).replace(',', ' às'),
+  type: 'Dor ao mastigar no lado direito inferior',
+  observation:
+    'Paciente relata dor à mastigação no lado inferior direito há cerca de duas semanas, ' +
+    'com sensibilidade ao frio. Sem histórico de trauma. Higiene satisfatória.',
+  teethNotes: [{ tooth: 46, notes: ['Restauração antiga com infiltração', 'Sensibilidade ao frio'] }],
+  professional: 'Você',
+  files: [],
+  procedimentosConcluidos: [],
+  procedimentosStatus: { 'Restauração de compósito (dente 46)': 'planejado', 'Profilaxia': 'planejado' },
+  procedimentos: ['Restauração de compósito (dente 46)', 'Profilaxia'],
+  conduta: 'Substituir a restauração do dente 46 e realizar profilaxia. Reavaliar sensibilidade em 30 dias.',
+  retornoSugerido: '30 dias',
+  assinaturaUrl: null,
+  assinadoEm: null,
+  tratamentoId: null,
+};
 
 interface FichasTabProps {
   patientId: string;
@@ -255,6 +269,12 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
 
   // Busca fichas do Supabase
   const fetchFichas = React.useCallback(async () => {
+    // Perfil demo: ficha enlatada, sem tocar no banco (K · spec 3.3).
+    if (patientId === 'demo') {
+      setEvolutions([DEMO_EVOLUTION]);
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
       const supabase = createClient();
@@ -447,6 +467,9 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
           : {}),
       };
 
+      // Id da ficha salva — vincula o orçamento auto-gerado (abaixo) à ficha de origem.
+      let fichaIdSalva: string | null = editingId ?? null;
+
       if (editingId) {
         const { error } = await supabase
           .from("fichas")
@@ -462,7 +485,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
 
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("fichas").insert({
+        const { data: novaFicha, error } = await supabase.from("fichas").insert({
           paciente_id: patientId,
           dentista_id: dentistaId,
           clinica_id: clinicaId,
@@ -471,9 +494,10 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
           dentes_afetados: dentesAfetados,
           dentes_observacoes: dentesObservacoes,
           status: "aberta",
-        });
+        }).select("id").single();
 
         if (error) throw error;
+        fichaIdSalva = (novaFicha as { id: string } | null)?.id ?? null;
       }
 
       await fetchFichas();
@@ -486,6 +510,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
         try {
           const result = await criarOrcamento({
             pacienteId: patientId,
+            fichaId:    fichaIdSalva,
             itens: itensValidos.map((i) => ({
               procedimentoId: null,
               descricao: i.descricao,

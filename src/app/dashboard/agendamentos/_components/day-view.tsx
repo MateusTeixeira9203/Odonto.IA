@@ -59,7 +59,8 @@ export function DayView({
     const d           = parseISO(apt.data_hora);
     const hourDecimal = d.getHours() + d.getMinutes() / 60;
     const top         = (hourDecimal - HOUR_START) * SLOT_HEIGHT;
-    const height      = Math.max((apt.duracao_minutos / 60) * SLOT_HEIGHT - 6, 40);
+    // Piso de 46px garante as 2 linhas essenciais (hora+status / nome) sem cortar — antes 40px cortava o nome em consultas curtas.
+    const height      = Math.max((apt.duracao_minutos / 60) * SLOT_HEIGHT - 6, 46);
     const { bg, border, text } = (STATUS_CONFIG[apt.status as AgendamentoStatus] ?? STATUS_CONFIG.scheduled).timeline;
     return { top, height, bg, border, text };
   }
@@ -176,7 +177,7 @@ export function DayView({
                     {/* Main clickable area */}
                     <button
                       onClick={() => onAppointmentClick(apt)}
-                      className="flex-1 text-left px-3 py-2 flex flex-col justify-start min-w-0 hover:brightness-[0.97] transition-all"
+                      className="flex-1 text-left px-3 py-1 flex flex-col justify-center min-w-0 hover:brightness-[0.97] transition-all"
                     >
                       <div className="flex items-center gap-2 mb-0.5">
                         <span className="font-mono text-[11px] font-bold" style={{ color: text }}>
@@ -200,7 +201,7 @@ export function DayView({
                           </span>
                         )}
                       </div>
-                      <p className="font-semibold text-sm truncate" style={{ color: text }}>
+                      <p className="font-semibold text-sm truncate leading-tight" style={{ color: text }}>
                         {apt.paciente?.nome ?? '—'}
                       </p>
                       {height > 56 && apt.observacoes && (

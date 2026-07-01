@@ -121,6 +121,7 @@ export default async function ConsultaPage({ params }: Props) {
   return (
     <ConsultaClient
       agendamentoId={agendamentoId}
+      clinicaId={clinicId}
       dentistaFoco={dentista?.foco_principal ?? null}
       paciente={{ ...paciente, idadeStr }}
       hora={hora}

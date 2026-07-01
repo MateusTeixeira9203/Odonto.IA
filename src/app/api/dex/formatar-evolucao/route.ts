@@ -4,6 +4,7 @@ import { withRateLimit } from '@/lib/rate-limit';
 import { generateStructured } from '@/lib/ai/provider';
 import { logAICall } from '@/lib/ai/logger';
 import { buildDentalContext } from '@/lib/odonto-dictionary';
+import { isArch } from '@/lib/arcadas';
 
 export interface EvolucaoFormatada {
   queixa_principal:    string;
@@ -54,7 +55,7 @@ Retorne SOMENTE um JSON válido, sem markdown, com exatamente esta estrutura:
 {
   "queixa_principal": "título objetivo do procedimento principal (ex: Endodontia dente 26, Restauração dentes 14 e 15)",
   "anotacoes": "evolução clínica completa e organizada em linguagem técnica — procedimento realizado, técnica usada, intercorrências, observações relevantes. 2-4 frases.",
-  "dentes_afetados": [lista de números FDI mencionados como inteiros — ex: [26, 36]],
+  "dentes_afetados": [lista de números FDI mencionados como inteiros — ex: [26, 36]. Para procedimentos de arcada ou boca inteira, use os sentinelas: 97 (arcada superior), 98 (arcada inferior), 99 (boca toda / todas as arcadas)],
   "dentes_observacoes": {"número": "procedimento 1 neste dente\nprocedimento 2 neste dente\nprocedimento 3 neste dente"},
   "procedimentos": ["lista resumida dos procedimentos realizados — ex: Tratamento endodôntico, Radiografia periapical"],
   "conduta": "orientações ao paciente, cuidados pós-procedimento, prescrições mencionadas. String vazia se não mencionado.",
@@ -64,6 +65,7 @@ Retorne SOMENTE um JSON válido, sem markdown, com exatamente esta estrutura:
 
 Regras críticas:
 - dentes_afetados: array de inteiros FDI válidos (11-48), nunca strings
+- ARCADA / BOCA INTEIRA: se o dentista descrever procedimento em "arcada superior", "arcada inferior", "boca toda", "toda a boca" ou "geral" (ex: clareamento, profilaxia de boca toda, raspagem de arcada), NÃO liste dentes individuais — use o sentinela correspondente (97/98/99). Nunca invente quais dentes foram afetados quando o relato é de arcada/boca inteira.
 - Se nenhum dente mencionado: [] e {}
 - dentes_observacoes: se mais de um procedimento no mesmo dente, separar por \\n — cada linha vira um item independente marcável pelo dentista
 - procedimentos: array de strings resumidas, mínimo 1 item baseado no relato
@@ -88,7 +90,7 @@ Regras críticas:
     };
     parsed.dentes_afetados = (parsed.dentes_afetados ?? [])
       .map((d) => Number(d))
-      .filter((d) => !isNaN(d) && isValidFDI(d));
+      .filter((d) => !isNaN(d) && (isValidFDI(d) || isArch(d))); // aceita dentes FDI e sentinelas de arcada (97/98/99)
     parsed.dentes_observacoes = parsed.dentes_observacoes ?? {};
     parsed.procedimentos = Array.isArray(parsed.procedimentos)
       ? (parsed.procedimentos as unknown[]).filter((p): p is string => typeof p === 'string')

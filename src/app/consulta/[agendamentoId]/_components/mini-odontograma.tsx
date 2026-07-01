@@ -1,7 +1,14 @@
 'use client';
 
+import { ARCH_SUPERIOR, ARCH_INFERIOR, ARCH_COMPLETA } from '@/lib/arcadas';
+
 const TEETH_UPPER = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
 const TEETH_LOWER = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
+const ARCH_OPTIONS: { id: number; label: string }[] = [
+  { id: ARCH_SUPERIOR, label: 'Arcada Sup.' },
+  { id: ARCH_INFERIOR, label: 'Arcada Inf.' },
+  { id: ARCH_COMPLETA, label: 'Boca Toda' },
+];
 const TOOTH_W: Record<number, string> = {
   1: 'w-6', 2: 'w-6', 3: 'w-6', 4: 'w-7', 5: 'w-7', 6: 'w-8', 7: 'w-8', 8: 'w-8',
 };
@@ -70,6 +77,30 @@ export function MiniOdontograma({ selected, aiDetected = [], onChange }: MiniOdo
       {renderRow(TEETH_UPPER, true)}
       <div className="h-px bg-border/60" />
       {renderRow(TEETH_LOWER, false)}
+
+      {/* Arcada / boca inteira — procedimentos que não têm dente FDI individual */}
+      <div className="flex gap-1.5 pt-3">
+        {ARCH_OPTIONS.map(({ id, label }) => {
+          const isSelected = selected.includes(id);
+          const isDetected = !isSelected && aiDetected.includes(id);
+          const cls = isSelected
+            ? 'bg-teal border-teal text-white shadow-[0_2px_6px_rgba(47,156,133,0.35)]'
+            : isDetected
+              ? 'bg-amber-500/10 border-amber-500 border-2 text-amber-600 dark:text-amber-400'
+              : 'bg-surface-alt border-border text-text-secondary hover:border-teal/50 hover:text-teal hover:bg-teal/5';
+          return (
+            <button
+              key={id}
+              onClick={() => toggle(id)}
+              title={isDetected ? `${label} — detectada pela IA (clique para confirmar)` : label}
+              className={`flex-1 py-1.5 rounded-lg border text-[10px] font-bold transition-all active:scale-95 ${cls}`}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
       {pendingCount > 0 && (
         <p className="text-[10px] text-amber-500 dark:text-amber-400 text-center mt-2 font-medium">
           {pendingCount} dente{pendingCount > 1 ? 's' : ''} detectado{pendingCount > 1 ? 's' : ''} pela IA — clique para confirmar

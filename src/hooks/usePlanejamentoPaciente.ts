@@ -64,6 +64,46 @@ function dedupProcs(procs: PlanProc[]): PlanProc[] {
   });
 }
 
+// ─── Mock do Apresentar na demo (K · spec 3.4) — enlatado, sem IA ao vivo ──────
+// Coerente com a ficha enlatada (João Silva, dente 46). Conteúdo dentista-conduzido.
+const DEMO_MOCK_SECTIONS: PlanSection[] = [
+  {
+    id: 'demo-sec-1',
+    title: 'O que encontramos',
+    content:
+      'A restauração antiga do dente 46 apresenta infiltração, o que explica a dor ao mastigar e a sensibilidade ao frio. ' +
+      'É uma situação comum e totalmente reversível quando tratada agora — antes que a infiltração avance para o nervo.',
+    imageIds: [], status: 'pendente', dataEstimada: null,
+  },
+  {
+    id: 'demo-sec-2',
+    title: 'Como vamos resolver',
+    content:
+      'Substituímos a restauração do dente 46 por uma resina nova, devolvendo o vedamento e eliminando a sensibilidade. ' +
+      'Na mesma sessão, fazemos uma profilaxia completa para deixar a boca em dia. Tratamento rápido, em uma única visita.',
+    imageIds: [], status: 'pendente', dataEstimada: null,
+  },
+  {
+    id: 'demo-sec-3',
+    title: 'Investimento',
+    content:
+      'Restauração de compósito (dente 46) e profilaxia. Valor total apresentado de forma clara, com opções de pagamento. ' +
+      'Sem surpresas: você aprova antes de começar.',
+    imageIds: [], status: 'pendente', dataEstimada: null,
+  },
+];
+
+const DEMO_MOCK_BUDGET: PlanBudgetProcedure[] = [
+  { id: 'demo-b1', name: 'Restauração de compósito (dente 46)', value: 350 },
+  { id: 'demo-b2', name: 'Profilaxia', value: 150 },
+];
+
+// Procedimentos do plano — alimenta o contador da capa ("2 procedimentos") na apresentação demo.
+const DEMO_MOCK_PROCS: PlanProc[] = [
+  { id: 'demo-p1', descricao: 'Restauração de compósito (dente 46)', dente: 46, status: 'pendente', fichaRef: 'demo-ficha', ordem: 0 },
+  { id: 'demo-p2', descricao: 'Profilaxia', dente: null, status: 'pendente', fichaRef: 'demo-ficha', ordem: 1 },
+];
+
 /**
  * Motor de planejamento por paciente (seções + procedimentos + orçamento + documentos).
  * Extraído do antigo PlanejamentoTab — agora nível paciente (modelo 1 ficha = 1 tratamento):
@@ -89,9 +129,13 @@ export function usePlanejamentoPaciente(patientId: string, clinicaId: string, pa
     setLoadingData(true);
     try {
       const supabase = createClient();
+      // Escopa o orçamento à ficha apresentada (quando houver) — senão a apresentação
+      // herdaria o orçamento mais recente de OUTRO tratamento do paciente.
+      let budgetQuery = supabase.from('orcamentos').select('*, orcamento_itens(*)').eq('paciente_id', patientId);
+      if (fichaId) budgetQuery = budgetQuery.eq('ficha_id', fichaId);
       const [docsResult, budgetResult, secoesResult] = await Promise.all([
         supabase.from('paciente_documentos').select('*').eq('paciente_id', patientId).in('categoria', ['Radiografias', 'Fotografias']),
-        supabase.from('orcamentos').select('*, orcamento_itens(*)').eq('paciente_id', patientId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+        budgetQuery.order('created_at', { ascending: false }).limit(1).maybeSingle(),
         supabase.from('planejamento_secoes').select('*').eq('paciente_id', patientId).order('ordem', { ascending: true }),
       ]);
       if (docsResult.error) throw docsResult.error;
@@ -122,7 +166,7 @@ export function usePlanejamentoPaciente(patientId: string, clinicaId: string, pa
     } finally {
       setLoadingData(false);
     }
-  }, [patientId]);
+  }, [patientId, fichaId]);
 
   // ── Fetch: procedimentos derivados de TODAS as fichas do paciente ──
   const fetchPlanProcs = useCallback(async () => {
@@ -177,6 +221,16 @@ export function usePlanejamentoPaciente(patientId: string, clinicaId: string, pa
 
   useEffect(() => {
     if (!patientId || !enabled) return;
+    // Perfil demo: conteúdo enlatado, sem tocar no banco nem na IA (K · spec 3.4).
+    if (patientId === 'demo') {
+      setSections(DEMO_MOCK_SECTIONS);
+      setBudgetProcedures(DEMO_MOCK_BUDGET);
+      setBudgetExists(true);
+      setPlanProcs(DEMO_MOCK_PROCS);
+      setDocuments([]);
+      setLoadingData(false);
+      return;
+    }
     void fetchGlobalData();
     void fetchPlanProcs();
   }, [patientId, enabled, fetchGlobalData, fetchPlanProcs]);

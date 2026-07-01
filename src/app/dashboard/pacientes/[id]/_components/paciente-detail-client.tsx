@@ -85,6 +85,7 @@ import { ConfirmarDeleteOrcModal } from './modals/confirmar-delete-orc-modal';
 import { NovaConsultaModal } from './modals/nova-consulta-modal';
 import { EmitirDocumentoModal } from '@/components/pacientes/EmitirDocumentoModal';
 import { NovoOrcamentoModal } from './modals/novo-orcamento-modal';
+import { ApresentarPaciente } from '@/components/pacientes/ApresentarPaciente';
 
 type FichaRecente = {
   id: string;
@@ -231,6 +232,7 @@ export function PacienteDetailClient({
   const [pagError, setPagError] = useState<string | null>(null);
   const [isLoadingFichaParaOrc, setIsLoadingFichaParaOrc] = useState(false);
   const [fichasParaOrc, setFichasParaOrc] = useState<FichaParaOrc[]>([]);
+  const [fichaOrcId, setFichaOrcId] = useState<string | null>(null);
   const [etapaNovoOrc, setEtapaNovoOrc] = useState<'selecionar' | 'itens'>('itens');
   const [novoOrcValorFinal, setNovoOrcValorFinal] = useState<number | null>(null);
 
@@ -667,15 +669,18 @@ export function PacienteDetailClient({
 
       if (fichas.length > 1) {
         // Mais de uma ficha: dentista escolhe qual usar
+        setFichaOrcId(null);
         setEtapaNovoOrc('selecionar');
         setNovoOrcItens([{ procedimentoId: '', descricao: '', quantidade: 1, preco: 0 }]);
       } else {
         // 0 ou 1 ficha: vai direto para os itens
+        setFichaOrcId(fichas.length === 1 ? fichas[0].id : null);
         setNovoOrcItens(fichas.length === 1 ? fichaParaItens(fichas[0]) : [{ procedimentoId: '', descricao: '', quantidade: 1, preco: 0 }]);
         setEtapaNovoOrc('itens');
       }
     } catch {
       setFichasParaOrc([]);
+      setFichaOrcId(null);
       setNovoOrcItens([{ procedimentoId: '', descricao: '', quantidade: 1, preco: 0 }]);
       setEtapaNovoOrc('itens');
     } finally {
@@ -685,6 +690,7 @@ export function PacienteDetailClient({
   };
 
   const selecionarFichaParaOrc = (fichaId: string | null) => {
+    setFichaOrcId(fichaId);
     if (!fichaId) {
       setNovoOrcItens([{ procedimentoId: '', descricao: '', quantidade: 1, preco: 0 }]);
     } else {
@@ -716,6 +722,7 @@ export function PacienteDetailClient({
     const result = await criarOrcamento({
       pacienteId: paciente.id,
       desconto:   descontoValor,
+      fichaId:    fichaOrcId,
       itens: itensValidos.map((i) => ({
         procedimentoId: i.procedimentoId || null,
         descricao: i.descricao,
@@ -880,6 +887,18 @@ export function PacienteDetailClient({
               >
                 <FilePlus className="w-4 h-4" />
               </button>
+            )}
+            {/* Apresentar — só aparece com ficha pra apresentar (DESIGN-KL §2 / spec 2.1) */}
+            {canViewClinical && fichasRecentes.length > 0 && (
+              <ApresentarPaciente
+                patientId={paciente.id}
+                clinicaId={clinicaId}
+                patientName={displayNome}
+                mode="picker"
+                fichas={fichasRecentes}
+                variant="header"
+                glow={paciente.id === 'demo'}
+              />
             )}
             <button
               onClick={() => { setConsultaError(null); setIsNovaConsultaOpen(true); }}

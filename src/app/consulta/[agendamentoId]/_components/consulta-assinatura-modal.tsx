@@ -15,12 +15,14 @@ interface ConsultaAssinaturaModalProps {
   pacienteId: string;
   pacienteNome: string;
   onSigned?: () => void;
+  /** Demo: simula sucesso sem gravar no banco (spec 3.2). */
+  isDemo?: boolean;
 }
 
 type Step = 'assinar' | 'salvando' | 'sucesso' | 'erro';
 
 export function ConsultaAssinaturaModal({
-  open, onClose, fichaId, pacienteId, pacienteNome, onSigned,
+  open, onClose, fichaId, pacienteId, pacienteNome, onSigned, isDemo = false,
 }: ConsultaAssinaturaModalProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const padRef    = useRef<SignaturePadLib | null>(null);
@@ -67,8 +69,19 @@ export function ConsultaAssinaturaModal({
   };
 
   const handleConfirmar = async () => {
-    if (!fichaId || !padRef.current || padRef.current.isEmpty()) return;
+    if (!padRef.current || padRef.current.isEmpty()) return;
+    if (!isDemo && !fichaId) return;
     setStep('salvando');
+
+    // Demo: simula sucesso sem tocar no banco (spec 3.2 — não há fichaId real).
+    if (isDemo) {
+      setTimeout(() => {
+        setStep('sucesso');
+        onSigned?.();
+        setTimeout(() => onClose(), 1600);
+      }, 800);
+      return;
+    }
 
     const dataUrl = padRef.current.toDataURL('image/png');
     const result  = await salvarAssinaturaConsulta(fichaId, pacienteId, dataUrl);

@@ -1,7 +1,7 @@
 # Spec — Workstream K (demo estende) + L (elevar Apresentar)
 
 > Pai: `plans/roadmap/plano-fase1-retencao.md` §⭐ "Estado atual + Sprint hoje→amanhã".
-> Status: **rascunho para aprovação** (2026-06-30). Não codar antes do "ok" + design-brief (regra 4).
+> Status: **APROVADA** (2026-06-30). Próximo gate: design-brief de K+L antes de codar (regra 4).
 > Irmã de `plans/specs/spec-A-onboarding-persona.md` — **A não muda**; aquela máquina de passos continua igual.
 
 ## 1. Objetivo
@@ -29,10 +29,12 @@
 - **UX:** lista clicável (data · queixa · dentista), mesma lógica de selecionar um orçamento. Selecionar → abre `ApresentarPanel` com aquele `fichaId`.
 - **Invariante:** `ApresentarPanel` **nunca abre sem `fichaId` resolvido** (do seletor ou do contexto).
 
-### 2.3 Apresentar na tela "Ficha salva!" (Modo Consulta)
+### 2.3 Gerar plano na tela "Ficha salva!" (Modo Consulta)
 - **Local:** `consulta-client.tsx`, branch `saved && !isDemo` (hoje só oferece assinatura + emitir documento).
-- **Novo:** CTA primário **"Montar e apresentar o plano"**.
-- **Wiring:** usa `savedFichaId` (já existe no estado) → abre `ApresentarPanel` **direto** (já tem contexto, sem seletor). A IA rascunha o plano da ficha recém-salva via `usePlanejamentoPaciente(...).generateFullPlanWithAI`.
+- **Momento:** paciente ainda na cadeira, consulta recém-encerrada — não há tempo pra montar nada à mão. O movimento certo é **um clique → plano pronto**.
+- **Novo:** CTA primário **"Gerar plano de tratamento"** (geração com IA, não montagem manual).
+- **Wiring:** usa `savedFichaId` (já existe no estado) → dispara `usePlanejamentoPaciente(...).generateFullPlanWithAI` da ficha recém-salva → abre `ApresentarPanel` **direto** (já tem contexto, sem seletor) **já com o rascunho carregado, em estado de revisão**.
+- **Invariante (anti-alucinação):** o clique **não** cai em apresentação full-screen. Abre em **revisão** — o dentista bate o olho / ajusta em ~10s e só então dispara **"Apresentar ao paciente"** (2º gesto). CLAUDE.md: a IA não inventa diagnóstico/procedimento; nenhum plano gerado vai aos olhos do paciente sem o aval do dentista. A IA carrega o esforço pesado; o dentista valida.
 
 ### 2.4 Contextual — manter
 - O botão `compact` na `FichasTab` (`mode: 'direct'`, apresenta a ficha expandida) **continua sem mudança de contrato**.
@@ -50,6 +52,11 @@
   - `reveal` — "A ficha foi estruturada." + bifurcação: **[Ver o que acontece com a ficha]** / **[Pular]**.
   - `assinatura` — assinatura **mock** (3.2). Não grava.
   - Os dois caminhos (assinar **ou** pular) → `router.push('/dashboard/pacientes/demo?from=demo')`.
+- **Contexto onboarding (decidido 2026-06-30):** quando o demo veio do onboarding
+  (`retornoOnboarding`), o perfil demo recebe a flag (`&onboarding=1`) e seu CTA volta pra
+  `/onboarding?step=plano` ("Continuar configuração"). Assim o usuário **vê o aha 2 E termina
+  o cadastro** — o loop do onboarding (spec-A) não quebra. No demo standalone, o CTA do perfil
+  é "Fazer minha primeira consulta real".
 
 ### 3.2 Assinatura mock
 - **Invariante:** em demo **nada grava no banco** (não há `fichaId` real).
@@ -58,11 +65,13 @@
 
 ### 3.3 Perfil demo com a ficha + Apresentar destacado (aha 2)
 - `/dashboard/pacientes/demo` (já existe — "Maria da Silva (Demonstração)") precisa:
-  1. **mostrar a ficha que a demo organizou** — hoje os dados do perfil demo são mock fixos; adicionar a ficha coerente com o relato. Fonte: ficha **canned** OU ler de `sessionStorage` o que foi organizado na demo. Decisão a detalhar.
+  1. **mostrar a ficha coerente com a Maria da Silva** — **decidido 2026-06-30: ficha `canned`**
+     (enlatada, escrita por nós). Descartado o sessionStorage (mais risco/variação pra ganho marginal).
   2. **o Apresentar do header (L) em destaque** — é o gatilho do aha 2.
 
 ### 3.4 Apresentar mockado na demo
 - Paciente `'demo'` não tem dados reais → `usePlanejamentoPaciente` recebe **`mockSections`** quando `patientId === 'demo'`. **Conteúdo enlatado, dentista conduzindo, sem IA ao vivo.**
+- **Reforça o aha:** o usuário novo clica **"Gerar plano de tratamento"** e vê um plano completo aparecer sozinho (mock) — materializa o "um clique e tá pronto" que vende o momento da cadeira (2.3).
 
 ---
 
@@ -70,8 +79,9 @@
 1. **Demo nunca grava no banco** (assinatura, ficha, plano).
 2. Apresentar do header **só aparece com algo pra apresentar**.
 3. `ApresentarPanel` **nunca abre sem `fichaId` resolvido**.
-4. Dark/light + `prefers-reduced-motion` respeitados.
-5. **A máquina de passos do onboarding (spec-A) NÃO muda.**
+4. **Plano gerado por IA nunca vai aos olhos do paciente sem revisão do dentista** — "Gerar" abre em revisão; "Apresentar ao paciente" é gesto separado (2.3).
+5. Dark/light + `prefers-reduced-motion` respeitados.
+6. **A máquina de passos do onboarding (spec-A) NÃO muda.**
 
 ## 5. Bugs do sprint (corrigir junto)
 - **Badge POPULAR** (tela de planos): aplicar estilo de pill (fundo + borda + radius), não só texto âmbar.

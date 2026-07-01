@@ -471,13 +471,7 @@ export function OnboardingClient({ initialStep, focoInicial, nomeInicial }: Onbo
                   >
                     {/* Badge "Popular" — canto superior ESQUERDO (não colide com o ✓) */}
                     {hasBadge && (
-                      <span
-                        className="absolute top-3.5 left-3.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider"
-                        style={{
-                          background: 'color-mix(in srgb, var(--color-teal) 15%, transparent)',
-                          color: 'var(--color-teal)',
-                        }}
-                      >
+                      <span className="absolute top-3.5 left-3.5 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider bg-teal/15 text-teal border border-teal/30">
                         {p.badge}
                       </span>
                     )}

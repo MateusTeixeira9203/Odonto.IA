@@ -159,6 +159,8 @@ export async function criarOrcamento(dados: {
     precoUnitario: number;
   }>;
   dentistaId?: string;
+  /** Ficha de origem do orçamento — vincula orçamento↔ficha p/ a apresentação não vazar entre tratamentos. */
+  fichaId?: string | null;
 }): Promise<{ error?: string; id?: string }> {
   const { supabase, user, clinicId } = await requireClinicContext();
 
@@ -186,6 +188,7 @@ export async function criarOrcamento(dados: {
       clinica_id:   clinicId,
       dentista_id:  dentistaAlvoId,
       paciente_id:  dados.pacienteId,
+      ...(dados.fichaId != null && { ficha_id: dados.fichaId }),
       status:       "rascunho",
       total,
       desconto,

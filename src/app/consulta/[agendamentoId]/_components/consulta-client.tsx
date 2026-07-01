@@ -15,6 +15,7 @@ import { DexAvatar } from '@/components/ui/dex-avatar';
 import { salvarFichaConsulta, iniciarAtendimentoConsulta } from '../actions';
 import { ConsultaAssinaturaModal } from './consulta-assinatura-modal';
 import { EmitirDocumentoModal } from '@/components/pacientes/EmitirDocumentoModal';
+import { ApresentarPaciente } from '@/components/pacientes/ApresentarPaciente';
 import type { EvolucaoFormatada } from '@/app/api/dex/formatar-evolucao/route';
 import type { FocoPrincipal } from '@/lib/persona';
 import { ConsultationSidebar } from './consultation-sidebar';
@@ -22,6 +23,7 @@ import { BotaoMensagemIA } from '@/components/orcamentos/botao-mensagem-ia';
 import { VoiceUX } from './voice-ux';
 import { DraftPendingCard } from './draft-pending-card';
 import { MiniOdontograma } from './mini-odontograma';
+import { denteLabel } from '@/lib/arcadas';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -48,6 +50,7 @@ interface Paciente {
 
 interface ConsultaClientProps {
   agendamentoId: string;
+  clinicaId: string;
   isDemo?: boolean;
   dentistaId?: string;
   paciente: Paciente;
@@ -112,6 +115,7 @@ const FORMATAR_ETAPAS = [
 
 export function ConsultaClient({
   agendamentoId,
+  clinicaId,
   isDemo = false,
   dentistaId,
   paciente,
@@ -140,6 +144,12 @@ export function ConsultaClient({
   const [saveCountdown, setSaveCountdown] = useState(5);
   const [showSignature, setShowSignature] = useState(false);
   const [showEmitir, setShowEmitir] = useState(false);
+  const [demoSignOpen, setDemoSignOpen] = useState(false); // assinatura mock da demo (K · spec 3.1/3.2)
+
+  // Destino comum da demo estendida — perfil demo com a ficha + Apresentar (aha 2).
+  // Carrega o contexto do onboarding pra o CTA do perfil voltar pro wizard (spec 3.1).
+  const irParaPerfilDemo = () =>
+    router.push(`/dashboard/pacientes/demo?from=demo${retornoOnboarding ? '&onboarding=1' : ''}`);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [aptStatus, setAptStatus] = useState(agendamentoStatus);
@@ -642,44 +652,28 @@ export function ConsultaClient({
                   <Check className="w-8 h-8 text-white" />
                 </motion.div>
                 <div>
-                  <p className="font-heading text-2xl text-text-primary mb-2">Você viu o DEX em ação.</p>
+                  <p className="font-heading text-2xl text-text-primary mb-2">A ficha foi estruturada.</p>
                   <p className="text-sm text-text-secondary leading-relaxed max-w-xs mx-auto">
-                    A ficha foi estruturada automaticamente. Na prática, ela seria salva no prontuário do paciente.
+                    O DEX organizou tudo sozinho. Quer ver o que acontece com ela depois da consulta?
                   </p>
                 </div>
-                {retornoOnboarding ? (
-                  <>
-                    <motion.button
-                      type="button"
-                      onClick={() => router.push('/onboarding?step=plano')}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.3 }}
-                      className="inline-flex items-center gap-2 bg-gradient-to-r from-teal to-teal-lt text-white px-6 py-3 rounded-xl font-bold text-sm shadow-[0_4px_14px_rgba(47,156,133,0.3)] hover:-translate-y-0.5 transition-all"
-                    >
-                      Continuar configuração
-                    </motion.button>
-                    <p className="text-xs text-text-secondary">
-                      Falta pouco pra terminar seu cadastro.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <motion.a
-                      href="/dashboard/agendamentos"
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.3 }}
-                      className="inline-flex items-center gap-2 bg-gradient-to-r from-teal to-teal-lt text-white px-6 py-3 rounded-xl font-bold text-sm shadow-[0_4px_14px_rgba(47,156,133,0.3)] hover:-translate-y-0.5 transition-all"
-                    >
-                      Fazer minha primeira consulta real
-                    </motion.a>
-                    <p className="text-xs text-text-secondary">
-                      Ou{' '}
-                      <a href="/dashboard" className="underline underline-offset-2">ir para o dashboard</a>
-                    </p>
-                  </>
-                )}
+                <motion.button
+                  type="button"
+                  onClick={() => setDemoSignOpen(true)}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="inline-flex items-center gap-2 bg-gradient-to-r from-teal to-teal-lt text-white px-6 py-3 rounded-xl font-bold text-sm shadow-[0_4px_14px_rgba(47,156,133,0.3)] hover:-translate-y-0.5 transition-all"
+                >
+                  Ver o que acontece com a ficha
+                </motion.button>
+                <button
+                  type="button"
+                  onClick={() => irParaPerfilDemo()}
+                  className="text-xs text-text-secondary underline underline-offset-2 hover:text-text-primary transition-colors"
+                >
+                  Pular
+                </button>
               </motion.div>
             )}
 
@@ -714,6 +708,27 @@ export function ConsultaClient({
                     {showSignature ? 'Coletando assinatura...' : `Redirecionando em ${saveCountdown}s`}
                   </p>
                 </div>
+                {/* CTA primário: gerar o plano enquanto o paciente ainda está na cadeira (spec 2.3) */}
+                {!showSignature && savedFichaId && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.25 }}
+                    onClick={() => {
+                      if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null; }
+                    }}
+                  >
+                    <ApresentarPaciente
+                      patientId={paciente.id}
+                      clinicaId={clinicaId}
+                      patientName={paciente.nome}
+                      fichaId={savedFichaId}
+                      mode="direct"
+                      autoGenerate
+                      label="Gerar plano de tratamento"
+                    />
+                  </motion.div>
+                )}
                 {!showSignature && savedFichaId && (
                   <motion.button
                     initial={{ opacity: 0, y: 8 }}
@@ -876,7 +891,7 @@ export function ConsultaClient({
                 {/* Odontograma — Fix #2: salva só confirmedTeeth; botão "Confirmar todos" */}
                 <DraftPendingCard label={
                   confirmedTeeth.length > 0
-                    ? `Dentes confirmados — ${confirmedTeeth.join(', ')}`
+                    ? `Dentes confirmados — ${confirmedTeeth.map(denteLabel).join(', ')}`
                     : evolucao.dentes_afetados.length > 0
                       ? `Dentes detectados — ${evolucao.dentes_afetados.length} aguardando confirmação`
                       : 'Dentes afetados'
@@ -906,7 +921,7 @@ export function ConsultaClient({
                     <div className="space-y-2">
                       {confirmedTeeth.map(dente => (
                         <div key={dente} className="flex items-center gap-3">
-                          <span className="font-mono text-xs font-bold text-teal w-8 shrink-0">{dente}</span>
+                          <span className={`font-mono text-xs font-bold text-teal shrink-0 ${dente > 90 ? 'w-24' : 'w-8'}`}>{denteLabel(dente)}</span>
                           <input
                             value={evolucao.dentes_observacoes[String(dente)] ?? ''}
                             onChange={e => setEvolucao({
@@ -958,6 +973,18 @@ export function ConsultaClient({
           pacienteId={paciente.id}
           pacienteNome={paciente.nome}
           onSigned={() => router.push(`/dashboard/pacientes/${paciente.id}`)}
+        />
+      )}
+
+      {/* ── Assinatura mock da demo (K · spec 3.1/3.2) — qualquer saída leva ao perfil demo ── */}
+      {demoSignOpen && (
+        <ConsultaAssinaturaModal
+          open={demoSignOpen}
+          isDemo
+          onClose={() => { setDemoSignOpen(false); irParaPerfilDemo(); }}
+          fichaId=""
+          pacienteId="demo"
+          pacienteNome={paciente.nome}
         />
       )}
 

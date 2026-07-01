@@ -24,7 +24,8 @@ function getHoraSaudacao(now: Date): string {
 }
 
 export function DashboardHeader({ nome, now, atendimentos }: DashboardHeaderProps) {
-  const primeiroNome = nome.split(' ')[0];
+  // Remove prefixo "Dr."/"Dra." do nome cadastrado pra não duplicar ("Dr. Dr.").
+  const primeiroNome = nome.replace(/^(dr\.?|dra\.?)\s*/i, '').trim().split(' ')[0] || nome;
   const saudacao = getHoraSaudacao(now);
   const dataFormatada = format(now, "EEEE, dd 'de' MMMM", { locale: ptBR });
 

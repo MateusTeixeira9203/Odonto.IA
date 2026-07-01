@@ -15,6 +15,7 @@ export default async function ConsultaDemoPage({
   return (
     <ConsultaClient
       isDemo
+      clinicaId="demo"
       retornoOnboarding={from === 'onboarding'}
       dentistaFoco={dentista.foco_principal}
       dentistaId={dentista.id}
