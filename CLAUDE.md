@@ -581,4 +581,15 @@ Toda tela ou componente novo passa pelo pipeline abaixo. Pular etapas é a causa
 - **Abertura:** quando eu cumprimentar pra começar ("bom dia", "boa tarde", "boa noite", "tudo bem Claude"), rode a skill `session-start` — leia o último handoff em `plans/handoffs/` e me dê o recap (onde paramos, próximo passo, erros em aberto, o que eu cogitava) antes de tocar em código.
 - **Fechamento:** quando eu disser que vou parar ("vou dormir", "terminamos por hoje", "encerra"), rode a skill `handoff` e salve em `plans/handoffs/` — o que concluímos, os erros, **como eu estava pensando em resolver**, o que ficou e o que eu cogitava.
 - A pasta `plans/` é **append-only** — é a memória do projeto, nunca apague. Organizada por tipo: `plans/handoffs/` (handoffs de sessão), `plans/specs/` (contratos técnicos), `plans/roadmap/` (planos mestres).
+
+### 6. Modos de sessão — planejamento vs execução
+Toda sessão tem **um modo**, e eles **não se misturam** (o atrito nº1 é planejar e codar meio a meio na mesma sessão):
+- **Planejamento** — discutir, escopar, decidir, **escrever spec** (regra 2). **Não coda produção** — no máximo investigação read-only ou spike descartável. Saída: roadmap/specs atualizados + **handoff de execução** no fecho.
+- **Execução** — pega o handoff de execução + os specs e **coda + testa + commita/deploya**. **Não re-escopa** — o que estiver especificado, executa; o que não estiver, volta pro planejamento.
+
+Rituais (estendem a regra 5):
+- **Fechar planejamento** → `handoff` gera um **handoff de execução** (`plans/handoffs/handoff-AAAA-MM-DD-execucao.md`): checklist acionável (arquivos + o que fazer) que **aponta** pros specs/roadmap, não os repete. Todo handoff declara o **modo da próxima sessão**.
+- **Abrir execução** → `session-start` lê o modo declarado e, em execução, carrega **roadmap + spec relevante + handoff de execução** (panorama completo) antes de codar.
+
+Artefatos: **planejamento cria o spec** (contrato: arquivos, tipos/API, mudanças); **execução implementa o spec**. Fix trivial (1 arquivo, óbvio) dispensa spec (regra 2). Contrato completo do fluxo: `plans/specs/spec-workflow-sessoes.md`.
 <!-- SAAS-BASE-RULES:END -->
