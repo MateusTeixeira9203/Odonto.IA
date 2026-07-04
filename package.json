@@ -24,7 +24,6 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "driver.js": "^1.4.0",
-    "framer-motion": "^12.35.2",
     "googleapis": "^171.4.0",
     "groq-sdk": "^1.2.1",
     "lucide-react": "^0.577.0",

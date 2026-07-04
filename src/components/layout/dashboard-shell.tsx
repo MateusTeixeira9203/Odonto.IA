@@ -80,7 +80,7 @@ export function DashboardShell({ children, nome, clinicaNome, activeClinicId, ro
         style={{ background: 'radial-gradient(ellipse at 50% 30%, rgba(47,156,133,0.12) 0%, transparent 65%)' }}
       />
 
-      {/* Depth Layer — blobs com teal real para contraste visível */}
+      {/* Depth Layer — blobs com teal real para contraste visível (#9: estáticos, blur rasterizado 1x) */}
       <div
         style={{
           position: 'absolute',
@@ -91,7 +91,6 @@ export function DashboardShell({ children, nome, clinicaNome, activeClinicId, ro
           backgroundColor: 'rgba(47, 156, 133, 0.28)',
           borderRadius: '40% 60% 70% 30% / 40% 50% 60% 50%',
           filter: 'blur(120px)',
-          animation: 'blob-morph 18s ease-in-out infinite, blob-float 20s ease-in-out infinite',
           pointerEvents: 'none',
           zIndex: -1,
         }}
@@ -106,8 +105,6 @@ export function DashboardShell({ children, nome, clinicaNome, activeClinicId, ro
           backgroundColor: 'rgba(47, 156, 133, 0.20)',
           borderRadius: '40% 60% 70% 30% / 40% 50% 60% 50%',
           filter: 'blur(120px)',
-          animation: 'blob-morph 18s ease-in-out infinite, blob-float 20s ease-in-out infinite',
-          animationDelay: '-8s',
           pointerEvents: 'none',
           zIndex: -1,
         }}

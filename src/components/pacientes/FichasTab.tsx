@@ -9,11 +9,9 @@ import {
   Trash2,
   FileText,
   Download,
-  Upload,
   Check,
   User,
   Loader2,
-  Sparkles,
   Lock,
   PenLine,
   Clock,
@@ -22,7 +20,6 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { DexLoader } from "@/components/ui/dex-loader";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -34,11 +31,13 @@ import {
 } from "@/components/ui/dialog";
 import { createClient } from "@/lib/supabase/client";
 import { HelpTooltip } from "@/components/ui/help-tooltip";
-import { criarOrcamento } from "@/app/dashboard/orcamentos/actions";
 import { toast } from 'sonner';
 import { temFeature, type PlanoId } from "@/lib/planos";
-import { Odontograma } from "@/components/odontograma/Odontograma";
-import { ARCH_SUPERIOR, ARCH_INFERIOR, ARCH_COMPLETA, ARCH_LABELS } from "@/lib/arcadas";
+import { Odontograma, type ToothStatus } from "@/components/odontograma/Odontograma";
+import {
+  ARCH_SUPERIOR, ARCH_INFERIOR, ARCH_COMPLETA, ARCH_LABELS,
+  QUAD_SUP_DIREITO, QUAD_SUP_ESQUERDO, QUAD_INF_DIREITO, QUAD_INF_ESQUERDO,
+} from "@/lib/arcadas";
 import dynamic from 'next/dynamic';
 import type SignaturePadLib from 'signature_pad';
 import { ApresentarPaciente } from '@/components/pacientes/ApresentarPaciente';
@@ -55,7 +54,36 @@ interface ToothNote {
 type SelectionMode = 'single' | 'multiple' | 'arch';
 
 
-type ProcStatus = 'planejado' | 'agendado' | 'concluido';
+type ProcStatus = ToothStatus;
+
+// #16 D3 — ciclo de status (clique avança) e metadados visuais (cinza → âmbar → teal).
+const STATUS_CYCLE: Record<ProcStatus, ProcStatus> = {
+  nao_iniciado: 'em_andamento',
+  em_andamento: 'concluido',
+  concluido: 'nao_iniciado',
+};
+
+const STATUS_META: Record<ProcStatus, { label: string; icon: typeof Check; className: string }> = {
+  nao_iniciado: { label: 'A fazer', icon: Circle, className: 'bg-surface border-border text-text-secondary hover:border-teal hover:text-teal' },
+  em_andamento: { label: 'Em andamento', icon: Clock, className: 'bg-amber-500/10 text-amber-600 border-amber-500/20 hover:bg-amber-500/20' },
+  concluido: { label: 'Concluído', icon: Check, className: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20' },
+};
+
+// #16 D7 — agrega o status dos procedimentos de cada dente pro odontograma-mapa.
+// Sentinelas de arcada/quadrante (>=90) não pintam por dente (D6).
+function computeToothStatusMap(evo: Evolution): Partial<Record<number, ToothStatus>> {
+  const map: Partial<Record<number, ToothStatus>> = {};
+  evo.teethNotes.forEach((tn) => {
+    if (tn.tooth >= 90) return;
+    const keys = tn.notes.filter(Boolean).map((_, i) => `${tn.tooth}_${i}`);
+    if (keys.length === 0) return;
+    const statuses = keys.map((k) => evo.procedimentosStatus[k] ?? 'nao_iniciado');
+    if (statuses.every((s) => s === 'concluido')) map[tn.tooth] = 'concluido';
+    else if (statuses.some((s) => s === 'concluido' || s === 'em_andamento')) map[tn.tooth] = 'em_andamento';
+    else map[tn.tooth] = 'nao_iniciado';
+  });
+  return map;
+}
 
 interface Evolution {
   id: string;
@@ -93,16 +121,6 @@ type FichaDB = {
   assinado_em: string | null;
   tratamento_id: string | null;
 };
-
-const ALLOWED_MIME: Record<string, boolean> = {
-  'image/jpeg': true,
-  'image/png': true,
-  'image/webp': true,
-  'application/pdf': true,
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': true,
-};
-const MAX_UPLOAD_SIZE = 10 * 1024 * 1024; // 10 MB
-const getCategoria = (mime: string) => (mime.startsWith('image/') ? 'Fotografias' : 'Documentos');
 
 const mapFichaToEvolution = (f: FichaDB): Evolution => ({
   id: f.id,
@@ -156,7 +174,7 @@ const DEMO_EVOLUTION: Evolution = {
   professional: 'Você',
   files: [],
   procedimentosConcluidos: [],
-  procedimentosStatus: { 'Restauração de compósito (dente 46)': 'planejado', 'Profilaxia': 'planejado' },
+  procedimentosStatus: { 'Restauração de compósito (dente 46)': 'nao_iniciado', 'Profilaxia': 'nao_iniciado' },
   procedimentos: ['Restauração de compósito (dente 46)', 'Profilaxia'],
   conduta: 'Substituir a restauração do dente 46 e realizar profilaxia. Reavaliar sensibilidade em 30 dias.',
   retornoSugerido: '30 dias',
@@ -175,7 +193,6 @@ interface FichasTabProps {
 }
 
 export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName, canWrite = true }: FichasTabProps) {
-  const router = useRouter();
   const [evolutions, setEvolutions] = React.useState<Evolution[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSaving, setIsSaving] = React.useState(false);
@@ -189,15 +206,10 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
   const [sharedNotes, setSharedNotes] = React.useState<string[]>(['']);
   const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
   const audioChunksRef = React.useRef<Blob[]>([]);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = React.useState<string | null>(null);
   const [signingFichaId, setSigningFichaId] = React.useState<string | null>(null);
   const [isSavingSignature, setIsSavingSignature] = React.useState(false);
   const signaturePadRef = React.useRef<SignaturePadLib | null>(null);
-  const [uploadedFiles, setUploadedFiles] = React.useState<
-    Array<{ name: string; url: string; docId: string; storagePath: string }>
-  >([]);
-  const [isUploading, setIsUploading] = React.useState(false);
 
   // ── Modo de visualização da ficha ─────────────────────────────────────────
   const [viewingEvo, setViewingEvo] = React.useState<Evolution | null>(null);
@@ -208,64 +220,6 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
     observation: "",
     teethNotes: [] as ToothNote[],
   } as { type: string; observation: string; teethNotes: ToothNote[] });
-
-  // ── Orçamento sugerido pela IA ────────────────────────────────────────────
-  type ItemSugerido = { descricao: string; quantidade: number; preco: number };
-  const [isDexAnalyzing, setIsDexAnalyzing] = React.useState(false);
-  const [orcamentoSugerido, setOrcamentoSugerido] = React.useState<ItemSugerido[] | null>(null);
-  const [criandoOrcamento, setCriandoOrcamento] = React.useState(false);
-  const dexDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Listener DEX com debounce de 2 s — analisa o texto enquanto o dentista digita
-  React.useEffect(() => {
-    // Geração de orçamento por IA não disponível no plano Solo
-    if (!temFeature(plano, 'orcamentoIA')) return;
-
-    const texto = formData.observation.trim();
-
-    // Só analisa novas fichas (não edições) com texto mínimo e painel aberto
-    if (!isPanelOpen || editingId || texto.length < 30) {
-      setIsDexAnalyzing(false);
-      if (dexDebounceRef.current) clearTimeout(dexDebounceRef.current);
-      return;
-    }
-
-    // Mostra indicador após 300 ms de pausa (feedback visual imediato)
-    if (dexDebounceRef.current) clearTimeout(dexDebounceRef.current);
-    setIsDexAnalyzing(true);
-
-    dexDebounceRef.current = setTimeout(async () => {
-      try {
-        const res = await fetch('/api/sugerir-orcamento', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ texto, clinicaId }),
-        });
-        if (!res.ok) return;
-        const data = await res.json() as {
-          itens?: Array<{ descricao: string; quantidade: number; precoSugerido: number | null }>;
-        };
-        if (data.itens && data.itens.length > 0) {
-          setOrcamentoSugerido(
-            data.itens.map((i) => ({
-              descricao: i.descricao,
-              quantidade: i.quantidade,
-              preco: i.precoSugerido ?? 0,
-            })),
-          );
-        }
-      } catch (err) {
-        console.error('[DEX] Erro ao analisar evolução:', err);
-      } finally {
-        setIsDexAnalyzing(false);
-      }
-    }, 2000);
-
-    return () => {
-      if (dexDebounceRef.current) clearTimeout(dexDebounceRef.current);
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.observation, isPanelOpen, editingId]);
 
   // Busca fichas do Supabase
   const fetchFichas = React.useCallback(async () => {
@@ -351,11 +305,11 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
       fd.append("audio", blob, "gravacao.webm");
       const response = await fetch("/api/transcrever", { method: "POST", body: fd });
       if (!response.ok) throw new Error("Falha na transcrição");
-      const data = await response.json() as { texto?: string };
-      if (data.texto) {
+      const data = await response.json() as { transcricao?: string };
+      if (data.transcricao) {
         setFormData((f) => ({
           ...f,
-          observation: f.observation ? `${f.observation}\n${data.texto}` : (data.texto ?? ""),
+          observation: f.observation ? `${f.observation}\n${data.transcricao}` : (data.transcricao ?? ""),
         }));
       }
     } catch (error) {
@@ -447,7 +401,6 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
 
   const handleSave = async () => {
     setIsSaving(true);
-    const isNovaFicha = !editingId;
 
     try {
       const supabase = createClient();
@@ -467,9 +420,6 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
           : {}),
       };
 
-      // Id da ficha salva — vincula o orçamento auto-gerado (abaixo) à ficha de origem.
-      let fichaIdSalva: string | null = editingId ?? null;
-
       if (editingId) {
         const { error } = await supabase
           .from("fichas")
@@ -485,7 +435,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
 
         if (error) throw error;
       } else {
-        const { data: novaFicha, error } = await supabase.from("fichas").insert({
+        const { error } = await supabase.from("fichas").insert({
           paciente_id: patientId,
           dentista_id: dentistaId,
           clinica_id: clinicaId,
@@ -494,73 +444,17 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
           dentes_afetados: dentesAfetados,
           dentes_observacoes: dentesObservacoes,
           status: "aberta",
-        }).select("id").single();
+        });
 
         if (error) throw error;
-        fichaIdSalva = (novaFicha as { id: string } | null)?.id ?? null;
       }
 
       await fetchFichas();
-      if (dexDebounceRef.current) clearTimeout(dexDebounceRef.current);
-      setIsDexAnalyzing(false);
-
-      // Auto-gera orçamento se houver procedimentos sugeridos pelo DEX
-      const itensValidos = (orcamentoSugerido ?? []).filter((i) => i.descricao.trim() && i.preco > 0);
-      if (itensValidos.length > 0) {
-        try {
-          const result = await criarOrcamento({
-            pacienteId: patientId,
-            fichaId:    fichaIdSalva,
-            itens: itensValidos.map((i) => ({
-              procedimentoId: null,
-              descricao: i.descricao,
-              quantidade: i.quantidade,
-              precoUnitario: i.preco,
-            })),
-          });
-          if (!result.error) {
-            setOrcamentoSugerido(null);
-            toast.success('Orçamento gerado automaticamente', {
-              description: 'Revise e confirme na aba Orçamentos para enviar à secretaria.',
-              duration: 5000,
-            });
-          }
-        } catch (err) {
-          console.error('Erro ao gerar orçamento automático:', err);
-        }
-      }
-
       closePanel();
     } catch (err) {
       console.error("Erro ao salvar ficha:", err);
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const handleConfirmarOrcamento = async () => {
-    if (!orcamentoSugerido) return;
-    const itensValidos = orcamentoSugerido.filter((i) => i.descricao.trim() && i.preco > 0);
-    if (itensValidos.length === 0) return;
-    setCriandoOrcamento(true);
-    try {
-      const result = await criarOrcamento({
-        pacienteId: patientId,
-        itens: itensValidos.map((i) => ({
-          procedimentoId: null,
-          descricao: i.descricao,
-          quantidade: i.quantidade,
-          precoUnitario: i.preco,
-        })),
-      });
-      if (!result.error) {
-        setOrcamentoSugerido(null);
-        router.push('/dashboard/orcamentos');
-      }
-    } catch (err) {
-      console.error('Erro ao criar orçamento:', err);
-    } finally {
-      setCriandoOrcamento(false);
     }
   };
 
@@ -620,7 +514,6 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
     setSelectionMode('single');
     setSharedNotes(['']);
     setFormData({ type: "Evolução", observation: "", teethNotes: [] } as { type: string; observation: string; teethNotes: ToothNote[] });
-    setUploadedFiles([]);
   };
 
   const updateProcStatus = async (fichaId: string, currentStatus: Record<string, ProcStatus>, procKey: string, newStatus: ProcStatus) => {
@@ -634,73 +527,6 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
       .eq('id', fichaId)
       .eq('clinica_id', clinicaId);
     if (error) console.error('[proc-status]', error);
-  };
-
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = '';
-
-    if (!ALLOWED_MIME[file.type]) {
-      toast.error('Tipo não permitido. Use JPG, PNG, WEBP, PDF ou DOCX.');
-      return;
-    }
-    if (file.size > MAX_UPLOAD_SIZE) {
-      toast.error('Arquivo muito grande. Máximo 10 MB.');
-      return;
-    }
-
-    setIsUploading(true);
-    try {
-      const supabase = createClient();
-      const storagePath = `${clinicaId}/${patientId}/${Date.now()}_${file.name}`;
-
-      const { error: storageErr } = await supabase.storage
-        .from('fichas')
-        .upload(storagePath, file, { upsert: false });
-      if (storageErr) throw storageErr;
-
-      const { data: signedData } = await supabase.storage
-        .from('fichas')
-        .createSignedUrl(storagePath, 3600);
-      const displayUrl = signedData?.signedUrl ?? '';
-
-      const { data: doc, error: dbErr } = await supabase
-        .from('paciente_documentos')
-        .insert({
-          paciente_id: patientId,
-          clinica_id: clinicaId,
-          nome: file.name,
-          url: storagePath,
-          categoria: getCategoria(file.type),
-        })
-        .select('id')
-        .single();
-      if (dbErr) throw dbErr;
-
-      setUploadedFiles((prev) => [
-        ...prev,
-        { name: file.name, url: displayUrl, docId: doc.id as string, storagePath },
-      ]);
-    } catch (err) {
-      console.error('Erro no upload:', err);
-      toast.error('Erro ao fazer upload. Tente novamente.');
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handleRemoveFile = async (docId: string, storagePath: string) => {
-    try {
-      const supabase = createClient();
-      await Promise.all([
-        supabase.from('paciente_documentos').delete().eq('id', docId),
-        supabase.storage.from('fichas').remove([storagePath]),
-      ]);
-      setUploadedFiles((prev) => prev.filter((f) => f.docId !== docId));
-    } catch (err) {
-      console.error('Erro ao remover arquivo:', err);
-    }
   };
 
   const handleEdit = (evolution: Evolution) => {
@@ -860,21 +686,6 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
                     placeholder="Descreva os procedimentos realizados, queixas do paciente, etc..."
                     className="w-full bg-surface-alt border border-border rounded-xl px-4 py-3 text-sm font-medium text-text-primary outline-none focus:border-teal transition-colors min-h-[120px] resize-y"
                   />
-                  {/* Indicador do DEX escutando */}
-                  <AnimatePresence>
-                    {isDexAnalyzing && !editingId && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -4 }}
-                        className="flex items-center gap-1.5 text-[11px] mt-1"
-                        style={{ color: 'rgba(47,156,133,0.7)' }}
-                      >
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        DEX analisando procedimentos...
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
                 </div>
 
                 {/* Seção de procedimentos — sempre visível, sem layout shift */}
@@ -1000,54 +811,6 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
                   )}
                 </div>
 
-                <div>
-                  <label className="block text-[11px] font-semibold text-text-secondary mb-2">
-                    Anexos
-                  </label>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".jpg,.jpeg,.png,.webp,.pdf,.docx"
-                    className="hidden"
-                    onChange={(e) => void handleFileSelect(e)}
-                  />
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploading}
-                    className="w-full border-2 border-dashed border-border hover:border-teal bg-surface-alt rounded-xl py-6 flex flex-col items-center justify-center gap-2 text-text-secondary hover:text-teal transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isUploading ? (
-                      <Loader2 className="w-6 h-6 animate-spin" />
-                    ) : (
-                      <Upload className="w-6 h-6" />
-                    )}
-                    <span className="text-sm font-medium">
-                      {isUploading ? 'Enviando...' : 'Clique para fazer upload de imagens ou raio-x'}
-                    </span>
-                  </button>
-                  {uploadedFiles.length > 0 && (
-                    <div className="mt-3 space-y-2">
-                      {uploadedFiles.map((f) => (
-                        <div
-                          key={f.docId}
-                          className="flex items-center justify-between px-3 py-2 bg-surface-alt rounded-xl border border-border/40"
-                        >
-                          <div className="flex items-center gap-2 text-xs font-medium text-text-primary min-w-0">
-                            <FileText className="w-3.5 h-3.5 text-teal shrink-0" />
-                            <span className="truncate">{f.name}</span>
-                          </div>
-                          <button
-                            onClick={() => void handleRemoveFile(f.docId, f.storagePath)}
-                            className="p-1 text-text-secondary hover:text-red-500 transition-colors shrink-0 ml-2"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
                 <div className="flex items-center justify-end gap-3 pt-4 border-t border-border/60">
                   <button
                     onClick={closePanel}
@@ -1159,8 +922,36 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
                           </span>
                         </button>
                       ))}
+
+                      {/* Quadrante (#16 D5) — raspagem/alisamento por quadrante, seleção manual v1 */}
+                      <div className="flex items-center gap-2 pt-1">
+                        <div className="flex-1 h-px bg-border/60" />
+                        <span className="text-[10px] font-bold text-text-secondary uppercase tracking-widest shrink-0">Ou por quadrante</span>
+                        <div className="flex-1 h-px bg-border/60" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { id: QUAD_SUP_DIREITO, label: 'Sup. Direito' },
+                          { id: QUAD_SUP_ESQUERDO, label: 'Sup. Esquerdo' },
+                          { id: QUAD_INF_DIREITO, label: 'Inf. Direito' },
+                          { id: QUAD_INF_ESQUERDO, label: 'Inf. Esquerdo' },
+                        ].map(({ id, label }) => (
+                          <button
+                            key={id}
+                            onClick={() => toggleArch(id)}
+                            className={`px-3 py-2 rounded-lg text-xs font-semibold border-2 transition-all ${
+                              selectedTeeth.includes(id)
+                                ? 'bg-teal border-teal text-white'
+                                : 'bg-surface-alt border-border text-text-primary hover:border-teal hover:text-teal'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+
                       <p className="text-center text-xs text-text-secondary font-medium mt-1">
-                        Procedimentos em toda a arcada ou boca.
+                        Procedimentos em toda a arcada, quadrante ou boca.
                       </p>
                     </motion.div>
                   )}
@@ -1170,9 +961,6 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Episódio de tratamento removido na Fase 3 (1 ficha = 1 tratamento).
-          Estado/handlers/modais órfãos do subsistema serão limpos no passo 1b. */}
 
       {/* Timeline */}
       {evolutions.length === 0 && !isPanelOpen && (
@@ -1197,7 +985,6 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
               const doneProcs = validKeys.filter((k) => evo.procedimentosStatus[k] === 'concluido').length;
               const allDone = totalProcs > 0 && doneProcs === totalProcs;
               const pct = totalProcs > 0 ? Math.round((doneProcs / totalProcs) * 100) : 0;
-              const affectedTeeth = new Set(evo.teethNotes.filter((tn) => tn.tooth < 90).map((tn) => tn.tooth));
               const filteredTeethNotes = isExpanded && filterTooth
                 ? evo.teethNotes.filter((tn) => tn.tooth === filterTooth)
                 : evo.teethNotes;
@@ -1423,11 +1210,17 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
                                 Clique em um dente para filtrar os procedimentos
                               </p>
                               <Odontograma
+                                colorMode="status"
+                                statusTeeth={computeToothStatusMap(evo)}
                                 selectedTeeth={filterTooth ? [filterTooth] : []}
-                                historicalTeeth={affectedTeeth}
                                 onToothToggle={(tooth) => setFilterTooth((prev) => prev === tooth ? null : tooth)}
                                 hideFilters
                               />
+                              <div className="flex items-center justify-center gap-4 mt-3 text-[10px] font-semibold text-text-secondary">
+                                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-surface-alt border border-border" /> A fazer</span>
+                                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ background: 'var(--color-warning)' }} /> Em andamento</span>
+                                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-teal" /> Concluído</span>
+                              </div>
                               {filterTooth && (
                                 <button
                                   onClick={() => setFilterTooth(null)}
@@ -1486,21 +1279,18 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
                                       <div className="space-y-2">
                                         {tn.notes.filter(Boolean).map((note, i) => {
                                           const procKey = `${tn.tooth}_${i}`;
-                                          const done = (evo.procedimentosStatus[procKey] ?? 'planejado') === 'concluido';
+                                          const status = evo.procedimentosStatus[procKey] ?? 'nao_iniciado';
+                                          const meta = STATUS_META[status] ?? STATUS_META.nao_iniciado;
                                           return (
                                             <div key={i} className="flex items-center gap-2">
                                               <button
-                                                onClick={() => void updateProcStatus(evo.id, evo.procedimentosStatus, procKey, done ? 'planejado' : 'concluido')}
-                                                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold flex-shrink-0 transition-all border ${
-                                                  done
-                                                    ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20'
-                                                    : 'bg-surface border-border text-text-secondary hover:border-teal hover:text-teal'
-                                                }`}
+                                                onClick={() => void updateProcStatus(evo.id, evo.procedimentosStatus, procKey, STATUS_CYCLE[status])}
+                                                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold flex-shrink-0 transition-all border ${meta.className}`}
                                               >
-                                                {done ? <Check className="w-3 h-3" /> : <Circle className="w-3 h-3" />}
-                                                {done ? 'Concluído' : 'Planejado'}
+                                                <meta.icon className="w-3 h-3" />
+                                                {meta.label}
                                               </button>
-                                              <span className={`text-xs leading-tight ${done ? 'line-through text-text-secondary' : 'text-text-primary'}`}>{note}</span>
+                                              <span className={`text-xs leading-tight ${status === 'concluido' ? 'line-through text-text-secondary' : 'text-text-primary'}`}>{note}</span>
                                             </div>
                                           );
                                         })}
@@ -1524,123 +1314,6 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
         )}
 
       </div>
-
-      {/* Modal: Orçamento sugerido pela IA */}
-      <Dialog
-        open={isDexAnalyzing || !!orcamentoSugerido}
-        onOpenChange={(open) => {
-          if (!open) {
-            setOrcamentoSugerido(null);
-            setIsDexAnalyzing(false);
-          }
-        }}
-      >
-        <DialogContent className="max-w-lg rounded-2xl bg-surface border-border max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="font-heading text-xl text-text-primary flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-teal" />
-              Orçamento sugerido pela IA
-            </DialogTitle>
-            <DialogDescription className="text-text-secondary text-sm">
-              Com base na evolução registrada, identifiquei os seguintes procedimentos.
-              Ajuste os valores e confirme para criar o rascunho de orçamento.
-            </DialogDescription>
-          </DialogHeader>
-
-          {isDexAnalyzing ? (
-            <div className="py-10 flex flex-col items-center gap-3 text-text-secondary">
-              <Loader2 className="w-7 h-7 animate-spin text-teal" />
-              <p className="text-sm font-medium">Analisando procedimentos...</p>
-            </div>
-          ) : orcamentoSugerido && (
-            <div className="space-y-3 my-2">
-              {orcamentoSugerido.map((item, idx) => (
-                <div key={idx} className="bg-surface-alt rounded-xl border border-border/60 p-3 space-y-2">
-                  <input
-                    type="text"
-                    value={item.descricao}
-                    onChange={(e) =>
-                      setOrcamentoSugerido((prev) =>
-                        prev?.map((it, i) => i === idx ? { ...it, descricao: e.target.value } : it) ?? null
-                      )
-                    }
-                    className="w-full bg-surface-alt border border-border rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-teal transition-colors"
-                  />
-                  <div className="flex gap-2">
-                    <div className="space-y-0.5">
-                      <label className="text-xs text-text-secondary font-bold uppercase tracking-wider">
-                        Qtd
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={item.quantidade}
-                        onChange={(e) =>
-                          setOrcamentoSugerido((prev) =>
-                            prev?.map((it, i) =>
-                              i === idx ? { ...it, quantidade: parseInt(e.target.value) || 1 } : it
-                            ) ?? null
-                          )
-                        }
-                        className="w-16 bg-surface-alt border border-border rounded-lg px-2 py-2 text-sm font-mono text-text-primary outline-none focus:border-teal"
-                      />
-                    </div>
-                    <div className="space-y-0.5 flex-1">
-                      <label className="text-xs text-text-secondary font-bold uppercase tracking-wider">
-                        Valor (R$)
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={item.preco}
-                        onChange={(e) =>
-                          setOrcamentoSugerido((prev) =>
-                            prev?.map((it, i) =>
-                              i === idx ? { ...it, preco: parseFloat(e.target.value) || 0 } : it
-                            ) ?? null
-                          )
-                        }
-                        className="w-full bg-surface-alt border border-border rounded-lg px-3 py-2 text-sm font-mono text-text-primary outline-none focus:border-teal"
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-              <div className="bg-teal/10 rounded-xl p-3 flex justify-between items-center border border-teal/20">
-                <span className="text-sm font-bold text-text-primary">Total estimado</span>
-                <span className="font-mono font-bold text-teal">
-                  {orcamentoSugerido
-                    .reduce((s, i) => s + i.quantidade * i.preco, 0)
-                    .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                </span>
-              </div>
-            </div>
-          )}
-
-          <DialogFooter className="gap-2 pt-2">
-            <Button
-              variant="outline"
-              onClick={() => setOrcamentoSugerido(null)}
-              disabled={criandoOrcamento || isDexAnalyzing}
-              className="rounded-xl border-border text-text-primary hover:bg-surface-alt"
-            >
-              Ignorar
-            </Button>
-            <Button
-              onClick={() => void handleConfirmarOrcamento()}
-              disabled={criandoOrcamento || !orcamentoSugerido}
-              className="bg-teal text-white hover:bg-teal-lt rounded-xl"
-            >
-              {criandoOrcamento ? (
-                <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Criando...</>
-              ) : (
-                'Criar Orçamento'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Dialog: Assinatura do Paciente */}
       <Dialog open={!!signingFichaId} onOpenChange={(open) => { if (!open) setSigningFichaId(null); }}>

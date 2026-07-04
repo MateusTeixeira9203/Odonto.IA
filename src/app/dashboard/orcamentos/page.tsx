@@ -105,12 +105,13 @@ export default async function OrcamentosPage() {
 
   return (
     <PageTransition>
-      <OrcamentosClient 
-        orcamentos={orcamentos} 
-        clinicaId={dentista.clinica_id} 
-        role={dentista.role} 
-        temSecretaria={temSecretaria} 
-        canEdit={canEdit} 
+      <OrcamentosClient
+        orcamentos={orcamentos}
+        clinicaId={dentista.clinica_id}
+        dentistaId={dentista.id}
+        role={dentista.role}
+        temSecretaria={temSecretaria}
+        canEdit={canEdit}
         dentistas={dentistasClinica}
       />
     </PageTransition>

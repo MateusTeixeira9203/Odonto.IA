@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import {
   Edit2, Trash2, CircleDollarSign, Plus, CheckCircle2,
   XCircle, Loader2, CreditCard, Clock, Banknote, Smartphone,
-  Receipt, ArrowUpRight, User, Send, BadgeCheck,
+  Receipt, ArrowUpRight, User, Send,
 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogTitle, DialogDescription,
@@ -21,6 +21,7 @@ import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { StatusOrcamento, FormaPagamento } from '@/app/dashboard/orcamentos/actions';
 import { STATUS_ORCAMENTO } from '@/lib/constants/orcamento-status';
+import { parseValorBR, formatValorBR } from '@/lib/valor-br';
 import type { OrcamentoComItens, OrcEditItem } from '../types';
 
 // ─── status options ───────────────────────────────────────────────────────────
@@ -54,13 +55,6 @@ const STATUS_OPTIONS: StatusOption[] = [
     icon: XCircle,
     active: 'bg-red-500/10 border-red-400/40 text-red-500',
     inactive: 'border-border text-text-secondary hover:border-red-400/30 hover:text-red-500',
-  },
-  {
-    value: 'pago',
-    label: 'Pago',
-    icon: BadgeCheck,
-    active: 'bg-emerald-500/10 border-emerald-500/40 text-emerald-600 dark:text-emerald-400',
-    inactive: 'border-border text-text-secondary hover:border-emerald-400/30 hover:text-emerald-600',
   },
 ];
 
@@ -375,8 +369,13 @@ export function DetalheOrcamentoModal({
                             <div className="space-y-1 flex-1">
                               <label className="text-xs text-text-secondary">Preço unitário (R$)</label>
                               <Input
-                                type="number" min="0" step="0.01" value={item.preco_unitario}
-                                onChange={e => setOrcEditItens(prev => prev.map((it, i) => i === idx ? { ...it, preco_unitario: parseFloat(e.target.value) || 0 } : it))}
+                                type="text" inputMode="decimal" placeholder="0,00"
+                                value={item.preco_unitario}
+                                onChange={e => setOrcEditItens(prev => prev.map((it, i) => i === idx ? { ...it, preco_unitario: e.target.value } : it))}
+                                onBlur={e => {
+                                  const parsed = parseValorBR(e.target.value);
+                                  setOrcEditItens(prev => prev.map((it, i) => i === idx ? { ...it, preco_unitario: parsed > 0 ? formatValorBR(parsed) : it.preco_unitario } : it));
+                                }}
                                 className="rounded-xl bg-surface border-border text-text-primary text-sm font-mono"
                               />
                             </div>
@@ -384,7 +383,7 @@ export function DetalheOrcamentoModal({
                         </div>
                       ))}
                       <button
-                        onClick={() => setOrcEditItens(prev => [...prev, { descricao: '', quantidade: 1, preco_unitario: 0 }])}
+                        onClick={() => setOrcEditItens(prev => [...prev, { descricao: '', quantidade: 1, preco_unitario: '' }])}
                         className="w-full py-3 border border-dashed border-border rounded-xl text-sm text-text-secondary hover:bg-surface-alt hover:text-text-primary transition-colors flex items-center justify-center gap-2"
                       >
                         <Plus className="w-4 h-4" /> Adicionar procedimento
@@ -521,7 +520,7 @@ export function DetalheOrcamentoModal({
                     </p>
                     <p className="font-mono text-3xl font-bold text-teal leading-none">
                       R$ {fmt(orcEditMode
-                        ? orcEditItens.reduce((s, i) => s + i.quantidade * i.preco_unitario, 0)
+                        ? orcEditItens.reduce((s, i) => s + i.quantidade * parseValorBR(i.preco_unitario), 0)
                         : detalheOrc.total ?? 0
                       )}
                     </p>
@@ -558,9 +557,13 @@ export function DetalheOrcamentoModal({
                         <div className="space-y-1.5">
                           <Label className="text-xs text-text-secondary">Valor (R$)</Label>
                           <Input
-                            type="number" placeholder="0,00" min="0" step="0.01"
+                            type="text" inputMode="decimal" placeholder="0,00"
                             value={pagForm.valor}
                             onChange={e => setPagForm(f => ({ ...f, valor: e.target.value }))}
+                            onBlur={e => {
+                              const parsed = parseValorBR(e.target.value);
+                              setPagForm(f => ({ ...f, valor: parsed > 0 ? formatValorBR(parsed) : f.valor }));
+                            }}
                             className="rounded-xl bg-surface-alt border-border text-text-primary font-mono"
                           />
                         </div>

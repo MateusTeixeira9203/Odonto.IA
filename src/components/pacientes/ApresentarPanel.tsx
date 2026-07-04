@@ -45,7 +45,7 @@ interface PlanProc {
   id: string;
   descricao: string;
   dente: number | null;
-  status: 'pendente' | 'agendado' | 'concluido';
+  status: 'nao_iniciado' | 'em_andamento' | 'concluido';
   fichaRef: string | null;
   ordem: number;
 }
@@ -510,8 +510,10 @@ export function ApresentarPanel({
                         animate={{ x: 0, opacity: 1 }}
                         exit={{ x: slideDirection * -60, opacity: 0 }}
                         transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
-                        className="absolute inset-0 flex flex-col items-center justify-center px-8 sm:px-16 py-10"
+                        className="absolute inset-0 overflow-y-auto"
+                        style={{ overscrollBehavior: 'contain' }}
                       >
+                      <div className="min-h-full flex flex-col items-center justify-center px-8 sm:px-16 py-10">
                         {currentSlide === 0 ? (
                           /* Slide 0: Progresso */
                           <div className="w-full max-w-lg flex flex-col items-center text-center">
@@ -622,6 +624,7 @@ export function ApresentarPanel({
                             )}
                           </div>
                         )}
+                      </div>
                       </motion.div>
                     </AnimatePresence>
                   )}

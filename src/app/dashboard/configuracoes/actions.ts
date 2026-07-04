@@ -188,11 +188,21 @@ export interface NovoProcedimentoData {
 export async function criarProcedimento(
   data: NovoProcedimentoData
 ): Promise<{ error?: string }> {
-  const { supabase, clinicId } = await requirePermission('configuracoes');
+  const { supabase, user, clinicId } = await requirePermission('configuracoes');
+
+  // Catálogo é privado por dentista (migration 084) — cadastra pro admin que está criando.
+  const { data: dentistaPerfil } = await supabase
+    .from("dentistas")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("clinica_id", clinicId)
+    .maybeSingle();
+
+  if (!dentistaPerfil) return { error: "Perfil de dentista não encontrado." };
 
   const { error } = await supabase
     .from("procedimentos")
-    .insert({ ...data, clinica_id: clinicId, ativo: true });
+    .insert({ ...data, clinica_id: clinicId, dentista_id: dentistaPerfil.id, ativo: true });
 
   if (error) {
     console.error("Erro ao criar procedimento:", error);

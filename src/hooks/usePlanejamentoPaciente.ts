@@ -27,7 +27,7 @@ export interface PlanProc {
   id: string;
   descricao: string;
   dente: number | null;
-  status: 'pendente' | 'agendado' | 'concluido';
+  status: 'nao_iniciado' | 'em_andamento' | 'concluido';
   fichaRef: string | null;
   ordem: number;
 }
@@ -42,17 +42,6 @@ export interface PlanBudgetProcedure {
 
 const isUUID = (str: string): boolean =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
-
-function mapPlanProc(row: Record<string, unknown>): PlanProc {
-  return {
-    id: row.id as string,
-    descricao: row.descricao as string,
-    dente: row.dente as number | null,
-    status: (row.status as PlanProc['status']) ?? 'pendente',
-    fichaRef: row.ficha_ref as string | null,
-    ordem: row.ordem as number,
-  };
-}
 
 function dedupProcs(procs: PlanProc[]): PlanProc[] {
   const seen = new Set<string>();
@@ -100,8 +89,8 @@ const DEMO_MOCK_BUDGET: PlanBudgetProcedure[] = [
 
 // Procedimentos do plano — alimenta o contador da capa ("2 procedimentos") na apresentação demo.
 const DEMO_MOCK_PROCS: PlanProc[] = [
-  { id: 'demo-p1', descricao: 'Restauração de compósito (dente 46)', dente: 46, status: 'pendente', fichaRef: 'demo-ficha', ordem: 0 },
-  { id: 'demo-p2', descricao: 'Profilaxia', dente: null, status: 'pendente', fichaRef: 'demo-ficha', ordem: 1 },
+  { id: 'demo-p1', descricao: 'Restauração de compósito (dente 46)', dente: 46, status: 'nao_iniciado', fichaRef: 'demo-ficha', ordem: 0 },
+  { id: 'demo-p2', descricao: 'Profilaxia', dente: null, status: 'nao_iniciado', fichaRef: 'demo-ficha', ordem: 1 },
 ];
 
 /**
@@ -169,55 +158,50 @@ export function usePlanejamentoPaciente(patientId: string, clinicaId: string, pa
   }, [patientId, fichaId]);
 
   // ── Fetch: procedimentos derivados de TODAS as fichas do paciente ──
+  // #16 D4: fonte única — deriva direto de fichas.dentes_observacoes + procedimentos_status,
+  // sem tabela intermediária (planejamento_procedimentos deixou de ser escrita).
   const fetchPlanProcs = useCallback(async () => {
     const supabase = createClient();
-    type FichaRow = { id: string; created_at: string; dentes_observacoes: Record<string, string> | null };
-    const [fichasResult, existingProcsResult] = await Promise.all([
-      supabase.from('fichas').select('id, created_at, dentes_observacoes').eq('paciente_id', patientId).not('dentes_observacoes', 'is', null),
-      supabase.from('planejamento_procedimentos').select('*').eq('paciente_id', patientId).order('ordem', { ascending: true }),
-    ]);
-    const allFichas = (fichasResult.data ?? []) as FichaRow[];
-    const fichas = allFichas.filter((f) => f.dentes_observacoes && Object.keys(f.dentes_observacoes).length > 0);
-    const fichaIds = new Set(fichas.map((f) => f.id));
+    type FichaRow = {
+      id: string;
+      dentes_observacoes: Record<string, string> | null;
+      procedimentos_status: Record<string, PlanProc['status']> | null;
+    };
+    const { data } = await supabase
+      .from('fichas')
+      .select('id, dentes_observacoes, procedimentos_status')
+      .eq('paciente_id', patientId)
+      .not('dentes_observacoes', 'is', null);
 
-    const rawProcs: { fichaRef: string; descricao: string; dente: number }[] = [];
+    const fichas = ((data ?? []) as FichaRow[]).filter(
+      (f) => f.dentes_observacoes && Object.keys(f.dentes_observacoes).length > 0
+    );
+
+    const rawProcs: PlanProc[] = [];
+    let ordem = 0;
     for (const ficha of fichas) {
       const obs = ficha.dentes_observacoes ?? {};
+      const statusMap = ficha.procedimentos_status ?? {};
       for (const [dente, desc] of Object.entries(obs)) {
         if (typeof desc === 'string' && desc.trim()) {
           desc.split('\n').filter(Boolean).forEach((line, idx) => {
-            rawProcs.push({ fichaRef: `${ficha.id}::${dente}::${idx}`, descricao: line.trim(), dente: parseInt(dente, 10) });
+            const key = `${dente}_${idx}`;
+            rawProcs.push({
+              id: `${ficha.id}::${key}`,
+              descricao: line.trim(),
+              dente: parseInt(dente, 10),
+              status: statusMap[key] ?? 'nao_iniciado',
+              fichaRef: `${ficha.id}::${key}`,
+              ordem: ordem++,
+            });
           });
         }
       }
     }
 
-    // Limpa procedimentos órfãos (ficha apagada)
-    const orphanIds = (existingProcsResult.data ?? [])
-      .filter((p: Record<string, unknown>) => {
-        const fichaId = (p.ficha_ref as string | null)?.split('::')?.[0];
-        return fichaId !== undefined && !fichaIds.has(fichaId);
-      })
-      .map((p: Record<string, unknown>) => p.id as string);
-    if (orphanIds.length > 0) {
-      void supabase.from('planejamento_procedimentos').delete().in('id', orphanIds);
-    }
-
-    const existingRefs = new Set((existingProcsResult.data ?? []).map((p: Record<string, unknown>) => p.ficha_ref as string));
-    const toInsert = rawProcs.filter((p) => !existingRefs.has(p.fichaRef));
-    if (toInsert.length > 0) {
-      const startOrdem = (existingProcsResult.data ?? []).length;
-      await supabase.from('planejamento_procedimentos').insert(toInsert.map((p, i) => ({
-        clinica_id: clinicaId, paciente_id: patientId, descricao: p.descricao, dente: p.dente, status: 'pendente', ficha_ref: p.fichaRef, ordem: startOrdem + i,
-      })));
-      const { data: refreshed } = await supabase.from('planejamento_procedimentos').select('*').eq('paciente_id', patientId).order('ordem', { ascending: true });
-      const all = dedupProcs((refreshed ?? []).map((r) => mapPlanProc(r as Record<string, unknown>)));
-      setPlanProcs(fichaId ? all.filter((p) => p.fichaRef?.startsWith(fichaId)) : all);
-    } else {
-      const all = dedupProcs((existingProcsResult.data ?? []).map((r) => mapPlanProc(r as Record<string, unknown>)));
-      setPlanProcs(fichaId ? all.filter((p) => p.fichaRef?.startsWith(fichaId)) : all);
-    }
-  }, [patientId, clinicaId, fichaId]);
+    const all = dedupProcs(rawProcs);
+    setPlanProcs(fichaId ? all.filter((p) => p.fichaRef?.startsWith(fichaId)) : all);
+  }, [patientId, fichaId]);
 
   useEffect(() => {
     if (!patientId || !enabled) return;

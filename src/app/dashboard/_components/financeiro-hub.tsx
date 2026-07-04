@@ -3,8 +3,14 @@
 import { useState, useEffect } from 'react';
 import { Eye, EyeOff, TrendingUp, TrendingDown, CircleDollarSign, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
-import { Ganhos7DiasChart } from './ganhos-7dias-chart';
+import dynamic from 'next/dynamic';
 import type { DayPoint } from '../financeiro/actions';
+
+// #9 — recharts lazy: só baixa o bundle do gráfico quando o hub do dashboard renderiza.
+const Ganhos7DiasChart = dynamic(
+  () => import('./ganhos-7dias-chart').then(m => m.Ganhos7DiasChart),
+  { ssr: false, loading: () => <div className="h-40 rounded-2xl bg-surface-alt animate-pulse" /> },
+);
 
 type SaldoMes = { receita: number; despesas: number; saldo: number };
 

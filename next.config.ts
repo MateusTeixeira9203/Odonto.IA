@@ -5,6 +5,10 @@ const nextConfig: NextConfig = {
   // Desabilitar a checagem redundante do next build evita OOM em máquinas com menos RAM.
   typescript: { ignoreBuildErrors: true },
   turbopack: {},
+  experimental: {
+    // #9 — tree-shaking agressivo pra bundle das libs mais pesadas do app.
+    optimizePackageImports: ['lucide-react', 'motion', 'date-fns', 'recharts'],
+  },
   images: {
     remotePatterns: [
       {

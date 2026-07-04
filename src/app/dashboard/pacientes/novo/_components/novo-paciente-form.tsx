@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
 import { createPaciente } from '../actions';
 import { AppInput } from '@/components/ui/app-input';
@@ -164,6 +165,7 @@ export default function NovoPacienteForm({ isSecretaria, dentistas, clinicaId }:
         responsavel_parentesco: eMenor ? (form.responsavel_parentesco || null) : null,
       });
       if (result.success) {
+        toast.success('Paciente cadastrado com sucesso!');
         router.push('/dashboard/pacientes');
       } else {
         setError(result.error ?? 'Erro ao cadastrar paciente.');
@@ -431,8 +433,8 @@ export default function NovoPacienteForm({ isSecretaria, dentistas, clinicaId }:
           </motion.div>
         </div>
 
-        {/* Sticky actions bar */}
-        <div className="sticky bottom-0 z-10 bg-surface border-t border-border py-4 flex items-center justify-between gap-3">
+        {/* Sticky actions bar — rodapé ancorado (full-bleed no container, elevação + blur) */}
+        <div className="sticky bottom-0 z-10 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-3 border-t border-border bg-surface/85 backdrop-blur-md shadow-[0_-6px_20px_-8px_rgba(0,0,0,0.15)]">
           <button
             type="button"
             onClick={() => router.push('/dashboard/pacientes')}

@@ -23,6 +23,7 @@ import {
   Loader2,
   Copy,
   Check,
+  AlertTriangle,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 const QRCode = dynamic(() => import('react-qr-code'), { ssr: false });
@@ -52,6 +53,7 @@ import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { createClient } from '@/lib/supabase/client';
+import { parseValorBR, formatValorBR } from '@/lib/valor-br';
 import type { OrcamentoRow, OrcamentoItemRow, PagamentoRow } from '../page';
 import { BotaoDownloadPDF } from '@/components/orcamentos/botao-download-pdf';
 import { BotaoEnviarWhatsApp } from '@/components/orcamentos/botao-enviar-whatsapp';
@@ -63,9 +65,11 @@ import {
   criarOrcamento,
   editarOrcamento,
   excluirOrcamento,
+  criarProcedimentoRapido,
   type FormaPagamento,
   type StatusOrcamento,
 } from '../actions';
+import { stripDenteDoNome } from '@/lib/arcadas';
 
 // Mapeamento de status para exibição
 const STATUS_MAP: Record<
@@ -80,13 +84,6 @@ const STATUS_MAP: Record<
 
 const formatCurrency = (value: number | null) =>
   (value ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
-// Helpers para input de valor estilo calculadora (dígitos → centavos)
-// "32555" → 325.55 → exibe "325,55"
-const centsToFloat  = (digits: string): number => parseInt(digits || '0', 10) / 100;
-const floatToCents  = (value: number): string  => String(Math.round(value * 100));
-const formatCents   = (digits: string): string  =>
-  centsToFloat(digits).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 interface ProcedimentoClinica {
   id: string;
@@ -115,6 +112,7 @@ interface NovoOrcItem {
 export function OrcamentosClient({
   orcamentos: inicial,
   clinicaId,
+  dentistaId,
   role,
   temSecretaria = false,
   canEdit = false,
@@ -122,6 +120,7 @@ export function OrcamentosClient({
 }: {
   orcamentos: OrcamentoRow[];
   clinicaId: string;
+  dentistaId: string;
   role: DentistaRole;
   temSecretaria?: boolean;
   canEdit?: boolean;
@@ -141,6 +140,7 @@ export function OrcamentosClient({
   const [novoOrcItens, setNovoOrcItens] = useState<NovoOrcItem[]>([
     { procedimentoId: '', descricao: '', quantidade: 1, preco: '' },
   ]);
+  const [registeringProcIdx, setRegisteringProcIdx] = useState<number | null>(null);
   const [novoOrcDesconto, setNovoOrcDesconto] = useState(0);
   const [novoOrcPacienteSearch, setNovoOrcPacienteSearch] = useState('');
   const [novoOrcPacienteId, setNovoOrcPacienteId] = useState('');
@@ -199,19 +199,23 @@ export function OrcamentosClient({
     buscarAbortRef.current?.abort();
   }, []);
 
-  // Busca procedimentos da clínica ao montar
+  // Busca o catálogo do dentista relevante — o próprio (dentista logado) ou o selecionado
+  // no dropdown (secretária criando em nome de outro). Catálogo é privado por dentista.
+  const catalogoDentistaId = isSecretaria ? novoOrcDentistaId : dentistaId;
   useEffect(() => {
+    if (!catalogoDentistaId) { setProcedimentosClinica([]); return; }
     const supabase = createClient();
     supabase
       .from('procedimentos')
       .select('id, nome, preco_padrao')
       .eq('clinica_id', clinicaId)
+      .eq('dentista_id', catalogoDentistaId)
       .eq('ativo', true)
       .order('nome')
       .then(({ data }) => {
         setProcedimentosClinica(data ?? []);
       });
-  }, [clinicaId]);
+  }, [clinicaId, catalogoDentistaId]);
 
   // Autocomplete de pacientes — debounced 300ms + AbortController
   const buscarPacientes = useCallback((nome: string) => {
@@ -299,7 +303,7 @@ export function OrcamentosClient({
   }, [selectedFichaKeys]);
 
   const novoOrcSubtotal = useMemo(
-    () => novoOrcItens.reduce((s, i) => s + i.quantidade * centsToFloat(i.preco), 0),
+    () => novoOrcItens.reduce((s, i) => s + i.quantidade * parseValorBR(i.preco), 0),
     [novoOrcItens]
   );
   const novoOrcTotal = useMemo(
@@ -415,18 +419,27 @@ export function OrcamentosClient({
   // Atualiza status via server action
   const handleStatusChange = useCallback(async (id: string, status: StatusOrcamento) => {
     setIsSaving(true);
-    const result = await atualizarStatusOrcamento(id, status);
-    if (!result.error) {
-      setOrcamentos((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
-      setSelected((prev) => (prev?.id === id ? { ...prev, status } : prev));
+    try {
+      const result = await atualizarStatusOrcamento(id, status);
+      if (!result.error) {
+        setOrcamentos((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
+        setSelected((prev) => (prev?.id === id ? { ...prev, status } : prev));
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    } catch (err) {
+      console.error('[orcamentos] handleStatusChange:', err);
+      toast.error('Não foi possível atualizar o status. Tente novamente.');
+    } finally {
+      setIsSaving(false);
     }
-    setIsSaving(false);
-  }, []);
+  }, [router]);
 
   // Registra pagamento no orçamento selecionado
   const handleRegistrarPagamento = async () => {
     if (!selected) return;
-    const valor = parseFloat(pagForm.valor.replace(',', '.'));
+    const valor = parseValorBR(pagForm.valor);
     if (!valor || valor <= 0) {
       setPagError('Informe um valor válido.');
       return;
@@ -485,13 +498,37 @@ export function OrcamentosClient({
     setPagSaving(false);
   };
 
+  // Cadastra no catálogo um procedimento digitado que não bateu com nenhum item existente —
+  // usa o nome (sem a referência de dente) e o valor já preenchidos no item, e vincula o item
+  // ao procedimento recém-criado.
+  const handleCadastrarProcedimento = async (idx: number) => {
+    const item = novoOrcItens[idx];
+    const nome = stripDenteDoNome(item.descricao);
+    if (!nome) return;
+    setRegisteringProcIdx(idx);
+    const precoNum = parseValorBR(item.preco);
+    const result = await criarProcedimentoRapido({ nome, precoPadrao: precoNum > 0 ? precoNum : null });
+    if (result.error || !result.id) {
+      toast.error(result.error ?? 'Não foi possível cadastrar o procedimento.');
+    } else {
+      const novoId = result.id;
+      setProcedimentosClinica(prev =>
+        [...prev, { id: novoId, nome, preco_padrao: precoNum > 0 ? precoNum : null }]
+          .sort((a, b) => a.nome.localeCompare(b.nome))
+      );
+      setNovoOrcItens(prev => prev.map((it, i) => (i === idx ? { ...it, procedimentoId: novoId } : it)));
+      toast.success('Procedimento cadastrado no catálogo.');
+    }
+    setRegisteringProcIdx(null);
+  };
+
   // Cria novo orçamento
   const handleCriarOrcamento = async () => {
     if (!novoOrcPacienteId) {
       setOrcError('Selecione um paciente.');
       return;
     }
-    const itensValidos = novoOrcItens.filter((i) => i.descricao.trim() && centsToFloat(i.preco) > 0);
+    const itensValidos = novoOrcItens.filter((i) => i.descricao.trim() && parseValorBR(i.preco) > 0);
     if (itensValidos.length === 0) {
       setOrcError('Adicione ao menos um procedimento com descrição e valor.');
       return;
@@ -507,7 +544,7 @@ export function OrcamentosClient({
         procedimentoId: i.procedimentoId || null,
         descricao: i.descricao,
         quantidade: i.quantidade,
-        precoUnitario: centsToFloat(i.preco),
+        precoUnitario: parseValorBR(i.preco),
       })),
     });
 
@@ -533,8 +570,8 @@ export function OrcamentosClient({
             orcamento_id: result.id ?? '',
             descricao: i.descricao,
             quantidade: i.quantidade,
-            preco_unitario: centsToFloat(i.preco),
-            preco_total: i.quantidade * centsToFloat(i.preco),
+            preco_unitario: parseValorBR(i.preco),
+            preco_total: i.quantidade * parseValorBR(i.preco),
           })
         ),
         pagamentos: [],
@@ -563,7 +600,7 @@ export function OrcamentosClient({
         id: item.id,
         descricao: item.descricao ?? '',
         quantidade: item.quantidade,
-        preco_unitario: floatToCents(
+        preco_unitario: formatValorBR(
           item.quantidade > 0
             ? (item.preco_total ?? 0) / item.quantidade
             : (item.preco_total ?? 0)
@@ -576,24 +613,24 @@ export function OrcamentosClient({
 
   const handleSalvarEdicao = async () => {
     if (!selected) return;
-    const itensValidos = editItens.filter((i) => i.descricao.trim() && centsToFloat(i.preco_unitario) > 0);
+    const itensValidos = editItens.filter((i) => i.descricao.trim() && parseValorBR(i.preco_unitario) > 0);
     if (itensValidos.length === 0) {
       setEditError('Adicione ao menos um procedimento com descrição e valor.');
       return;
     }
     setEditSaving(true);
-    const result = await editarOrcamento(selected.id, itensValidos.map(i => ({ ...i, preco_unitario: centsToFloat(i.preco_unitario) })));
+    const result = await editarOrcamento(selected.id, itensValidos.map(i => ({ ...i, preco_unitario: parseValorBR(i.preco_unitario) })));
     if (result.error) {
       setEditError(result.error);
     } else {
-      const novoTotal = itensValidos.reduce((sum, i) => sum + i.quantidade * centsToFloat(i.preco_unitario), 0);
+      const novoTotal = itensValidos.reduce((sum, i) => sum + i.quantidade * parseValorBR(i.preco_unitario), 0);
       const novosItens: OrcamentoItemRow[] = itensValidos.map((i) => ({
         id: i.id ?? crypto.randomUUID(),
         orcamento_id: selected.id,
         descricao: i.descricao,
         quantidade: i.quantidade,
-        preco_unitario: centsToFloat(i.preco_unitario),
-        preco_total: i.quantidade * centsToFloat(i.preco_unitario),
+        preco_unitario: parseValorBR(i.preco_unitario),
+        preco_total: i.quantidade * parseValorBR(i.preco_unitario),
       }));
       setOrcamentos((prev) =>
         prev.map((o) =>
@@ -1219,16 +1256,24 @@ export function OrcamentosClient({
                               </label>
                               <Input
                                 type="text"
-                                inputMode="numeric"
+                                inputMode="decimal"
                                 placeholder="0,00"
-                                value={formatCents(item.preco_unitario)}
+                                value={item.preco_unitario}
                                 onChange={(e) =>
                                   setEditItens((prev) =>
                                     prev.map((it, i) =>
-                                      i === idx ? { ...it, preco_unitario: e.target.value.replace(/\D/g, '') } : it
+                                      i === idx ? { ...it, preco_unitario: e.target.value } : it
                                     )
                                   )
                                 }
+                                onBlur={(e) => {
+                                  const parsed = parseValorBR(e.target.value);
+                                  setEditItens((prev) =>
+                                    prev.map((it, i) =>
+                                      i === idx ? { ...it, preco_unitario: parsed > 0 ? formatValorBR(parsed) : it.preco_unitario } : it
+                                    )
+                                  );
+                                }}
                                 className="rounded-xl bg-surface border-border text-text-primary text-sm font-mono"
                               />
                             </div>
@@ -1249,7 +1294,7 @@ export function OrcamentosClient({
                       <div className="bg-teal/10 rounded-xl p-3 border border-teal/20 flex items-center justify-between">
                         <span className="text-sm font-bold text-text-primary">Total</span>
                         <span className="font-mono text-lg font-bold text-teal">
-                          {formatCurrency(editItens.reduce((sum, i) => sum + i.quantidade * centsToFloat(i.preco_unitario), 0))}
+                          {formatCurrency(editItens.reduce((sum, i) => sum + i.quantidade * parseValorBR(i.preco_unitario), 0))}
                         </span>
                       </div>
                       {editError && (
@@ -1384,12 +1429,15 @@ export function OrcamentosClient({
                           <div className="space-y-1.5">
                             <Label className="text-text-primary text-xs">Valor (R$)</Label>
                             <Input
-                              type="number"
-                              placeholder={restante > 0 ? restante.toFixed(2) : '0,00'}
-                              min="0"
-                              step="0.01"
+                              type="text"
+                              inputMode="decimal"
+                              placeholder={restante > 0 ? formatValorBR(restante) : '0,00'}
                               value={pagForm.valor}
                               onChange={(e) => setPagForm((f) => ({ ...f, valor: e.target.value }))}
+                              onBlur={(e) => {
+                                const parsed = parseValorBR(e.target.value);
+                                setPagForm((f) => ({ ...f, valor: parsed > 0 ? formatValorBR(parsed) : f.valor }));
+                              }}
                               className="rounded-xl bg-surface-alt border-border text-text-primary"
                             />
                           </div>
@@ -1807,7 +1855,7 @@ export function OrcamentosClient({
                                   ...it,
                                   procedimentoId: v,
                                   descricao: proc?.nome ?? it.descricao,
-                                  preco: proc?.preco_padrao != null ? floatToCents(proc.preco_padrao) : it.preco,
+                                  preco: proc?.preco_padrao != null ? formatValorBR(proc.preco_padrao) : it.preco,
                                 }
                               : it
                           )
@@ -1866,20 +1914,44 @@ export function OrcamentosClient({
                         <Label className="text-xs text-text-secondary">Valor unitário (R$)</Label>
                         <Input
                           type="text"
-                          inputMode="numeric"
+                          inputMode="decimal"
                           placeholder="0,00"
-                          value={formatCents(item.preco)}
+                          value={item.preco}
                           onChange={(e) =>
                             setNovoOrcItens(prev =>
                               prev.map((it, i) =>
-                                i === idx ? { ...it, preco: e.target.value.replace(/\D/g, '') } : it
+                                i === idx ? { ...it, preco: e.target.value } : it
                               )
                             )
                           }
+                          onBlur={(e) => {
+                            const parsed = parseValorBR(e.target.value);
+                            setNovoOrcItens(prev =>
+                              prev.map((it, i) =>
+                                i === idx ? { ...it, preco: parsed > 0 ? formatValorBR(parsed) : it.preco } : it
+                              )
+                            );
+                          }}
                           className="rounded-xl bg-surface border-border text-text-primary font-mono"
                         />
                       </div>
                     </div>
+
+                    {!item.procedimentoId && item.descricao.trim() && (
+                      <div className="flex items-center justify-between gap-2 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2">
+                        <span className="flex items-center gap-1.5 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                          Procedimento não cadastrado no catálogo
+                        </span>
+                        <button
+                          onClick={() => void handleCadastrarProcedimento(idx)}
+                          disabled={registeringProcIdx === idx}
+                          className="shrink-0 text-[11px] font-bold text-amber-700 dark:text-amber-300 hover:underline disabled:opacity-50"
+                        >
+                          {registeringProcIdx === idx ? 'Cadastrando...' : '+ Cadastrar no catálogo'}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
 

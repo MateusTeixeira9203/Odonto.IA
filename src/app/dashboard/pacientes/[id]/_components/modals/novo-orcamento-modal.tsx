@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Plus, Trash2, CircleDollarSign } from 'lucide-react';
+import { Plus, Trash2, CircleDollarSign, AlertTriangle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -20,6 +20,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { parseValorBR, formatValorBR } from '@/lib/valor-br';
 import type { FichaParaOrc, ProcedimentoClinica, NovoOrcItem } from '../types';
 
 interface NovoOrcamentoModalProps {
@@ -39,6 +40,8 @@ interface NovoOrcamentoModalProps {
   orcSaving: boolean;
   onCriarOrcamento: () => void;
   onSelecionarFicha: (fichaId: string | null) => void;
+  onCadastrarProcedimento: (idx: number) => void;
+  registeringProcIdx: number | null;
 }
 
 export function NovoOrcamentoModal({
@@ -58,6 +61,8 @@ export function NovoOrcamentoModal({
   orcSaving,
   onCriarOrcamento,
   onSelecionarFicha,
+  onCadastrarProcedimento,
+  registeringProcIdx,
 }: NovoOrcamentoModalProps) {
   const temDesconto = novoOrcValorFinal !== null && novoOrcSubtotal > 0 && novoOrcValorFinal < novoOrcSubtotal;
   const pctDesconto = temDesconto
@@ -137,7 +142,7 @@ export function NovoOrcamentoModal({
             <div className="flex-1 min-w-0 overflow-y-auto p-6 space-y-4">
               {novoOrcItens.map((item, idx) => (
                 <div key={idx} className={`bg-surface-alt rounded-2xl border p-4 space-y-3 transition-all duration-200 ${
-                  item.preco > 0 ? 'border-l-2 border-l-teal/50 border-t-border border-r-border border-b-border' : 'border-border'
+                  parseValorBR(item.preco) > 0 ? 'border-l-2 border-l-teal/50 border-t-border border-r-border border-b-border' : 'border-border'
                 }`}>
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-[10px] text-text-secondary uppercase tracking-widest">
@@ -161,7 +166,7 @@ export function NovoOrcamentoModal({
                       setNovoOrcItens((prev) =>
                         prev.map((it, i) =>
                           i === idx
-                            ? { ...it, procedimentoId: v, descricao: proc?.nome ?? it.descricao, preco: proc?.preco_padrao ?? it.preco }
+                            ? { ...it, procedimentoId: v, descricao: proc?.nome ?? it.descricao, preco: proc?.preco_padrao != null ? formatValorBR(proc.preco_padrao) : it.preco }
                             : it
                         )
                       );
@@ -202,28 +207,48 @@ export function NovoOrcamentoModal({
                     <div className="space-y-1">
                       <Label className="text-xs text-text-secondary">Valor unitário (R$)</Label>
                       <Input
-                        type="number"
-                        min="0"
-                        step="0.01"
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="0,00"
                         value={item.preco}
-                        onChange={(e) => setNovoOrcItens((prev) => prev.map((it, i) => i === idx ? { ...it, preco: parseFloat(e.target.value) || 0 } : it))}
+                        onChange={(e) => setNovoOrcItens((prev) => prev.map((it, i) => i === idx ? { ...it, preco: e.target.value } : it))}
+                        onBlur={(e) => {
+                          const parsed = parseValorBR(e.target.value);
+                          setNovoOrcItens((prev) => prev.map((it, i) => i === idx ? { ...it, preco: parsed > 0 ? formatValorBR(parsed) : it.preco } : it));
+                        }}
                         className="rounded-xl bg-surface border-border text-text-primary font-mono"
                       />
                     </div>
                   </div>
 
-                  {item.preco > 0 && (
+                  {parseValorBR(item.preco) > 0 && (
                     <div className="flex justify-end pt-1 border-t border-border/40">
                       <span className="text-xs font-mono font-semibold text-teal">
-                        = R$ {(item.quantidade * item.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        = R$ {(item.quantidade * parseValorBR(item.preco)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </span>
+                    </div>
+                  )}
+
+                  {!item.procedimentoId && item.descricao.trim() && (
+                    <div className="flex items-center justify-between gap-2 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2">
+                      <span className="flex items-center gap-1.5 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                        Procedimento não cadastrado no catálogo
+                      </span>
+                      <button
+                        onClick={() => onCadastrarProcedimento(idx)}
+                        disabled={registeringProcIdx === idx}
+                        className="shrink-0 text-[11px] font-bold text-amber-700 dark:text-amber-300 hover:underline disabled:opacity-50"
+                      >
+                        {registeringProcIdx === idx ? 'Cadastrando...' : '+ Cadastrar no catálogo'}
+                      </button>
                     </div>
                   )}
                 </div>
               ))}
 
               <button
-                onClick={() => setNovoOrcItens((prev) => [...prev, { procedimentoId: '', descricao: '', quantidade: 1, preco: 0 }])}
+                onClick={() => setNovoOrcItens((prev) => [...prev, { procedimentoId: '', descricao: '', quantidade: 1, preco: '' }])}
                 className="w-full py-3 border border-dashed border-border rounded-xl text-sm text-text-secondary hover:bg-surface-alt hover:text-text-primary transition-colors flex items-center justify-center gap-2"
               >
                 <Plus className="w-3.5 h-3.5" />

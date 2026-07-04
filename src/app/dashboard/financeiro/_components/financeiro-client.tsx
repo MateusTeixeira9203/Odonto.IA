@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { createClient } from '@/lib/supabase/client';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, parseISO, addMonths, subMonths } from 'date-fns';
@@ -30,10 +31,15 @@ import type {
 } from '../actions';
 import { criarDespesa, excluirDespesa, criarReceita, excluirReceita, exportarFinanceiroCsv, buscarOrcamentosPendentesPorPaciente, registrarRecebimento } from '../actions';
 import { downloadCsv } from '@/lib/export/csv';
-import { GanhosDespesasChart } from '../../_components/ganhos-despesas-chart';
 import type { DentistaRole } from '@/types/database';
 import type { PlanoId } from '@/lib/planos';
 import { PlanGuard } from '@/components/plan-guard';
+
+// #9 — recharts lazy: só baixa o bundle do gráfico quando a página do financeiro renderiza.
+const GanhosDespesasChart = dynamic(
+  () => import('../../_components/ganhos-despesas-chart').then(m => m.GanhosDespesasChart),
+  { ssr: false, loading: () => <div className="h-64 rounded-2xl bg-surface-alt animate-pulse" /> },
+);
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 

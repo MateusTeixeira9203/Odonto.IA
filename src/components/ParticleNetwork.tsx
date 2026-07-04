@@ -6,6 +6,8 @@ import { useEffect, useRef } from 'react';
 const CONNECT_DIST_SQ = 110 * 110;
 const REPEL_DIST_SQ   = 140 * 140;
 const MAX_PARTICLES   = 85;
+// #9 — a tela "ganha vida" só na entrada; depois congela (sem rAF contínuo em idle).
+const ANIMATE_MS = 2500;
 
 export default function ParticleNetwork() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -18,11 +20,16 @@ export default function ParticleNetwork() {
     // Capture non-null reference for use inside class methods
     const cvs = canvas;
 
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
     let particles: Particle[] = [];
     let rafId = 0;
     let mouseRafId = 0;
     let mouseX = -2000;
     let mouseY = -2000;
+    let elapsedMs = 0;
+    let lastTs: number | null = null;
+    let frozen = false;
 
     class Particle {
       x: number; y: number; vx: number; vy: number;
@@ -95,10 +102,23 @@ export default function ParticleNetwork() {
       }
     };
 
-    const loop = () => {
+    // Anima ~2.5s (ganha vida) e congela — cancelAnimationFrame, o snapshot fica no canvas.
+    // prefers-reduced-motion: desenha 1 frame estático, sem animar. document.hidden: pausa
+    // (não conta o tempo oculto) e retoma ao voltar o foco, via visibilitychange abaixo.
+    const loop = (ts: number) => {
+      if (frozen) return;
+      if (document.hidden) { lastTs = null; return; }
+      if (lastTs !== null) elapsedMs += ts - lastTs;
+      lastTs = ts;
+
       ctx.clearRect(0, 0, cvs.width, cvs.height);
       for (const p of particles) { p.update(); p.draw(); }
       drawLines();
+
+      if (prefersReducedMotion || elapsedMs >= ANIMATE_MS) {
+        frozen = true;
+        return;
+      }
       rafId = requestAnimationFrame(loop);
     };
 
@@ -107,7 +127,17 @@ export default function ParticleNetwork() {
       cvs.width  = window.innerWidth;
       cvs.height = window.innerHeight;
       init();
-      loop();
+      frozen = false;
+      elapsedMs = 0;
+      lastTs = null;
+      rafId = requestAnimationFrame(loop);
+    };
+
+    const onVisibilityChange = () => {
+      if (!document.hidden && !frozen) {
+        lastTs = null;
+        rafId = requestAnimationFrame(loop);
+      }
     };
 
     // Throttle mouse via RAF so it never runs more than once per frame
@@ -120,6 +150,7 @@ export default function ParticleNetwork() {
     window.addEventListener('resize',     resize,      { passive: true });
     window.addEventListener('mousemove',  onMouseMove, { passive: true });
     window.addEventListener('mouseleave', onMouseLeave);
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
     resize();
 
@@ -129,6 +160,7 @@ export default function ParticleNetwork() {
       window.removeEventListener('resize',     resize);
       window.removeEventListener('mousemove',  onMouseMove);
       window.removeEventListener('mouseleave', onMouseLeave);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, []);
 

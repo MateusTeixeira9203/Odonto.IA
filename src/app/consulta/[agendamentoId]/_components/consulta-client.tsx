@@ -22,7 +22,8 @@ import { ConsultationSidebar } from './consultation-sidebar';
 import { BotaoMensagemIA } from '@/components/orcamentos/botao-mensagem-ia';
 import { VoiceUX } from './voice-ux';
 import { DraftPendingCard } from './draft-pending-card';
-import { MiniOdontograma } from './mini-odontograma';
+import { Odontograma } from '@/components/odontograma/Odontograma';
+import { ArchChips } from './arch-chips';
 import { denteLabel } from '@/lib/arcadas';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -300,6 +301,24 @@ export function ConsultaClient({
     }
   };
 
+  // Alterna um dente/sentinela em confirmedTeeth (usado pelo odontograma e pelos chips de arcada).
+  const toggleTooth = (t: number) =>
+    setConfirmedTeeth(prev => (prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]));
+
+  // Procedimentos por dente — `dentes_observacoes[dente]` guarda "proc1\nproc2..." (\n-separado).
+  // A UI edita cada procedimento como uma linha própria e junta com \n ao gravar, mantendo o
+  // contrato da coluna e espelhando o editor de ficha (multi-procedimento por dente).
+  const getDenteProcs = (dente: number): string[] =>
+    (evolucao?.dentes_observacoes[String(dente)] ?? '').split('\n');
+
+  const setDenteProcs = (dente: number, procs: string[]) => {
+    setEvolucao(prev =>
+      prev
+        ? { ...prev, dentes_observacoes: { ...prev.dentes_observacoes, [String(dente)]: procs.join('\n') } }
+        : prev,
+    );
+  };
+
   const handleSalvar = async () => {
     if (!evolucao) return;
     setIsSaving(true);
@@ -346,13 +365,21 @@ export function ConsultaClient({
         if (prev <= 1) {
           clearInterval(countdownRef.current!);
           countdownRef.current = null;
-          router.push(`/dashboard/pacientes/${paciente.id}`);
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
   };
+
+  // Redireciona quando o countdown pós-salvar zera — fora do updater de estado
+  // ("Cannot update Router while rendering ConsultaClient": navegar dentro do
+  // setSaveCountdown(prev => ...) conta como side-effect em render).
+  useEffect(() => {
+    if (saved && saveCountdown === 0) {
+      router.push(`/dashboard/pacientes/${paciente.id}`);
+    }
+  }, [saved, saveCountdown, router, paciente.id]);
 
   // Recompensa pós-ficha por persona (Workstream B1). Heurística: ~180 caracteres
   // estruturados ≈ 1 min que o dentista não precisou digitar.
@@ -896,10 +923,17 @@ export function ConsultaClient({
                       ? `Dentes detectados — ${evolucao.dentes_afetados.length} aguardando confirmação`
                       : 'Dentes afetados'
                 }>
-                  <MiniOdontograma
+                  <Odontograma
+                    selectedTeeth={confirmedTeeth}
+                    detectedTeeth={evolucao.dentes_afetados.filter(t => !confirmedTeeth.includes(t))}
+                    onToothToggle={toggleTooth}
+                    compact
+                    hideFilters
+                  />
+                  <ArchChips
                     selected={confirmedTeeth}
-                    aiDetected={evolucao.dentes_afetados.filter(t => !confirmedTeeth.includes(t))}
-                    onChange={setConfirmedTeeth}
+                    detected={evolucao.dentes_afetados}
+                    onToggle={toggleTooth}
                   />
                   {/* Atalho para confirmar todos os dentes detectados */}
                   {evolucao.dentes_afetados.filter(t => !confirmedTeeth.includes(t)).length > 0 && (
@@ -912,27 +946,52 @@ export function ConsultaClient({
                   )}
                 </DraftPendingCard>
 
-                {/* Obs por dente — Fix #2: itera só confirmedTeeth */}
+                {/* Procedimentos por dente — cada procedimento numa linha própria (multi-proc por dente) */}
                 {confirmedTeeth.length > 0 && (
                   <div className="bg-surface rounded-2xl border border-border p-5">
                     <label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest block mb-3">
-                      Observações por dente
+                      Procedimentos por dente
                     </label>
-                    <div className="space-y-2">
-                      {confirmedTeeth.map(dente => (
-                        <div key={dente} className="flex items-center gap-3">
-                          <span className={`font-mono text-xs font-bold text-teal shrink-0 ${dente > 90 ? 'w-24' : 'w-8'}`}>{denteLabel(dente)}</span>
-                          <input
-                            value={evolucao.dentes_observacoes[String(dente)] ?? ''}
-                            onChange={e => setEvolucao({
-                              ...evolucao,
-                              dentes_observacoes: { ...evolucao.dentes_observacoes, [String(dente)]: e.target.value },
-                            })}
-                            placeholder="Observação para este dente..."
-                            className="flex-1 text-sm text-text-primary bg-surface-alt rounded-lg px-3 py-2 outline-none border border-transparent focus:border-teal transition-colors"
-                          />
-                        </div>
-                      ))}
+                    <div className="space-y-4">
+                      {confirmedTeeth.map(dente => {
+                        const procs = getDenteProcs(dente);
+                        return (
+                          <div key={dente}>
+                            <span className="font-mono text-xs font-bold text-teal block mb-1.5">{denteLabel(dente)}</span>
+                            <div className="space-y-1.5">
+                              {procs.map((proc, idx) => (
+                                <div key={idx} className="flex items-center gap-2">
+                                  <input
+                                    value={proc}
+                                    onChange={e => {
+                                      const next = [...procs];
+                                      next[idx] = e.target.value;
+                                      setDenteProcs(dente, next);
+                                    }}
+                                    placeholder="Procedimento neste dente..."
+                                    className="flex-1 text-sm text-text-primary bg-surface-alt rounded-lg px-3 py-2 outline-none border border-transparent focus:border-teal transition-colors"
+                                  />
+                                  {procs.length > 1 && (
+                                    <button
+                                      onClick={() => setDenteProcs(dente, procs.filter((_, i) => i !== idx))}
+                                      title="Remover procedimento"
+                                      className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-text-secondary hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
+                              <button
+                                onClick={() => setDenteProcs(dente, [...procs, ''])}
+                                className="text-[11px] text-teal font-semibold hover:opacity-75 transition-opacity"
+                              >
+                                + adicionar procedimento
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

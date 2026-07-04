@@ -68,6 +68,7 @@ import {
   criarOrcamento,
   editarOrcamento,
   excluirOrcamento,
+  criarProcedimentoRapido,
   type FormaPagamento,
   type StatusOrcamento,
 } from '@/app/dashboard/orcamentos/actions';
@@ -78,6 +79,8 @@ import { format, parseISO, differenceInCalendarDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { STATUS_ORCAMENTO } from '@/lib/constants/orcamento-status';
+import { parseValorBR, formatValorBR } from '@/lib/valor-br';
+import { stripDenteDoNome } from '@/lib/arcadas';
 import type { OrcamentoComItens, OrcamentoItem, Pagamento, FichaParaOrc, ProcedimentoClinica, NovoOrcItem, OrcEditItem } from './types';
 import { EditarPacienteModal } from './modals/editar-paciente-modal';
 import { DetalheOrcamentoModal } from './modals/detalhe-orcamento-modal';
@@ -219,8 +222,9 @@ export function PacienteDetailClient({
   const [isNovoOrcOpen, setIsNovoOrcOpen] = useState(false);
   const [procedimentosClinica, setProcedimentosClinica] = useState<ProcedimentoClinica[]>([]);
   const [novoOrcItens, setNovoOrcItens] = useState<NovoOrcItem[]>([
-    { procedimentoId: '', descricao: '', quantidade: 1, preco: 0 },
+    { procedimentoId: '', descricao: '', quantidade: 1, preco: '' },
   ]);
+  const [registeringProcIdx, setRegisteringProcIdx] = useState<number | null>(null);
   const [pagForm, setPagForm] = useState({
     valor: '',
     formaPagamento: 'pix' as FormaPagamento,
@@ -353,7 +357,7 @@ export function PacienteDetailClient({
   // Orçamento selecionado no detalhe
   const detalheOrc = orcamentosState.find((o) => o.id === detalheOrcId) ?? null;
   const novoOrcSubtotal = useMemo(
-    () => novoOrcItens.reduce((s, i) => s + i.quantidade * i.preco, 0),
+    () => novoOrcItens.reduce((s, i) => s + i.quantidade * parseValorBR(i.preco), 0),
     [novoOrcItens]
   );
   const novoOrcTotal = useMemo(
@@ -473,13 +477,15 @@ export function PacienteDetailClient({
     });
   };
 
-  // Busca procedimentos da clínica, fichas recentes e pendências ao montar
+  // Busca procedimentos da clínica, fichas recentes e pendências ao montar.
+  // Catálogo de procedimentos é privado por dentista — filtra pelo dono da sessão.
   useEffect(() => {
     const supabase = createClient();
     void supabase
       .from('procedimentos')
       .select('id, nome, preco_padrao')
       .eq('clinica_id', clinicaId)
+      .eq('dentista_id', dentistaId)
       .eq('ativo', true)
       .order('nome')
       .then(({ data }) => setProcedimentosClinica(data ?? []));
@@ -528,7 +534,7 @@ export function PacienteDetailClient({
         setPendencias(items);
         setPendenciasConcluidas(concluidos);
       });
-  }, [clinicaId, paciente.id]);
+  }, [clinicaId, paciente.id, dentistaId]);
 
   const togglePendencia = async (item: PendenciaItem) => {
     if (togglingPendencia === item.globalKey) return;
@@ -559,13 +565,21 @@ export function PacienteDetailClient({
   };
 
   const handleStatusChange = useCallback(async (orcId: string, status: StatusOrcamento) => {
-    const result = await atualizarStatusOrcamento(orcId, status);
-    if (!result.error) {
-      setOrcamentosState((prev) =>
-        prev.map((o) => (o.id === orcId ? { ...o, status } : o))
-      );
+    try {
+      const result = await atualizarStatusOrcamento(orcId, status);
+      if (!result.error) {
+        setOrcamentosState((prev) =>
+          prev.map((o) => (o.id === orcId ? { ...o, status } : o))
+        );
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    } catch (err) {
+      console.error('[paciente] handleStatusChange:', err);
+      toast.error('Não foi possível atualizar o status. Tente novamente.');
     }
-  }, []);
+  }, [router]);
 
   const handleRegistrarPagamento = async () => {
     if (!detalheOrcId) return;
@@ -617,7 +631,7 @@ export function PacienteDetailClient({
   const fichaParaItens = (ficha: FichaParaOrc): NovoOrcItem[] => {
     const dentes = ficha.dentes_afetados ?? [];
     const obs = ficha.dentes_observacoes ?? {};
-    if (dentes.length === 0) return [{ procedimentoId: '', descricao: '', quantidade: 1, preco: 0 }];
+    if (dentes.length === 0) return [{ procedimentoId: '', descricao: '', quantidade: 1, preco: '' }];
 
     // Agrupa dentes por procedimento: mesmo texto em vários dentes → um item com quantidade N
     const procToTeeth = new Map<string, number[]>();
@@ -629,7 +643,7 @@ export function PacienteDetailClient({
     }
 
     if (procToTeeth.size === 0) {
-      return dentes.map((t) => ({ procedimentoId: '', descricao: `Dente ${t}`, quantidade: 1, preco: 0 }));
+      return dentes.map((t) => ({ procedimentoId: '', descricao: `Dente ${t}`, quantidade: 1, preco: '' }));
     }
 
     return Array.from(procToTeeth.entries()).map(([proc, teeth]) => {
@@ -646,7 +660,7 @@ export function PacienteDetailClient({
         procedimentoId: match?.id ?? '',
         descricao,
         quantidade: teeth.length,
-        preco: match?.preco_padrao ?? 0,
+        preco: match?.preco_padrao != null ? formatValorBR(match.preco_padrao) : '',
       };
     });
   };
@@ -671,17 +685,17 @@ export function PacienteDetailClient({
         // Mais de uma ficha: dentista escolhe qual usar
         setFichaOrcId(null);
         setEtapaNovoOrc('selecionar');
-        setNovoOrcItens([{ procedimentoId: '', descricao: '', quantidade: 1, preco: 0 }]);
+        setNovoOrcItens([{ procedimentoId: '', descricao: '', quantidade: 1, preco: '' }]);
       } else {
         // 0 ou 1 ficha: vai direto para os itens
         setFichaOrcId(fichas.length === 1 ? fichas[0].id : null);
-        setNovoOrcItens(fichas.length === 1 ? fichaParaItens(fichas[0]) : [{ procedimentoId: '', descricao: '', quantidade: 1, preco: 0 }]);
+        setNovoOrcItens(fichas.length === 1 ? fichaParaItens(fichas[0]) : [{ procedimentoId: '', descricao: '', quantidade: 1, preco: '' }]);
         setEtapaNovoOrc('itens');
       }
     } catch {
       setFichasParaOrc([]);
       setFichaOrcId(null);
-      setNovoOrcItens([{ procedimentoId: '', descricao: '', quantidade: 1, preco: 0 }]);
+      setNovoOrcItens([{ procedimentoId: '', descricao: '', quantidade: 1, preco: '' }]);
       setEtapaNovoOrc('itens');
     } finally {
       setIsLoadingFichaParaOrc(false);
@@ -692,12 +706,36 @@ export function PacienteDetailClient({
   const selecionarFichaParaOrc = (fichaId: string | null) => {
     setFichaOrcId(fichaId);
     if (!fichaId) {
-      setNovoOrcItens([{ procedimentoId: '', descricao: '', quantidade: 1, preco: 0 }]);
+      setNovoOrcItens([{ procedimentoId: '', descricao: '', quantidade: 1, preco: '' }]);
     } else {
       const ficha = fichasParaOrc.find((f) => f.id === fichaId);
-      setNovoOrcItens(ficha ? fichaParaItens(ficha) : [{ procedimentoId: '', descricao: '', quantidade: 1, preco: 0 }]);
+      setNovoOrcItens(ficha ? fichaParaItens(ficha) : [{ procedimentoId: '', descricao: '', quantidade: 1, preco: '' }]);
     }
     setEtapaNovoOrc('itens');
+  };
+
+  // Cadastra no catálogo um procedimento digitado que não bateu com nenhum item existente —
+  // usa o nome (sem a referência de dente) e o valor já preenchidos no item, e vincula o item
+  // ao procedimento recém-criado.
+  const handleCadastrarProcedimento = async (idx: number) => {
+    const item = novoOrcItens[idx];
+    const nome = stripDenteDoNome(item.descricao);
+    if (!nome) return;
+    setRegisteringProcIdx(idx);
+    const precoNum = parseValorBR(item.preco);
+    const result = await criarProcedimentoRapido({ nome, precoPadrao: precoNum > 0 ? precoNum : null });
+    if (result.error || !result.id) {
+      toast.error(result.error ?? 'Não foi possível cadastrar o procedimento.');
+    } else {
+      const novoId = result.id;
+      setProcedimentosClinica((prev) =>
+        [...prev, { id: novoId, nome, preco_padrao: precoNum > 0 ? precoNum : null }]
+          .sort((a, b) => a.nome.localeCompare(b.nome))
+      );
+      setNovoOrcItens((prev) => prev.map((it, i) => (i === idx ? { ...it, procedimentoId: novoId } : it)));
+      toast.success('Procedimento cadastrado no catálogo.');
+    }
+    setRegisteringProcIdx(null);
   };
 
   const handleCriarOrcamento = async () => {
@@ -707,7 +745,7 @@ export function PacienteDetailClient({
       setOrcError('Adicione ao menos um procedimento com descrição.');
       return;
     }
-    const temSemPreco = itensValidos.some((i) => i.preco === 0);
+    const temSemPreco = itensValidos.some((i) => parseValorBR(i.preco) === 0);
     if (temSemPreco) {
       setOrcError('Atenção: alguns procedimentos estão sem valor. Defina o preço antes de continuar.');
       return;
@@ -715,7 +753,7 @@ export function PacienteDetailClient({
     setOrcError(null);
     setOrcSaving(true);
 
-    const subtotalValido = itensValidos.reduce((s, i) => s + i.quantidade * i.preco, 0);
+    const subtotalValido = itensValidos.reduce((s, i) => s + i.quantidade * parseValorBR(i.preco), 0);
     const finalValido    = novoOrcValorFinal !== null ? Math.max(0, novoOrcValorFinal) : subtotalValido;
     const descontoValor  = Math.max(0, Math.round((subtotalValido - finalValido) * 100) / 100);
 
@@ -727,7 +765,7 @@ export function PacienteDetailClient({
         procedimentoId: i.procedimentoId || null,
         descricao: i.descricao,
         quantidade: i.quantidade,
-        precoUnitario: i.preco,
+        precoUnitario: parseValorBR(i.preco),
       })),
     });
 
@@ -745,7 +783,7 @@ export function PacienteDetailClient({
           id: `temp-${idx}`,
           descricao: i.descricao,
           quantidade: i.quantidade,
-          preco_total: i.quantidade * i.preco,
+          preco_total: i.quantidade * parseValorBR(i.preco),
         })),
         pagamentos: [],
         aprovado_por: null,
@@ -753,7 +791,7 @@ export function PacienteDetailClient({
       };
       setOrcamentosState((prev) => [novoOrc, ...prev]);
       setIsNovoOrcOpen(false);
-      setNovoOrcItens([{ procedimentoId: '', descricao: '', quantidade: 1, preco: 0 }]);
+      setNovoOrcItens([{ procedimentoId: '', descricao: '', quantidade: 1, preco: '' }]);
       toast.success('Orçamento criado como rascunho', {
         description: 'Revise os itens e envie para o paciente quando estiver pronto.',
         duration: 4000,
@@ -769,8 +807,9 @@ export function PacienteDetailClient({
         id: item.id,
         descricao: item.descricao ?? '',
         quantidade: item.quantidade,
-        preco_unitario:
-          item.quantidade > 0 ? (item.preco_total ?? 0) / item.quantidade : (item.preco_total ?? 0),
+        preco_unitario: formatValorBR(
+          item.quantidade > 0 ? (item.preco_total ?? 0) / item.quantidade : (item.preco_total ?? 0)
+        ),
       }))
     );
     setOrcEditError(null);
@@ -779,22 +818,22 @@ export function PacienteDetailClient({
 
   const handleSalvarEdicaoOrc = async () => {
     if (!detalheOrc) return;
-    const itensValidos = orcEditItens.filter((i) => i.descricao.trim() && i.preco_unitario > 0);
+    const itensValidos = orcEditItens.filter((i) => i.descricao.trim() && parseValorBR(i.preco_unitario) > 0);
     if (itensValidos.length === 0) {
       setOrcEditError('Adicione ao menos um procedimento com descrição e valor.');
       return;
     }
     setOrcEditSaving(true);
-    const result = await editarOrcamento(detalheOrc.id, itensValidos);
+    const result = await editarOrcamento(detalheOrc.id, itensValidos.map(i => ({ ...i, preco_unitario: parseValorBR(i.preco_unitario) })));
     if (result.error) {
       setOrcEditError(result.error);
     } else {
-      const novoTotal = itensValidos.reduce((sum, i) => sum + i.quantidade * i.preco_unitario, 0);
+      const novoTotal = itensValidos.reduce((sum, i) => sum + i.quantidade * parseValorBR(i.preco_unitario), 0);
       const novosItens: OrcamentoItem[] = itensValidos.map((i) => ({
         id: i.id ?? crypto.randomUUID(),
         descricao: i.descricao,
         quantidade: i.quantidade,
-        preco_total: i.quantidade * i.preco_unitario,
+        preco_total: i.quantidade * parseValorBR(i.preco_unitario),
       }));
       setOrcamentosState((prev) =>
         prev.map((o) =>
@@ -1521,6 +1560,8 @@ export function PacienteDetailClient({
         orcSaving={orcSaving}
         onCriarOrcamento={handleCriarOrcamento}
         onSelecionarFicha={selecionarFichaParaOrc}
+        onCadastrarProcedimento={(idx) => void handleCadastrarProcedimento(idx)}
+        registeringProcIdx={registeringProcIdx}
       />
     </div>
   );

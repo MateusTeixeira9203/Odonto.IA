@@ -14,7 +14,7 @@ export type FormaPagamento =
   | "boleto"
   | "outro";
 
-export type StatusOrcamento = "rascunho" | "enviado" | "aprovado" | "recusado" | "pago";
+export type StatusOrcamento = "rascunho" | "enviado" | "aprovado" | "recusado";
 
 export async function atualizarStatusOrcamento(
   orcamentoId: string,
@@ -481,4 +481,49 @@ export async function excluirOrcamento(
   if (pacienteId) revalidatePath(`/dashboard/pacientes/${pacienteId}`);
   revalidatePath("/dashboard/orcamentos");
   return {};
+}
+
+/**
+ * Cadastro rápido de procedimento a partir do orçamento — quando o item digitado não
+ * corresponde a nada no catálogo. Qualquer dentista da clínica pode usar (não só admin;
+ * ver migration 083). Catálogo é privado por dentista (migration 084) — o procedimento
+ * nasce vinculado a quem criou, nunca a um id vindo do cliente. Editar/excluir o catálogo
+ * completo continua em Configurações.
+ */
+export async function criarProcedimentoRapido(dados: {
+  nome: string;
+  precoPadrao: number | null;
+}): Promise<{ error?: string; id?: string }> {
+  const { supabase, user, clinicId } = await requireClinicContext();
+
+  const nome = dados.nome.trim();
+  if (!nome) return { error: "Informe o nome do procedimento." };
+
+  const { data: dentistaPerfil } = await supabase
+    .from("dentistas")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("clinica_id", clinicId)
+    .maybeSingle();
+
+  if (!dentistaPerfil) return { error: "Perfil de dentista não encontrado." };
+
+  const { data, error } = await supabase
+    .from("procedimentos")
+    .insert({
+      clinica_id:   clinicId,
+      dentista_id:  dentistaPerfil.id,
+      nome,
+      preco_padrao: dados.precoPadrao,
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    console.error("Erro ao cadastrar procedimento:", error);
+    return { error: "Não foi possível cadastrar o procedimento. Tente novamente." };
+  }
+
+  revalidatePath("/dashboard/configuracoes");
+  return { id: (data as { id: string }).id };
 }

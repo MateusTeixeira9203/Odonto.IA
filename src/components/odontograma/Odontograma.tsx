@@ -299,7 +299,10 @@ function lowerRootPath(w: number, crownH: number, rootH: number, family: ToothFa
 }
 
 // ─── State type ───────────────────────────────────────────────────────────────
-type ToothState = 'default' | 'historical' | 'shared' | 'selected';
+type ToothState = 'default' | 'historical' | 'shared' | 'selected' | 'detected';
+
+/** Status de acompanhamento de tratamento (ficha unificada, #16 D3). */
+export type ToothStatus = 'nao_iniciado' | 'em_andamento' | 'concluido';
 
 // ─── Individual tooth SVG ─────────────────────────────────────────────────────
 interface ToothSVGProps {
@@ -308,9 +311,11 @@ interface ToothSVGProps {
   state: ToothState;
   hovered: boolean;
   showCheckbox: boolean;
+  /** Anel de destaque independente do preenchimento — usado pra indicar filtro ativo em colorMode='status'. */
+  ringed?: boolean;
 }
 
-function ToothSVG({ num, isUpper, state, hovered, showCheckbox }: ToothSVGProps) {
+function ToothSVG({ num, isUpper, state, hovered, showCheckbox, ringed = false }: ToothSVGProps) {
   const cls    = TOOTH_CLASS[num] ?? 'premolar';
   const family = TOOTH_FAMILY[cls];
   const { w, crownH, rootH } = DIMS[cls];
@@ -321,21 +326,26 @@ function ToothSVG({ num, isUpper, state, hovered, showCheckbox }: ToothSVGProps)
   const crownFill =
     state === 'selected'    ? 'var(--color-teal)'
     : state === 'shared'    ? 'color-mix(in srgb, var(--color-teal) 25%, var(--color-surface-alt))'
+    : state === 'detected'  ? 'color-mix(in srgb, var(--color-warning) 18%, var(--color-surface-alt))'
     : state === 'historical' ? 'color-mix(in srgb, var(--color-teal) 20%, var(--color-surface-alt))'
     : 'var(--color-surface-alt)';
 
-  const crownStroke =
-    hovered                   ? 'var(--color-teal)'
+  const crownStroke = ringed
+    ? 'var(--color-teal)'
+    : hovered                   ? 'var(--color-teal)'
     : state === 'selected'    ? 'var(--color-teal)'
     : state === 'shared'      ? 'color-mix(in srgb, var(--color-teal) 70%, var(--color-border))'
+    : state === 'detected'    ? 'var(--color-warning)'
     : state === 'historical'  ? 'color-mix(in srgb, var(--color-teal) 55%, var(--color-border))'
     : 'var(--color-border)';
 
-  const strokeW = state === 'selected' ? 2 : (state === 'shared' || hovered) ? 1.5 : 1;
+  const strokeW = ringed ? 2.5 : state === 'selected' ? 2 : (state === 'shared' || state === 'detected' || hovered) ? 1.5 : 1;
 
   const crownFilter =
     state === 'selected'
       ? 'drop-shadow(0 0 4px color-mix(in srgb, var(--color-teal) 45%, transparent))'
+      : state === 'detected'
+      ? 'drop-shadow(0 0 3px color-mix(in srgb, var(--color-warning) 40%, transparent))'
       : 'none';
 
   const rootFill =
@@ -353,6 +363,7 @@ function ToothSVG({ num, isUpper, state, hovered, showCheckbox }: ToothSVGProps)
   const rootOpacity =
     state === 'selected' ? 0.40
     : state === 'shared' ? 0.58
+    : state === 'detected' ? 0.58
     : 0.72;
 
   const cbX = w - 9;
@@ -439,22 +450,35 @@ export interface OdontogramaProps {
   selectedTeeth: number[];
   sharedTeeth?: number[];
   historicalTeeth?: Set<number>;
+  /** Dentes detectados pela IA, pendentes de confirmação (estado amber). Ex: modo consulta. */
+  detectedTeeth?: number[];
   onToothToggle: (tooth: number) => void;
   showCheckbox?: boolean;
   className?: string;
   compact?: boolean;
   hideFilters?: boolean;
+  /**
+   * Significado da cor (#16 D7). 'selection' (padrão) = seletor de dentes (teal=selecionado,
+   * amber=detectado). 'status' = mapa de progresso do tratamento (teal=concluído,
+   * amber=em andamento, cinza=não iniciado) — vem de `statusTeeth`, não de `selectedTeeth`.
+   */
+  colorMode?: 'selection' | 'status';
+  /** Status por dente/sentinela — só usado quando `colorMode='status'`. */
+  statusTeeth?: Partial<Record<number, ToothStatus>>;
 }
 
 export function Odontograma({
   selectedTeeth,
   sharedTeeth = [],
   historicalTeeth = new Set(),
+  detectedTeeth = [],
   onToothToggle,
   showCheckbox = false,
   className,
   compact = false,
   hideFilters = false,
+  colorMode = 'selection',
+  statusTeeth = {},
 }: OdontogramaProps) {
   const [hoveredTooth, setHoveredTooth]   = useState<number | null>(null);
   const [tab, setTab]                     = useState<'permanent' | 'deciduous'>('permanent');
@@ -465,9 +489,25 @@ export function Odontograma({
   const upperTeeth = tab === 'permanent' ? TEETH_UPPER : TEETH_UPPER_DEC;
   const lowerTeeth = tab === 'permanent' ? TEETH_LOWER : TEETH_LOWER_DEC;
 
+  // Contagem de dentes ativos por dentição — indicador nas abas (torna decíduo detectado descobrível)
+  const activeTeeth = colorMode === 'status'
+    ? Object.keys(statusTeeth).map(Number)
+    : [...selectedTeeth, ...detectedTeeth];
+  const tabCounts: Record<'permanent' | 'deciduous', number> = {
+    permanent: activeTeeth.filter(t => TEETH_UPPER.includes(t) || TEETH_LOWER.includes(t)).length,
+    deciduous: activeTeeth.filter(t => TEETH_UPPER_DEC.includes(t) || TEETH_LOWER_DEC.includes(t)).length,
+  };
+
   function getState(tooth: number): ToothState {
+    if (colorMode === 'status') {
+      const st = statusTeeth[tooth];
+      if (st === 'concluido') return 'selected';
+      if (st === 'em_andamento') return 'detected';
+      return 'default';
+    }
     if (sharedTeeth.includes(tooth)) return 'shared';
     if (selectedTeeth.includes(tooth)) return 'selected';
+    if (detectedTeeth.includes(tooth)) return 'detected';
     if (historicalTeeth.has(tooth)) return 'historical';
     return 'default';
   }
@@ -478,11 +518,12 @@ export function Odontograma({
       const state  = getState(num);
       const isHov  = hoveredTooth === num;
       const isActive = state === 'selected' || state === 'shared';
-      const numWeight = (state === 'selected' || state === 'shared') ? 800 : 700;
+      const numWeight = (state === 'selected' || state === 'shared' || state === 'detected') ? 800 : 700;
 
       const numColor =
         state === 'selected'    ? 'var(--color-teal)'
         : state === 'shared'    ? 'var(--color-teal)'
+        : state === 'detected'  ? 'var(--color-warning)'
         : state === 'historical' ? 'color-mix(in srgb, var(--color-teal) 70%, var(--color-text-secondary))'
         : isHov                 ? 'var(--color-text-primary)'
         : 'var(--color-text-secondary)';
@@ -538,6 +579,7 @@ export function Odontograma({
               state={state}
               hovered={isHov}
               showCheckbox={showCheckbox}
+              ringed={colorMode === 'status' && selectedTeeth.includes(num)}
             />
 
             {!isUpper && (
@@ -591,6 +633,14 @@ export function Odontograma({
             }}
           >
             {label}
+            {tabCounts[id] > 0 && (
+              <span
+                className="ml-1.5 inline-flex items-center justify-center min-w-[15px] h-[15px] px-1 rounded-full text-[9px] font-bold align-middle"
+                style={{ background: 'var(--color-teal)', color: 'white' }}
+              >
+                {tabCounts[id]}
+              </span>
+            )}
             {tab === id && (
               <span
                 className="absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full"

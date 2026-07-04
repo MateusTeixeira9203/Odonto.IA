@@ -16,7 +16,7 @@ export type Pagamento = {
 
 export type OrcamentoComItens = {
   id: string;
-  status: 'rascunho' | 'enviado' | 'aprovado' | 'recusado' | 'pago';
+  status: 'rascunho' | 'enviado' | 'aprovado' | 'recusado';
   total: number | null;
   created_at: string;
   validade_dias: number;
@@ -45,12 +45,14 @@ export type NovoOrcItem = {
   procedimentoId: string;
   descricao: string;
   quantidade: number;
-  preco: number;
+  /** Texto decimal BR ("250" ou "250,50") — parsear com `parseValorBR` antes de usar como número. */
+  preco: string;
 };
 
 export type OrcEditItem = {
   id?: string;
   descricao: string;
   quantidade: number;
-  preco_unitario: number;
+  /** Texto decimal BR ("250" ou "250,50") — parsear com `parseValorBR` antes de usar como número. */
+  preco_unitario: string;
 };

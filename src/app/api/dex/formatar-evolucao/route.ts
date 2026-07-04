@@ -56,7 +56,7 @@ Retorne SOMENTE um JSON válido, sem markdown, com exatamente esta estrutura:
   "queixa_principal": "título objetivo do procedimento principal (ex: Endodontia dente 26, Restauração dentes 14 e 15)",
   "anotacoes": "evolução clínica completa e organizada em linguagem técnica — procedimento realizado, técnica usada, intercorrências, observações relevantes. 2-4 frases.",
   "dentes_afetados": [lista de números FDI mencionados como inteiros — ex: [26, 36]. Para procedimentos de arcada ou boca inteira, use os sentinelas: 97 (arcada superior), 98 (arcada inferior), 99 (boca toda / todas as arcadas)],
-  "dentes_observacoes": {"número": "procedimento 1 neste dente\nprocedimento 2 neste dente\nprocedimento 3 neste dente"},
+  "dentes_observacoes": {"13": "Tratamento de canal\nPino\nProvisório\nCoroa de porcelana", "98": "PPR (prótese parcial removível)"},
   "procedimentos": ["lista resumida dos procedimentos realizados — ex: Tratamento endodôntico, Radiografia periapical"],
   "conduta": "orientações ao paciente, cuidados pós-procedimento, prescrições mencionadas. String vazia se não mencionado.",
   "retorno_sugerido": "prazo de retorno se mencionado (ex: 7 dias, 1 mês) ou null",
@@ -65,7 +65,11 @@ Retorne SOMENTE um JSON válido, sem markdown, com exatamente esta estrutura:
 
 Regras críticas:
 - dentes_afetados: array de inteiros FDI válidos (11-48), nunca strings
-- ARCADA / BOCA INTEIRA: se o dentista descrever procedimento em "arcada superior", "arcada inferior", "boca toda", "toda a boca" ou "geral" (ex: clareamento, profilaxia de boca toda, raspagem de arcada), NÃO liste dentes individuais — use o sentinela correspondente (97/98/99). Nunca invente quais dentes foram afetados quando o relato é de arcada/boca inteira.
+- ARCADA / BOCA INTEIRA: procedimentos sem dente FDI individual usam sentinelas em dentes_afetados:
+    99 = boca toda (ex: limpeza, profilaxia, clareamento, raspagem geral, "boca toda", "toda a boca", "geral")
+    97 = arcada superior / 98 = arcada inferior (ex: PPR / prótese parcial removível, prótese total, aparelho, placa — na arcada indicada)
+  Exemplos de mapeamento: "PPR inferior" → 98; "prótese superior" → 97; "limpeza boca toda" → 99. NÃO liste dentes individuais nesses casos e NUNCA invente quais dentes foram afetados.
+  Para CADA sentinela em dentes_afetados, crie também a entrada correspondente em dentes_observacoes com o nome do procedimento (ex: dentes_observacoes["98"] = "PPR (prótese parcial removível)") — sem isso o procedimento não aparece marcável.
 - Se nenhum dente mencionado: [] e {}
 - dentes_observacoes: se mais de um procedimento no mesmo dente, separar por \\n — cada linha vira um item independente marcável pelo dentista
 - procedimentos: array de strings resumidas, mínimo 1 item baseado no relato
