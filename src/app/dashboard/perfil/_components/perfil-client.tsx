@@ -8,6 +8,8 @@ import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { salvarAvatarUrl, removerAvatar, salvarPerfil, salvarNomeClinica } from '../actions';
 import type { DentistaRole } from '@/types/database';
+import type { Especialidade } from '@/lib/especialidades';
+import { EspecialidadeChips } from '@/components/ui/especialidade-chips';
 import Image from 'next/image';
 
 const ROLE_LABELS: Record<DentistaRole, string> = {
@@ -16,17 +18,6 @@ const ROLE_LABELS: Record<DentistaRole, string> = {
   secretaria: 'Secretária',
 };
 
-const ESPECIALIDADES = [
-  'Clínico Geral',
-  'Ortodontia',
-  'Endodontia',
-  'Implantodontia',
-  'Periodontia',
-  'Odontopediatria',
-  'Cirurgia',
-  'Outro',
-] as const;
-
 interface Props {
   nome: string;
   email: string | null;
@@ -34,7 +25,7 @@ interface Props {
   clinica: string;
   avatarUrl: string | null;
   cro: string | null;
-  especialidade: string | null;
+  especialidade: Especialidade[];
   telefone: string | null;
   cpf: string | null;
   chavePix: string | null;
@@ -50,7 +41,7 @@ export function PerfilClient({ nome, email, role, clinica, avatarUrl: initialAva
   const [formNome, setFormNome]                   = useState(nome);
   const [formTelefone, setFormTelefone]           = useState(telefone ?? '');
   const [formCro, setFormCro]                     = useState(cro ?? '');
-  const [formEspecialidade, setFormEspecialidade] = useState(especialidade ?? '');
+  const [formEspecialidade, setFormEspecialidade] = useState<Especialidade[]>(especialidade);
   const [formCpf, setFormCpf]                     = useState(cpf ?? '');
   const [formChavePix, setFormChavePix]           = useState(chavePix ?? '');
   const [formClinica, setFormClinica]             = useState(clinica);
@@ -115,6 +106,10 @@ export function PerfilClient({ nome, email, role, clinica, avatarUrl: initialAva
   async function handleSalvarPerfil(e: React.FormEvent) {
     e.preventDefault();
     if (!formNome.trim()) { toast.error('Nome é obrigatório'); return; }
+    if (showProfissional && formEspecialidade.length === 0) {
+      toast.error('Selecione ao menos uma especialidade');
+      return;
+    }
     setSaving(true);
     try {
       const [perfilResult, clinicaResult] = await Promise.all([
@@ -122,7 +117,7 @@ export function PerfilClient({ nome, email, role, clinica, avatarUrl: initialAva
           nome:          formNome.trim(),
           telefone:      formTelefone.trim(),
           cro:           formCro.trim(),
-          especialidade: formEspecialidade.trim(),
+          especialidade: formEspecialidade,
           cpf:           formCpf.trim(),
           chavePix:      formChavePix.trim(),
         }),
@@ -302,18 +297,12 @@ export function PerfilClient({ nome, email, role, clinica, avatarUrl: initialAva
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="block text-[11px] font-bold text-text-secondary uppercase tracking-widest">Especialidade</label>
-                    <select
-                      value={formEspecialidade}
-                      onChange={(e) => setFormEspecialidade(e.target.value)}
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase tracking-widest">Especialidades</label>
+                    <EspecialidadeChips
+                      selected={formEspecialidade}
+                      onChange={setFormEspecialidade}
                       disabled={saving}
-                      className={inputClass}
-                    >
-                      <option value="">Selecione</option>
-                      {ESPECIALIDADES.map((esp) => (
-                        <option key={esp} value={esp}>{esp}</option>
-                      ))}
-                    </select>
+                    />
                   </div>
 
                   <div className="pt-2 pb-1 border-t border-border">

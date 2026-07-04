@@ -25,7 +25,7 @@ export default async function PerfilPage() {
         clinica={dentista.clinica}
         avatarUrl={dentista.avatar_url}
         cro={dados?.cro ?? null}
-        especialidade={dados?.especialidade ?? null}
+        especialidade={dados?.especialidade ?? []}
         telefone={dados?.telefone ?? null}
         cpf={(dados as { cpf?: string | null } | null)?.cpf ?? null}
         chavePix={(dados as { chave_pix?: string | null } | null)?.chave_pix ?? null}

@@ -45,6 +45,8 @@ export interface Secretaria {
   updated_at: string;
 }
 
+import type { Especialidade } from '@/lib/especialidades';
+
 export type DentistaRole = 'admin' | 'dentista' | 'secretaria';
 
 export interface Dentista {
@@ -54,7 +56,7 @@ export interface Dentista {
   nome: string;
   role: DentistaRole;
   cro: string | null;
-  especialidade: string | null;
+  especialidade: Especialidade[];
   telefone: string | null;
   email: string | null;
   ativo: boolean;

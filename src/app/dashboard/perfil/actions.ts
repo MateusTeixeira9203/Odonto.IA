@@ -3,6 +3,7 @@
 import { requireUser } from '@/server/auth/user';
 import { requireClinicContext } from '@/server/auth/clinic';
 import { revalidatePath } from 'next/cache';
+import type { Especialidade } from '@/lib/especialidades';
 
 export async function salvarAvatarUrl(avatarUrl: string): Promise<{ error?: string }> {
   const { supabase, user } = await requireUser();
@@ -36,7 +37,7 @@ export interface PerfilData {
   nome: string;
   telefone: string;
   cro: string;
-  especialidade: string;
+  especialidade: Especialidade[];
   cpf: string;
   chavePix: string;
 }
@@ -44,13 +45,17 @@ export interface PerfilData {
 export async function salvarPerfil(data: PerfilData): Promise<{ error?: string }> {
   const { supabase, user } = await requireUser();
 
+  if (data.especialidade.length === 0) {
+    return { error: 'Selecione ao menos uma especialidade.' };
+  }
+
   const { error } = await supabase
     .from('dentistas')
     .update({
       nome:          data.nome          || null,
       telefone:      data.telefone      || null,
       cro:           data.cro           || null,
-      especialidade: data.especialidade || null,
+      especialidade: data.especialidade,
       cpf:           data.cpf           || null,
       chave_pix:     data.chavePix      || null,
     })

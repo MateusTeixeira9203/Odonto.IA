@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { DentistaRole } from "@/types/database";
 import type { PlanoId } from "@/lib/planos";
 import type { FocoPrincipal } from "@/lib/persona";
+import type { Especialidade } from "@/lib/especialidades";
 
 export interface DentistaCache {
   id: string;
@@ -10,7 +11,7 @@ export interface DentistaCache {
   cro: string | null;
   clinica_id: string;
   clinica: string;
-  especialidade: string | null;
+  especialidade: Especialidade[];
   role: DentistaRole;
   avatar_url: string | null;
   status_convite: "pendente" | "aceito" | null;
@@ -75,7 +76,7 @@ export const getDentistaCached = cache(async (): Promise<DentistaCache | null> =
     nome: string;
     cro: string | null;
     clinica_id: string;
-    especialidade: string | null;
+    especialidade: Especialidade[] | null;
     role: string;
     avatar_url: string | null;
     status_convite: string | null;
@@ -107,7 +108,7 @@ export const getDentistaCached = cache(async (): Promise<DentistaCache | null> =
     cro: row.cro,
     clinica_id: row.clinica_id,
     clinica: clinica?.nome ?? "",
-    especialidade: row.especialidade,
+    especialidade: row.especialidade ?? [],
     role: (row.role ?? "dentista") as DentistaRole,
     avatar_url: row.avatar_url,
     status_convite: row.status_convite as "pendente" | "aceito" | null,

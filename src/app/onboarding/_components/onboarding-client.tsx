@@ -11,28 +11,16 @@ import {
   Stethoscope, Building2, Check, Clock, TrendingUp, Play,
 } from 'lucide-react';
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
-import {
   iniciarOnboarding, definirPlano, marcarOnboardingCompleto,
   definirProcedimentosPendente, type PlanoClinica,
 } from '../actions';
 import { PERSONAS, PERSONA_IDS, getPersona, type FocoPrincipal } from '@/lib/persona';
+import { especialidadesSchema } from '@/lib/especialidades';
+import { EspecialidadeChips } from '@/components/ui/especialidade-chips';
 import { DexMark } from '@/components/dex/dex-mark';
 import { toast } from 'sonner';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
-
-const ESPECIALIDADES = [
-  'Clínico Geral',
-  'Ortodontia',
-  'Endodontia',
-  'Implantodontia',
-  'Periodontia',
-  'Odontopediatria',
-  'Cirurgia',
-  'Outro',
-] as const;
 
 const PLANOS_CONFIG = [
   {
@@ -78,7 +66,7 @@ const PERSONA_ICONS: Record<FocoPrincipal, typeof Clock> = {
 const schema = z.object({
   nome:            z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
   cro:             z.string().min(1, 'Informe o CRO'),
-  especialidade:   z.enum(ESPECIALIDADES),
+  especialidade:   especialidadesSchema,
   nomeConsultorio: z.string().min(2, 'Informe o nome'),
 });
 
@@ -141,7 +129,7 @@ export function OnboardingClient({ initialStep, focoInicial, nomeInicial }: Onbo
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { nome: '', cro: '', nomeConsultorio: '' },
+    defaultValues: { nome: '', cro: '', nomeConsultorio: '', especialidade: [] },
   });
 
   const especialidadeValue = watch('especialidade');
@@ -283,24 +271,13 @@ export function OnboardingClient({ initialStep, focoInicial, nomeInicial }: Onbo
 
                   <div className="space-y-1.5">
                     <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest">
-                      Especialidade
+                      Especialidades
                     </label>
-                    <Select
-                      value={especialidadeValue ?? ''}
-                      onValueChange={(v) =>
-                        setValue('especialidade', v as typeof ESPECIALIDADES[number], { shouldValidate: true })
-                      }
+                    <EspecialidadeChips
+                      selected={especialidadeValue ?? []}
+                      onChange={(next) => setValue('especialidade', next, { shouldValidate: true })}
                       disabled={isLoading}
-                    >
-                      <SelectTrigger className="w-full h-[46px] rounded-xl border border-border bg-surface-alt text-text-primary text-sm px-4">
-                        <SelectValue placeholder="Selecione" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ESPECIALIDADES.map((esp) => (
-                          <SelectItem key={esp} value={esp}>{esp}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    />
                     {errors.especialidade && <p className="text-xs text-coral">{errors.especialidade.message}</p>}
                   </div>
                 </div>

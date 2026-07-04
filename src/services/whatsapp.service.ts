@@ -7,6 +7,7 @@
 import { sendText, sendInteractiveList, type ListSection } from '@/lib/whatsapp/provider';
 import { getBotMensagens, parseTemplate, type TemplateVars } from '@/lib/whatsapp/template';
 import { createServiceClient } from '@/lib/supabase/service';
+import { formatEspecialidades, type Especialidade } from '@/lib/especialidades';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -20,7 +21,7 @@ export interface WhatsAppInstanceInfo {
 export interface DentistListItem {
   id: string;
   nome: string;
-  especialidade: string | null;
+  especialidade: Especialidade[];
 }
 
 export interface SlotInfo {
@@ -128,7 +129,7 @@ export async function sendDentistList(
       rows: dentistas.map(d => ({
         rowId:       d.id,
         title:       d.nome,
-        description: d.especialidade ?? 'Clínico Geral',
+        description: formatEspecialidades(d.especialidade),
       })),
     },
     {

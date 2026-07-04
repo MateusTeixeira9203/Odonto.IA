@@ -4,22 +4,14 @@ import { requireUser } from "@/server/auth/user";
 import { requireClinicContext } from "@/server/auth/clinic";
 import { enviarEmailD0 } from "@/server/services/onboarding-emails";
 import type { FocoPrincipal } from "@/lib/persona";
+import type { Especialidade } from "@/lib/especialidades";
 
 export type PlanoClinica = "SOLO" | "CLINICA";
-export type Especialidade =
-  | "Clínico Geral"
-  | "Ortodontia"
-  | "Endodontia"
-  | "Implantodontia"
-  | "Periodontia"
-  | "Odontopediatria"
-  | "Cirurgia"
-  | "Outro";
 
 export interface IniciarOnboardingInput {
   nome: string;
   cro: string;
-  especialidade: Especialidade;
+  especialidade: Especialidade[];
   /** Nome do consultório/clínica — obrigatório para todos os planos */
   nomeConsultorio: string;
   /** Persona escolhida na identidade (Workstream E). */
