@@ -293,6 +293,11 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
 
   const stopRecording = (): void => {
     if (mediaRecorderRef.current && isRecording) {
+      // Trava o botão já aqui — entre parar e o onstop assíncrono disparar
+      // a transcrição, havia uma janela em que o botão voltava a ficar
+      // clicável e dava pra iniciar uma segunda gravação sem perceber,
+      // duplicando o trecho transcrito.
+      setIsTranscribing(true);
       mediaRecorderRef.current.stop();
       setIsRecording(false);
     }
