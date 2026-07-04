@@ -360,7 +360,7 @@ export async function aceitarConvite(
   // 5. Garantir registro em public.users e definir nova clínica como ativa.
   //    Upsert: cria se não existir, atualiza active_clinica_id se já existir.
   //    Paralelo com dentistas — ambos independentes entre si.
-  await Promise.all([
+  const [, dentistaUpsert] = await Promise.all([
     db.from('users').upsert(
       { id: userId, email: userEmail, active_clinica_id: clinicId },
       { onConflict: 'id' },
@@ -369,8 +369,38 @@ export async function aceitarConvite(
     db.from('dentistas').upsert(
       { clinica_id: clinicId, user_id: userId, nome, email: userEmail, role, ativo: true },
       { onConflict: 'clinica_id,user_id' },
-    ),
+    ).select('id').single(),
   ]);
+
+  // 5b. Dentista novo ganha a própria cópia do catálogo padrão — catálogo é
+  // privado por dentista (não herda de ninguém da clínica). Best-effort:
+  // falha aqui não deve impedir o aceite do convite.
+  const dentistaId = dentistaUpsert.data?.id as string | undefined;
+  if (role === 'dentista' && dentistaId) {
+    try {
+      const { data: padroes } = await db
+        .from('procedimentos_padrao')
+        .select('nome, descricao, categoria, preco_sugerido, duracao_minutos')
+        .eq('ativo', true);
+
+      if (padroes && padroes.length > 0) {
+        await db.from('procedimentos').insert(
+          padroes.map((p) => ({
+            clinica_id: clinicId,
+            dentista_id: dentistaId,
+            nome: p.nome,
+            descricao: p.descricao,
+            categoria: p.categoria,
+            preco_padrao: p.preco_sugerido,
+            duracao_minutos: p.duracao_minutos,
+            ativo: true,
+          })),
+        );
+      }
+    } catch (err) {
+      console.error('[aceitarConvite] falha ao copiar procedimentos_padrao:', err);
+    }
+  }
 
   // 6. Membership canônica — depende de public.users existir (FK)
   const { error: memberError } = await db.from('clinica_usuarios').insert({
