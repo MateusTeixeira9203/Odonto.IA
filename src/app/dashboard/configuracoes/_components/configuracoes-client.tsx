@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { ImportarProcedimentosModal } from './importar-procedimentos-modal';
 import { MigrarClinicaModal } from './migrar-clinica-modal';
 import { createClient } from '@/lib/supabase/client';
+import { parseValorBR, formatValorBR } from '@/lib/valor-br';
 import { getLabelContexto, getPlano } from '@/lib/planos';
 import type { PlanoId } from '@/lib/planos';
 import { motion } from 'motion/react';
@@ -258,7 +259,7 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
   // --- Aba Procedimentos ---
   const [procedimentos, setProcedimentos] = useState(procedimentosIniciais);
   const [editandoId, setEditandoId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ nome: '', preco_padrao: 0, duracao_minutos: 0 });
+  const [editForm, setEditForm] = useState({ nome: '', preco_padrao: '', duracao_minutos: 0 });
   const [showNovoProcedimento, setShowNovoProcedimento] = useState(false);
   const [showImportar, setShowImportar] = useState(false);
   const [novoProc, setNovoProc] = useState({
@@ -273,23 +274,24 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
     setEditandoId(proc.id);
     setEditForm({
       nome: proc.nome,
-      preco_padrao: proc.preco_padrao ?? 0,
+      preco_padrao: formatValorBR(proc.preco_padrao ?? 0),
       duracao_minutos: proc.duracao_minutos ?? 30,
     });
   };
 
   const handleSalvarProcedimento = (id: string) => {
+    const precoNum = parseValorBR(editForm.preco_padrao);
     startTransition(async () => {
       const result = await atualizarProcedimento(id, {
         nome: editForm.nome.trim() || 'Procedimento',
-        preco_padrao: editForm.preco_padrao,
+        preco_padrao: precoNum,
         duracao_minutos: editForm.duracao_minutos,
       });
       if (!result.error) {
         setProcedimentos((prev) =>
           prev.map((p) =>
             p.id === id
-              ? { ...p, nome: editForm.nome.trim() || p.nome, preco_padrao: editForm.preco_padrao, duracao_minutos: editForm.duracao_minutos }
+              ? { ...p, nome: editForm.nome.trim() || p.nome, preco_padrao: precoNum, duracao_minutos: editForm.duracao_minutos }
               : p
           )
         );
@@ -316,7 +318,7 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
         nome: novoProc.nome.trim(),
         descricao: novoProc.descricao.trim(),
         categoria: novoProc.categoria.trim() || 'Geral',
-        preco_padrao: parseFloat(novoProc.preco_padrao) || 0,
+        preco_padrao: parseValorBR(novoProc.preco_padrao),
         duracao_minutos: parseInt(novoProc.duracao_minutos, 10) || 30,
       });
       if (!result.error) {
@@ -799,7 +801,7 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
                       />
                       <input
                         placeholder="Preço (R$)"
-                        type="number"
+                        type="text" inputMode="decimal"
                         value={novoProc.preco_padrao}
                         onChange={(e) => setNovoProc((f) => ({ ...f, preco_padrao: e.target.value }))}
                         className="border border-border rounded-lg px-3 py-2 text-sm bg-surface-alt text-text-primary outline-none focus:border-teal font-mono"
@@ -877,12 +879,12 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
                                   <div className="flex items-center gap-2">
                                     <span className="text-xs text-text-secondary">R$</span>
                                     <input
-                                      type="number"
+                                      type="text" inputMode="decimal"
                                       value={editForm.preco_padrao}
                                       onChange={(e) =>
                                         setEditForm((f) => ({
                                           ...f,
-                                          preco_padrao: parseFloat(e.target.value) || 0,
+                                          preco_padrao: e.target.value,
                                         }))
                                       }
                                       className="w-24 border border-border rounded-lg px-2 py-1 text-xs font-mono bg-surface-alt text-text-primary outline-none focus:border-teal"

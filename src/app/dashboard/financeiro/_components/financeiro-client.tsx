@@ -31,6 +31,7 @@ import type {
 } from '../actions';
 import { criarDespesa, excluirDespesa, criarReceita, excluirReceita, exportarFinanceiroCsv, buscarOrcamentosPendentesPorPaciente, registrarRecebimento } from '../actions';
 import { downloadCsv } from '@/lib/export/csv';
+import { parseValorBR, formatValorBR } from '@/lib/valor-br';
 import type { DentistaRole } from '@/types/database';
 import type { PlanoId } from '@/lib/planos';
 import { PlanGuard } from '@/components/plan-guard';
@@ -180,7 +181,7 @@ export function FinanceiroClient({
     setRecOrcamentos(result.orcamentos);
     if (result.orcamentos.length === 1) {
       setRecOrcamentoId(result.orcamentos[0].id);
-      setRecValor(String(result.orcamentos[0].valor_pendente));
+      setRecValor(formatValorBR(result.orcamentos[0].valor_pendente));
     }
     setRecBuscando(false);
   };
@@ -188,7 +189,7 @@ export function FinanceiroClient({
   const handleRegistrarRecebimento = async () => {
     if (!recPacienteId) { setRecError('Selecione o paciente.'); return; }
     if (!recOrcamentoId) { setRecError('Selecione o orçamento.'); return; }
-    const valorNum = parseFloat(recValor.replace(',', '.'));
+    const valorNum = parseValorBR(recValor);
     if (!valorNum || valorNum <= 0) { setRecError('Informe um valor válido.'); return; }
     setRecError(null);
     setRecLoading(true);
@@ -230,8 +231,8 @@ export function FinanceiroClient({
   );
 
   // ── Estados: formulário saída ─────────────────────────────────────────────
-  const [form, setForm] = useState<NovaDespesaForm>({
-    valor: 0, categoria: 'Outro', tipo: 'variavel',
+  const [form, setForm] = useState<Omit<NovaDespesaForm, 'valor'> & { valor: string }>({
+    valor: '', categoria: 'Outro', tipo: 'variavel',
     data: format(new Date(), 'yyyy-MM-dd'), descricao: '',
     dentistaId: role === 'secretaria' ? (initialDentistaFiltro || dentistasClinica[0]?.id || '') : dentistaId,
   });
@@ -239,8 +240,8 @@ export function FinanceiroClient({
   const [removendo, setRemovendo] = useState<string | null>(null);
 
   // ── Estados: formulário entrada ───────────────────────────────────────────
-  const [formReceita, setFormReceita] = useState<NovaReceitaForm>({
-    valor: 0, forma: 'pix',
+  const [formReceita, setFormReceita] = useState<Omit<NovaReceitaForm, 'valor'> & { valor: string }>({
+    valor: '', forma: 'pix',
     data: format(new Date(), 'yyyy-MM-dd'), descricao: '',
     dentistaId: role === 'secretaria' ? (initialDentistaFiltro || dentistasClinica[0]?.id || '') : dentistaId,
   });
@@ -277,26 +278,27 @@ export function FinanceiroClient({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.valor || form.valor <= 0) { toast.error('Informe um valor válido'); return; }
+    const valorNum = parseValorBR(form.valor);
+    if (!valorNum || valorNum <= 0) { toast.error('Informe um valor válido'); return; }
     if (role === 'secretaria' && !form.dentistaId) {
       toast.error('Selecione o dentista responsável'); return;
     }
     setSalvando(true);
     try {
-      const res = await criarDespesa(form);
+      const res = await criarDespesa({ ...form, valor: valorNum });
       if (!res.ok) { toast.error(res.erro ?? 'Erro ao salvar'); return; }
       if (form.data.startsWith(mesAtual)) {
         const nova: Despesa = {
           id: res.id ?? crypto.randomUUID(), clinica_id: '',
-          dentista_id: form.dentistaId ?? null, valor: form.valor,
+          dentista_id: form.dentistaId ?? null, valor: valorNum,
           categoria: form.categoria, tipo: form.tipo, data: form.data,
           descricao: form.descricao?.trim() || null, created_at: new Date().toISOString(),
         };
         setDespesas(prev => [nova, ...prev]);
-        setSaldo(prev => ({ ...prev, despesas: prev.despesas + form.valor, saldo: prev.saldo - form.valor }));
+        setSaldo(prev => ({ ...prev, despesas: prev.despesas + valorNum, saldo: prev.saldo - valorNum }));
       }
       toast.success('Saída registrada!');
-      setForm(f => ({ ...f, valor: 0, descricao: '', dentistaId: role === 'secretaria' ? selectedDentistaId : dentistaId }));
+      setForm(f => ({ ...f, valor: '', descricao: '', dentistaId: role === 'secretaria' ? selectedDentistaId : dentistaId }));
       setSheetMode(null);
     } finally { setSalvando(false); }
   }
@@ -318,26 +320,27 @@ export function FinanceiroClient({
 
   async function handleSubmitReceita(e: React.FormEvent) {
     e.preventDefault();
-    if (!formReceita.valor || formReceita.valor <= 0) { toast.error('Informe um valor válido'); return; }
+    const valorNum = parseValorBR(formReceita.valor);
+    if (!valorNum || valorNum <= 0) { toast.error('Informe um valor válido'); return; }
     if (role === 'secretaria' && !formReceita.dentistaId) {
       toast.error('Selecione o dentista responsável'); return;
     }
     setSalvandoReceita(true);
     try {
-      const res = await criarReceita(formReceita);
+      const res = await criarReceita({ ...formReceita, valor: valorNum });
       if (!res.ok) { toast.error(res.erro ?? 'Erro ao salvar'); return; }
       if (formReceita.data.startsWith(mesAtual)) {
         const nova: ReceitaManual = {
           id: res.id ?? crypto.randomUUID(), clinica_id: '',
-          dentista_id: formReceita.dentistaId ?? null, valor: formReceita.valor,
+          dentista_id: formReceita.dentistaId ?? null, valor: valorNum,
           forma: formReceita.forma, data: formReceita.data,
           descricao: formReceita.descricao?.trim() || null, created_at: new Date().toISOString(),
         };
         setReceitas(prev => [nova, ...prev]);
-        setSaldo(prev => ({ ...prev, receita: prev.receita + formReceita.valor, saldo: prev.saldo + formReceita.valor }));
+        setSaldo(prev => ({ ...prev, receita: prev.receita + valorNum, saldo: prev.saldo + valorNum }));
       }
       toast.success('Entrada registrada!');
-      setFormReceita(f => ({ ...f, valor: 0, descricao: '', dentistaId: role === 'secretaria' ? selectedDentistaId : dentistaId }));
+      setFormReceita(f => ({ ...f, valor: '', descricao: '', dentistaId: role === 'secretaria' ? selectedDentistaId : dentistaId }));
       setSheetMode(null);
     } finally { setSalvandoReceita(false); }
   }
@@ -835,9 +838,9 @@ export function FinanceiroClient({
                 <div className="space-y-1.5">
                   <Label className="text-sm text-text-secondary">Valor (R$)</Label>
                   <Input
-                    type="number" min="0.01" step="0.01" placeholder="0,00"
-                    value={form.valor || ''}
-                    onChange={e => setForm(f => ({ ...f, valor: parseFloat(e.target.value) || 0 }))}
+                    type="text" inputMode="decimal" placeholder="0,00"
+                    value={form.valor}
+                    onChange={e => setForm(f => ({ ...f, valor: e.target.value }))}
                     className="rounded-xl font-mono" required
                   />
                 </div>
@@ -904,9 +907,9 @@ export function FinanceiroClient({
                 <div className="space-y-1.5">
                   <Label className="text-sm text-text-secondary">Valor (R$)</Label>
                   <Input
-                    type="number" min="0.01" step="0.01" placeholder="0,00"
-                    value={formReceita.valor || ''}
-                    onChange={e => setFormReceita(f => ({ ...f, valor: parseFloat(e.target.value) || 0 }))}
+                    type="text" inputMode="decimal" placeholder="0,00"
+                    value={formReceita.valor}
+                    onChange={e => setFormReceita(f => ({ ...f, valor: e.target.value }))}
                     className="rounded-xl font-mono" required
                   />
                 </div>
@@ -1091,7 +1094,7 @@ export function FinanceiroClient({
                       Valor (R$) <span className="text-coral">*</span>
                     </Label>
                     <Input
-                      type="number" step="0.01" min="0.01"
+                      type="text" inputMode="decimal"
                       value={recValor}
                       onChange={(e) => setRecValor(e.target.value)}
                       className="rounded-xl bg-surface-alt border-border text-text-primary font-mono"

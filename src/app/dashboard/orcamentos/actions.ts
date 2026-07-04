@@ -326,6 +326,107 @@ export async function registrarPagamento(dados: {
   return { id: data.id, autoAprovado };
 }
 
+export async function editarPagamento(
+  pagamentoId: string,
+  dados: { valor: number; formaPagamento: FormaPagamento; data: string },
+): Promise<{ error?: string }> {
+  const { supabase, user, clinicId } = await requireClinicContext();
+
+  const { data: pagAtual } = await supabase
+    .from("pagamentos")
+    .select("id, paciente_id")
+    .eq("id", pagamentoId)
+    .eq("clinica_id", clinicId)
+    .maybeSingle();
+
+  if (!pagAtual) {
+    return { error: "Pagamento não encontrado." };
+  }
+
+  const { error } = await supabase
+    .from("pagamentos")
+    .update({
+      valor:           dados.valor,
+      forma_pagamento: dados.formaPagamento,
+      data_pagamento:  dados.data,
+    })
+    .eq("id", pagamentoId)
+    .eq("clinica_id", clinicId);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  const { data: dentistaPerfil } = await supabase
+    .from("dentistas")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("clinica_id", clinicId)
+    .maybeSingle();
+
+  registrarLog(supabase, {
+    clinicaId:   clinicId,
+    actorId:     dentistaPerfil?.id ?? null,
+    pacienteId:  pagAtual.paciente_id,
+    entityType:  'pagamento',
+    entityId:    pagamentoId,
+    action:      'pagamento.editado',
+    metadata:    { valor: dados.valor, forma: dados.formaPagamento },
+  });
+
+  revalidatePath("/dashboard/orcamentos");
+  revalidatePath("/dashboard/financeiro");
+  return {};
+}
+
+export async function excluirPagamento(
+  pagamentoId: string,
+): Promise<{ error?: string }> {
+  const { supabase, user, clinicId } = await requireClinicContext();
+
+  const { data: pagAtual } = await supabase
+    .from("pagamentos")
+    .select("id, paciente_id, valor, forma_pagamento")
+    .eq("id", pagamentoId)
+    .eq("clinica_id", clinicId)
+    .maybeSingle();
+
+  if (!pagAtual) {
+    return { error: "Pagamento não encontrado." };
+  }
+
+  const { error } = await supabase
+    .from("pagamentos")
+    .delete()
+    .eq("id", pagamentoId)
+    .eq("clinica_id", clinicId);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  const { data: dentistaPerfil } = await supabase
+    .from("dentistas")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("clinica_id", clinicId)
+    .maybeSingle();
+
+  registrarLog(supabase, {
+    clinicaId:   clinicId,
+    actorId:     dentistaPerfil?.id ?? null,
+    pacienteId:  pagAtual.paciente_id,
+    entityType:  'pagamento',
+    entityId:    pagamentoId,
+    action:      'pagamento.excluido',
+    metadata:    { valor: pagAtual.valor, forma: pagAtual.forma_pagamento },
+  });
+
+  revalidatePath("/dashboard/orcamentos");
+  revalidatePath("/dashboard/financeiro");
+  return {};
+}
+
 export async function editarOrcamento(
   orcamentoId: string,
   itens: Array<{

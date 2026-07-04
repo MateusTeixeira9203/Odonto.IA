@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Upload, FileText, Loader2, X, Check, Plus, AlertCircle } from 'lucide-react';
 import { criarProcedimento } from '../actions';
+import { parseValorBR } from '@/lib/valor-br';
 
 type ProcRow = {
   key: string;
@@ -107,7 +108,7 @@ export function ImportarProcedimentosModal({ open, onOpenChange, onSaved }: Prop
         nome: row.nome.trim(),
         descricao: '',
         categoria: row.categoria.trim() || 'Geral',
-        preco_padrao: parseFloat(row.preco_padrao) || 0,
+        preco_padrao: parseValorBR(row.preco_padrao),
         duracao_minutos: parseInt(row.duracao_minutos, 10) || 30,
       });
       count++;
@@ -235,7 +236,7 @@ export function ImportarProcedimentosModal({ open, onOpenChange, onSaved }: Prop
                         </td>
                         <td className="px-2 py-1.5">
                           <input
-                            type="number"
+                            type="text" inputMode="decimal"
                             value={row.preco_padrao}
                             onChange={(e) => updateRow(row.key, 'preco_padrao', e.target.value)}
                             className="w-20 bg-transparent px-1.5 py-0.5 text-right font-mono text-text-primary rounded focus:outline-none focus:bg-surface-alt focus:ring-1 focus:ring-teal/40 text-sm ml-auto block"

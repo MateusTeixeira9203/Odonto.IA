@@ -142,6 +142,7 @@ export function OrcamentosClient({
   ]);
   const [registeringProcIdx, setRegisteringProcIdx] = useState<number | null>(null);
   const [novoOrcDesconto, setNovoOrcDesconto] = useState(0);
+  const [descontoTexto, setDescontoTexto] = useState('');
   const [novoOrcPacienteSearch, setNovoOrcPacienteSearch] = useState('');
   const [novoOrcPacienteId, setNovoOrcPacienteId] = useState('');
   const [novoOrcPacienteNome, setNovoOrcPacienteNome] = useState('');
@@ -317,6 +318,12 @@ export function OrcamentosClient({
       setNovoOrcDesconto(Math.round(novoOrcSubtotal * descontoPercent) / 100);
     }
   }, [descontoPercent, novoOrcSubtotal]);
+
+  // Mantém o texto exibido em sincronia com o valor numérico (digitação manual
+  // ou botão de percentual) — evita reformatar a cada tecla, só reflete depois.
+  useEffect(() => {
+    setDescontoTexto(novoOrcDesconto > 0 ? formatValorBR(novoOrcDesconto) : '');
+  }, [novoOrcDesconto]);
 
   // Dentistas únicos para o dropdown da secretaria
   const dentistasUnicos = useMemo(() => {
@@ -2002,13 +2009,15 @@ export function OrcamentosClient({
                   <div className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2">
                     <span className="text-xs text-text-secondary shrink-0">R$</span>
                     <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={novoOrcDesconto || ''}
+                      type="text" inputMode="decimal"
+                      value={descontoTexto}
                       onChange={(e) => {
                         setDescontoPercent(null);
-                        setNovoOrcDesconto(Math.max(0, parseFloat(e.target.value) || 0));
+                        setDescontoTexto(e.target.value);
+                      }}
+                      onBlur={(e) => {
+                        setDescontoPercent(null);
+                        setNovoOrcDesconto(Math.max(0, parseValorBR(e.target.value)));
                       }}
                       placeholder="0,00"
                       className="rounded-lg bg-transparent border-0 text-right font-mono text-sm p-0 h-auto focus-visible:ring-0 shadow-none"

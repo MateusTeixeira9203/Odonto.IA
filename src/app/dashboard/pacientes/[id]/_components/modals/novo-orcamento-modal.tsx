@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Plus, Trash2, CircleDollarSign, AlertTriangle } from 'lucide-react';
 import {
   Dialog,
@@ -64,6 +64,9 @@ export function NovoOrcamentoModal({
   onCadastrarProcedimento,
   registeringProcIdx,
 }: NovoOrcamentoModalProps) {
+  const [valorFinalTexto, setValorFinalTexto] = useState(
+    novoOrcValorFinal !== null ? formatValorBR(novoOrcValorFinal) : ''
+  );
   const temDesconto = novoOrcValorFinal !== null && novoOrcSubtotal > 0 && novoOrcValorFinal < novoOrcSubtotal;
   const pctDesconto = temDesconto
     ? Math.round(((novoOrcSubtotal - novoOrcValorFinal!) / novoOrcSubtotal) * 100 * 10) / 10
@@ -279,14 +282,14 @@ export function NovoOrcamentoModal({
                     Valor final negociado (R$)
                   </Label>
                   <Input
-                    type="number"
-                    min="0"
-                    step="0.01"
+                    type="text" inputMode="decimal"
                     placeholder={novoOrcSubtotal.toFixed(2)}
-                    value={novoOrcValorFinal ?? ''}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setNovoOrcValorFinal(v === '' ? null : parseFloat(v) || 0);
+                    value={valorFinalTexto}
+                    onChange={(e) => setValorFinalTexto(e.target.value)}
+                    onBlur={(e) => {
+                      const parsed = parseValorBR(e.target.value);
+                      setNovoOrcValorFinal(parsed > 0 ? parsed : null);
+                      setValorFinalTexto(parsed > 0 ? formatValorBR(parsed) : '');
                     }}
                     className="rounded-xl bg-surface border-border text-text-primary font-mono"
                   />

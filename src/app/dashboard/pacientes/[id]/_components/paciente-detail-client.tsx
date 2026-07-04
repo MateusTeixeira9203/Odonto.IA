@@ -65,6 +65,8 @@ import type { PlanoId } from '@/lib/planos';
 import {
   atualizarStatusOrcamento,
   registrarPagamento,
+  editarPagamento,
+  excluirPagamento,
   criarOrcamento,
   editarOrcamento,
   excluirOrcamento,
@@ -234,6 +236,18 @@ export function PacienteDetailClient({
   const [pagSaving, setPagSaving] = useState(false);
   const [orcError, setOrcError] = useState<string | null>(null);
   const [pagError, setPagError] = useState<string | null>(null);
+
+  // Edição / exclusão de pagamento já registrado
+  const [editingPagId, setEditingPagId] = useState<string | null>(null);
+  const [editPagForm, setEditPagForm] = useState({
+    valor: '',
+    formaPagamento: 'pix' as FormaPagamento,
+    data: new Date().toISOString().split('T')[0],
+  });
+  const [editPagSaving, setEditPagSaving] = useState(false);
+  const [editPagError, setEditPagError] = useState<string | null>(null);
+  const [confirmDeletePagId, setConfirmDeletePagId] = useState<string | null>(null);
+  const [pagDeleteSaving, setPagDeleteSaving] = useState(false);
   const [isLoadingFichaParaOrc, setIsLoadingFichaParaOrc] = useState(false);
   const [fichasParaOrc, setFichasParaOrc] = useState<FichaParaOrc[]>([]);
   const [fichaOrcId, setFichaOrcId] = useState<string | null>(null);
@@ -583,7 +597,7 @@ export function PacienteDetailClient({
 
   const handleRegistrarPagamento = async () => {
     if (!detalheOrcId) return;
-    const valor = parseFloat(pagForm.valor.replace(',', '.'));
+    const valor = parseValorBR(pagForm.valor);
     if (!valor || valor <= 0) {
       setPagError('Informe um valor válido.');
       return;
@@ -624,6 +638,74 @@ export function PacienteDetailClient({
       });
     }
     setPagSaving(false);
+  };
+
+  const handleIniciarEdicaoPagamento = (pg: Pagamento) => {
+    setConfirmDeletePagId(null);
+    setEditingPagId(pg.id);
+    setEditPagForm({
+      valor: formatValorBR(pg.valor),
+      formaPagamento: (pg.forma_pagamento as FormaPagamento) ?? 'pix',
+      data: pg.data_pagamento ?? new Date().toISOString().split('T')[0],
+    });
+    setEditPagError(null);
+  };
+
+  const handleSalvarEdicaoPagamento = async () => {
+    if (!editingPagId) return;
+    const valor = parseValorBR(editPagForm.valor);
+    if (!valor || valor <= 0) {
+      setEditPagError('Informe um valor válido.');
+      return;
+    }
+    setEditPagError(null);
+    setEditPagSaving(true);
+
+    const result = await editarPagamento(editingPagId, {
+      valor,
+      formaPagamento: editPagForm.formaPagamento,
+      data: editPagForm.data,
+    });
+
+    if (result.error) {
+      setEditPagError(result.error);
+    } else {
+      setOrcamentosState((prev) =>
+        prev.map((o) =>
+          o.id === detalheOrcId
+            ? {
+                ...o,
+                pagamentos: o.pagamentos.map((p) =>
+                  p.id === editingPagId
+                    ? { ...p, valor, forma_pagamento: editPagForm.formaPagamento, data_pagamento: editPagForm.data }
+                    : p
+                ),
+              }
+            : o
+        )
+      );
+      setEditingPagId(null);
+    }
+    setEditPagSaving(false);
+  };
+
+  const handleExcluirPagamento = async (pagamentoId: string) => {
+    setPagDeleteSaving(true);
+    const result = await excluirPagamento(pagamentoId);
+    if (result.error) {
+      toast.error(result.error);
+    } else {
+      setOrcamentosState((prev) =>
+        prev.map((o) =>
+          o.id === detalheOrcId
+            ? { ...o, pagamentos: o.pagamentos.filter((p) => p.id !== pagamentoId) }
+            : o
+        )
+      );
+      setConfirmDeletePagId(null);
+      toast.success('Pagamento excluído.');
+    }
+    setPagDeleteSaving(false);
   };
 
   // Converte dentes_afetados + dentes_observacoes de uma ficha em itens de orçamento.
@@ -1492,6 +1574,9 @@ export function PacienteDetailClient({
           setOrcEditMode(false);
           setOrcEditError(null);
           setPagForm({ valor: '', formaPagamento: 'pix', data: new Date().toISOString().split('T')[0] });
+          setEditingPagId(null);
+          setEditPagError(null);
+          setConfirmDeletePagId(null);
         }}
         pagForm={pagForm}
         setPagForm={setPagForm}
@@ -1509,6 +1594,18 @@ export function PacienteDetailClient({
         onStatusChange={handleStatusChange}
         onRegistrarPagamento={handleRegistrarPagamento}
         onDeleteClick={setConfirmDeleteOrcId}
+        editingPagId={editingPagId}
+        editPagForm={editPagForm}
+        setEditPagForm={setEditPagForm}
+        editPagSaving={editPagSaving}
+        editPagError={editPagError}
+        onIniciarEdicaoPagamento={handleIniciarEdicaoPagamento}
+        onCancelarEdicaoPagamento={() => { setEditingPagId(null); setEditPagError(null); }}
+        onSalvarEdicaoPagamento={handleSalvarEdicaoPagamento}
+        confirmDeletePagId={confirmDeletePagId}
+        setConfirmDeletePagId={setConfirmDeletePagId}
+        pagDeleteSaving={pagDeleteSaving}
+        onExcluirPagamento={handleExcluirPagamento}
       />
 
       <ConfirmarDeleteOrcModal

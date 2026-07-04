@@ -22,7 +22,7 @@ import { ptBR } from 'date-fns/locale';
 import type { StatusOrcamento, FormaPagamento } from '@/app/dashboard/orcamentos/actions';
 import { STATUS_ORCAMENTO } from '@/lib/constants/orcamento-status';
 import { parseValorBR, formatValorBR } from '@/lib/valor-br';
-import type { OrcamentoComItens, OrcEditItem } from '../types';
+import type { OrcamentoComItens, OrcEditItem, Pagamento } from '../types';
 
 // ─── status options ───────────────────────────────────────────────────────────
 
@@ -100,6 +100,18 @@ interface Props {
   onStatusChange: (id: string, status: StatusOrcamento) => void;
   onRegistrarPagamento: () => void;
   onDeleteClick: (id: string | null) => void;
+  editingPagId: string | null;
+  editPagForm: PagForm;
+  setEditPagForm: React.Dispatch<React.SetStateAction<PagForm>>;
+  editPagSaving: boolean;
+  editPagError: string | null;
+  onIniciarEdicaoPagamento: (pg: Pagamento) => void;
+  onCancelarEdicaoPagamento: () => void;
+  onSalvarEdicaoPagamento: () => void;
+  confirmDeletePagId: string | null;
+  setConfirmDeletePagId: (id: string | null) => void;
+  pagDeleteSaving: boolean;
+  onExcluirPagamento: (id: string) => void;
 }
 
 // ─── component ───────────────────────────────────────────────────────────────
@@ -111,6 +123,9 @@ export function DetalheOrcamentoModal({
   orcEditSaving, orcEditError, setOrcEditError,
   onOpenEditOrc, onSalvarEdicaoOrc,
   onStatusChange, onRegistrarPagamento, onDeleteClick,
+  editingPagId, editPagForm, setEditPagForm, editPagSaving, editPagError,
+  onIniciarEdicaoPagamento, onCancelarEdicaoPagamento, onSalvarEdicaoPagamento,
+  confirmDeletePagId, setConfirmDeletePagId, pagDeleteSaving, onExcluirPagamento,
 }: Props) {
   const [isApprovingLocal, setIsApprovingLocal] = useState(false);
   const [justApproved, setJustApproved] = useState(false);
@@ -135,7 +150,9 @@ export function DetalheOrcamentoModal({
     orcamento_aprovado: 'Aprovado',
     orcamento_enviado:  'Enviado ao paciente',
     orcamento_recusado: 'Recusado',
-    pagamento_registrado: 'Pagamento registrado',
+    'pagamento.registrado': 'Pagamento registrado',
+    'pagamento.editado': 'Pagamento editado',
+    'pagamento.excluido': 'Pagamento excluído',
     status_alterado: 'Status alterado',
   };
 
@@ -446,10 +463,87 @@ export function DetalheOrcamentoModal({
                       {detalheOrc.pagamentos.map(pg => {
                         const Icon = FORMA_ICON[pg.forma_pagamento ?? 'outro'] ?? CircleDollarSign;
                         const isPago = pg.status === 'pago';
+
+                        if (editingPagId === pg.id) {
+                          return (
+                            <div key={pg.id} className="rounded-xl border border-teal/30 bg-surface-alt p-3 space-y-2">
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="space-y-1">
+                                  <Label className="text-[10px] text-text-secondary">Valor (R$)</Label>
+                                  <Input
+                                    type="text" inputMode="decimal" placeholder="0,00"
+                                    value={editPagForm.valor}
+                                    onChange={e => setEditPagForm(f => ({ ...f, valor: e.target.value }))}
+                                    className="rounded-lg bg-surface border-border text-text-primary text-sm font-mono h-8"
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <Label className="text-[10px] text-text-secondary">Data</Label>
+                                  <Input
+                                    type="date" value={editPagForm.data}
+                                    onChange={e => setEditPagForm(f => ({ ...f, data: e.target.value }))}
+                                    className="rounded-lg bg-surface border-border text-text-primary text-sm h-8"
+                                  />
+                                </div>
+                              </div>
+                              <Select
+                                value={editPagForm.formaPagamento}
+                                onValueChange={(v) => setEditPagForm(f => ({ ...f, formaPagamento: v as FormaPagamento }))}
+                              >
+                                <SelectTrigger className="rounded-lg bg-surface border-border text-text-primary text-sm h-8">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {Object.entries(FORMA_LABEL).map(([value, label]) => (
+                                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              {editPagError && <p className="text-xs text-red-500">{editPagError}</p>}
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm" variant="outline" onClick={onCancelarEdicaoPagamento} disabled={editPagSaving}
+                                  className="flex-1 rounded-lg h-8 text-xs"
+                                >
+                                  Cancelar
+                                </Button>
+                                <Button
+                                  size="sm" onClick={onSalvarEdicaoPagamento} disabled={editPagSaving}
+                                  className="flex-1 rounded-lg h-8 text-xs bg-teal hover:bg-teal/90 text-white"
+                                >
+                                  {editPagSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Salvar'}
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        if (confirmDeletePagId === pg.id) {
+                          return (
+                            <div key={pg.id} className="rounded-xl border border-coral/30 bg-coral/5 p-3 flex items-center justify-between gap-2">
+                              <p className="text-xs text-text-primary">Excluir pagamento de R$ {fmt(pg.valor)}?</p>
+                              <div className="flex gap-1.5 shrink-0">
+                                <Button
+                                  size="sm" variant="outline" onClick={() => setConfirmDeletePagId(null)} disabled={pagDeleteSaving}
+                                  className="rounded-lg h-7 text-xs px-2"
+                                >
+                                  Cancelar
+                                </Button>
+                                <Button
+                                  size="sm" onClick={() => onExcluirPagamento(pg.id)} disabled={pagDeleteSaving}
+                                  className="rounded-lg h-7 text-xs px-2 bg-coral hover:bg-coral/90 text-white"
+                                >
+                                  {pagDeleteSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Excluir'}
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        }
+
                         return (
                           <div
                             key={pg.id}
-                            className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors ${
+                            className={`group flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors ${
                               isPago
                                 ? 'border-teal/20 bg-teal/5'
                                 : 'border-border bg-surface-alt/40'
@@ -477,6 +571,22 @@ export function DetalheOrcamentoModal({
                                 ? <CheckCircle2 className="w-3 h-3 text-teal ml-auto mt-0.5" />
                                 : <Clock className="w-3 h-3 text-text-secondary ml-auto mt-0.5" />
                               }
+                            </div>
+                            <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={() => onIniciarEdicaoPagamento(pg)}
+                                className="p-1.5 rounded-lg hover:bg-surface-alt text-text-secondary hover:text-text-primary transition-colors"
+                                aria-label="Editar pagamento"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => setConfirmDeletePagId(pg.id)}
+                                className="p-1.5 rounded-lg hover:bg-coral/10 text-text-secondary hover:text-coral transition-colors"
+                                aria-label="Excluir pagamento"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
                             </div>
                           </div>
                         );
