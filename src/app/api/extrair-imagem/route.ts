@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
+import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@/lib/supabase/server";
 import { withRateLimit } from "@/lib/rate-limit";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY ?? "" });
+const MIME_POR_EXTENSAO: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  gif: "image/gif",
+};
 
 interface ExtrairImagemBody {
   ficha_arquivo_id: string;
@@ -31,8 +37,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  if (!process.env.OPENAI_API_KEY) {
-    return NextResponse.json({ error: "OPENAI_API_KEY não configurada." }, { status: 500 });
+  if (!process.env.GEMINI_API_KEY) {
+    return NextResponse.json({ error: "GEMINI_API_KEY não configurada." }, { status: 500 });
   }
 
   const supabase = await createClient();
@@ -91,31 +97,41 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const prompt =
     tipo === "foto_ficha"
       ? "Esta é uma foto de uma ficha odontológica física. Extraia todas as informações visíveis: procedimentos anotados, observações, datas e qualquer dado clínico relevante. Retorne em texto limpo e organizado."
-      : "Extraia todas as informações clínicas visíveis nesta imagem odontológica.";
+      : "Extraia todas as informações clínicas visíveis nesta imagem odontológica (radiografia).";
+
+  // Baixa a imagem e converte pra base64 — Gemini recebe inlineData, não URL
+  const imageResponse = await fetch(signedData.signedUrl);
+  if (!imageResponse.ok) {
+    return NextResponse.json(
+      { error: "Erro ao baixar a imagem." },
+      { status: 500 }
+    );
+  }
+  const imageBuffer = await imageResponse.arrayBuffer();
+  const imageBase64 = Buffer.from(imageBuffer).toString("base64");
+  const ext = (arquivo.nome_original as string | null)?.split(".").pop()?.toLowerCase() ?? "";
+  const mimeType = MIME_POR_EXTENSAO[ext] ?? "image/jpeg";
 
   let textoExtraido: string;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [
         {
           role: "user",
-          content: [
-            { type: "text", text: prompt },
-            {
-              type: "image_url",
-              image_url: { url: signedData.signedUrl },
-            },
+          parts: [
+            { inlineData: { mimeType, data: imageBase64 } },
+            { text: prompt },
           ],
         },
       ],
-      max_tokens: 2000,
     });
 
-    textoExtraido = response.choices[0]?.message?.content ?? "";
+    textoExtraido = response.text ?? "";
   } catch (err) {
-    console.error("Erro no GPT-4o Vision:", err);
+    console.error("Erro no Gemini Vision:", err);
     return NextResponse.json(
       { error: "Erro ao processar imagem com IA." },
       { status: 500 }

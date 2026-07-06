@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { PacientesList } from './_components/pacientes-list';
 import { PageTransition } from '@/components/layout/page-transition';
+import { PageContainer } from '@/components/layout/page-container';
 import { getDentistaCached } from '@/lib/get-dentista';
 
 interface PacientesPageProps {
@@ -29,7 +30,7 @@ export default async function PacientesPage({ searchParams }: PacientesPageProps
 
   return (
     <PageTransition>
-      <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+      <PageContainer variant="wide">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="font-heading font-bold text-3xl md:text-4xl text-text-primary mb-1">Pacientes</h1>
@@ -59,7 +60,7 @@ export default async function PacientesPage({ searchParams }: PacientesPageProps
         <Suspense fallback={<PacientesListSkeleton />}>
           <PacientesList canCreate={canCreate} params={params} />
         </Suspense>
-      </div>
+      </PageContainer>
     </PageTransition>
   );
 }

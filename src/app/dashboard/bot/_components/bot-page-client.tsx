@@ -2,6 +2,7 @@
 
 import { useState, useEffect, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { PageContainer } from '@/components/layout/page-container';
 import {
   WifiOff,
   QrCode,
@@ -341,11 +342,12 @@ export function BotPageClient({
   ];
 
   return (
+    <PageContainer>
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="relative max-w-5xl mx-auto p-8 space-y-6"
+      className="relative space-y-6"
     >
       {/* ── Em Breve overlay ──────────────────────────────────────────────────── */}
       <div className="absolute inset-0 z-50 rounded-3xl backdrop-blur-sm bg-bg/60 flex flex-col items-center justify-center gap-4 pointer-events-auto">
@@ -698,5 +700,6 @@ export function BotPageClient({
         </AnimatePresence>
       )}
     </motion.div>
+    </PageContainer>
   );
 }

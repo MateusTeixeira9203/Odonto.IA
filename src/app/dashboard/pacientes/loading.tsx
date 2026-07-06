@@ -1,8 +1,9 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageContainer } from "@/components/layout/page-container";
 
 export default function PacientesLoading(): React.JSX.Element {
   return (
-    <div className="p-8 max-w-7xl mx-auto w-full space-y-6">
+    <PageContainer variant="wide" className="space-y-6">
       <div className="flex items-center justify-between">
         <Skeleton className="h-9 w-36 rounded" />
         <Skeleton className="h-10 w-40 rounded" />
@@ -21,6 +22,6 @@ export default function PacientesLoading(): React.JSX.Element {
           </div>
         ))}
       </div>
-    </div>
+    </PageContainer>
   );
 }

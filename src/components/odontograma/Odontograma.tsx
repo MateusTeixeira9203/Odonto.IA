@@ -3,6 +3,10 @@
 import { useState, Fragment } from 'react';
 import { List } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  ARCH_SUPERIOR, ARCH_INFERIOR, ARCH_COMPLETA,
+  QUAD_SUP_DIREITO, QUAD_SUP_ESQUERDO, QUAD_INF_DIREITO, QUAD_INF_ESQUERDO,
+} from '@/lib/arcadas';
 
 // ─── FDI tooth layout ────────────────────────────────────────────────────────
 export const TEETH_UPPER = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
@@ -512,6 +516,28 @@ export function Odontograma({
     return 'default';
   }
 
+  // #16 D6 — "destaque de região" pros rótulos de quadrante: agrega o status das
+  // sentinelas que afetam aquele canto (quadrante + arcada + boca toda), mesma
+  // regra de prioridade do computeToothStatusMap (concluído só se tudo concluído).
+  function regionStatus(...sentinels: number[]): ToothStatus | undefined {
+    const statuses = sentinels
+      .map((s) => statusTeeth[s])
+      .filter((s): s is ToothStatus => s != null);
+    if (statuses.length === 0) return undefined;
+    if (statuses.every((s) => s === 'concluido')) return 'concluido';
+    if (statuses.some((s) => s === 'concluido' || s === 'em_andamento')) return 'em_andamento';
+    return 'nao_iniciado';
+  }
+
+  function RegionDot({ status }: { status: ToothStatus | undefined }) {
+    if (colorMode !== 'status' || !status) return null;
+    const color =
+      status === 'concluido'     ? 'var(--color-teal)'
+      : status === 'em_andamento' ? 'var(--color-warning)'
+      : 'var(--color-text-muted)';
+    return <span className="inline-block w-1.5 h-1.5 rounded-full ml-1.5 align-middle" style={{ background: color }} aria-hidden="true" />;
+  }
+
   function renderArch(teeth: number[], isUpper: boolean) {
     return teeth.map((num) => {
       const isMidlineStart = num === 21 || num === 31 || num === 61 || num === 71;
@@ -727,10 +753,12 @@ export function Odontograma({
               <span className="text-[9px] uppercase tracking-[0.22em] font-semibold"
                 style={{ color: 'var(--color-text-muted)' }}>
                 Sup. Direito
+                <RegionDot status={regionStatus(QUAD_SUP_DIREITO, ARCH_SUPERIOR, ARCH_COMPLETA)} />
               </span>
               <span className="text-[9px] uppercase tracking-[0.22em] font-semibold"
                 style={{ color: 'var(--color-text-muted)' }}>
                 Sup. Esquerdo
+                <RegionDot status={regionStatus(QUAD_SUP_ESQUERDO, ARCH_SUPERIOR, ARCH_COMPLETA)} />
               </span>
             </div>
           )}
@@ -766,10 +794,12 @@ export function Odontograma({
               <span className="text-[9px] uppercase tracking-[0.22em] font-semibold"
                 style={{ color: 'var(--color-text-muted)' }}>
                 Inf. Direito
+                <RegionDot status={regionStatus(QUAD_INF_DIREITO, ARCH_INFERIOR, ARCH_COMPLETA)} />
               </span>
               <span className="text-[9px] uppercase tracking-[0.22em] font-semibold"
                 style={{ color: 'var(--color-text-muted)' }}>
                 Inf. Esquerdo
+                <RegionDot status={regionStatus(QUAD_INF_ESQUERDO, ARCH_INFERIOR, ARCH_COMPLETA)} />
               </span>
             </div>
           )}

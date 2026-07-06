@@ -41,6 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { PageContainer } from '@/components/layout/page-container';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -198,7 +199,23 @@ export function PacienteDetailClient({
   const [editTelefone, setEditTelefone] = useState(paciente.telefone ?? '');
   const [editEmail, setEditEmail] = useState(paciente.email ?? '');
   const [editEndereco, setEditEndereco] = useState(paciente.endereco ?? '');
+  const [editDentistaId, setEditDentistaId] = useState(paciente.dentista_id ?? '');
   const [editError, setEditError] = useState<string | null>(null);
+
+  // Encaminhamento (hierarquia §3) — só a secretária reatribui o dentista responsável.
+  const [dentistasClinica, setDentistasClinica] = useState<{ id: string; nome: string }[]>([]);
+  useEffect(() => {
+    if (role !== 'secretaria') return;
+    const supabase = createClient();
+    void supabase
+      .from('dentistas')
+      .select('id, nome')
+      .eq('clinica_id', clinicaId)
+      .neq('role', 'secretaria')
+      .eq('ativo', true)
+      .order('nome')
+      .then(({ data }) => setDentistasClinica(data ?? []));
+  }, [role, clinicaId]);
 
   // Dados exibíveis do paciente — atualizados localmente após edição (sem router.refresh)
   const [displayNome, setDisplayNome] = useState(paciente.nome);
@@ -478,6 +495,7 @@ export function PacienteDetailClient({
         telefone: editTelefone || null,
         email: editEmail || null,
         endereco: editEndereco || null,
+        ...(role === 'secretaria' ? { dentista_id: editDentistaId || null } : {}),
       });
       if (result.error) {
         setEditError(result.error);
@@ -968,7 +986,7 @@ export function PacienteDetailClient({
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+    <PageContainer variant="wide">
 
       {/* ── NAV + PATIENT CARD ──────────────────────────────────────── */}
       <motion.div
@@ -1549,6 +1567,7 @@ export function PacienteDetailClient({
             setEditTelefone(paciente.telefone ?? '');
             setEditEmail(paciente.email ?? '');
             setEditEndereco(paciente.endereco ?? '');
+            setEditDentistaId(paciente.dentista_id ?? '');
             setEditError(null);
           }
         }}
@@ -1563,6 +1582,9 @@ export function PacienteDetailClient({
         editError={editError}
         isPending={isPending}
         onSave={handleSaveEdit}
+        editDentistaId={editDentistaId}
+        setEditDentistaId={setEditDentistaId}
+        dentistasClinica={role === 'secretaria' ? dentistasClinica : null}
       />
 
       <DetalheOrcamentoModal
@@ -1660,6 +1682,6 @@ export function PacienteDetailClient({
         onCadastrarProcedimento={(idx) => void handleCadastrarProcedimento(idx)}
         registeringProcIdx={registeringProcIdx}
       />
-    </div>
+    </PageContainer>
   );
 }

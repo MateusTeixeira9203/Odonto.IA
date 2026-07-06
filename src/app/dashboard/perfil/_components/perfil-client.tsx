@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { motion } from 'motion/react';
+import { PageContainer } from '@/components/layout/page-container';
 import { Camera, Trash2, Loader2, User } from 'lucide-react';
 import { OdontoIALogo } from '@/components/ui/dent-ia-logo';
 import { toast } from 'sonner';
@@ -13,7 +14,7 @@ import { EspecialidadeChips } from '@/components/ui/especialidade-chips';
 import Image from 'next/image';
 
 const ROLE_LABELS: Record<DentistaRole, string> = {
-  admin: 'Administrador',
+  admin: 'Criador',
   dentista: 'Dentista',
   secretaria: 'Secretária',
 };
@@ -139,7 +140,7 @@ export function PerfilClient({ nome, email, role, clinica, avatarUrl: initialAva
   }
 
   return (
-    <div className="p-8 max-w-5xl mx-auto w-full">
+    <PageContainer>
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -363,6 +364,6 @@ export function PerfilClient({ nome, email, role, clinica, avatarUrl: initialAva
           </div>
         </div>
       </motion.div>
-    </div>
+    </PageContainer>
   );
 }

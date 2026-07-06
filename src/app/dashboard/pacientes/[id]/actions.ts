@@ -46,9 +46,17 @@ export async function atualizarPaciente(
     estado?: string | null;
     endereco?: string | null;
     observacoes?: string | null;
+    dentista_id?: string | null;
   }
 ): Promise<{ error?: string }> {
-  const { supabase, clinicId } = await requireClinicContext();
+  const { supabase, clinicId, role } = await requireClinicContext();
+
+  // Encaminhamento (hierarquia §3): só a secretária troca o dentista responsável —
+  // a ficha não acompanha, fica com quem a criou. RLS já bloqueia na escrita, mas
+  // aqui dá um erro claro em vez do erro cru do Postgres.
+  if (dados.dentista_id !== undefined && role !== 'secretaria') {
+    return { error: 'Só a secretária pode reatribuir o dentista responsável.' };
+  }
 
   const { error } = await supabase
     .from("pacientes")
@@ -147,7 +155,7 @@ export async function gerarPlanejamentoIA(
 
   try {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

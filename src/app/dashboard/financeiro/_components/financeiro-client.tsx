@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { createClient } from '@/lib/supabase/client';
 import { motion, AnimatePresence } from 'motion/react';
+import { PageContainer } from '@/components/layout/page-container';
 import { format, parseISO, addMonths, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -375,11 +376,11 @@ export function FinanceiroClient({
     : null;
 
   return (
+    <PageContainer variant="wide">
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="p-4 md:p-8 max-w-5xl mx-auto w-full"
     >
       {/* ── Cabeçalho ──────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
@@ -1156,6 +1157,7 @@ export function FinanceiroClient({
         </SheetContent>
       </Sheet>
     </motion.div>
+    </PageContainer>
   );
 }
 

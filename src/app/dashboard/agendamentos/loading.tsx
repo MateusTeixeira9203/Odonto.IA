@@ -1,6 +1,8 @@
+import { PageContainer } from '@/components/layout/page-container';
+
 export default function AgendamentosLoading() {
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+    <PageContainer variant="wide">
       {/* Header skeleton */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-8">
         <div className="space-y-2.5">
@@ -62,6 +64,6 @@ export default function AgendamentosLoading() {
           </div>
         </div>
       </div>
-    </div>
+    </PageContainer>
   );
 }

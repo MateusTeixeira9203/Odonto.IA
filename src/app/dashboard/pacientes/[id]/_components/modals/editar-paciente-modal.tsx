@@ -11,6 +11,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface EditarPacienteModalProps {
   open: boolean;
@@ -26,6 +33,10 @@ interface EditarPacienteModalProps {
   editError: string | null;
   isPending: boolean;
   onSave: () => void;
+  editDentistaId: string;
+  setEditDentistaId: (v: string) => void;
+  /** null quando o papel atual não pode reatribuir (só a secretária pode). */
+  dentistasClinica: { id: string; nome: string }[] | null;
 }
 
 export function EditarPacienteModal({
@@ -42,6 +53,9 @@ export function EditarPacienteModal({
   editError,
   isPending,
   onSave,
+  editDentistaId,
+  setEditDentistaId,
+  dentistasClinica,
 }: EditarPacienteModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -93,6 +107,24 @@ export function EditarPacienteModal({
               className="rounded-xl bg-surface-alt border-border"
             />
           </div>
+          {dentistasClinica && (
+            <div className="space-y-2">
+              <Label htmlFor="edit-dentista">Dentista responsável</Label>
+              <Select value={editDentistaId} onValueChange={(v) => setEditDentistaId(v ?? '')}>
+                <SelectTrigger id="edit-dentista" className="rounded-xl bg-surface-alt border-border">
+                  <SelectValue placeholder="Selecione o dentista" />
+                </SelectTrigger>
+                <SelectContent>
+                  {dentistasClinica.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>{d.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-text-secondary">
+                A ficha não acompanha — fica com quem a criou. O novo dentista passa a ver o paciente e cria as próprias fichas.
+              </p>
+            </div>
+          )}
           {editError && <p className="text-xs text-red-500">{editError}</p>}
         </div>
         <DialogFooter>

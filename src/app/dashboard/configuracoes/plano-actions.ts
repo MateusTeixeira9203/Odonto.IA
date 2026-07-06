@@ -34,14 +34,14 @@ export async function verificarStatusMigracao(): Promise<
     status: {
       dentistasAtivos,
       planoAtual: (clinica as { plano: string }).plano,
-      podeAtivar: dentistasAtivos >= 3,
+      podeAtivar: dentistasAtivos >= 2,
     },
   };
 }
 
 /**
- * Ativa o plano Clínica quando há 3+ dentistas ativos.
- * Muda `clinicas.plano` de 'SOLO' para 'CLINICA' e define limite = 99.
+ * Ativa o plano Clínica quando há 2+ dentistas ativos.
+ * Muda `clinicas.plano` de 'SOLO' para 'CLINICA' e define limite = 5.
  */
 export async function ativarPlanoClinica(): Promise<
   { ok: true } | { ok: false; error: string }
@@ -56,16 +56,16 @@ export async function ativarPlanoClinica(): Promise<
     .neq('role', 'secretaria')
     .eq('ativo', true);
 
-  if ((count ?? 0) < 3) {
+  if ((count ?? 0) < 2) {
     return {
       ok: false,
-      error: `São necessários 3 dentistas ativos. Atualmente: ${count ?? 0}.`,
+      error: `São necessários 2 dentistas ativos. Atualmente: ${count ?? 0}.`,
     };
   }
 
   const { error } = await supabase
     .from('clinicas')
-    .update({ plano: 'CLINICA', limite_dentistas: 99 })
+    .update({ plano: 'CLINICA', limite_dentistas: 5 })
     .eq('id', clinicId)
     .eq('plano', 'SOLO');
 

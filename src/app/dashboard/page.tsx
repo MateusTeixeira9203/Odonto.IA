@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { getDentistaCached } from '@/lib/get-dentista';
 import { createClient } from '@/lib/supabase/server';
 import { PageTransition } from '@/components/layout/page-transition';
+import { PageContainer } from '@/components/layout/page-container';
 import { DentistaDashboard, DashboardSkeleton } from './_components/dentista-dashboard';
 import { SecretariaDashboard } from './_components/secretaria-dashboard';
 import type { AgendamentoHoje, DentistaItem, PendenciaItem } from './_components/secretaria-dashboard';
@@ -195,7 +196,7 @@ export default async function DashboardPage({
 
   return (
     <PageTransition>
-      <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto w-full">
+      <PageContainer variant="wide">
         <PrimeirosPassosCard progresso={progresso} dentistaId={dentista.id} />
         {bloqueadoModoConsulta && (
           <div className="mb-6 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-5 flex items-start gap-4">
@@ -221,7 +222,7 @@ export default async function DashboardPage({
         <Suspense fallback={<DashboardSkeleton />}>
           <DentistaDashboard dentista={dentista} />
         </Suspense>
-      </div>
+      </PageContainer>
     </PageTransition>
   );
 }

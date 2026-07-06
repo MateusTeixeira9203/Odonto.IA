@@ -30,7 +30,7 @@ import { deletarUsuario, criarSecretariaAction } from '../actions';
 // ── Constantes de role ────────────────────────────────────────────────────────
 
 const ROLE_LABELS: Record<DentistaRole, string> = {
-  admin:     'Admin',
+  admin:     'Criador',
   dentista:  'Dentista Agregado',
   secretaria:'Secretária',
 };

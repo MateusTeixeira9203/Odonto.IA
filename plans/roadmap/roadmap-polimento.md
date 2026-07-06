@@ -34,17 +34,35 @@
 | 7 | Ver a integração da secretária | = **I** | 🗣️ |
 | 8 | Unificar o DEX (2 designs hoje) + animações leves | F + motion (adiado) | 🗣️ |
 | 9 | Otimizar o site ao máximo (carregamento) — **foco APP** (landing → #17) | **Novo** (perf) | ✅ **escopado** → `plans/specs/spec-9-performance-app.md`: fundo Opção A (partículas animam na entrada e congelam + blobs estáticos) · optimizePackageImports · lazy recharts/pdf · remover framer-motion |
-| 10 | Melhorar o dicionário de odontologia | = **H** | 🗣️ |
-| 11 | Modo consulta identificar só o importante | = **H** (parte já em 03/07) | 🗣️ |
+| 10 | Melhorar o dicionário de odontologia | = **H** | ✅ **escopado** → `spec-precisao-extracao-consulta.md` (dicionário fonte única + expandido: variações, conjuntos, quadrante, decíduos; ordem: prompt+dicionário antes de trocar modelo) |
+| 11 | Modo consulta identificar só o importante | = **H** | ✅ **escopado** → `spec-precisao-extracao-consulta.md` (prompt "sinal, não ruído") + `spec-arquitetura-ia-providers.md` (fusão Groq/Gemini) |
 | 12 | Criar paciente novo — barra de ações flutuando + sucesso silencioso | **Bug** | ✅ Barra → rodapé ancorado (full-bleed + blur + elevação, light/dark) + toast de sucesso. Falta eyeball visual |
 | 13 | Valor no orçamento — input corrompe ao editar (zero grudado + 250→289) | Orçamento | 🗣️→**decidido (Opção B)**: input decimal normal, parse no blur ("250"=R$250), guarda número. Raiz: `value=formatCents` + onChange `replace(/\D/g,'')` (linhas 1224/1228 editar, 1869/1875 novo). Trocar nos 2 + alinhar input de pagamento. Sem migration |
 | 14 | Status do orçamento — 'pago' órfão + falha silenciosa | Orçamento | 🗣️→**decidido (Opção A)**: 2 dimensões (comercial vs pagamento derivado). SEM migration (constraint já exclui 'pago'). Remover 'pago' do type + refs órfãs, rotular as 2 dimensões, toast no erro, verificar recusado. Vai no spec do cluster |
 | 15 | Scroll travado (novo orçamento + apresentação) — não era "abas" | UI/scroll | 🗣️→**escopado**: unificar container de scroll dos slides (ApresentarPanel 472/480/513) + confirmar modal novo orç (empírico); polish visual da apresentação dobra no F3. No spec do cluster |
 | 16 | Ficha unificada — criar+acompanhar numa superfície · 3 status (não iniciado/em andamento/concluído) · odontograma-mapa · quadrante · sai DEX-sugere-orçamento e anexos | Ficha/tratamento | ✅ **escopado** → `plans/specs/spec-16-ficha-unificada.md` (execução pendente; v1 sem tocar consulta) |
 | 17 | **Landing** — redesenho completo + botão "Continuar com Google" direto no hero (reduz fricção de entrar→depois Google; OAuth **já existe** em `login`/`cadastro`, é reuso) + perf da landing (hoje `'use client'` total: ParticleNetwork/motion/blobs, absorve a parte "landing" do #9). Bug de copy: hero diz "7 dias", planos/FAQ dizem "14". | Landing/aquisição | 🗣️ **design-first** (brief→shotgun antes de código, regra 4) · **paralelo/pós-teste** — topo de funil, NÃO bloqueia o teste da clínica |
-| 18 | **Largura global (pós-sidebar)** — sistema foi montado com sidebar (removida), mas os containers seguem em `max-w-7xl` (~1280px) e sobra tela nas laterais. Alargar o aproveitamento no sistema todo (perfil do paciente + abas, listas, agenda, dashboard). Critério: telas **densas** alargam e ganham colunas; **leitura/formulário** mantêm medida confortável. Largura extra exige **plano de uso** (colunas/painéis), não esticar vazio. Mecânico = trocar container; bem-feito = decidir layout por tela. Transversal, casa com o polish/F3. | Layout/UI | 🗣️ |
+| 18 | **Largura global (pós-sidebar)** — sistema foi montado com sidebar (removida), mas os containers seguem em `max-w-7xl` (~1280px) e sobra tela nas laterais. Alargar o aproveitamento no sistema todo (perfil do paciente + abas, listas, agenda, dashboard). Critério: telas **densas** alargam e ganham colunas; **leitura/formulário** mantêm medida confortável. Largura extra exige **plano de uso** (colunas/painéis), não esticar vazio. Mecânico = trocar container; bem-feito = decidir layout por tela. Transversal, casa com o polish/F3. | Layout/UI | ✅ **escopado** → `spec-18-largura-global.md` (wide 1536 / comfortable 1280 via PageContainer; Fase A mecânica + Fase B por tela; classificação a confirmar) |
 
 > Ao discutir cada item: definir escopo/abordagem, mover de 🗣️ p/ um passo concreto (com arquivos), e priorizar. Itens que já são C/D/F/H/I/J consolidam com o bloco 1/2.
+
+## 4. Escopado na sessão de planejamento de 2026-07-05
+| Tema | Spec | Status |
+|---|---|---|
+| **Hierarquia** — 3 papéis (Criador/Dentista/Secretária), silo total por dentista (secretária vê tudo), planos Individual(1)/Clínica(2–5, teto 5), assinatura por-dentista | `spec-hierarquia-papeis-planos.md` | ✅ pronta |
+| **IA — precisão da consulta** — dicionário fonte única + expandido, prompt "só o importante", híbrido Groq-voz/Gemini-estrutura | `spec-precisao-extracao-consulta.md` | ✅ pronta |
+| **IA — arquitetura/fusão** — Groq (voz/texto) + Gemini (precisão/visão), limpar 5 rotas disfarçadas de Gemini, GPT-4o sai se Gemini cobrir | `spec-arquitetura-ia-providers.md` | ✅ mapa validado |
+| **#16 Ficha** — +D12 layout 2 colunas (odontograma 40% / procedimentos+progresso 60%) | `spec-16-ficha-unificada.md` | ✅ pronta |
+| **#18 Largura** — PageContainer wide 1536 / comfortable 1280 | `spec-18-largura-global.md` | ✅ escopo (classificação a confirmar) |
+
+> Handoff de execução: `plans/handoffs/handoff-2026-07-05-execucao.md`. **Próxima sessão: execução.** Gates antes de codar: classificação #18 + confirmação da migration de hierarquia (prod=dev).
+
+## 5. Escopado na discussão de 2026-07-05 (noite) — segurança
+| Tema | Spec | Status |
+|---|---|---|
+| **Blindagem do silo** — RLS de tabela OK, mas storage tem vazamento **cross-clínica** (buckets `fichas`/`radiografias`/`audios` com policy legada ampla) + 1 over-fetch service-role (`salvarAssinaturaConsulta`) + RPC de helpers exposto a `anon`. Gate de segurança = simulação SQL dois-dentistas (determinística, sem clínica) + audit service-role, **antes** de qualquer clínica real | `spec-seguranca-silo-validacao.md` | ✅ pronta p/ execução |
+
+> Descoberta-chave: **RLS de tabela é 1 de 3 camadas.** Service-role e storage bypassam/ignoram a RLS e precisam do mesmo silo. Achado 🔴 ALTO (PHI cross-tenant) já em produção, herdado (não da migration 089).
 
 ## Transversais (descobertos na discussão)
 - **Feedback de sucesso consistente** 🔴 — o form de novo paciente redirecionava **em silêncio** (corrigido com toast). Auditar outros forms que redirecionam sem confirmar: **editar paciente, agendamento, orçamento, configurações, convites**. Padronizar toast de sucesso — é sinal de confiança ("salvou mesmo?").

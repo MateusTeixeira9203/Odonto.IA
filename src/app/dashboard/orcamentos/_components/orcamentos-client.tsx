@@ -29,6 +29,7 @@ import dynamic from 'next/dynamic';
 const QRCode = dynamic(() => import('react-qr-code'), { ssr: false });
 import type { DentistaRole } from '@/types/database';
 import { motion, AnimatePresence } from 'motion/react';
+import { PageContainer } from '@/components/layout/page-container';
 import { DexLoader } from '@/components/ui/dex-loader';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -703,7 +704,7 @@ export function OrcamentosClient({
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto w-full">
+    <PageContainer variant="wide">
       {/* Cabeçalho */}
       <motion.header
         initial={{ opacity: 0, y: -20 }}
@@ -2077,6 +2078,6 @@ export function OrcamentosClient({
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageContainer>
   );
 }

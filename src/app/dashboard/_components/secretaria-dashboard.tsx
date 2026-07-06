@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'motion/react';
+import { PageContainer } from '@/components/layout/page-container';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -285,7 +286,7 @@ export function SecretariaDashboard({
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto w-full">
+    <PageContainer variant="wide">
 
       {/* ── Cabeçalho ─────────────────────────────────────────────────────── */}
       <motion.header
@@ -648,6 +649,6 @@ export function SecretariaDashboard({
           }}
         />
       )}
-    </div>
+    </PageContainer>
   );
 }

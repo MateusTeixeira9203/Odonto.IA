@@ -70,11 +70,12 @@ const STATUS_META: Record<ProcStatus, { label: string; icon: typeof Check; class
 };
 
 // #16 D7 — agrega o status dos procedimentos de cada dente pro odontograma-mapa.
-// Sentinelas de arcada/quadrante (>=90) não pintam por dente (D6).
+// Sentinelas de arcada/quadrante (>=90) entram no mapa também (mesma agregação),
+// mas o Odontograma não pinta dente a dente com elas — usa só pro "destaque de
+// região" nos rótulos de quadrante (D6).
 function computeToothStatusMap(evo: Evolution): Partial<Record<number, ToothStatus>> {
   const map: Partial<Record<number, ToothStatus>> = {};
   evo.teethNotes.forEach((tn) => {
-    if (tn.tooth >= 90) return;
     const keys = tn.notes.filter(Boolean).map((_, i) => `${tn.tooth}_${i}`);
     if (keys.length === 0) return;
     const statuses = keys.map((k) => evo.procedimentosStatus[k] ?? 'nao_iniciado');
@@ -1132,27 +1133,14 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
                       )}
 
                       {evo.teethNotes.length > 0 && (
-                        <div className="flex flex-col gap-2 mb-4">
+                        <div className="flex flex-wrap gap-1.5 mb-4">
                           {evo.teethNotes.map((tn) => (
-                            <div key={tn.tooth} className="bg-surface-alt rounded-lg border border-border/40 px-3 py-2">
-                              <span className="font-mono text-[10px] font-bold text-teal block mb-1.5">
-                                {tn.tooth in ARCH_LABELS ? ARCH_LABELS[tn.tooth] : `D${tn.tooth}`}
-                              </span>
-                              <div className="flex flex-col gap-1.5">
-                                {tn.notes.filter(Boolean).map((n, i) => {
-                                  const procKey = `${tn.tooth}_${i}`;
-                                  const done = evo.procedimentosStatus[procKey] === 'concluido';
-                                  return (
-                                    <div key={i} className="flex items-center gap-2">
-                                      <div className={`w-4 h-4 rounded border shrink-0 flex items-center justify-center ${done ? 'bg-emerald-500 border-emerald-500' : 'border-border/60'}`}>
-                                        {done && <Check className="w-2.5 h-2.5 text-white" />}
-                                      </div>
-                                      <span className={`text-[11px] font-medium ${done ? 'line-through text-text-secondary' : 'text-text-primary'}`}>{n}</span>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
+                            <span
+                              key={tn.tooth}
+                              className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-mono font-bold text-teal bg-surface-alt border border-border/40"
+                            >
+                              {tn.tooth in ARCH_LABELS ? ARCH_LABELS[tn.tooth] : `D${tn.tooth}`}
+                            </span>
                           ))}
                         </div>
                       )}
@@ -1182,62 +1170,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
                       >
                         <div className="border-t border-border/40 px-6 pb-6 pt-5 space-y-6">
 
-                          {/* Progresso + Apresentar */}
-                          <div>
-                            <div className="flex items-center justify-between mb-2">
-                              <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary/70">Progresso do tratamento</p>
-                              <span className="text-xs text-text-secondary">{doneProcs} de {totalProcs} concluídos</span>
-                            </div>
-                            <div className="h-2 w-full rounded-full bg-surface-alt border border-border/40 overflow-hidden">
-                              <div className="h-2 rounded-full bg-teal transition-all duration-500" style={{ width: `${pct}%` }} />
-                            </div>
-                            <div className="flex items-center justify-between mt-2">
-                              <div className="flex items-baseline gap-2">
-                                <span className="text-2xl font-bold text-teal">{pct}%</span>
-                                <span className="text-sm text-text-secondary">concluído</span>
-                              </div>
-                              <ApresentarPaciente
-                                patientId={patientId}
-                                clinicaId={clinicaId}
-                                patientName={patientName ?? ''}
-                                fichaId={evo.id}
-                                compact
-                              />
-                            </div>
-                          </div>
-
-                          {/* Odontograma */}
-                          <div>
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary/70 mb-3">Odontograma</p>
-                            <div className="bg-surface-alt rounded-2xl border border-border/40 px-6 py-5">
-                              <p className="text-[11px] text-text-secondary/60 text-center mb-4 flex items-center justify-center gap-1.5">
-                                <ChevronRight className="w-3 h-3" />
-                                Clique em um dente para filtrar os procedimentos
-                              </p>
-                              <Odontograma
-                                colorMode="status"
-                                statusTeeth={computeToothStatusMap(evo)}
-                                selectedTeeth={filterTooth ? [filterTooth] : []}
-                                onToothToggle={(tooth) => setFilterTooth((prev) => prev === tooth ? null : tooth)}
-                                hideFilters
-                              />
-                              <div className="flex items-center justify-center gap-4 mt-3 text-[10px] font-semibold text-text-secondary">
-                                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-surface-alt border border-border" /> A fazer</span>
-                                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ background: 'var(--color-warning)' }} /> Em andamento</span>
-                                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-teal" /> Concluído</span>
-                              </div>
-                              {filterTooth && (
-                                <button
-                                  onClick={() => setFilterTooth(null)}
-                                  className="mt-4 w-full text-center text-xs text-teal hover:underline flex items-center justify-center gap-1"
-                                >
-                                  <X className="w-3 h-3" /> Limpar filtro (D{filterTooth})
-                                </button>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Observações — sempre visível */}
+                          {/* Observações — sempre visível, full-width */}
                           <div>
                             <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary/70 mb-2">Observações gerais</p>
                             <div className="bg-surface-alt rounded-xl border border-border/40 px-4 py-3 flex flex-wrap items-start gap-x-6 gap-y-2">
@@ -1263,48 +1196,115 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
                             </div>
                           </div>
 
-                          {/* Procedimentos com status toggle */}
-                          <div>
-                            <div className="flex items-center justify-between mb-3">
-                              <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary/70">
-                                Procedimentos
-                                {filterTooth && <span className="ml-2 text-teal normal-case font-normal">— D{filterTooth}</span>}
-                              </p>
-                              <p className="text-[10px] text-text-secondary/60">Clique no status para avançar</p>
-                            </div>
-                            {filteredTeethNotes.length === 0 ? (
-                              <p className="text-sm text-text-secondary/50 italic">Nenhum procedimento registrado.</p>
-                            ) : (
-                              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                                {filteredTeethNotes.map((tn) => {
-                                  const label = tn.tooth in ARCH_LABELS ? ARCH_LABELS[tn.tooth] : `D${tn.tooth}`;
-                                  return (
-                                    <div key={tn.tooth} className="bg-surface-alt rounded-xl border border-border/40 p-4">
-                                      <p className="font-mono text-[10px] font-bold text-teal mb-3">{label}</p>
-                                      <div className="space-y-2">
-                                        {tn.notes.filter(Boolean).map((note, i) => {
-                                          const procKey = `${tn.tooth}_${i}`;
-                                          const status = evo.procedimentosStatus[procKey] ?? 'nao_iniciado';
-                                          const meta = STATUS_META[status] ?? STATUS_META.nao_iniciado;
-                                          return (
-                                            <div key={i} className="flex items-center gap-2">
-                                              <button
-                                                onClick={() => void updateProcStatus(evo.id, evo.procedimentosStatus, procKey, STATUS_CYCLE[status])}
-                                                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold flex-shrink-0 transition-all border ${meta.className}`}
-                                              >
-                                                <meta.icon className="w-3 h-3" />
-                                                {meta.label}
-                                              </button>
-                                              <span className={`text-xs leading-tight ${status === 'concluido' ? 'line-through text-text-secondary' : 'text-text-primary'}`}>{note}</span>
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
+                          {/* #16 D12 (revisado) — 2 colunas no modo leitura: odontograma 60% esq / progresso+procedimentos 40% dir.
+                              Invertido do plano original (40/60): cada dente tem largura fixa em px (min-w-max) — a fileira de
+                              16 dentes precisa de ~725px pra não entrar em scroll horizontal, o que só cabe dando 60% à coluna.
+                              Empilha abaixo de lg. */}
+                          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+
+                            {/* Odontograma — 40% */}
+                            <div className="lg:col-span-3">
+                              <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary/70 mb-3">Odontograma</p>
+                              <div className="bg-surface-alt rounded-2xl border border-border/40 px-6 py-5">
+                                <p className="text-[11px] text-text-secondary/60 text-center mb-4 flex items-center justify-center gap-1.5">
+                                  <ChevronRight className="w-3 h-3" />
+                                  Clique em um dente para filtrar os procedimentos
+                                </p>
+                                <Odontograma
+                                  colorMode="status"
+                                  statusTeeth={computeToothStatusMap(evo)}
+                                  selectedTeeth={filterTooth ? [filterTooth] : []}
+                                  onToothToggle={(tooth) => setFilterTooth((prev) => prev === tooth ? null : tooth)}
+                                  hideFilters
+                                />
+                                <div className="flex items-center justify-center gap-4 mt-3 text-[10px] font-semibold text-text-secondary">
+                                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-surface-alt border border-border" /> A fazer</span>
+                                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ background: 'var(--color-warning)' }} /> Em andamento</span>
+                                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-teal" /> Concluído</span>
+                                </div>
+                                {filterTooth && (
+                                  <button
+                                    onClick={() => setFilterTooth(null)}
+                                    className="mt-4 w-full text-center text-xs text-teal hover:underline flex items-center justify-center gap-1"
+                                  >
+                                    <X className="w-3 h-3" /> Limpar filtro (D{filterTooth})
+                                  </button>
+                                )}
                               </div>
-                            )}
+                            </div>
+
+                            {/* Progresso + Procedimentos — 60% */}
+                            <div className="lg:col-span-2 space-y-6">
+
+                              {/* Progresso + Apresentar */}
+                              <div>
+                                <div className="flex items-center justify-between mb-2">
+                                  <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary/70">Progresso do tratamento</p>
+                                  <span className="text-xs text-text-secondary">{doneProcs} de {totalProcs} concluídos</span>
+                                </div>
+                                <div className="h-2 w-full rounded-full bg-surface-alt border border-border/40 overflow-hidden">
+                                  <div className="h-2 rounded-full bg-teal transition-all duration-500" style={{ width: `${pct}%` }} />
+                                </div>
+                                <div className="flex items-center justify-between mt-2">
+                                  <div className="flex items-baseline gap-2">
+                                    <span className="text-2xl font-bold text-teal">{pct}%</span>
+                                    <span className="text-sm text-text-secondary">concluído</span>
+                                  </div>
+                                  <ApresentarPaciente
+                                    patientId={patientId}
+                                    clinicaId={clinicaId}
+                                    patientName={patientName ?? ''}
+                                    fichaId={evo.id}
+                                    compact
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Procedimentos com status toggle */}
+                              <div>
+                                <div className="flex items-center justify-between mb-3">
+                                  <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary/70">
+                                    Procedimentos
+                                    {filterTooth && <span className="ml-2 text-teal normal-case font-normal">— D{filterTooth}</span>}
+                                  </p>
+                                  <p className="text-[10px] text-text-secondary/60">Clique no status para avançar</p>
+                                </div>
+                                {filteredTeethNotes.length === 0 ? (
+                                  <p className="text-sm text-text-secondary/50 italic">Nenhum procedimento registrado.</p>
+                                ) : (
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {filteredTeethNotes.map((tn) => {
+                                      const label = tn.tooth in ARCH_LABELS ? ARCH_LABELS[tn.tooth] : `D${tn.tooth}`;
+                                      return (
+                                        <div key={tn.tooth} className="bg-surface-alt rounded-xl border border-border/40 p-4">
+                                          <p className="font-mono text-[10px] font-bold text-teal mb-3">{label}</p>
+                                          <div className="space-y-2">
+                                            {tn.notes.filter(Boolean).map((note, i) => {
+                                              const procKey = `${tn.tooth}_${i}`;
+                                              const status = evo.procedimentosStatus[procKey] ?? 'nao_iniciado';
+                                              const meta = STATUS_META[status] ?? STATUS_META.nao_iniciado;
+                                              return (
+                                                <div key={i} className="flex items-center gap-2">
+                                                  <button
+                                                    onClick={() => void updateProcStatus(evo.id, evo.procedimentosStatus, procKey, STATUS_CYCLE[status])}
+                                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold flex-shrink-0 transition-all border ${meta.className}`}
+                                                  >
+                                                    <meta.icon className="w-3 h-3" />
+                                                    {meta.label}
+                                                  </button>
+                                                  <span className={`text-xs leading-tight ${status === 'concluido' ? 'line-through text-text-secondary' : 'text-text-primary'}`}>{note}</span>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+
+                            </div>
                           </div>
 
                         </div>

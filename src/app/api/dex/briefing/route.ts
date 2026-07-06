@@ -28,8 +28,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const agendamentoId = req.nextUrl.searchParams.get('agendamentoId');
   if (!agendamentoId) return NextResponse.json({ error: 'agendamentoId obrigatório' }, { status: 400 });
 
-  if (!process.env.GEMINI_API_KEY) {
-    return NextResponse.json({ error: 'GEMINI_API_KEY não configurada' }, { status: 500 });
+  if (!process.env.GROQ_API_KEY) {
+    return NextResponse.json({ error: 'GROQ_API_KEY não configurada' }, { status: 500 });
   }
 
   const today    = new Date().toISOString().split('T')[0];
@@ -101,8 +101,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     const errorMsg = err instanceof Error ? err.message : 'Erro interno';
     logAICall({
       feature:    'briefing',
-      provider:   'gemini',
-      model:      'gemini-2.5-flash',
+      provider:   'groq',
+      model:      'llama-3.3-70b-versatile',
       latencyMs:  Date.now() - callStart,
       success:    false,
       dentistaId: dentista.id,

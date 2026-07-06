@@ -29,7 +29,7 @@ interface FloatingDockProps {
 }
 
 const ROLE_PT: Record<string, string> = {
-  admin: 'Admin',
+  admin: 'Criador',
   dentista: 'Dentista',
   secretaria: 'Secretária',
 };

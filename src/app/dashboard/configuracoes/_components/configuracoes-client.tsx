@@ -11,6 +11,7 @@ import { parseValorBR, formatValorBR } from '@/lib/valor-br';
 import { getLabelContexto, getPlano } from '@/lib/planos';
 import type { PlanoId } from '@/lib/planos';
 import { motion } from 'motion/react';
+import { PageContainer } from '@/components/layout/page-container';
 import type { ConfiguracaoClinica, HorarioDisponivel, Procedimento, DentistaRole } from '@/types/database';
 import { HelpTooltip } from '@/components/ui/help-tooltip';
 import { UsuariosClient } from '../usuarios/_components/usuarios-client';
@@ -335,7 +336,7 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
 
   return (
     <>
-    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto w-full">
+    <PageContainer>
       <motion.header
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -1282,7 +1283,7 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
           </div>
         </div>
       )}
-    </div>
+    </PageContainer>
 
     <MigrarClinicaModal
       open={migrarOpen}

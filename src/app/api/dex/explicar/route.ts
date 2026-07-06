@@ -25,8 +25,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!dentista) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
   if (dentista.role === 'secretaria') return NextResponse.json({ error: 'Sem permissão.' }, { status: 403 });
 
-  if (!process.env.GEMINI_API_KEY) {
-    return NextResponse.json({ error: 'GEMINI_API_KEY não configurada' }, { status: 500 });
+  if (!process.env.GROQ_API_KEY) {
+    return NextResponse.json({ error: 'GROQ_API_KEY não configurada' }, { status: 500 });
   }
 
   let body: ExplicarBody;
@@ -67,8 +67,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     console.error('[dex/explicar] Erro:', err);
     logAICall({
       feature:    'explicar',
-      provider:   'gemini',
-      model:      'gemini-2.5-flash',
+      provider:   'groq',
+      model:      'llama-3.3-70b-versatile',
       latencyMs:  Date.now() - callStart,
       success:    false,
       dentistaId: dentista.id,

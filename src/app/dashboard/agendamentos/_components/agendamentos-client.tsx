@@ -29,6 +29,7 @@ const AssinaturaRecepcaoModal = dynamic(
 import { buildClinicDatetime } from './date-helpers';
 import { useState, useMemo, useCallback, useTransition, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { PageContainer } from '@/components/layout/page-container';
 import {
   format,
   addMonths,
@@ -723,7 +724,7 @@ export function AgendamentosClient({
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+    <PageContainer variant="wide">
       {/* Cabeçalho */}
       <motion.header
         initial={{ opacity: 0, y: 16 }}
@@ -1793,7 +1794,7 @@ export function AgendamentosClient({
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </PageContainer>
   );
 }
 

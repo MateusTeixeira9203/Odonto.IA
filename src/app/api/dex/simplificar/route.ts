@@ -12,8 +12,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const dentista = await getDentistaCached();
   if (!dentista) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
 
-  if (!process.env.GEMINI_API_KEY) {
-    return NextResponse.json({ error: 'GEMINI_API_KEY não configurada' }, { status: 500 });
+  if (!process.env.GROQ_API_KEY) {
+    return NextResponse.json({ error: 'GROQ_API_KEY não configurada' }, { status: 500 });
   }
 
   let body: { orcamentoId?: string };
@@ -77,8 +77,8 @@ Total: R$ ${total.toFixed(2)}`;
     console.error('[dex/simplificar] Erro:', err);
     logAICall({
       feature:    'simplificar',
-      provider:   'gemini',
-      model:      'gemini-2.5-flash',
+      provider:   'groq',
+      model:      'llama-3.3-70b-versatile',
       latencyMs:  Date.now() - callStart,
       success:    false,
       dentistaId: dentista.id,

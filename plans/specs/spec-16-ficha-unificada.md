@@ -38,6 +38,7 @@ progresso** da boca.
 | D9 | **Mantido:** assinatura (SignaturePad), impressão PDF, voz→IA preenchendo | |
 | D10 | **Removido:** "DEX sugerindo orçamento" dentro da ficha (o modal analisa-enquanto-digita) | orçamento nasce automático fora da ficha |
 | D11 | **Anexos NÃO entram na ficha** — ficam na aba Arquivos (pool, com data) | ficha magra; menos poluição |
+| D12 | **Modo leitura em 2 colunas (60 / 40, revisado 2026-07-05):** odontograma **à esquerda, 60%** da largura; procedimentos + progresso **à direita, 40%** — lado a lado, em vez de empilhados. Cabeçalho (data/evolução/retorno + botões baixar/editar/assinar) full-width no topo | invertido do plano original (40/60): cada dente do odontograma tem largura fixa em px (`min-w-max`, sem shrink) — a fileira de 16 dentes por arcada precisa de ~725px pra não entrar em scroll horizontal, só cabendo com 60%. Em telas estreitas **empilha** (odontograma em cima). Aproveita a largura extra → casa com **#18** |
 
 **Fora do #16 (itens adjacentes, execução própria):**
 - Orçamento "já estruturado, dentista só aprova" (fluxo do orçamento, não da ficha).
@@ -74,6 +75,9 @@ progresso** da boca.
 
 - **Refatorar `FichasTab`** para a superfície única (edição ↔ leitura). Fundir o painel de
   criação com a visão expandida.
+- **Layout do modo leitura (D12):** grid de 2 colunas — **odontograma à esquerda 40%**,
+  **procedimentos + progresso à direita 60%**. Header full-width acima. Responsivo:
+  colapsa pra 1 coluna (odontograma em cima) abaixo do breakpoint. Depende de largura → sinergia com #18.
 - **`Odontograma`**: adicionar prop de **significado de cor** (ex: `colorMode: 'status' | 'selection'`).
   Status: cinza/âmbar/teal. Aditivo — não quebra o uso atual da consulta.
 - **Remover** da ficha: modal "orçamento sugerido pela IA" (o analisa-enquanto-digita) e a

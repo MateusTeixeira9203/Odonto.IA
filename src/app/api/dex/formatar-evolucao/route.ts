@@ -26,8 +26,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const dentista = await getDentistaCached();
     if (!dentista) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
 
-    if (!process.env.GEMINI_API_KEY) {
-      return NextResponse.json({ error: 'GEMINI_API_KEY não configurada' }, { status: 500 });
+    if (!process.env.GROQ_API_KEY) {
+      return NextResponse.json({ error: 'GROQ_API_KEY não configurada' }, { status: 500 });
     }
 
     let body: { texto: string; pacienteNome?: string };
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (!body.texto?.trim()) return NextResponse.json({ error: 'Texto vazio' }, { status: 400 });
 
     const prompt = `Você é um assistente clínico odontológico especializado em documentação.
-Analise o relato livre do dentista e extraia TODAS as informações clínicas de forma estruturada.
+Analise o relato livre do dentista e extraia SOMENTE o que é clinicamente relevante — sinal, não ruído.
 
 ${buildDentalContext()}
 
@@ -54,8 +54,8 @@ CONTEXTO:
 Retorne SOMENTE um JSON válido, sem markdown, com exatamente esta estrutura:
 {
   "queixa_principal": "título objetivo do procedimento principal (ex: Endodontia dente 26, Restauração dentes 14 e 15)",
-  "anotacoes": "evolução clínica completa e organizada em linguagem técnica — procedimento realizado, técnica usada, intercorrências, observações relevantes. 2-4 frases.",
-  "dentes_afetados": [lista de números FDI mencionados como inteiros — ex: [26, 36]. Para procedimentos de arcada ou boca inteira, use os sentinelas: 97 (arcada superior), 98 (arcada inferior), 99 (boca toda / todas as arcadas)],
+  "anotacoes": "evolução clínica em linguagem técnica — procedimento realizado, técnica usada, intercorrências relevantes. 2-3 frases, sem repetição, sem encher linguiça.",
+  "dentes_afetados": [lista de números FDI mencionados como inteiros — ex: [26, 36]. Para procedimentos de arcada ou boca inteira, use os sentinelas do glossário acima (97/98/99)],
   "dentes_observacoes": {"13": "Tratamento de canal\nPino\nProvisório\nCoroa de porcelana", "98": "PPR (prótese parcial removível)"},
   "procedimentos": ["lista resumida dos procedimentos realizados — ex: Tratamento endodôntico, Radiografia periapical"],
   "conduta": "orientações ao paciente, cuidados pós-procedimento, prescrições mencionadas. String vazia se não mencionado.",
@@ -64,11 +64,10 @@ Retorne SOMENTE um JSON válido, sem markdown, com exatamente esta estrutura:
 }
 
 Regras críticas:
-- dentes_afetados: array de inteiros FDI válidos (11-48), nunca strings
-- ARCADA / BOCA INTEIRA: procedimentos sem dente FDI individual usam sentinelas em dentes_afetados:
-    99 = boca toda (ex: limpeza, profilaxia, clareamento, raspagem geral, "boca toda", "toda a boca", "geral")
-    97 = arcada superior / 98 = arcada inferior (ex: PPR / prótese parcial removível, prótese total, aparelho, placa — na arcada indicada)
-  Exemplos de mapeamento: "PPR inferior" → 98; "prótese superior" → 97; "limpeza boca toda" → 99. NÃO liste dentes individuais nesses casos e NUNCA invente quais dentes foram afetados.
+- IGNORE conversa não-clínica: saudação, small talk, divagação, interrupção — não vira anotação nem aparece no JSON.
+- NÃO INVENTE nem infira o que não foi dito — dente, procedimento, conduta ou diagnóstico ausentes no relato ficam vazios/null, nunca "chutados".
+- dentes_afetados: array de inteiros FDI válidos (11-48, decíduos 51-85), nunca strings.
+- ARCADA / BOCA INTEIRA: procedimentos sem dente FDI individual usam sentinelas em dentes_afetados (99 boca toda, 97 arcada superior, 98 arcada inferior — ver glossário). NÃO liste dentes individuais nesses casos.
   Para CADA sentinela em dentes_afetados, crie também a entrada correspondente em dentes_observacoes com o nome do procedimento (ex: dentes_observacoes["98"] = "PPR (prótese parcial removível)") — sem isso o procedimento não aparece marcável.
 - Se nenhum dente mencionado: [] e {}
 - dentes_observacoes: se mais de um procedimento no mesmo dente, separar por \\n — cada linha vira um item independente marcável pelo dentista

@@ -2,14 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Groq from 'groq-sdk';
 import { createClient } from '@/lib/supabase/server';
 import { withRateLimit } from '@/lib/rate-limit';
-
-// Prompt de contexto odontológico — melhora reconhecimento de termos técnicos no Whisper
-const DENTAL_CONTEXT =
-  'dentista, endodontia, exodontia, raspagem supra e infragengival, ' +
-  'restauração com resina composta, amálgama, faceta de porcelana, ' +
-  'implante osseointegrado, enxerto ósseo, prótese total, prótese parcial removível, ' +
-  'coroa total, retentores intracanal, placa miorrelaxante, clareamento dental, ' +
-  'cárie, periodontia, gengivite, periodontite, bruxismo, oclusão, extração.';
+import { WHISPER_DENTAL_PROMPT } from '@/lib/odonto-dictionary';
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const rateLimitResponse = await withRateLimit(req, 'transcrever', 20, 60_000);
@@ -45,7 +38,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       file: audioFile,
       model: 'whisper-large-v3-turbo',
       language: 'pt',
-      prompt: DENTAL_CONTEXT,
+      prompt: WHISPER_DENTAL_PROMPT,
       response_format: 'json',
     });
 
