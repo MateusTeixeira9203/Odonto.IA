@@ -86,17 +86,19 @@ export async function salvarAssinaturaConsulta(
   pacienteId: string,
   assinaturaDataUrl: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  const { clinicId, role } = await requireClinicContext();
+  const { clinicId, dentistaId, role } = await requireClinicContext();
   if (role === 'secretaria') return { ok: false, error: 'Sem permissão' };
 
   const db = createServiceClient();
 
+  // dono: só o dentista que criou a ficha pode assiná-la
   const { data: ficha } = await db
     .from('fichas')
     .select('id')
     .eq('id', fichaId)
     .eq('clinica_id', clinicId)
     .eq('paciente_id', pacienteId)
+    .eq('dentista_id', dentistaId)
     .maybeSingle();
 
   if (!ficha) return { ok: false, error: 'Ficha não encontrada' };
@@ -117,7 +119,8 @@ export async function salvarAssinaturaConsulta(
     .from('fichas')
     .update({ assinatura_url: storagePath, assinado_em: new Date().toISOString() })
     .eq('id', fichaId)
-    .eq('clinica_id', clinicId);
+    .eq('clinica_id', clinicId)
+    .eq('dentista_id', dentistaId);
 
   if (dbErr) return { ok: false, error: dbErr.message };
 
