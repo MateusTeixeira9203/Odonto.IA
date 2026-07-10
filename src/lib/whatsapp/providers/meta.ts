@@ -17,7 +17,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { createHmac } from 'crypto';
+import { createHmac, timingSafeEqual } from 'crypto';
 import type {
   WhatsAppProvider,
   InboundMessage,
@@ -344,16 +344,19 @@ export class MetaProvider implements WhatsAppProvider {
    * Deve ser chamada no webhook POST antes de processar qualquer payload.
    */
   validateSignature(rawBody: string, signature: string): boolean {
-    // TODO: habilitar após plugar WHATSAPP_APP_SECRET
+    // Fail-closed: sem a secret não há como validar → rejeita (segurança > conveniência).
     if (!process.env.WHATSAPP_APP_SECRET) {
-      console.warn('[meta] WHATSAPP_APP_SECRET não definida — validação de assinatura desabilitada');
-      return true;
+      console.warn('[meta] WHATSAPP_APP_SECRET não definida — rejeitando payload (fail-closed)');
+      return false;
     }
 
     const expected = 'sha256=' + createHmac('sha256', this.appSecret)
       .update(rawBody, 'utf8')
       .digest('hex');
 
-    return signature === expected;
+    // Comparação timing-safe (mesmo padrão do webhook AbacatePay).
+    const sigBuf = Buffer.from(signature);
+    const expBuf = Buffer.from(expected);
+    return sigBuf.length === expBuf.length && timingSafeEqual(sigBuf, expBuf);
   }
 }
