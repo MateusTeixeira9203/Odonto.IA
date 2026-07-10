@@ -21,6 +21,7 @@ import { Label } from '@/components/ui/label';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { parseValorBR, formatValorBR } from '@/lib/valor-br';
+import { stripDenteDoNome } from '@/lib/arcadas';
 import type { FichaParaOrc, ProcedimentoClinica, NovoOrcItem } from '../types';
 
 interface NovoOrcamentoModalProps {
@@ -233,17 +234,19 @@ export function NovoOrcamentoModal({
                   )}
 
                   {!item.procedimentoId && item.descricao.trim() && (
-                    <div className="flex items-center justify-between gap-2 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2">
+                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2.5 space-y-2">
                       <span className="flex items-center gap-1.5 text-[11px] font-medium text-amber-600 dark:text-amber-400">
                         <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                        Procedimento não cadastrado no catálogo
+                        Não cadastrado no catálogo
                       </span>
                       <button
                         onClick={() => onCadastrarProcedimento(idx)}
                         disabled={registeringProcIdx === idx}
-                        className="shrink-0 text-[11px] font-bold text-amber-700 dark:text-amber-300 hover:underline disabled:opacity-50"
+                        className="w-full py-2 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-[11px] font-bold text-amber-700 dark:text-amber-300 transition-colors disabled:opacity-50"
                       >
-                        {registeringProcIdx === idx ? 'Cadastrando...' : '+ Cadastrar no catálogo'}
+                        {registeringProcIdx === idx
+                          ? 'Cadastrando...'
+                          : `Cadastrar "${stripDenteDoNome(item.descricao)}"${parseValorBR(item.preco) > 0 ? ` a R$ ${formatValorBR(parseValorBR(item.preco))}` : ''} no catálogo`}
                       </button>
                     </div>
                   )}

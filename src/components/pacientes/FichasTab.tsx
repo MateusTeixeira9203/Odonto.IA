@@ -14,6 +14,10 @@ import {
   Loader2,
   Lock,
   PenLine,
+  Pencil,
+  Signature,
+  CircleDollarSign,
+  CalendarClock,
   Clock,
   Circle,
   ChevronRight,
@@ -191,9 +195,13 @@ interface FichasTabProps {
   plano?: PlanoId;
   patientName?: string;
   canWrite?: boolean;
+  /** #6 — abre o modal de orçamento no pai, já mirado nesta ficha. */
+  onGerarOrcamento?: (fichaId: string) => void;
+  /** #10 — abre "Nova Consulta" no pai, pré-preenchida com o prazo de retorno. */
+  onAgendarRetorno?: (fichaId: string, prazo: string | null) => void;
 }
 
-export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName, canWrite = true }: FichasTabProps) {
+export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName, canWrite = true, onGerarOrcamento, onAgendarRetorno }: FichasTabProps) {
   const [evolutions, setEvolutions] = React.useState<Evolution[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSaving, setIsSaving] = React.useState(false);
@@ -1040,34 +1048,61 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap justify-end">
+                        {/* Ação principal por estado (#5 + #6) — máx. 2 botões grandes */}
                         {evo.assinadoEm ? (
-                          <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[9px] font-bold">
-                            <Check className="w-3 h-3" />
-                            Assinado em {new Date(evo.assinadoEm).toLocaleDateString('pt-BR')}
-                          </span>
+                          <>
+                            <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[9px] font-bold">
+                              <Check className="w-3 h-3" />
+                              Assinado em {new Date(evo.assinadoEm).toLocaleDateString('pt-BR')}
+                            </span>
+                            {onGerarOrcamento && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); onGerarOrcamento(evo.id); }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 min-h-[36px] rounded-lg text-[10px] font-bold bg-teal text-white hover:bg-teal-lt transition-colors shadow-sm"
+                              >
+                                <CircleDollarSign className="w-3.5 h-3.5" />
+                                Gerar orçamento
+                              </button>
+                            )}
+                          </>
                         ) : (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setSigningFichaId(evo.id); }}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 min-h-[36px] rounded-lg text-[10px] font-bold border border-border text-text-secondary hover:border-teal hover:text-teal transition-colors"
-                          >
-                            <PenLine className="w-3 h-3" />
-                            Assinar
-                          </button>
+                          <>
+                            {onGerarOrcamento && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); onGerarOrcamento(evo.id); }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 min-h-[36px] rounded-lg text-[10px] font-bold bg-teal text-white hover:bg-teal-lt transition-colors shadow-sm"
+                              >
+                                <CircleDollarSign className="w-3.5 h-3.5" />
+                                Gerar orçamento
+                              </button>
+                            )}
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setSigningFichaId(evo.id); }}
+                              className="flex items-center gap-1.5 px-3 py-1.5 min-h-[36px] rounded-lg text-[10px] font-bold border border-border text-text-secondary hover:border-teal hover:text-teal transition-colors"
+                            >
+                              <Signature className="w-3.5 h-3.5" />
+                              Assinar
+                            </button>
+                          </>
                         )}
 
+                        {/* Divisor */}
+                        <div className="w-px h-6 bg-border/60 mx-0.5" />
+
+                        {/* Ações secundárias — ícones (#5) */}
                         {canWrite && (
                           <button
                             onClick={(e) => { e.stopPropagation(); handleEdit(evo); }}
                             title="Editar"
                             className="p-2 hover:bg-surface-alt rounded-lg transition-colors text-text-secondary hover:text-teal"
                           >
-                            <PenLine className="w-4 h-4" />
+                            <Pencil className="w-4 h-4" />
                           </button>
                         )}
                         <button
                           onClick={(e) => { e.stopPropagation(); window.open(`/api/fichas/${evo.id}/pdf`, '_blank'); }}
-                          title="Imprimir"
+                          title="Baixar"
                           className="p-2 hover:bg-surface-alt rounded-lg transition-colors text-text-secondary hover:text-text-primary"
                         >
                           <Download className="w-4 h-4" />
@@ -1120,9 +1155,20 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
                             </div>
                           )}
                           {evo.retornoSugerido && (
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border border-border/50 bg-surface-alt text-text-secondary">
-                              <Clock className="w-3 h-3" />
-                              Retorno em {evo.retornoSugerido}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border border-border/50 bg-surface-alt text-text-secondary">
+                                <Clock className="w-3 h-3" />
+                                Retorno em {evo.retornoSugerido}
+                              </div>
+                              {onAgendarRetorno && (
+                                <button
+                                  onClick={() => onAgendarRetorno(evo.id, evo.retornoSugerido)}
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border border-teal/40 text-teal hover:bg-teal/10 transition-colors"
+                                >
+                                  <CalendarClock className="w-3 h-3" />
+                                  Agendar retorno
+                                </button>
+                              )}
                             </div>
                           )}
                         </div>

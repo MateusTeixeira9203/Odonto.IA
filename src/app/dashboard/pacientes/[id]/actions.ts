@@ -181,6 +181,47 @@ export async function gerarPlanejamentoIA(
   }
 }
 
+// #2 — Cadastro rápido de paciente no fluxo walk-in ("Atender agora"): quando a busca
+// não acha ninguém, cria com o mínimo (nome + telefone) e devolve o id pra iniciar o
+// encaixe/consulta na hora. Nasce no clinica_id ativo e vinculado ao dentista da sessão.
+export async function criarPacienteRapido(dados: {
+  nome: string;
+  telefone: string | null;
+}): Promise<{ error?: string; id?: string }> {
+  const { supabase, user, clinicId } = await requireClinicContext();
+
+  const nome = dados.nome.trim();
+  if (!nome) return { error: "Informe o nome do paciente." };
+
+  const { data: dentistaPerfil } = await supabase
+    .from("dentistas")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("clinica_id", clinicId)
+    .maybeSingle();
+
+  if (!dentistaPerfil) return { error: "Perfil de dentista não encontrado." };
+
+  const { data, error } = await supabase
+    .from("pacientes")
+    .insert({
+      clinica_id:  clinicId,
+      dentista_id: dentistaPerfil.id,
+      nome,
+      telefone:    dados.telefone?.trim() || null,
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    console.error("Erro ao criar paciente rápido:", error);
+    return { error: "Não foi possível cadastrar o paciente. Tente novamente." };
+  }
+
+  revalidatePath("/dashboard/pacientes");
+  return { id: (data as { id: string }).id };
+}
+
 export async function criarFichaInline(dados: {
   pacienteId: string;
   queixaPrincipal: string;

@@ -93,6 +93,7 @@ import { toast } from 'sonner';
 import { WeekView } from './week-view';
 import { DayView } from './day-view';
 import { MonthView } from './month-view';
+import { AtenderAgoraModal } from './atender-agora-modal';
 import { BotaoMensagemIA } from '@/components/orcamentos/botao-mensagem-ia';
 import { StatusBadge } from './status-badge';
 
@@ -264,6 +265,9 @@ export function AgendamentosClient({
   const [cancelDialog, setCancelDialog] = useState<{ aptId: string; aptNome: string } | null>(null);
   const [cancelMotivo, setCancelMotivo] = useState('');
   const [isCancelling, setIsCancelling] = useState(false);
+
+  // Walk-in "Atender agora" — busca/cria paciente e cai direto na consulta (#2)
+  const [isAtenderAgoraOpen, setIsAtenderAgoraOpen] = useState(false);
 
   // Walk-in / encaixe
   const [isEncaixeOpen, setIsEncaixeOpen] = useState(false);
@@ -819,6 +823,17 @@ export function AgendamentosClient({
             </button>
           </div>
 
+          {/* Atender agora — walk-in do dentista: cai direto na consulta (#2) */}
+          {!isSecretaria && (
+            <button
+              onClick={() => setIsAtenderAgoraOpen(true)}
+              className="bg-teal text-white hover:bg-teal-lt active:scale-[0.98] px-4 py-2.5 rounded-xl font-semibold text-sm flex items-center gap-2 transition-all shadow-md"
+            >
+              <Stethoscope className="w-4 h-4" />
+              Atender agora
+            </button>
+          )}
+
           {/* Encaixe — secretária */}
           {canEdit && isSecretaria && (
             <button
@@ -1257,6 +1272,9 @@ export function AgendamentosClient({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── Atender agora (walk-in do dentista) ───────────────────── */}
+      <AtenderAgoraModal open={isAtenderAgoraOpen} onOpenChange={setIsAtenderAgoraOpen} />
 
       {/* ── Encaixe / Walk-in drawer ──────────────────────────────── */}
       <Sheet open={isEncaixeOpen} onOpenChange={(open) => { if (!open) { setIsEncaixeOpen(false); setEncaixeConflito(false); setEncaixeError(null); }}}>

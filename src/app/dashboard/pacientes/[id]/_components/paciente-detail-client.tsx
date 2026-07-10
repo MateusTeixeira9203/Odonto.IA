@@ -814,6 +814,35 @@ export function PacienteDetailClient({
     setEtapaNovoOrc('itens');
   };
 
+  // #6 — entrada mirada: abre o modal de orçamento já pré-preenchido com os itens
+  // desta ficha, pulando a etapa "selecionar" mesmo quando há várias fichas.
+  const abrirOrcamentoParaFicha = async (fichaId: string) => {
+    setOrcError(null);
+    setIsLoadingFichaParaOrc(true);
+    try {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from('fichas')
+        .select('id, created_at, queixa_principal, dentes_afetados, dentes_observacoes')
+        .eq('id', fichaId)
+        .eq('clinica_id', clinicaId)
+        .single();
+      const ficha = data as unknown as FichaParaOrc | null;
+      setFichaOrcId(fichaId);
+      // fichasParaOrc com 1 item → esconde "Voltar" e mantém o foco na ficha clicada
+      setFichasParaOrc(ficha ? [ficha] : []);
+      setNovoOrcItens(ficha ? fichaParaItens(ficha) : [{ procedimentoId: '', descricao: '', quantidade: 1, preco: '' }]);
+    } catch {
+      setFichaOrcId(fichaId);
+      setFichasParaOrc([]);
+      setNovoOrcItens([{ procedimentoId: '', descricao: '', quantidade: 1, preco: '' }]);
+    } finally {
+      setEtapaNovoOrc('itens');
+      setIsLoadingFichaParaOrc(false);
+    }
+    setIsNovoOrcOpen(true);
+  };
+
   // Cadastra no catálogo um procedimento digitado que não bateu com nenhum item existente —
   // usa o nome (sem a referência de dente) e o valor já preenchidos no item, e vincula o item
   // ao procedimento recém-criado.
@@ -958,6 +987,33 @@ export function PacienteDetailClient({
       setOrcDeleteError(result.error);
     }
     setOrcDeleteSaving(false);
+  };
+
+  // #10 — parse do prazo pt-BR ("30 dias", "1 mês", "7 dias"...) → data absoluta (yyyy-mm-dd).
+  // Não parseou → default +30 dias. Sempre sugestão; o dentista confirma o slot.
+  const calcularDataRetorno = (prazo: string | null): string => {
+    const base = new Date();
+    const p = (prazo ?? '').toLowerCase();
+    const mesMatch = p.match(/(\d+)\s*m[eê]s/);
+    const diaMatch = p.match(/(\d+)\s*dia/);
+    if (mesMatch) {
+      base.setMonth(base.getMonth() + parseInt(mesMatch[1], 10));
+    } else if (diaMatch) {
+      base.setDate(base.getDate() + parseInt(diaMatch[1], 10));
+    } else {
+      base.setDate(base.getDate() + 30);
+    }
+    // format (local) e não toISOString (UTC): à noite em BRT o UTC vira o dia
+    // seguinte e o retorno sairia com 1 dia a mais.
+    return format(base, 'yyyy-MM-dd');
+  };
+
+  // #10 — abre "Nova Consulta" pré-preenchida (paciente já conhecido + data = hoje + prazo);
+  // o dentista ajusta o horário e confirma. Reusa handleNovaConsulta → criarAgendamento.
+  const agendarRetornoParaFicha = (prazo: string | null) => {
+    setConsultaError(null);
+    setConsultaForm({ data: calcularDataRetorno(prazo), hora: '', duracao: '30', observacoes: '' });
+    setIsNovaConsultaOpen(true);
   };
 
   const handleNovaConsulta = async () => {
@@ -1120,9 +1176,9 @@ export function PacienteDetailClient({
               {(
                 [
                   ...(canViewClinical  ? [['ficha-clinica','Prontuário','tab-fichas',       FileText]] : []),
-                  ['agenda',        'Agenda',        undefined,          Calendar],
                   ['orcamentos',    'Orçamentos',   'tab-orcamento',    CreditCard],
                   ['arquivos',      'Arquivos',     'tab-documentos',   Paperclip],
+                  ['agenda',        'Agenda',        undefined,          Calendar],
                 ] as [string, string, string | undefined, React.ComponentType<{ className?: string }>][]
               ).map(([val, label, tourId, Icon]) => (
                 <TabsTrigger
@@ -1307,6 +1363,8 @@ export function PacienteDetailClient({
                         plano={plano}
                         patientName={displayNome}
                         canWrite={canWriteClinical}
+                        onGerarOrcamento={role !== 'secretaria' ? (fichaId) => void abrirOrcamentoParaFicha(fichaId) : undefined}
+                        onAgendarRetorno={(_fichaId, prazo) => agendarRetornoParaFicha(prazo)}
                       />
                     )}
                   </TabsContent>
