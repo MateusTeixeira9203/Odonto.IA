@@ -1,0 +1,46 @@
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Bloco E da auditoria 2026-07-09 (recalibrado). Endurecimento de superfície.
+--
+-- IMPORTANTE — o que este arquivo DELIBERADAMENTE *não* faz, e por quê:
+--
+-- A auditoria (P2 / advisor 0029) sugeriu "REVOKE EXECUTE ... FROM authenticated"
+-- nos 12 helpers SECURITY DEFINER. Isso está ERRADO para 11 deles:
+--
+--   • 10 são helpers de RLS (belongs_to_active_clinic, get_my_role, get_my_clinica_id,
+--     get_my_dentista_id, has_active_membership, is_clinic_admin, is_clinic_dentista,
+--     is_my_patient, is_own_clinical_record, is_own_finance_record). As policies de RLS
+--     os invocam durante QUALQUER query do usuário autenticado. O Postgres avalia a
+--     expressão da policy "with the privileges of the user running the query"
+--     (docs oficiais, ddl-rowsecurity) → sem EXECUTE para `authenticated`, toda query
+--     nas tabelas protegidas falha com 42501 "permission denied for function".
+--     As migrations 091/093/095 já mantêm o grant a `authenticated` DE PROPÓSITO
+--     ("a própria RLS depende dele"). Revogar quebraria o app inteiro.
+--
+--   • complete_onboarding é chamada por `authenticated` no fluxo legítimo de cadastro
+--     (src/app/onboarding/actions.ts). A 095 manteve o grant de propósito.
+--
+-- Sobra 1 função onde revogar de `authenticated` é seguro E fecha um buraco real:
+-- provision_secretaria (abaixo). É o único item do bloco E que toca função.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- 1. provision_secretaria — fecha escrita cross-tenant por usuário autenticado.
+--
+-- É SECURITY DEFINER (roda como owner, bypassa RLS) e escreve em users,
+-- dentistas, clinica_usuarios e secretarias. NÃO valida que auth.uid() é admin
+-- de p_clinica_id, e o upsert em public.users faz ON CONFLICT DO UPDATE de
+-- active_clinica_id. A 063 já revogou de PUBLIC e concedeu a service_role, mas o
+-- default-privilege do schema public reconcedeu a `authenticated` (advisor 0029
+-- ainda acusa). Nenhum caller legítimo usa a via `authenticated` — o app chama
+-- via service_role (src/server/services/team.ts). Revogar fecha a via RPC direta
+-- sem afetar o fluxo real.
+revoke execute on function public.provision_secretaria(uuid, text, text, uuid, text, uuid) from authenticated;
+
+-- 2. Bucket avatars — remove a policy de SELECT ampla que permite LISTAR arquivos.
+--
+-- advisor 0025: bucket público `avatars` tem a policy `avatars_public_read`
+-- (SELECT amplo) que deixa clientes enumerarem todos os arquivos via storage API.
+-- Bucket público serve URL sem policy (o app usa getPublicUrl()/CDN e só faz
+-- upload=INSERT — nunca .list()/.download() autenticado), então dropar a listagem
+-- não quebra exibição nem upload de avatar. A policy foi criada via dashboard
+-- (não existe em migration anterior) — IF EXISTS torna isto idempotente.
+drop policy if exists "avatars_public_read" on storage.objects;
