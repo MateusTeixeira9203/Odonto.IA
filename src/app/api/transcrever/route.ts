@@ -40,7 +40,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       // é onde o turbo errava dente/termo (spec fase1-5 §A, decisão 13/07).
       model: 'whisper-large-v3',
       language: 'pt',
-      prompt: WHISPER_DENTAL_PROMPT,
+      // Groq rejeita prompt > 896 chars no large-v3 (400) — clamp de segurança
+      // caso o dicionário cresça; a fonte já é mantida ≤ 860.
+      prompt: WHISPER_DENTAL_PROMPT.slice(0, 896),
       response_format: 'json',
     });
 

@@ -286,8 +286,11 @@ export const MATERIAIS_MAP: Record<string, string> = {
 };
 
 // ── Prompt para Whisper — vocabulário de contexto ────────────────────────────
-// Whisper só usa os ~224 primeiros tokens do prompt: FDI/quadrantes primeiro
-// (ataca "erra o dente"), vocabulário clínico depois.
+// LIMITE DURO: whisper-large-v3 no Groq rejeita prompt > 896 CARACTERES (400
+// invalid_request_error — visto em prod 13/07). Manter ≤ 860 de folga; a rota
+// ainda aplica .slice(0, 896) como cinto de segurança. FDI/quadrantes primeiro
+// (ataca "erra o dente"), depois só termos foneticamente traiçoeiros — palavra
+// comum (restauração, clareamento, ponte) o ASR acerta sozinho e não paga o custo.
 
 export const WHISPER_DENTAL_PROMPT =
   'Dentista relatando consulta odontológica em português brasileiro. ' +
@@ -296,12 +299,10 @@ export const WHISPER_DENTAL_PROMPT =
   'Decíduos: 51-55, 61-65, 71-75, 81-85. Siso = terceiro molar (18, 28, 38, 48). ' +
   'Faces: M, D, O, V, L, MOD, MO, DO. ' +
   'Termos: endodontia, exodontia, pulpotomia, pulpectomia, raspagem supra e infragengival, ' +
-  'restauração com resina e amálgama, faceta, selante, verniz fluoretado, mantenedor de espaço, ' +
-  'implante osseointegrado, enxerto ósseo, prótese total e parcial removível, ponte, coroa de zircônia, ' +
-  'onlay, inlay, overdenture, pivô, retentor intracanal, placa miorrelaxante, bruxismo, alinhadores, ' +
-  'clareamento, apicectomia, gengivoplastia, gengivectomia, frenectomia, alveoloplastia, splintagem, ' +
-  'bichectomia, toxina botulínica, radiografia periapical, panorâmica, bitewing, tomografia CBCT, ' +
-  'profilaxia, lidocaína, articaína.';
+  'resina, amálgama, faceta, selante, implante osseointegrado, enxerto ósseo, PPR, ' +
+  'overdenture, onlay, inlay, zircônia, pivô, placa miorrelaxante, bruxismo, apicectomia, ' +
+  'gengivoplastia, gengivectomia, frenectomia, alveoloplastia, splintagem, bichectomia, ' +
+  'periapical, bitewing, tomografia CBCT, profilaxia, lidocaína, articaína.';
 
 // ── Contexto para injeção no prompt da IA ────────────────────────────────────
 
