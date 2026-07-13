@@ -106,6 +106,17 @@ function avaliar(resp, espera) {
   if (espera.alerta_novo_nao_null && !(typeof resp.alerta_novo === 'string' && resp.alerta_novo.trim())) {
     falhas.push('alerta_novo veio null (alergia/medicamento mencionado no relato)');
   }
+  // Adendo 13/07 §G: a observação de um dente específico deve conter um termo
+  // (ex: nota de coordenação vira "Planejamento: ..." no dente certo).
+  for (const [dente, termo] of Object.entries(espera.observacao_contem ?? {})) {
+    const obs = norm((resp.dentes_observacoes ?? {})[String(Number(dente))] ?? '');
+    if (!obs.includes(norm(termo))) falhas.push(`observação do dente ${dente} não contém "${termo}"`);
+  }
+  // Adendo 13/07 §G: nota de coordenação nunca vira item de procedimentos.
+  for (const prefixo of espera.procedimentos_nao_contem_prefixo ?? []) {
+    const ofensor = (resp.procedimentos ?? []).find((p) => norm(p).startsWith(norm(prefixo)));
+    if (ofensor) falhas.push(`procedimentos contém item de coordenação "${ofensor}" (prefixo proibido: "${prefixo}")`);
+  }
   return { falhas, orphans, alucinacoes };
 }
 

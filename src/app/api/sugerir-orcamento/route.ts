@@ -94,6 +94,7 @@ Regras:
 - Use nomes simples e compreensíveis para o paciente.
 - Se um dente específico foi mencionado, inclua no nome do procedimento.
 - Se não houver preço na tabela da clínica, use null para precoSugerido.
+- IGNORE notas de planejamento/coordenação — linhas iniciadas com "Planejamento:" e falas de preparo/encaminhamento sem intervenção executável ("preparar para passar ao Dr. X", "avaliar futuramente", "encaminhar ao especialista") NÃO viram item de orçamento. Só o que é procedimento executável entra.
 - Máximo de 10 itens.
 - Se não identificar procedimentos, retorne { "itens": [] }.`;
 

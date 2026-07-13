@@ -218,3 +218,59 @@ Whisper erraria foneticamente.
   `generateStructured` (Groq) na rota — 1 import + 1 função; caminho Groq permanece no código.
 - Corte por silêncio com threshold ruim (consultório barulhento) → flag `silenceAutoStop`
   permite desligar por código; se incomodar em prod, desliga por default em patch trivial.
+
+---
+
+# Adendo 13/07 (noite) — feedback de campo do Mateus
+
+> Teste real em prod: transcrição e organizador aprovados ("os milímetros que a gente
+> comia agora vêm certos; errinho o corretor pega"). Três refinamentos pedidos:
+
+## G. Nota de planejamento/coordenação ≠ procedimento orçável
+
+Caso de campo: dentista dita "preparar o dente pra passar pro Dr. Fulano" / "planejar
+implante futuramente". Precisa aparecer na ficha (no dente certo), mas NÃO é intervenção
+executável — não pode virar linha de orçamento.
+
+Taxonomia final (refina D6/“planejado também conta”):
+| Fala | Destino | Orçamento |
+|---|---|---|
+| feito ("extraí o 18") | observação do dente | ✅ |
+| intervenção indicada ("vou extrair o 28 na próxima") | observação "— planejado" | ✅ |
+| coordenação/preparo ("preparar pro protesista", "avaliar implante depois") | observação prefixada **"Planejamento: "** | ❌ nunca |
+
+Implementação: regra no prompt do organizador (coordenação vira "Planejamento: …" e
+nunca entra em `procedimentos`) + regra no `sugerir-orcamento` (ignora linhas
+"Planejamento:" e frases de coordenação/encaminhamento). Sem migração, contrato intacto.
+Eval ganha caso novo + check `observacao_contem` no runner.
+
+## H. Detecção ao vivo unificada (bug de campo: ao vivo ≠ ficha final)
+
+Diagnóstico: o painel "DETECTANDO AO VIVO" tinha DOIS cérebros dessincronizados —
+chips de dente por regex client-side que só cobria permanentes (`[1-4][1-8]`; o 51
+decíduo sumia) e chips de procedimento reusando `/api/sugerir-orcamento` (máx. 10
+itens, tela cortava em 6, agrupamento de orçamento — o canal do 15 sumia). A ficha
+final (Gemini) acertava tudo; só o preview mentia.
+
+Fix:
+1. Regex de dentes cobre decíduos: `\b([1-4][1-8]|[5-8][1-5])\b` (instantâneo, mantém).
+2. Nova rota leve **`/api/dex/detectar-consulta`**: `generateStructuredGemini`, schema
+   mínimo `{ procedimentos: [{ descricao, dentes: number[] }] }`, glossário + regras
+   essenciais (sentinelas, achado≠procedimento, planejado incluído, coordenação como
+   "Planejamento: …"), sem tabela de preços, rate-limit próprio (30/60s). O painel
+   passa a mostrar TODOS os procedimentos com seus dentes, da mesma família de prompt
+   do organizador. `sugerir-orcamento` volta a ser só orçamento.
+
+## I. UI da confirmação: full-width + grade de blocos
+
+Ao clicar "Organizar" (`evolucao && !saved`), a `ConsultationSidebar` some (o briefing
+fica vazio ocupando ~1/3 da tela justo na hora de maior densidade). O container da
+confirmação vira `max-w` generoso centralizado com **grid 2 colunas** (lg+): textos
+(queixa/anotações/procedimentos/conduta/alertas/retorno) à esquerda; odontograma +
+procedimentos por dente à direita. Lista "procedimentos por dente" ganha grade interna
+(md: 2 colunas) quando muitos dentes. Mobile permanece coluna única.
+
+## Fora deste adendo
+- Ortodontia ("parte de aparelho") — especialidade mais complexa por ser relacional;
+  entra na spec do odontograma modular alimentada pelas respostas da clínica piloto
+  (roteiro `perguntas-clinica-piloto-odontograma-2026-07-13.md`, Bloco 5).

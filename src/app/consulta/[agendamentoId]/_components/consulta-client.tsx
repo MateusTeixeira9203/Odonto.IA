@@ -159,12 +159,13 @@ export function ConsultaClient({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // ── Detecção ao vivo (copiloto) ──
-  // Dentes: regex FDI client-side, instantâneo e grátis.
+  // Dentes: regex FDI client-side, instantâneo e grátis — permanentes E decíduos (5x-8x).
   const detectedTeeth = useMemo(() => {
-    const matches = textoLivre.match(/\b[1-4][1-8]\b/g) ?? [];
+    const matches = textoLivre.match(/\b(?:[1-4][1-8]|[5-8][1-5])\b/g) ?? [];
     return [...new Set(matches.map(Number))].sort((a, b) => a - b);
   }, [textoLivre]);
-  // Procedimentos: debounce ~2s reaproveitando /api/sugerir-orcamento (mesmo padrão do FichasTab).
+  // Procedimentos: debounce ~2s na rota leve própria (adendo 13/07 §H) — mesma família
+  // de prompt do organizador, pra o preview não divergir da ficha final.
   const [detectedProcs, setDetectedProcs] = useState<string[]>([]);
   const [isDetecting, setIsDetecting] = useState(false);
   const detectDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -207,14 +208,19 @@ export function ConsultaClient({
     setIsDetecting(true);
     detectDebounceRef.current = setTimeout(async () => {
       try {
-        const res = await fetch('/api/sugerir-orcamento', {
+        const res = await fetch('/api/dex/detectar-consulta', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ texto }),
         });
         if (!res.ok) return;
-        const data = await res.json() as { itens?: { descricao: string }[] };
-        setDetectedProcs((data.itens ?? []).map(i => i.descricao).filter(Boolean).slice(0, 6));
+        const data = await res.json() as { procedimentos?: { descricao: string; dentes: number[] }[] };
+        setDetectedProcs(
+          (data.procedimentos ?? [])
+            .filter(p => p?.descricao)
+            .map(p => p.dentes.length > 0 ? `${p.descricao} – ${p.dentes.map(denteLabel).join(', ')}` : p.descricao)
+            .slice(0, 12)
+        );
       } catch (err) {
         console.error('[consulta] detecção ao vivo:', err);
       } finally {
@@ -432,19 +438,23 @@ export function ConsultaClient({
       <div className="flex flex-col md:flex-row flex-1 md:overflow-hidden">
 
         {/* ── Coluna esquerda: Sidebar ──────────────────────────────────── */}
-        <ConsultationSidebar
-          agendamentoId={agendamentoId}
-          pacienteNome={paciente.nome}
-          idadeStr={paciente.idadeStr}
-          observacoes={paciente.observacoes}
-          observacoesAgendamento={observacoesAgendamento}
-          ultimaQueixa={ultimaQueixa}
-          ultimasAnotacoes={ultimasAnotacoes}
-          fichas={fichas}
-          orcamentos={orcamentos}
-          alertasClinicos={alertasClinicos}
-          planejamento={planejamento}
-        />
+        {/* Some na confirmação (adendo 13/07 §I): o briefing vazio ocupava ~1/3 da tela
+            justo no momento de maior densidade de informação. */}
+        {!(evolucao && !saved) && (
+          <ConsultationSidebar
+            agendamentoId={agendamentoId}
+            pacienteNome={paciente.nome}
+            idadeStr={paciente.idadeStr}
+            observacoes={paciente.observacoes}
+            observacoesAgendamento={observacoesAgendamento}
+            ultimaQueixa={ultimaQueixa}
+            ultimasAnotacoes={ultimasAnotacoes}
+            fichas={fichas}
+            orcamentos={orcamentos}
+            alertasClinicos={alertasClinicos}
+            planejamento={planejamento}
+          />
+        )}
 
         {/* ── Coluna direita: Escrita livre / Evolução ──────────────────── */}
         <main className="flex-1 flex flex-col p-4 md:p-6 overflow-y-auto min-h-0">
@@ -781,7 +791,7 @@ export function ConsultaClient({
                 key="confirm"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="flex flex-col gap-5"
+                className="flex flex-col gap-5 w-full max-w-6xl mx-auto"
               >
                 <div className="flex items-center justify-between">
                   <div>
@@ -795,6 +805,11 @@ export function ConsultaClient({
                     <Edit2 className="w-4 h-4" /> Editar relato
                   </button>
                 </div>
+
+                {/* Grade 2 colunas (lg+): textos à esquerda; odontograma + procedimentos
+                    por dente à direita (adendo 13/07 §I). Mobile: coluna única. */}
+                <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
+                <div className="flex flex-col gap-5">
 
                 {/* Queixa principal */}
                 <DraftPendingCard label="Tipo / Queixa principal">
@@ -901,6 +916,9 @@ export function ConsultaClient({
                   </DraftPendingCard>
                 )}
 
+                </div>{/* /coluna esquerda */}
+                <div className="flex flex-col gap-5">
+
                 {/* Odontograma — Fix #2: salva só confirmedTeeth; botão "Confirmar todos" */}
                 <DraftPendingCard label={
                   confirmedTeeth.length > 0
@@ -938,7 +956,8 @@ export function ConsultaClient({
                     <label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest block mb-3">
                       Procedimentos por dente
                     </label>
-                    <div className="space-y-4">
+                    {/* Grade interna em 2 colunas (md+) quando muitos dentes — corta o paredão de scroll */}
+                    <div className={confirmedTeeth.length > 4 ? 'grid gap-4 md:grid-cols-2' : 'space-y-4'}>
                       {confirmedTeeth.map(dente => {
                         const procs = getDenteProcs(dente);
                         return (
@@ -981,6 +1000,9 @@ export function ConsultaClient({
                     </div>
                   </div>
                 )}
+
+                </div>{/* /coluna direita */}
+                </div>{/* /grade 2 colunas */}
 
                 {/* Botão Confirmar e salvar */}
                 <button

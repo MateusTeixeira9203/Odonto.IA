@@ -103,6 +103,20 @@
         "procedimentos_nao_contem_achado": ["abscesso", "cárie"],
         "anotacoes_nao_contem": ["carnaval", "remarcando"]
       }
+    },
+    {
+      "id": "nota-planejamento-nao-orcavel",
+      "provenance": "real-observado",
+      "_origem": "Feedback de campo 13/07: 'preparar pra passar pro dentista tal' precisa aparecer na ficha (no dente certo) mas NÃO pode virar item de orçamento (adendo spec fase1-5 §G).",
+      "texto": "Hoje fiz a restauração com resina composta na oclusal do quarenta e seis. Aproveitei e já deixei anotado: o quarenta e sete a gente vai preparar pra passar pro doutor Carlos, o protesista, avaliar uma coroa. E ali no espaço do trinta e seis, planejar um implante mais pra frente, quando ela terminar o tratamento periodontal. Retorno em quinze dias.",
+      "espera": {
+        "dentes_afetados_contem": [46, 47, 36],
+        "dentes_observacoes_tem_chave": [46, 47, 36],
+        "dentes_permitidos": [46, 47, 36],
+        "observacao_contem": { "47": "planejamento", "36": "planejamento" },
+        "procedimentos_nao_contem_prefixo": ["planejamento"],
+        "retorno_sugerido_nao_null": true
+      }
     }
   ]
 }
