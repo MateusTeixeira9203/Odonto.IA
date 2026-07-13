@@ -588,19 +588,23 @@ Toda tela ou componente novo passa pelo pipeline abaixo. Pular etapas é a causa
 - **Fechamento:** quando eu disser que vou parar ("vou dormir", "terminamos por hoje", "encerra"), rode a skill `handoff` e salve em `plans/handoffs/` — o que concluímos, os erros, **como eu estava pensando em resolver**, o que ficou e o que eu cogitava.
 - A pasta `plans/` é **append-only** — é a memória do projeto, nunca apague. Organizada por tipo: `plans/handoffs/` (handoffs de sessão), `plans/specs/` (contratos técnicos), `plans/roadmap/` (planos mestres).
 
-### 6. Modos de sessão — discussão, planejamento, execução
-Toda sessão tem **um modo**, e eles **não se misturam** (o atrito nº1 é discutir, planejar e codar meio a meio na mesma sessão):
+### 6. Modos de trabalho — discussão, planejamento, execução
+Existem três modos, e eles **não se misturam** (o atrito nº1 é discutir, planejar e codar meio a meio na mesma sessão). **Quem ativa o modo é o usuário**, quando achar necessário — eu não tento adivinhar pela saudação nem pelo handoff anterior.
 
-- **Discussão** — debater ideia, direção de produto, arquitetura ou mercado, **sem compromisso ainda**. Não escreve spec, não coda. A regra 1 vale com força total aqui: traga sempre **outro ponto de vista**, cubra várias possibilidades — o objetivo é abrir opções, não fechar decisão cedo. Entra com o handoff mais recente (de qualquer modo) pra continuar de onde parou.
-- **Planejamento** — discute, escopa, decide, **escreve spec** (regra 2). Não coda produção — no máximo investigação read-only ou spike descartável. **Lê o handoff de discussão mais recente como insumo** (se existir) e formaliza o que foi debatido — mas continua pressionando por ângulos que a discussão não cobriu antes de congelar a spec. Saída: roadmap/specs atualizados + **handoff de execução** no fecho.
-- **Execução** — pega o handoff de execução + os specs e **coda + testa + commita/deploya**. **Não re-escopa** — o que estiver especificado, executa; o que não estiver, volta pro planejamento.
+- **Discussão** — debater ideia, direção de produto, arquitetura ou mercado, **sem compromisso ainda**. Não escreve spec, não coda. A regra 1 vale com força total aqui: traga sempre **outro ponto de vista**, cubra várias possibilidades — o objetivo é abrir opções, não fechar decisão cedo.
+- **Planejamento** — discute, escopa, decide, **escreve spec** (regra 2). Não coda produção — no máximo investigação read-only ou spike descartável.
+- **Execução** — coda + testa + commita/deploya contra a spec (as tarefas são derivadas dela na hora, não de um checklist separado). **Não re-escopa** — o que não estiver especificado volta pro planejamento.
 
-Cadeia dos artefatos: **discussão → planejamento → execução**, cada handoff é insumo do próximo.
+**Equipe de cada modo — quem eu aciono:**
 
-Rituais (estendem a regra 5):
-- **Fechar discussão** → `handoff` gera um **handoff de discussão** (`plans/handoffs/handoff-AAAA-MM-DD-discussao.md`): direções cogitadas, pontos de vista considerados e descartados (e por quê), o que ficou em aberto pro planejamento decidir. Leve — não é checklist, é raciocínio.
-- **Fechar planejamento** → `handoff` gera um **handoff de execução** (`plans/handoffs/handoff-AAAA-MM-DD-execucao.md`): checklist acionável (arquivos + o que fazer) que **aponta** pros specs/roadmap, não os repete. Todo handoff declara o **modo da próxima sessão**.
-- **Abrir sessão** → `session-start` lê o modo declarado e carrega o contexto certo: em **discussão**, o último handoff (qualquer tipo) + roadmap; em **planejamento**, o handoff de discussão mais recente (se houver) + roadmap; em **execução**, roadmap + spec relevante + handoff de execução (panorama completo) antes de codar.
+| Modo | Agentes | Skills de apoio |
+|---|---|---|
+| **Discussão** | `thinking-partner` (ideia/produto), `business-strategist` (mercado/vendas) | `research`, `_obsidian` |
+| **Planejamento** | `planner` (plano + spec) | `intent-driven-development`, `spec-driven`, `design-brief` (se UI) |
+| **Execução** | *(eu, thread principal, codo)* | `next-app-router`, `supabase-patterns`, `tailwind-shadcn`, `zod-validation`, `ai-integration`, `error-handling`, `saas-patterns`, `ponytail` |
+| **Auditoria** *(gate antes de commitar/mergear)* | `typescript-reviewer`, `ux-reviewer`, `design-polish` | `qa-web`, `design-review`, `ponytail-review`, skill `/security-review` |
 
-Artefatos: **discussão não compromete nada** (só o handoff leve); **planejamento cria o spec** (contrato: arquivos, tipos/API, mudanças); **execução implementa o spec**. Fix trivial (1 arquivo, óbvio) dispensa o fluxo inteiro (regra 2).
-<!-- SAAS-BASE-RULES:END -->
+**Regra de acionamento:** ao entrar num modo eu **proponho** qual equipe vou acionar e por quê, e **espero seu ok** — nunca disparo um subagent sozinho. Agentes não se coordenam entre si; **eu** os aciono na ordem e junto os resultados. A **Auditoria** é o gate final da execução: reviewers rodam antes do commit/merge, `design-polish` aplica os fixes que o `design-review` diagnostica, `qa-web` valida no fim.
+
+### 7. Autonomia — quando agir e quando parar
+Decisão **reversível** (código ainda não commitado, arquivo local, escolha que dá pra desfazer): aja com o melhor julgamento, não pare pra perguntar. Decisão **cara ou irreversível** (push, deploy, apagar dado, mudar schema em produção, gastar dinheiro): pare e confirme antes. Na dúvida sobre qual é, trate como cara.
