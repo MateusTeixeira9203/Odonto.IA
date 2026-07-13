@@ -1644,7 +1644,7 @@ export function AgendamentosClient({
                         className="rounded-xl flex items-center gap-1.5 bg-gradient-to-r from-teal to-teal-lt text-white shadow-[0_4px_16px_rgba(47,156,133,0.3)] hover:-translate-y-0.5 transition-all"
                       >
                         <Stethoscope className="w-4 h-4" />
-                        Iniciar consulta
+                        {selectedApt.status === 'in_progress' ? 'Continuar atendimento' : 'Iniciar consulta'}
                       </Button>
                     )}
                   </div>

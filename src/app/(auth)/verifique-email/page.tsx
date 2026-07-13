@@ -94,7 +94,7 @@ function VerifiqueEmailContent(): React.JSX.Element {
             </p>
             <p className="text-sm text-text-secondary">
               <span className="font-semibold text-text-primary">2.</span>{" "}
-              Clique em <strong className="text-text-primary">"Confirmar email"</strong>
+              Clique em <strong className="text-text-primary">&quot;Confirmar email&quot;</strong>
             </p>
             <p className="text-sm text-text-secondary">
               <span className="font-semibold text-text-primary">3.</span>{" "}

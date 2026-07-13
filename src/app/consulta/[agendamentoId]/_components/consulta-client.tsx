@@ -142,7 +142,6 @@ export function ConsultaClient({
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [savedFichaId, setSavedFichaId] = useState<string | null>(null);
-  const [saveCountdown, setSaveCountdown] = useState(5);
   const [showSignature, setShowSignature] = useState(false);
   const [showEmitir, setShowEmitir] = useState(false);
   const [demoSignOpen, setDemoSignOpen] = useState(false); // assinatura mock da demo (K · spec 3.1/3.2)
@@ -151,7 +150,6 @@ export function ConsultaClient({
   // Carrega o contexto do onboarding pra o CTA do perfil voltar pro wizard (spec 3.1).
   const irParaPerfilDemo = () =>
     router.push(`/dashboard/pacientes/demo?from=demo${retornoOnboarding ? '&onboarding=1' : ''}`);
-  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [aptStatus, setAptStatus] = useState(agendamentoStatus);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -207,7 +205,6 @@ export function ConsultaClient({
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
-      if (countdownRef.current) clearInterval(countdownRef.current);
     };
   }, []);
 
@@ -359,27 +356,7 @@ export function ConsultaClient({
     if (result.error) { toast.error(result.error); setIsSaving(false); return; }
     if (result.fichaId) setSavedFichaId(result.fichaId);
     setSaved(true);
-    setSaveCountdown(5);
-    countdownRef.current = setInterval(() => {
-      setSaveCountdown(prev => {
-        if (prev <= 1) {
-          clearInterval(countdownRef.current!);
-          countdownRef.current = null;
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
   };
-
-  // Redireciona quando o countdown pós-salvar zera — fora do updater de estado
-  // ("Cannot update Router while rendering ConsultaClient": navegar dentro do
-  // setSaveCountdown(prev => ...) conta como side-effect em render).
-  useEffect(() => {
-    if (saved && saveCountdown === 0) {
-      router.push(`/dashboard/pacientes/${paciente.id}`);
-    }
-  }, [saved, saveCountdown, router, paciente.id]);
 
   // Recompensa pós-ficha por persona (Workstream B1). Heurística: ~180 caracteres
   // estruturados ≈ 1 min que o dentista não precisou digitar.
@@ -732,7 +709,17 @@ export function ConsultaClient({
                     {recompensaPersona}
                   </motion.p>
                   <p className="text-sm text-text-secondary">
-                    {showSignature ? 'Coletando assinatura...' : `Redirecionando em ${saveCountdown}s`}
+                    {showSignature ? (
+                      'Coletando assinatura...'
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/dashboard/pacientes/${paciente.id}`)}
+                        className="underline underline-offset-2 hover:text-text-primary transition-colors"
+                      >
+                        Voltar ao perfil do paciente
+                      </button>
+                    )}
                   </p>
                 </div>
                 {/* CTA primário: gerar o plano enquanto o paciente ainda está na cadeira (spec 2.3) */}
@@ -741,9 +728,6 @@ export function ConsultaClient({
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.25 }}
-                    onClick={() => {
-                      if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null; }
-                    }}
                   >
                     <ApresentarPaciente
                       patientId={paciente.id}
@@ -761,13 +745,7 @@ export function ConsultaClient({
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.3 }}
-                    onClick={() => {
-                      if (countdownRef.current) {
-                        clearInterval(countdownRef.current);
-                        countdownRef.current = null;
-                      }
-                      setShowSignature(true);
-                    }}
+                    onClick={() => setShowSignature(true)}
                     className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold border transition-colors"
                     style={{ borderColor: 'rgba(47,156,133,0.30)', color: '#2f9c85' }}
                   >
@@ -777,10 +755,7 @@ export function ConsultaClient({
                 )}
                 {!showSignature && (
                   <button
-                    onClick={() => {
-                      if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null; }
-                      setShowEmitir(true);
-                    }}
+                    onClick={() => setShowEmitir(true)}
                     className="text-xs text-text-secondary underline underline-offset-2 hover:text-text-primary transition-colors"
                   >
                     Emitir documento (receita, atestado, pedido)

@@ -12,6 +12,11 @@ export default async function ConsultaPage({ params }: Props) {
   const { supabase, clinicId } = await requireClinicContext();
   const dentista = await getDentistaCached();
 
+  // Secretária não atende — Modo Consulta é só pra quem tem CRO
+  if (dentista?.role === 'secretaria') {
+    redirect('/dashboard');
+  }
+
   // Bloquear acesso ao Modo Consulta quando trial expirou
   const { data: clinica } = await supabase
     .from('clinicas')

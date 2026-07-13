@@ -59,7 +59,7 @@ export async function criarAgendamento(dados: {
     .select('data_hora, duracao_minutos')
     .eq('dentista_id', dentistaAlvo)
     .eq('clinica_id', clinicId)
-    .or('status.eq.scheduled,status.eq.confirmed,status.eq.completed')
+    .in('status', ['scheduled', 'confirmed', 'checked_in', 'in_progress', 'completed'])
     .gte('data_hora', `${dateOnly}T00:00:00.000Z`)
     .lt('data_hora', `${dateOnly}T23:59:59.999Z`);
 
@@ -484,14 +484,13 @@ export async function criarEncaixe(dados: {
 }): Promise<{ error?: string; conflito?: boolean; id?: string }> {
   const { supabase, user, clinicId } = await requireClinicContext();
 
-  const { data: dentistaPerfil } = await supabase
-    .from('dentistas')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('clinica_id', clinicId)
-    .maybeSingle();
+  const [{ data: dentistaPerfil }, { count: pacCount }] = await Promise.all([
+    supabase.from('dentistas').select('id').eq('user_id', user.id).eq('clinica_id', clinicId).maybeSingle(),
+    supabase.from('pacientes').select('id', { count: 'exact', head: true }).eq('id', dados.pacienteId).eq('clinica_id', clinicId),
+  ]);
 
   if (!dentistaPerfil) redirect('/onboarding');
+  if ((pacCount ?? 0) === 0) return { error: 'Paciente não encontrado.' };
 
   const dentistaAlvo = dados.dentistaId ?? dentistaPerfil.id;
   const novoStart = new Date(dados.dataHora).getTime();

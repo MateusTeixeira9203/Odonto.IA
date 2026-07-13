@@ -611,7 +611,7 @@ export default function LandingPage() {
           <div className="max-w-4xl mx-auto">
             <motion.div {...fadeIn} className="text-center mb-14">
               <p className="text-xs font-mono font-bold uppercase tracking-[0.22em] mb-3" style={{ color: TEAL }}>
-                // a mudança real
+                {'// a mudança real'}
               </p>
               <h2 className="text-3xl md:text-5xl font-[family-name:var(--font-dm-serif)] leading-tight">
                 O que muda no <span className="italic text-teal">seu dia.</span>
@@ -634,8 +634,8 @@ export default function LandingPage() {
                 className="grid grid-cols-2 px-6 py-3 text-[10px] font-mono font-bold uppercase tracking-widest"
                 style={{ background: tableHeadBg, borderBottom: `1px solid ${tableHeadBorder}` }}
               >
-                <span className="text-gray-400">// antes</span>
-                <span style={{ color: TEAL }}>// com odonto.ia</span>
+                <span className="text-gray-400">{'// antes'}</span>
+                <span style={{ color: TEAL }}>{'// com odonto.ia'}</span>
               </div>
 
               {ANTES_DEPOIS.map((row, i) => (

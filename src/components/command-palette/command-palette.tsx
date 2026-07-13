@@ -267,7 +267,7 @@ export function CommandPalette({ open, onClose, clinicaId }: Props) {
               <div className="max-h-[340px] overflow-y-auto py-1.5">
                 {allItems.length === 0 && !searching && query.length >= 2 && (
                   <div className="px-4 py-8 text-center text-sm text-text-secondary">
-                    Nenhum resultado para <span className="font-semibold text-text-primary">"{query}"</span>
+                    Nenhum resultado para <span className="font-semibold text-text-primary">&quot;{query}&quot;</span>
                   </div>
                 )}
 

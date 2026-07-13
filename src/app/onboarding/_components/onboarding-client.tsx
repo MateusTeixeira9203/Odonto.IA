@@ -160,8 +160,10 @@ export function OnboardingClient({ initialStep, focoInicial, nomeInicial }: Onbo
         return;
       }
       if (result.success) {
+        // FASE 1: teatro do onboarding (aha/plano/procedimentos) desativado — ver roadmap-3-fases A1
         setNome(data.nome.trim().split(' ')[0]);
-        setStep('aha');
+        await marcarOnboardingCompleto();
+        router.replace('/dashboard');
       } else {
         toast.error(result.error ?? 'Erro ao salvar. Tente novamente.');
       }

@@ -282,8 +282,8 @@ export function UsuariosClient({
           </p>
           <p className="text-xs text-text-secondary mt-1 font-mono">
             {convitesRestantes > 0
-              ? `${convitesRestantes} vaga${convitesRestantes !== 1 ? 's' : ''} disponível${convitesRestantes !== 1 ? 'is' : ''} de ${limiteDentistas} dentistas`
-              : `Limite de ${limiteDentistas} dentistas atingido`}
+              ? `${convitesRestantes} vaga${convitesRestantes !== 1 ? 's' : ''} disponível${convitesRestantes !== 1 ? 'is' : ''} de ${limiteDentistas} dentista${limiteDentistas !== 1 ? 's' : ''}`
+              : `Limite de ${limiteDentistas} dentista${limiteDentistas !== 1 ? 's' : ''} atingido`}
           </p>
         </div>
 

@@ -40,7 +40,12 @@ export function useSessionGuard({
 }: SessionGuardOptions): void {
   const lastCheckRef    = useRef<number>(0);
   const onExpiredRef    = useRef(onExpired);
-  onExpiredRef.current  = onExpired;
+
+  // Mantém a ref sempre com a última closure de onExpired, sem entrar na
+  // dependency array do efeito principal (evitaria re-inscrição a cada render).
+  useEffect(() => {
+    onExpiredRef.current = onExpired;
+  });
 
   useEffect(() => {
     const supabase = createClient();

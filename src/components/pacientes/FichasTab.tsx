@@ -1235,6 +1235,15 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
                                     <div className="flex items-center gap-1.5 text-sm text-text-secondary">
                                       <Clock className="w-3.5 h-3.5 text-teal flex-shrink-0" />
                                       <span><span className="font-bold text-text-primary">Retorno:</span> {evo.retornoSugerido}</span>
+                                      {onAgendarRetorno && (
+                                        <button
+                                          onClick={() => onAgendarRetorno(evo.id, evo.retornoSugerido)}
+                                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border border-teal/40 text-teal hover:bg-teal/10 transition-colors flex-shrink-0"
+                                        >
+                                          <CalendarClock className="w-3 h-3" />
+                                          Agendar retorno
+                                        </button>
+                                      )}
                                     </div>
                                   )}
                                 </div>

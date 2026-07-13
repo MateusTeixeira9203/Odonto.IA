@@ -7,8 +7,9 @@ import { PageContainer } from '@/components/layout/page-container';
 import { DentistaDashboard, DashboardSkeleton } from './_components/dentista-dashboard';
 import { SecretariaDashboard } from './_components/secretaria-dashboard';
 import type { AgendamentoHoje, DentistaItem, PendenciaItem } from './_components/secretaria-dashboard';
-import { getOnboardingProgresso } from '@/lib/onboarding-progress';
-import { PrimeirosPassosCard } from '@/components/dashboard/primeiros-passos-card';
+// FASE 1: guia desativado — ver roadmap-3-fases A2
+// import { getOnboardingProgresso } from '@/lib/onboarding-progress';
+// import { PrimeirosPassosCard } from '@/components/dashboard/primeiros-passos-card';
 
 // ── Dashboard para Secretária ─────────────────────────────────────────────────
 
@@ -192,12 +193,11 @@ export default async function DashboardPage({
 
   const sp = await searchParams;
   const bloqueadoModoConsulta = sp.bloqueado === 'modo-consulta';
-  const progresso = await getOnboardingProgresso(dentista.clinica_id, dentista.foco_principal);
-
   return (
     <PageTransition>
       <PageContainer variant="wide">
-        <PrimeirosPassosCard progresso={progresso} dentistaId={dentista.id} />
+        {/* FASE 1: guia desativado — ver roadmap-3-fases A2 */}
+        {/* <PrimeirosPassosCard progresso={progresso} dentistaId={dentista.id} /> */}
         {bloqueadoModoConsulta && (
           <div className="mb-6 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-5 flex items-start gap-4">
             <div className="w-8 h-8 rounded-xl bg-amber-500/15 flex items-center justify-center shrink-0">

@@ -6,7 +6,8 @@ import { FloatingDock } from "@/components/layout/floating-dock";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { MobileDrawer } from "@/components/layout/mobile-drawer";
 import { DexWidget } from "@/components/layout/dex-widget";
-import { DexGuide } from "@/components/onboarding/dex-guide";
+// FASE 1: guia desativado — ver roadmap-3-fases A2
+// import { DexGuide } from "@/components/onboarding/dex-guide";
 import ParticleNetwork from "@/components/ParticleNetwork";
 import { CommandPalette } from "@/components/command-palette/command-palette";
 import { useSessionGuard } from "@/hooks/use-session-guard";
@@ -135,7 +136,8 @@ export function DashboardShell({ children, nome, clinicaNome, activeClinicId, ro
         plano={plano}
       />
 
-      {role !== 'secretaria' && <DexGuide nome={nome} dentistaId={dentistaId} />}
+      {/* FASE 1: guia desativado — ver roadmap-3-fases A2 */}
+      {/* {role !== 'secretaria' && <DexGuide nome={nome} dentistaId={dentistaId} />} */}
 
       {role !== 'secretaria' && (
         <DexWidget

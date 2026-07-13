@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      # TODO(Fase 3/H5): 24 erros pré-existentes de react-hooks/set-state-in-effect
+      # (refactor de efeitos, não é fix mecânico). typecheck+build são o gate duro;
+      # tirar o continue-on-error quando esses forem corrigidos.
+      - run: npm run lint
+        continue-on-error: true
+
+      - run: npm run build
