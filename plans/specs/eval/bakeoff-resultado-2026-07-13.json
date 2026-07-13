@@ -1,0 +1,943 @@
+{
+  "quando": "2026-07-13T03:22:04.338Z",
+  "runs_por_caso": 3,
+  "modelos": {
+    "baseline-llama": {
+      "casos": [
+        {
+          "id": "canal-26-caries-14-15",
+          "pass": true,
+          "estavel": true,
+          "totalFalhas": 0,
+          "rodadas": [
+            {
+              "latMs": 1655,
+              "falhas": [],
+              "orphans": [],
+              "alucinacoes": [],
+              "afetados": [
+                14,
+                15,
+                26
+              ],
+              "chaves": [
+                14,
+                15,
+                26
+              ]
+            },
+            {
+              "latMs": 1079,
+              "falhas": [],
+              "orphans": [],
+              "alucinacoes": [],
+              "afetados": [
+                14,
+                15,
+                26
+              ],
+              "chaves": [
+                14,
+                15,
+                26
+              ]
+            },
+            {
+              "latMs": 1228,
+              "falhas": [],
+              "orphans": [],
+              "alucinacoes": [],
+              "afetados": [
+                14,
+                15,
+                26
+              ],
+              "chaves": [
+                14,
+                15,
+                26
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ppr-inferior-mais-exodontia-36",
+          "pass": false,
+          "estavel": false,
+          "totalFalhas": 0,
+          "rodadas": [
+            {
+              "latMs": 93,
+              "erro": "429 {\"error\":{\"message\":\"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per day (TPD): L"
+            },
+            {
+              "latMs": 56,
+              "erro": "429 {\"error\":{\"message\":\"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per day (TPD): L"
+            },
+            {
+              "latMs": 57,
+              "erro": "429 {\"error\":{\"message\":\"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per day (TPD): L"
+            }
+          ]
+        },
+        {
+          "id": "pulpite-46-diagnostico-preservado",
+          "pass": false,
+          "estavel": false,
+          "totalFalhas": 0,
+          "rodadas": [
+            {
+              "latMs": 96,
+              "erro": "429 {\"error\":{\"message\":\"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per day (TPD): L"
+            },
+            {
+              "latMs": 58,
+              "erro": "429 {\"error\":{\"message\":\"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per day (TPD): L"
+            },
+            {
+              "latMs": 55,
+              "erro": "429 {\"error\":{\"message\":\"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per day (TPD): L"
+            }
+          ]
+        },
+        {
+          "id": "profilaxia-boca-toda-99",
+          "pass": false,
+          "estavel": false,
+          "totalFalhas": 0,
+          "rodadas": [
+            {
+              "latMs": 93,
+              "erro": "429 {\"error\":{\"message\":\"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per day (TPD): L"
+            },
+            {
+              "latMs": 58,
+              "erro": "429 {\"error\":{\"message\":\"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per day (TPD): L"
+            },
+            {
+              "latMs": 54,
+              "erro": "429 {\"error\":{\"message\":\"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per day (TPD): L"
+            }
+          ]
+        },
+        {
+          "id": "ruido-small-talk-restauracao-11",
+          "pass": false,
+          "estavel": false,
+          "totalFalhas": 0,
+          "rodadas": [
+            {
+              "latMs": 88,
+              "erro": "429 {\"error\":{\"message\":\"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per day (TPD): L"
+            },
+            {
+              "latMs": 55,
+              "erro": "429 {\"error\":{\"message\":\"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per day (TPD): L"
+            },
+            {
+              "latMs": 53,
+              "erro": "429 {\"error\":{\"message\":\"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per day (TPD): L"
+            }
+          ]
+        },
+        {
+          "id": "reab-boca-inteira-17-dentes",
+          "pass": false,
+          "estavel": false,
+          "totalFalhas": 0,
+          "rodadas": [
+            {
+              "latMs": 86,
+              "erro": "429 {\"error\":{\"message\":\"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per day (TPD): L"
+            },
+            {
+              "latMs": 52,
+              "erro": "429 {\"error\":{\"message\":\"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per day (TPD): L"
+            },
+            {
+              "latMs": 58,
+              "erro": "429 {\"error\":{\"message\":\"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per day (TPD): L"
+            }
+          ]
+        },
+        {
+          "id": "odontopediatria-deciduos-selantes",
+          "pass": false,
+          "estavel": false,
+          "totalFalhas": 0,
+          "rodadas": [
+            {
+              "latMs": 129,
+              "erro": "429 {\"error\":{\"message\":\"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per day (TPD): L"
+            },
+            {
+              "latMs": 39,
+              "erro": "429 {\"error\":{\"message\":\"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per day (TPD): L"
+            },
+            {
+              "latMs": 51,
+              "erro": "429 {\"error\":{\"message\":\"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per day (TPD): L"
+            }
+          ]
+        },
+        {
+          "id": "rajadas-acumuladas-orto-dtm-urgencia",
+          "pass": false,
+          "estavel": false,
+          "totalFalhas": 0,
+          "rodadas": [
+            {
+              "latMs": 90,
+              "erro": "429 {\"error\":{\"message\":\"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per day (TPD): L"
+            },
+            {
+              "latMs": 58,
+              "erro": "429 {\"error\":{\"message\":\"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per day (TPD): L"
+            },
+            {
+              "latMs": 39,
+              "erro": "429 {\"error\":{\"message\":\"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per day (TPD): L"
+            }
+          ]
+        }
+      ],
+      "erros": 21,
+      "orphansTotal": 0,
+      "alucinacoesTotal": 0,
+      "falhasTotal": 0,
+      "latencias": [
+        1655,
+        1079,
+        1228
+      ]
+    },
+    "groq-gpt-oss-120b": {
+      "casos": [
+        {
+          "id": "canal-26-caries-14-15",
+          "pass": false,
+          "estavel": false,
+          "totalFalhas": 0,
+          "rodadas": [
+            {
+              "latMs": 69,
+              "erro": "413 {\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-120b` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per minute (TPM): Lim"
+            },
+            {
+              "latMs": 43,
+              "erro": "413 {\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-120b` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per minute (TPM): Lim"
+            },
+            {
+              "latMs": 42,
+              "erro": "413 {\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-120b` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per minute (TPM): Lim"
+            }
+          ]
+        },
+        {
+          "id": "ppr-inferior-mais-exodontia-36",
+          "pass": false,
+          "estavel": false,
+          "totalFalhas": 0,
+          "rodadas": [
+            {
+              "latMs": 60,
+              "erro": "413 {\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-120b` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per minute (TPM): Lim"
+            },
+            {
+              "latMs": 55,
+              "erro": "413 {\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-120b` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per minute (TPM): Lim"
+            },
+            {
+              "latMs": 55,
+              "erro": "413 {\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-120b` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per minute (TPM): Lim"
+            }
+          ]
+        },
+        {
+          "id": "pulpite-46-diagnostico-preservado",
+          "pass": false,
+          "estavel": false,
+          "totalFalhas": 0,
+          "rodadas": [
+            {
+              "latMs": 57,
+              "erro": "413 {\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-120b` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per minute (TPM): Lim"
+            },
+            {
+              "latMs": 63,
+              "erro": "413 {\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-120b` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per minute (TPM): Lim"
+            },
+            {
+              "latMs": 55,
+              "erro": "413 {\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-120b` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per minute (TPM): Lim"
+            }
+          ]
+        },
+        {
+          "id": "profilaxia-boca-toda-99",
+          "pass": false,
+          "estavel": false,
+          "totalFalhas": 0,
+          "rodadas": [
+            {
+              "latMs": 46,
+              "erro": "413 {\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-120b` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per minute (TPM): Lim"
+            },
+            {
+              "latMs": 57,
+              "erro": "413 {\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-120b` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per minute (TPM): Lim"
+            },
+            {
+              "latMs": 56,
+              "erro": "413 {\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-120b` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per minute (TPM): Lim"
+            }
+          ]
+        },
+        {
+          "id": "ruido-small-talk-restauracao-11",
+          "pass": false,
+          "estavel": false,
+          "totalFalhas": 0,
+          "rodadas": [
+            {
+              "latMs": 47,
+              "erro": "413 {\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-120b` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per minute (TPM): Lim"
+            },
+            {
+              "latMs": 51,
+              "erro": "413 {\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-120b` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per minute (TPM): Lim"
+            },
+            {
+              "latMs": 39,
+              "erro": "413 {\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-120b` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per minute (TPM): Lim"
+            }
+          ]
+        },
+        {
+          "id": "reab-boca-inteira-17-dentes",
+          "pass": false,
+          "estavel": false,
+          "totalFalhas": 0,
+          "rodadas": [
+            {
+              "latMs": 41,
+              "erro": "413 {\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-120b` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per minute (TPM): Lim"
+            },
+            {
+              "latMs": 43,
+              "erro": "413 {\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-120b` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per minute (TPM): Lim"
+            },
+            {
+              "latMs": 55,
+              "erro": "413 {\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-120b` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per minute (TPM): Lim"
+            }
+          ]
+        },
+        {
+          "id": "odontopediatria-deciduos-selantes",
+          "pass": false,
+          "estavel": false,
+          "totalFalhas": 0,
+          "rodadas": [
+            {
+              "latMs": 55,
+              "erro": "413 {\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-120b` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per minute (TPM): Lim"
+            },
+            {
+              "latMs": 56,
+              "erro": "413 {\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-120b` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per minute (TPM): Lim"
+            },
+            {
+              "latMs": 54,
+              "erro": "413 {\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-120b` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per minute (TPM): Lim"
+            }
+          ]
+        },
+        {
+          "id": "rajadas-acumuladas-orto-dtm-urgencia",
+          "pass": false,
+          "estavel": false,
+          "totalFalhas": 0,
+          "rodadas": [
+            {
+              "latMs": 55,
+              "erro": "413 {\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-120b` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per minute (TPM): Lim"
+            },
+            {
+              "latMs": 45,
+              "erro": "413 {\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-120b` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per minute (TPM): Lim"
+            },
+            {
+              "latMs": 56,
+              "erro": "413 {\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-120b` in organization `org_01ktg9r9e6ep081v4rh0crtwnj` service tier `on_demand` on tokens per minute (TPM): Lim"
+            }
+          ]
+        }
+      ],
+      "erros": 24,
+      "orphansTotal": 0,
+      "alucinacoesTotal": 0,
+      "falhasTotal": 0,
+      "latencias": []
+    },
+    "gemini-2.5-flash": {
+      "casos": [
+        {
+          "id": "canal-26-caries-14-15",
+          "pass": true,
+          "estavel": true,
+          "totalFalhas": 0,
+          "rodadas": [
+            {
+              "latMs": 10972,
+              "falhas": [],
+              "orphans": [],
+              "alucinacoes": [],
+              "afetados": [
+                14,
+                15,
+                26
+              ],
+              "chaves": [
+                14,
+                15,
+                26
+              ]
+            },
+            {
+              "latMs": 6969,
+              "falhas": [],
+              "orphans": [],
+              "alucinacoes": [],
+              "afetados": [
+                14,
+                15,
+                26
+              ],
+              "chaves": [
+                14,
+                15,
+                26
+              ]
+            },
+            {
+              "latMs": 6451,
+              "falhas": [],
+              "orphans": [],
+              "alucinacoes": [],
+              "afetados": [
+                14,
+                15,
+                26
+              ],
+              "chaves": [
+                14,
+                15,
+                26
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ppr-inferior-mais-exodontia-36",
+          "pass": true,
+          "estavel": true,
+          "totalFalhas": 0,
+          "rodadas": [
+            {
+              "latMs": 9488,
+              "falhas": [],
+              "orphans": [],
+              "alucinacoes": [],
+              "afetados": [
+                36,
+                98
+              ],
+              "chaves": [
+                36,
+                98
+              ]
+            },
+            {
+              "latMs": 6360,
+              "falhas": [],
+              "orphans": [],
+              "alucinacoes": [],
+              "afetados": [
+                36,
+                98
+              ],
+              "chaves": [
+                36,
+                98
+              ]
+            },
+            {
+              "latMs": 8648,
+              "falhas": [],
+              "orphans": [],
+              "alucinacoes": [],
+              "afetados": [
+                36,
+                98
+              ],
+              "chaves": [
+                36,
+                98
+              ]
+            }
+          ]
+        },
+        {
+          "id": "pulpite-46-diagnostico-preservado",
+          "pass": true,
+          "estavel": true,
+          "totalFalhas": 0,
+          "rodadas": [
+            {
+              "latMs": 6906,
+              "falhas": [],
+              "orphans": [],
+              "alucinacoes": [],
+              "afetados": [
+                46
+              ],
+              "chaves": [
+                46
+              ]
+            },
+            {
+              "latMs": 6009,
+              "falhas": [],
+              "orphans": [],
+              "alucinacoes": [],
+              "afetados": [
+                46
+              ],
+              "chaves": [
+                46
+              ]
+            },
+            {
+              "latMs": 4891,
+              "falhas": [],
+              "orphans": [],
+              "alucinacoes": [],
+              "afetados": [
+                46
+              ],
+              "chaves": [
+                46
+              ]
+            }
+          ]
+        },
+        {
+          "id": "profilaxia-boca-toda-99",
+          "pass": true,
+          "estavel": true,
+          "totalFalhas": 0,
+          "rodadas": [
+            {
+              "latMs": 5772,
+              "falhas": [],
+              "orphans": [],
+              "alucinacoes": [],
+              "afetados": [
+                99
+              ],
+              "chaves": [
+                99
+              ]
+            },
+            {
+              "latMs": 6993,
+              "falhas": [],
+              "orphans": [],
+              "alucinacoes": [],
+              "afetados": [
+                99
+              ],
+              "chaves": [
+                99
+              ]
+            },
+            {
+              "latMs": 6412,
+              "falhas": [],
+              "orphans": [],
+              "alucinacoes": [],
+              "afetados": [
+                99
+              ],
+              "chaves": [
+                99
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ruido-small-talk-restauracao-11",
+          "pass": true,
+          "estavel": true,
+          "totalFalhas": 0,
+          "rodadas": [
+            {
+              "latMs": 4130,
+              "falhas": [],
+              "orphans": [],
+              "alucinacoes": [],
+              "afetados": [
+                11
+              ],
+              "chaves": [
+                11
+              ]
+            },
+            {
+              "latMs": 4504,
+              "falhas": [],
+              "orphans": [],
+              "alucinacoes": [],
+              "afetados": [
+                11
+              ],
+              "chaves": [
+                11
+              ]
+            },
+            {
+              "latMs": 4312,
+              "falhas": [],
+              "orphans": [],
+              "alucinacoes": [],
+              "afetados": [
+                11
+              ],
+              "chaves": [
+                11
+              ]
+            }
+          ]
+        },
+        {
+          "id": "reab-boca-inteira-17-dentes",
+          "pass": false,
+          "estavel": false,
+          "totalFalhas": 26,
+          "rodadas": [
+            {
+              "latMs": 21729,
+              "falhas": [
+                "faltou dente 28 em dentes_afetados",
+                "faltou dente 48 em dentes_afetados",
+                "faltou dente 37 em dentes_afetados",
+                "faltou dente 12 em dentes_afetados",
+                "faltou dente 22 em dentes_afetados",
+                "sem observação para \"28\"",
+                "sem observação para \"48\"",
+                "sem observação para \"37\"",
+                "sem observação para \"12\"",
+                "sem observação para \"22\"",
+                "anotacoes sem \"pulpite\""
+              ],
+              "orphans": [],
+              "alucinacoes": [],
+              "afetados": [
+                11,
+                14,
+                15,
+                16,
+                18,
+                21,
+                25,
+                34,
+                36,
+                46,
+                97,
+                99
+              ],
+              "chaves": [
+                11,
+                14,
+                15,
+                16,
+                18,
+                21,
+                25,
+                34,
+                36,
+                46,
+                97,
+                99
+              ]
+            },
+            {
+              "latMs": 20181,
+              "falhas": [
+                "faltou dente 28 em dentes_afetados",
+                "faltou dente 48 em dentes_afetados",
+                "sem observação para \"28\"",
+                "sem observação para \"48\""
+              ],
+              "orphans": [],
+              "alucinacoes": [],
+              "afetados": [
+                11,
+                12,
+                14,
+                15,
+                16,
+                18,
+                21,
+                22,
+                25,
+                34,
+                36,
+                37,
+                46,
+                97,
+                99
+              ],
+              "chaves": [
+                11,
+                12,
+                14,
+                15,
+                16,
+                18,
+                21,
+                22,
+                25,
+                34,
+                36,
+                37,
+                46,
+                97,
+                99
+              ]
+            },
+            {
+              "latMs": 21538,
+              "falhas": [
+                "faltou dente 28 em dentes_afetados",
+                "faltou dente 48 em dentes_afetados",
+                "faltou dente 37 em dentes_afetados",
+                "faltou dente 12 em dentes_afetados",
+                "faltou dente 22 em dentes_afetados",
+                "sem observação para \"28\"",
+                "sem observação para \"48\"",
+                "sem observação para \"37\"",
+                "sem observação para \"12\"",
+                "sem observação para \"22\"",
+                "anotacoes sem \"pulpite\""
+              ],
+              "orphans": [],
+              "alucinacoes": [],
+              "afetados": [
+                11,
+                14,
+                15,
+                16,
+                18,
+                21,
+                25,
+                34,
+                36,
+                46,
+                97,
+                99
+              ],
+              "chaves": [
+                11,
+                14,
+                15,
+                16,
+                18,
+                21,
+                25,
+                34,
+                36,
+                46,
+                97,
+                99
+              ]
+            }
+          ]
+        },
+        {
+          "id": "odontopediatria-deciduos-selantes",
+          "pass": true,
+          "estavel": true,
+          "totalFalhas": 0,
+          "rodadas": [
+            {
+              "latMs": 7832,
+              "falhas": [],
+              "orphans": [],
+              "alucinacoes": [],
+              "afetados": [
+                16,
+                26,
+                36,
+                46,
+                74,
+                84,
+                99
+              ],
+              "chaves": [
+                16,
+                26,
+                36,
+                46,
+                74,
+                84,
+                99
+              ]
+            },
+            {
+              "latMs": 7672,
+              "falhas": [],
+              "orphans": [],
+              "alucinacoes": [],
+              "afetados": [
+                16,
+                26,
+                36,
+                46,
+                74,
+                84,
+                99
+              ],
+              "chaves": [
+                16,
+                26,
+                36,
+                46,
+                74,
+                84,
+                99
+              ]
+            },
+            {
+              "latMs": 8140,
+              "falhas": [],
+              "orphans": [],
+              "alucinacoes": [],
+              "afetados": [
+                16,
+                26,
+                36,
+                46,
+                74,
+                84,
+                99
+              ],
+              "chaves": [
+                16,
+                26,
+                36,
+                46,
+                74,
+                84,
+                99
+              ]
+            }
+          ]
+        },
+        {
+          "id": "rajadas-acumuladas-orto-dtm-urgencia",
+          "pass": true,
+          "estavel": true,
+          "totalFalhas": 0,
+          "rodadas": [
+            {
+              "latMs": 12221,
+              "falhas": [],
+              "orphans": [],
+              "alucinacoes": [],
+              "afetados": [
+                45,
+                47,
+                98,
+                99
+              ],
+              "chaves": [
+                45,
+                47,
+                98,
+                99
+              ]
+            },
+            {
+              "latMs": 11234,
+              "falhas": [],
+              "orphans": [],
+              "alucinacoes": [],
+              "afetados": [
+                45,
+                47,
+                98,
+                99
+              ],
+              "chaves": [
+                45,
+                47,
+                98,
+                99
+              ]
+            },
+            {
+              "latMs": 14954,
+              "falhas": [],
+              "orphans": [],
+              "alucinacoes": [],
+              "afetados": [
+                45,
+                47,
+                98,
+                99
+              ],
+              "chaves": [
+                45,
+                47,
+                98,
+                99
+              ]
+            }
+          ]
+        }
+      ],
+      "erros": 0,
+      "orphansTotal": 0,
+      "alucinacoesTotal": 0,
+      "falhasTotal": 26,
+      "latencias": [
+        10972,
+        6969,
+        6451,
+        9488,
+        6360,
+        8648,
+        6906,
+        6009,
+        4891,
+        5772,
+        6993,
+        6412,
+        4130,
+        4504,
+        4312,
+        21729,
+        20181,
+        21538,
+        7832,
+        7672,
+        8140,
+        12221,
+        11234,
+        14954
+      ]
+    }
+  }
+}

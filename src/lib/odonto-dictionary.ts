@@ -78,6 +78,10 @@ export const PROCEDIMENTOS_MAP: Record<string, string> = {
   'retratamento endodôntico':    'Retratamento endodôntico',
   'apicectomia':                 'Cirurgia parendodôntica (apicectomia)',
   'cirurgia parendodôntica':     'Cirurgia parendodôntica (apicectomia)',
+  'pulpotomia':                  'Pulpotomia',
+  'pulpectomia':                 'Pulpectomia',
+  'curativo de demora':          'Curativo de demora (medicação intracanal)',
+  'medicação intracanal':        'Curativo de demora (medicação intracanal)',
 
   // Exodontia
   'extração':                    'Exodontia',
@@ -90,6 +94,25 @@ export const PROCEDIMENTOS_MAP: Record<string, string> = {
   'dente do siso':               'Exodontia de terceiro molar',
   'terceiro molar':              'Exodontia de terceiro molar',
 
+  // Cirurgia oral menor
+  'frenectomia':                 'Frenectomia',
+  'frenectomia lingual':         'Frenectomia lingual',
+  'frenectomia labial':          'Frenectomia labial',
+  'biópsia':                     'Biópsia de tecido bucal',
+  'drenagem de abscesso':        'Drenagem de abscesso',
+  'drenagem':                    'Drenagem de abscesso',
+  'alveoloplastia':              'Alveoloplastia (regularização de rebordo)',
+  'regularização de rebordo':    'Alveoloplastia (regularização de rebordo)',
+  'tracionamento':               'Tracionamento de dente incluso',
+  'exposição de dente incluso':  'Exposição cirúrgica de dente incluso',
+  'cirurgia ortognática':        'Cirurgia ortognática',
+  'ortognática':                 'Cirurgia ortognática',
+  'redução de fratura':          'Redução de fratura facial',
+  'fratura facial':              'Redução de fratura facial',
+  'remoção de cisto':            'Remoção de cisto odontogênico',
+  'remoção de tumor':            'Remoção de tumor odontogênico',
+  'enucleação de cisto':         'Remoção de cisto odontogênico',
+
   // Periodontia
   'raspagem':                    'Raspagem e alisamento radicular',
   'alisamento radicular':        'Raspagem e alisamento radicular',
@@ -101,6 +124,11 @@ export const PROCEDIMENTOS_MAP: Record<string, string> = {
   'gengivoplastia':              'Gengivoplastia',
   'gengivectomia':               'Gengivectomia',
   'cirurgia periodontal':        'Cirurgia periodontal',
+  'enxerto gengival':            'Enxerto gengival livre/conjuntivo',
+  'recobrimento radicular':      'Recobrimento radicular',
+  'cunha distal':                'Cunha distal',
+  'splintagem':                  'Splintagem (contenção de dentes com mobilidade)',
+  'esplintagem':                 'Splintagem (contenção de dentes com mobilidade)',
 
   // Dentística / restauradora
   'profilaxia':                  'Profilaxia dental',
@@ -118,18 +146,54 @@ export const PROCEDIMENTOS_MAP: Record<string, string> = {
   'clareamento':                 'Clareamento dental',
   'clareamento dental':          'Clareamento dental',
   'clareamento a laser':         'Clareamento dental a laser',
+  'fechamento de diastema':      'Fechamento de diastema com resina',
+  'fechar diastema':             'Fechamento de diastema com resina',
+  'ajuste oclusal':              'Ajuste oclusal',
+  'colagem de fragmento':        'Colagem de fragmento dental',
+  'dessensibilização':           'Dessensibilização dentinária',
+  'aplicação de dessensibilizante': 'Dessensibilização dentinária',
+
+  // Odontopediatria
+  'selante':                     'Selante de fossas e fissuras',
+  'aplicação de selante':        'Selante de fossas e fissuras',
+  'flúor':                       'Aplicação tópica de flúor',
+  'aplicação de flúor':          'Aplicação tópica de flúor',
+  'flúor verniz':                'Aplicação tópica de flúor (verniz)',
+  'verniz fluoretado':           'Aplicação tópica de flúor (verniz)',
+  'mantenedor de espaço':        'Mantenedor de espaço',
+  'mantenedor':                  'Mantenedor de espaço',
+  'ulectomia':                   'Ulectomia',
+  'ulotomia':                    'Ulotomia',
+  'adequação do meio bucal':     'Adequação do meio bucal',
 
   // Prótese
   'coroa':                       'Coroa total protética',
   'coroa protética':             'Coroa total protética',
   'coroa de porcelana':          'Coroa total protética em porcelana',
+  'coroa de zircônia':           'Coroa total protética em zircônia',
+  'zircônia':                    'Coroa total protética em zircônia',
+  'e-max':                       'Coroa/faceta em cerâmica (e.max)',
+  'emax':                        'Coroa/faceta em cerâmica (e.max)',
+  'coroa sobre implante':        'Coroa protética sobre implante',
   'prótese':                     'Prótese dentária',
   'prótese total':               'Prótese total',
   'dentadura':                   'Prótese total',
+  'chapa':                       'Prótese total',
   'ppr':                         'Prótese parcial removível',
   'prótese parcial removível':   'Prótese parcial removível',
+  'roach':                       'Prótese parcial removível',
+  'ponte':                       'Prótese parcial fixa (ponte)',
+  'prótese fixa':                'Prótese parcial fixa (ponte)',
+  'ppf':                         'Prótese parcial fixa (ponte)',
+  'prótese adesiva':             'Prótese adesiva',
+  'overdenture':                 'Overdenture sobre implante',
+  'onlay':                       'Restauração indireta (onlay/inlay)',
+  'inlay':                       'Restauração indireta (onlay/inlay)',
+  'overlay':                     'Restauração indireta (onlay/inlay)',
+  'bloco':                       'Restauração indireta (onlay/inlay)',
   'protocolo':                   'Prótese protocolo sobre implante',
   'pino':                        'Núcleo de preenchimento / retentor intracanal',
+  'pivô':                        'Núcleo de preenchimento / retentor intracanal',
   'retentor intracanal':         'Núcleo de preenchimento / retentor intracanal',
   'núcleo de preenchimento':     'Núcleo de preenchimento / retentor intracanal',
   'provisório':                  'Coroa/restauração provisória',
@@ -141,18 +205,48 @@ export const PROCEDIMENTOS_MAP: Record<string, string> = {
   'enxerto ósseo':               'Enxerto ósseo/tecido mole',
   'levantamento de seio':        'Levantamento de seio maxilar',
   'sinus lift':                  'Levantamento de seio maxilar',
+  'implante de carga imediata':  'Implante osseointegrado de carga imediata',
+  'carga imediata':              'Implante osseointegrado de carga imediata',
 
   // Ortodontia / disfunção
   'aparelho':                    'Aparelho ortodôntico',
   'aparelho ortodôntico':        'Aparelho ortodôntico',
+  'aparelho fixo':               'Aparelho ortodôntico fixo',
+  'aparelho móvel':              'Aparelho ortodôntico removível',
+  'instalação de aparelho':      'Instalação de aparelho ortodôntico',
+  'manutenção do aparelho':      'Manutenção ortodôntica',
+  'manutenção ortodôntica':      'Manutenção ortodôntica',
+  'remoção de aparelho':         'Remoção de aparelho ortodôntico',
+  'alinhadores':                 'Tratamento com alinhadores ortodônticos',
+  'alinhador invisível':         'Tratamento com alinhadores ortodônticos',
   'contenção':                   'Contenção ortodôntica',
+  'contenção fixa':              'Contenção ortodôntica fixa',
+  'botão ortodôntico':           'Colagem de botão/braquete ortodôntico',
+  'documentação ortodôntica':    'Documentação ortodôntica',
   'placa':                       'Placa miorrelaxante/de bruxismo',
   'placa miorrelaxante':         'Placa miorrelaxante/de bruxismo',
   'placa de bruxismo':           'Placa miorrelaxante/de bruxismo',
+  'ajuste de placa':             'Ajuste de placa miorrelaxante',
+  'tratamento de dtm':           'Tratamento de disfunção temporomandibular (DTM)',
+  'agulhamento':                 'Agulhamento seco (DTM/dor orofacial)',
+
+  // Harmonização orofacial
+  'botox':                       'Aplicação de toxina botulínica',
+  'toxina botulínica':           'Aplicação de toxina botulínica',
+  'preenchimento':               'Preenchimento com ácido hialurônico',
+  'ácido hialurônico':           'Preenchimento com ácido hialurônico',
+  'bichectomia':                 'Bichectomia',
 
   // Diagnóstico / imagem
   'radiografia':                 'Exame radiográfico',
   'raio-x':                      'Exame radiográfico',
+  'radiografia periapical':      'Radiografia periapical',
+  'periapical':                  'Radiografia periapical',
+  'panorâmica':                  'Radiografia panorâmica',
+  'raio-x panorâmico':           'Radiografia panorâmica',
+  'interproximal':               'Radiografia interproximal (bitewing)',
+  'bitewing':                    'Radiografia interproximal (bitewing)',
+  'documentação completa':       'Documentação radiográfica completa',
   'tomografia':                  'Tomografia computadorizada de feixe cônico (CBCT)',
   'tomografia computadorizada':  'Tomografia computadorizada de feixe cônico (CBCT)',
 
@@ -201,9 +295,12 @@ export const WHISPER_DENTAL_PROMPT =
   'quadrante 3 (31-38) inferior esquerdo, quadrante 4 (41-48) inferior direito. ' +
   'Decíduos: 51-55, 61-65, 71-75, 81-85. Siso = terceiro molar (18, 28, 38, 48). ' +
   'Faces: M, D, O, V, L, MOD, MO, DO. ' +
-  'Termos: endodontia, exodontia, raspagem supra e infragengival, restauração com resina e amálgama, faceta, ' +
-  'implante osseointegrado, enxerto ósseo, prótese total e parcial removível, coroa, retentor intracanal, ' +
-  'placa miorrelaxante, clareamento, apicectomia, gengivoplastia, radiografia periapical, tomografia CBCT, ' +
+  'Termos: endodontia, exodontia, pulpotomia, pulpectomia, raspagem supra e infragengival, ' +
+  'restauração com resina e amálgama, faceta, selante, verniz fluoretado, mantenedor de espaço, ' +
+  'implante osseointegrado, enxerto ósseo, prótese total e parcial removível, ponte, coroa de zircônia, ' +
+  'onlay, inlay, overdenture, pivô, retentor intracanal, placa miorrelaxante, bruxismo, alinhadores, ' +
+  'clareamento, apicectomia, gengivoplastia, gengivectomia, frenectomia, alveoloplastia, splintagem, ' +
+  'bichectomia, toxina botulínica, radiografia periapical, panorâmica, bitewing, tomografia CBCT, ' +
   'profilaxia, lidocaína, articaína.';
 
 // ── Contexto para injeção no prompt da IA ────────────────────────────────────
@@ -220,7 +317,7 @@ Sisos: 18, 28, 38, 48
 Faces: M=Mesial, D=Distal, O=Oclusal, V=Vestibular, L=Lingual, MOD=Mesio-ocluso-distal
 Arcada/boca: sentinela 99 = boca toda (limpeza, profilaxia, clareamento, raspagem geral); 97 = arcada superior; 98 = arcada inferior (ex: PPR, prótese total, aparelho, placa)
 Procedimentos: ${procedimentos}
-ACHADOS (não são procedimentos — descrevem o problema, não a intervenção): cárie, pulpite, necrose, fratura, mobilidade, retração gengival, abscesso, tártaro. Ao ver um achado, o procedimento é a intervenção correspondente (cárie→restauração, pulpite→endodontia, tártaro→raspagem/profilaxia).
+ACHADOS (não são procedimentos — descrevem o problema, não a intervenção): cárie, pulpite, necrose, fratura, mobilidade dental, retração gengival, abscesso, tártaro, envolvimento de furca, apinhamento, diastema, má oclusão (classe I/II/III de Angle), giroversão. Ao ver um achado, o procedimento é a intervenção correspondente (cárie→restauração, pulpite→endodontia, tártaro→raspagem/profilaxia, mobilidade→splintagem, diastema→fechamento com resina ou ortodontia, má oclusão/apinhamento→indicação ortodôntica).
 Sempre converter número verbal para FDI: "vinte e seis" → 26, "trinta e seis" → 36
 `.trim();
 }

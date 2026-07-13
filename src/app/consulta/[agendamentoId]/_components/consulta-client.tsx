@@ -169,7 +169,31 @@ export function ConsultaClient({
   const [isDetecting, setIsDetecting] = useState(false);
   const detectDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { status: micStatus, startRecording, stopRecording } = useAudioRecorder();
+  // Caminho único de pós-gravação: usado pelo stop manual E pelo corte por silêncio.
+  const processarAudio = useCallback(async (blob: Blob | null) => {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    if (!blob) { setIsTranscribing(false); return; }
+    setIsTranscribing(true);
+    try {
+      const fd = new FormData();
+      fd.append('audio', blob, 'audio.webm');
+      const res = await fetch('/api/transcrever', { method: 'POST', body: fd });
+      if (!res.ok) throw new Error(`Erro ${res.status}`);
+      const data = await res.json() as { transcricao?: string };
+      const texto = data.transcricao?.trim();
+      if (texto) {
+        setLiveTranscript(texto);
+        setTextoLivre(prev => prev ? `${prev}\n${texto}` : texto);
+      }
+    } catch (err) {
+      console.error('[consulta] transcrever:', err);
+      toast.error('Não foi possível transcrever o áudio. Tente novamente.');
+    } finally { setIsTranscribing(false); }
+  }, []);
+
+  const { status: micStatus, startRecording, stopRecording } = useAudioRecorder({
+    onAutoStop: (blob) => { void processarAudio(blob); },
+  });
 
   // Detecção ao vivo de procedimentos enquanto o dentista escreve (só na fase de captura).
   useEffect(() => {
@@ -228,25 +252,9 @@ export function ConsultaClient({
 
   const handleVoice = useCallback(async () => {
     if (micStatus === 'recording') {
-      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
       setIsTranscribing(true);
       const blob = await stopRecording();
-      if (!blob) { setIsTranscribing(false); return; }
-      try {
-        const fd = new FormData();
-        fd.append('audio', blob, 'audio.webm');
-        const res = await fetch('/api/transcrever', { method: 'POST', body: fd });
-        if (!res.ok) throw new Error(`Erro ${res.status}`);
-        const data = await res.json() as { transcricao?: string };
-        const texto = data.transcricao?.trim();
-        if (texto) {
-          setLiveTranscript(texto);
-          setTextoLivre(prev => prev ? `${prev}\n${texto}` : texto);
-        }
-      } catch (err) {
-        console.error('[consulta] transcrever:', err);
-        toast.error('Não foi possível transcrever o áudio. Tente novamente.');
-      } finally { setIsTranscribing(false); }
+      await processarAudio(blob);
     } else {
       if (micStatus === 'error') {
         toast.error('Microfone indisponível. Verifique as permissões do navegador e recarregue a página.');
@@ -262,7 +270,7 @@ export function ConsultaClient({
       // Só inicia o timer após confirmar que a gravação começou
       timerRef.current = setInterval(() => setElapsedSeconds(s => s + 1), 1000);
     }
-  }, [micStatus, startRecording, stopRecording]);
+  }, [micStatus, startRecording, stopRecording, processarAudio]);
 
   const handleFormatar = async () => {
     const texto = textoLivre.trim();
@@ -708,19 +716,9 @@ export function ConsultaClient({
                   >
                     {recompensaPersona}
                   </motion.p>
-                  <p className="text-sm text-text-secondary">
-                    {showSignature ? (
-                      'Coletando assinatura...'
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => router.push(`/dashboard/pacientes/${paciente.id}`)}
-                        className="underline underline-offset-2 hover:text-text-primary transition-colors"
-                      >
-                        Voltar ao perfil do paciente
-                      </button>
-                    )}
-                  </p>
+                  {showSignature && (
+                    <p className="text-sm text-text-secondary">Coletando assinatura...</p>
+                  )}
                 </div>
                 {/* CTA primário: gerar o plano enquanto o paciente ainda está na cadeira (spec 2.3) */}
                 {!showSignature && savedFichaId && (
@@ -751,6 +749,19 @@ export function ConsultaClient({
                   >
                     <PenLine className="w-4 h-4" />
                     Solicitar assinatura do paciente
+                  </motion.button>
+                )}
+                {/* Saída explícita do fluxo — fecha o ciclo da consulta (spec fase1-5 §E, D8) */}
+                {!showSignature && (
+                  <motion.button
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.35 }}
+                    onClick={() => router.push(`/dashboard/pacientes/${paciente.id}`)}
+                    className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold border border-border bg-surface text-text-secondary hover:text-text-primary transition-colors"
+                  >
+                    <Check className="w-4 h-4" />
+                    Concluir consulta
                   </motion.button>
                 )}
                 {!showSignature && (

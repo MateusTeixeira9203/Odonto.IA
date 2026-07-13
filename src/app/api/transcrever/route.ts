@@ -36,7 +36,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     const transcription = await groq.audio.transcriptions.create({
       file: audioFile,
-      model: 'whisper-large-v3-turbo',
+      // large-v3 cheio (não turbo): visivelmente melhor em PT-BR e número falado —
+      // é onde o turbo errava dente/termo (spec fase1-5 §A, decisão 13/07).
+      model: 'whisper-large-v3',
       language: 'pt',
       prompt: WHISPER_DENTAL_PROMPT,
       response_format: 'json',

@@ -20,7 +20,7 @@ import { dirname, join } from 'node:path';
 
 const BASE = process.env.EVAL_BASE ?? 'http://localhost:3000';
 const RUNS_PER_CASE = 3;
-const THROTTLE_MS = 2000; // gentileza com o rate-limit (20/60s por IP)
+const THROTTLE_MS = 3500; // gentileza com o rate-limit (20/60s por IP) — 8 casos x 3 runs = 24 chamadas
 const DENTIST = { email: 'test-diag-0712@example.com', password: 'TesteDiag2026!' };
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -45,10 +45,17 @@ async function login(page) {
 
 async function chamar(ctx, texto) {
   for (let tentativa = 0; tentativa < 2; tentativa++) {
-    const res = await ctx.request.post(`${BASE}/api/dex/formatar-evolucao`, {
-      data: { texto },
-      timeout: 30000,
-    });
+    let res;
+    try {
+      // 45s > teto de 30s da rota: capturamos o 500 da rota em vez de estourar antes dela.
+      res = await ctx.request.post(`${BASE}/api/dex/formatar-evolucao`, {
+        data: { texto },
+        timeout: 45000,
+      });
+    } catch (err) {
+      // Timeout/erro de rede vira erro de rodada — nunca derruba a suíte inteira.
+      return { erro: `request falhou: ${String(err?.message ?? err).slice(0, 120)}` };
+    }
     if (res.status() === 429) {
       const retry = Number(res.headers()['retry-after'] ?? 3);
       await new Promise((r) => setTimeout(r, (retry + 1) * 1000));
@@ -60,7 +67,7 @@ async function chamar(ctx, texto) {
   return { erro: 'rate-limit persistente após retry' };
 }
 
-/** Avalia uma resposta contra a `espera` do caso. Retorna { falhas: string[], orphans: number[] }. */
+/** Avalia uma resposta contra a `espera` do caso. Retorna { falhas: string[], orphans: number[], alucinacoes: number[] }. */
 function avaliar(resp, espera) {
   const falhas = [];
   const afetados = (resp.dentes_afetados ?? []).map(Number);
@@ -69,6 +76,13 @@ function avaliar(resp, espera) {
   // Invariante universal: nenhum dente órfão.
   const orphans = afetados.filter((d) => !chaves.has(String(d)));
   if (orphans.length) falhas.push(`ORFÃO: dente(s) ${orphans.join(',')} sem chave em dentes_observacoes`);
+
+  // Universo fechado (casos pesados): dente fora de dentes_permitidos = alucinação, falha grave.
+  let alucinacoes = [];
+  if (espera.dentes_permitidos) {
+    alucinacoes = afetados.filter((d) => !espera.dentes_permitidos.includes(d));
+    if (alucinacoes.length) falhas.push(`ALUCINAÇÃO: dente(s) ${alucinacoes.join(',')} não estão no relato`);
+  }
 
   for (const d of espera.dentes_afetados_contem ?? []) {
     if (!afetados.includes(d)) falhas.push(`dentes_afetados não contém ${d}`);
@@ -89,7 +103,10 @@ function avaliar(resp, espera) {
   if (espera.retorno_sugerido_nao_null && !resp.retorno_sugerido) {
     falhas.push('retorno_sugerido veio null (esperado prazo)');
   }
-  return { falhas, orphans };
+  if (espera.alerta_novo_nao_null && !(typeof resp.alerta_novo === 'string' && resp.alerta_novo.trim())) {
+    falhas.push('alerta_novo veio null (alergia/medicamento mencionado no relato)');
+  }
+  return { falhas, orphans, alucinacoes };
 }
 
 async function main() {
@@ -104,18 +121,22 @@ async function main() {
   for (const caso of casos) {
     const rodadas = [];
     for (let i = 0; i < RUNS_PER_CASE; i++) {
+      const t0 = Date.now();
       const r = await chamar(ctx, caso.texto);
+      const latMs = Date.now() - t0;
       if (r.erro) {
-        rodadas.push({ erro: r.erro });
+        rodadas.push({ erro: r.erro, latMs });
       } else {
-        const { falhas, orphans } = avaliar(r.data, caso.espera);
+        const { falhas, orphans, alucinacoes } = avaliar(r.data, caso.espera);
         rodadas.push({
           dentes_afetados: (r.data.dentes_afetados ?? []).map(Number).sort((a, b) => a - b),
           chaves_obs: Object.keys(r.data.dentes_observacoes ?? {}).map(Number).sort((a, b) => a - b),
           procedimentos: r.data.procedimentos ?? [],
           retorno: r.data.retorno_sugerido ?? null,
           orphans,
+          alucinacoes,
           falhas,
+          latMs,
         });
       }
       await new Promise((res) => setTimeout(res, THROTTLE_MS));
@@ -143,18 +164,17 @@ async function main() {
 
   // Resumo
   const pass = resultado.casos.filter((c) => c.totalFalhas === 0 && c.estavel && c.rodadas.every((r) => !r.erro)).length;
+  const latencias = resultado.casos.flatMap((c) => c.rodadas.filter((r) => !r.erro).map((r) => r.latMs)).sort((a, b) => a - b);
+  const latP95 = latencias.length ? latencias[Math.floor(latencias.length * 0.95)] : 0;
+  const latMed = latencias.length ? Math.round(latencias.reduce((a, b) => a + b, 0) / latencias.length) : 0;
   console.log(`\n=== RESUMO [${TAG}] ${pass}/${resultado.casos.length} casos PASS ===`);
   console.log(`orphans totais: ${resultado.casos.reduce((n, c) => n + c.orphansTotais, 0)}`);
+  console.log(`alucinações totais: ${resultado.casos.reduce((n, c) => n + c.rodadas.reduce((m, r) => m + (r.alucinacoes?.length ?? 0), 0), 0)}`);
+  console.log(`latência rota: méd=${latMed}ms p95=${latP95}ms (gate spec fase1-5: p95 < 6000ms)`);
 
-  const SCRATCH = 'C:/Users/mateu/AppData/Local/Temp/claude/C--Users-mateu-Desktop-Odonto-IA-main/fff5c442-4df7-466b-aa83-78731a50485b/scratchpad';
-  let out;
-  try {
-    out = join(SCRATCH, `eval-formatar-${TAG}.json`);
-    writeFileSync(out, JSON.stringify(resultado, null, 2));
-  } catch {
-    out = join(__dirname, `eval-resultado-${TAG}.json`);
-    writeFileSync(out, JSON.stringify(resultado, null, 2));
-  }
+  // Resultado fica junto dos casos (plans/ é a memória do projeto).
+  const out = join(__dirname, `eval-resultado-${TAG}.json`);
+  writeFileSync(out, JSON.stringify(resultado, null, 2));
   console.log(`Resultado completo: ${out}`);
 }
 
