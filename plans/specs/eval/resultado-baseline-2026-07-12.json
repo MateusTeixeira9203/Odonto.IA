@@ -1,0 +1,298 @@
+{
+  "tag": "baseline",
+  "base": "http://localhost:3000",
+  "quando": "2026-07-13T00:22:43.283Z",
+  "casos": [
+    {
+      "id": "canal-26-caries-14-15",
+      "provenance": "real-observado",
+      "estavel": true,
+      "totalFalhas": 0,
+      "orphansTotais": 0,
+      "rodadas": [
+        {
+          "dentes_afetados": [
+            14,
+            15,
+            26
+          ],
+          "chaves_obs": [
+            14,
+            15,
+            26
+          ],
+          "procedimentos": [
+            "Tratamento endodôntico",
+            "Restauração com resina"
+          ],
+          "retorno": "7 dias",
+          "orphans": [],
+          "falhas": []
+        },
+        {
+          "dentes_afetados": [
+            14,
+            15,
+            26
+          ],
+          "chaves_obs": [
+            14,
+            15,
+            26
+          ],
+          "procedimentos": [
+            "Tratamento endodôntico",
+            "Restauração provisória"
+          ],
+          "retorno": "7 dias",
+          "orphans": [],
+          "falhas": []
+        },
+        {
+          "dentes_afetados": [
+            14,
+            15,
+            26
+          ],
+          "chaves_obs": [
+            14,
+            15,
+            26
+          ],
+          "procedimentos": [
+            "Tratamento endodôntico",
+            "Restauração com resina"
+          ],
+          "retorno": "7 dias",
+          "orphans": [],
+          "falhas": []
+        }
+      ]
+    },
+    {
+      "id": "ppr-inferior-mais-exodontia-36",
+      "provenance": "construido",
+      "estavel": true,
+      "totalFalhas": 0,
+      "orphansTotais": 0,
+      "rodadas": [
+        {
+          "dentes_afetados": [
+            36,
+            98
+          ],
+          "chaves_obs": [
+            36,
+            98
+          ],
+          "procedimentos": [
+            "Exodontia simples",
+            "Moldagem para prótese parcial removível"
+          ],
+          "retorno": "15 dias",
+          "orphans": [],
+          "falhas": []
+        },
+        {
+          "dentes_afetados": [
+            36,
+            98
+          ],
+          "chaves_obs": [
+            36,
+            98
+          ],
+          "procedimentos": [
+            "Exodontia simples",
+            "Moldagem para prótese parcial removível"
+          ],
+          "retorno": "15 dias",
+          "orphans": [],
+          "falhas": []
+        },
+        {
+          "dentes_afetados": [
+            36,
+            98
+          ],
+          "chaves_obs": [
+            36,
+            98
+          ],
+          "procedimentos": [
+            "Moldagem para prótese parcial removível",
+            "Extração simples"
+          ],
+          "retorno": "15 dias",
+          "orphans": [],
+          "falhas": []
+        }
+      ]
+    },
+    {
+      "id": "pulpite-46-diagnostico-preservado",
+      "provenance": "construido",
+      "estavel": true,
+      "totalFalhas": 2,
+      "orphansTotais": 0,
+      "rodadas": [
+        {
+          "dentes_afetados": [
+            46
+          ],
+          "chaves_obs": [
+            46
+          ],
+          "procedimentos": [
+            "Tratamento endodôntico"
+          ],
+          "retorno": "1 semana",
+          "orphans": [],
+          "falhas": [
+            "anotacoes não contém \"pulpite\""
+          ]
+        },
+        {
+          "dentes_afetados": [
+            46
+          ],
+          "chaves_obs": [
+            46
+          ],
+          "procedimentos": [
+            "Tratamento endodôntico"
+          ],
+          "retorno": "1 semana",
+          "orphans": [],
+          "falhas": [
+            "anotacoes não contém \"pulpite\""
+          ]
+        },
+        {
+          "dentes_afetados": [
+            46
+          ],
+          "chaves_obs": [
+            46
+          ],
+          "procedimentos": [
+            "Tratamento endodôntico"
+          ],
+          "retorno": "1 semana",
+          "orphans": [],
+          "falhas": []
+        }
+      ]
+    },
+    {
+      "id": "profilaxia-boca-toda-99",
+      "provenance": "construido",
+      "estavel": true,
+      "totalFalhas": 0,
+      "orphansTotais": 0,
+      "rodadas": [
+        {
+          "dentes_afetados": [
+            99
+          ],
+          "chaves_obs": [
+            99
+          ],
+          "procedimentos": [
+            "Profilaxia dental",
+            "Aplicação de flúor"
+          ],
+          "retorno": "6 meses",
+          "orphans": [],
+          "falhas": []
+        },
+        {
+          "dentes_afetados": [
+            99
+          ],
+          "chaves_obs": [
+            99
+          ],
+          "procedimentos": [
+            "Profilaxia dental",
+            "Raspagem supragengival"
+          ],
+          "retorno": "6 meses",
+          "orphans": [],
+          "falhas": []
+        },
+        {
+          "dentes_afetados": [
+            99
+          ],
+          "chaves_obs": [
+            99
+          ],
+          "procedimentos": [
+            "Profilaxia dental"
+          ],
+          "retorno": "6 meses",
+          "orphans": [],
+          "falhas": []
+        }
+      ]
+    },
+    {
+      "id": "ruido-small-talk-restauracao-11",
+      "provenance": "construido",
+      "estavel": false,
+      "totalFalhas": 4,
+      "orphansTotais": 2,
+      "rodadas": [
+        {
+          "dentes_afetados": [
+            11
+          ],
+          "chaves_obs": [
+            11
+          ],
+          "procedimentos": [
+            "Restauração direta"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "falhas": []
+        },
+        {
+          "dentes_afetados": [
+            11
+          ],
+          "chaves_obs": [],
+          "procedimentos": [
+            "Restauração com resina composta"
+          ],
+          "retorno": null,
+          "orphans": [
+            11
+          ],
+          "falhas": [
+            "ORFÃO: dente(s) 11 sem chave em dentes_observacoes",
+            "dentes_observacoes sem chave \"11\""
+          ]
+        },
+        {
+          "dentes_afetados": [
+            11
+          ],
+          "chaves_obs": [],
+          "procedimentos": [
+            "Restauração com resina composta"
+          ],
+          "retorno": null,
+          "orphans": [
+            11
+          ],
+          "falhas": [
+            "ORFÃO: dente(s) 11 sem chave em dentes_observacoes",
+            "dentes_observacoes sem chave \"11\""
+          ]
+        }
+      ]
+    }
+  ]
+}

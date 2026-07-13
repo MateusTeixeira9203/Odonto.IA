@@ -68,10 +68,12 @@ Regras críticas:
 - NÃO INVENTE nem infira o que não foi dito — dente, procedimento, conduta ou diagnóstico ausentes no relato ficam vazios/null, nunca "chutados".
 - dentes_afetados: array de inteiros FDI válidos (11-48, decíduos 51-85), nunca strings.
 - ARCADA / BOCA INTEIRA: procedimentos sem dente FDI individual usam sentinelas em dentes_afetados (99 boca toda, 97 arcada superior, 98 arcada inferior — ver glossário). NÃO liste dentes individuais nesses casos.
-  Para CADA sentinela em dentes_afetados, crie também a entrada correspondente em dentes_observacoes com o nome do procedimento (ex: dentes_observacoes["98"] = "PPR (prótese parcial removível)") — sem isso o procedimento não aparece marcável.
+- OBRIGATÓRIO — dentes_observacoes cobre TODO dente: para CADA número em dentes_afetados (dente individual OU sentinela 97/98/99), crie a entrada correspondente em dentes_observacoes com o(s) procedimento(s) daquele dente/região (ex: dentes_observacoes["26"] = "Tratamento de canal", dentes_observacoes["98"] = "PPR (prótese parcial removível)"). Nenhum dente citado em dentes_afetados pode ficar sem entrada em dentes_observacoes — se o dente foi mencionado, o que se fez nele TEM que estar lá. Sem isso o procedimento some do orçamento e do progresso.
 - Se nenhum dente mencionado: [] e {}
 - dentes_observacoes: se mais de um procedimento no mesmo dente, separar por \\n — cada linha vira um item independente marcável pelo dentista
 - procedimentos: array de strings resumidas, mínimo 1 item baseado no relato
+- procedimentos = INTERVENÇÕES (o que foi feito ou será feito: restauração, endodontia, exodontia, profilaxia…), NUNCA achados/diagnósticos. Cárie, pulpite, necrose, fratura, mobilidade, retração gengival são ACHADOS — descrevem o problema, vão em anotacoes/queixa_principal, jamais em procedimentos. Ex: relato "cárie oclusal no 14" → procedimento = "Restauração com resina composta", não "Cárie oclusal".
+- O diagnóstico e o raciocínio clínico (ex: "pulpite irreversível confirmada por teste de vitalidade") entram em anotacoes — registrar, não descartar.
 - conduta: string vazia "" se não houver orientações mencionadas
 - retorno_sugerido: null se não mencionado
 - alerta_novo: null se não mencionado
@@ -95,6 +97,16 @@ Regras críticas:
       .map((d) => Number(d))
       .filter((d) => !isNaN(d) && (isValidFDI(d) || isArch(d))); // aceita dentes FDI e sentinelas de arcada (97/98/99)
     parsed.dentes_observacoes = parsed.dentes_observacoes ?? {};
+    // Rede de segurança: nenhum dente detectado pode ficar sem observação (senão some do
+    // orçamento/progresso, que derivam de dentes_observacoes). O prompt (C2) já exige isso;
+    // aqui é o fallback caso o modelo escorregue. Rótulo genérico — o dentista revisa/edita
+    // na tela "Confirmar evolução" antes de salvar.
+    for (const dente of parsed.dentes_afetados) {
+      const key = String(dente);
+      if (!parsed.dentes_observacoes[key]?.trim()) {
+        parsed.dentes_observacoes[key] = 'Procedimento a confirmar';
+      }
+    }
     parsed.procedimentos = Array.isArray(parsed.procedimentos)
       ? (parsed.procedimentos as unknown[]).filter((p): p is string => typeof p === 'string')
       : [];

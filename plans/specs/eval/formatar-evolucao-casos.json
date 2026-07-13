@@ -1,0 +1,65 @@
+{
+  "_meta": {
+    "descricao": "Eval set de consistência da estruturação clínica (/api/dex/formatar-evolucao). Cada caso roda 3x. Origem: Spec Fase 1 #2 (C3).",
+    "criado": "2026-07-12",
+    "provenance_legenda": "real-observado = bug visto ao vivo no teste 12/07; construido = narrativa realista escrita a partir do vocabulário do catálogo (substituir/ampliar quando o fundador trouxer áudios reais do teste)",
+    "invariante_universal": "Todo dente listado em dentes_afetados DEVE ter chave correspondente em dentes_observacoes (orphan=0). Aferido em todos os casos, independente de espera.",
+    "achados_bare_proibidos_em_procedimentos": "Um item de procedimentos falha se sua PRIMEIRA palavra (normalizada) for um achado (cárie, pulpite, necrose, fratura, mobilidade, abscesso, tártaro). 'Restauração de cárie oclusal' passa (começa com 'restauração'); 'Cárie oclusal' falha."
+  },
+  "casos": [
+    {
+      "id": "canal-26-caries-14-15",
+      "provenance": "real-observado",
+      "texto": "Então, paciente chegou com bastante dor no vinte e seis, fiz o teste de vitalidade e deu pulpite irreversível. Abri o dente, fiz o acesso, instrumentei os canais e coloquei uma medicação de hidróxido de cálcio, deixei com restauração provisória. Aí aproveitei e vi que tinha cárie oclusal no quatorze e no quinze também, esses dois vou restaurar com resina na próxima. Orientei ela a não mastigar do lado esquerdo por enquanto. Retorno em sete dias pra terminar o canal.",
+      "espera": {
+        "dentes_afetados_contem": [26, 14, 15],
+        "dentes_observacoes_tem_chave": [26, 14, 15],
+        "procedimentos_nao_contem_achado": ["cárie", "pulpite"],
+        "anotacoes_contem": ["pulpite"],
+        "retorno_sugerido_nao_null": true
+      }
+    },
+    {
+      "id": "ppr-inferior-mais-exodontia-36",
+      "provenance": "construido",
+      "texto": "Hoje fiz a moldagem pra prótese parcial removível inferior dessa paciente, ela já perdeu vários dentes de trás. E o trinta e seis que sobrou só o resto radicular, tá condenado, então extraí, exodontia simples, saiu tranquilo. Suturei e pedi pra ela voltar em quinze dias pra ver a cicatrização antes de instalar a prótese.",
+      "espera": {
+        "dentes_afetados_contem": [98, 36],
+        "dentes_observacoes_tem_chave": [98, 36],
+        "retorno_sugerido_nao_null": true
+      }
+    },
+    {
+      "id": "pulpite-46-diagnostico-preservado",
+      "provenance": "construido",
+      "texto": "Paciente com sensibilidade espontânea no quarenta e seis há uns três dias. Fiz teste térmico, resposta prolongada ao frio, diagnóstico de pulpite irreversível. Iniciei o tratamento endodôntico, localizei quatro canais, fiz a instrumentação e curativo. Prescrevi anti-inflamatório. Volta semana que vem.",
+      "espera": {
+        "dentes_afetados_contem": [46],
+        "dentes_observacoes_tem_chave": [46],
+        "procedimentos_nao_contem_achado": ["pulpite"],
+        "anotacoes_contem": ["pulpite"]
+      }
+    },
+    {
+      "id": "profilaxia-boca-toda-99",
+      "provenance": "construido",
+      "texto": "Consulta de rotina, fiz a profilaxia completa, removi o biofilme e um pouco de tártaro que tinha na região dos inferiores da frente. Apliquei flúor. Paciente com boa higiene no geral, só reforcei a técnica de escovação e o uso do fio. Retorno em seis meses pra manutenção.",
+      "espera": {
+        "dentes_afetados_contem": [99],
+        "dentes_observacoes_tem_chave": [99],
+        "retorno_sugerido_nao_null": true
+      }
+    },
+    {
+      "id": "ruido-small-talk-restauracao-11",
+      "provenance": "construido",
+      "texto": "Nossa, o trânsito hoje tava impossível, né. Enfim. A paciente comentou que vai viajar pra praia mês que vem, aproveitando as férias. Falamos um pouco sobre o jogo de ontem também. Sobre o atendimento: ela fraturou a quina do onze mordendo alguma coisa dura, fratura de esmalte só, sem exposição de dentina. Fiz a restauração com resina composta, reconstruí o ângulo, ajustei a oclusão. Ficou bem estético. Não precisa de retorno específico, só a revisão de rotina.",
+      "espera": {
+        "dentes_afetados_contem": [11],
+        "dentes_observacoes_tem_chave": [11],
+        "procedimentos_nao_contem_achado": ["fratura"],
+        "anotacoes_nao_contem": ["praia", "trânsito", "jogo", "férias"]
+      }
+    }
+  ]
+}

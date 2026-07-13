@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { createClient } from '@/lib/supabase/server';
+import { withRateLimit } from '@/lib/rate-limit';
 
 interface SugerirOrcamentoBody {
   texto: string;
@@ -20,6 +21,9 @@ export interface ItemSugerido {
  * procedimentos odontológicos e sugerir um rascunho de orçamento.
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  const limited = await withRateLimit(req, 'sugerir-orcamento', 20, 60_000);
+  if (limited) return limited;
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {

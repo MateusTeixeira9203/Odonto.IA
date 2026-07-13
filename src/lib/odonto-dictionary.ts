@@ -220,6 +220,7 @@ Sisos: 18, 28, 38, 48
 Faces: M=Mesial, D=Distal, O=Oclusal, V=Vestibular, L=Lingual, MOD=Mesio-ocluso-distal
 Arcada/boca: sentinela 99 = boca toda (limpeza, profilaxia, clareamento, raspagem geral); 97 = arcada superior; 98 = arcada inferior (ex: PPR, prótese total, aparelho, placa)
 Procedimentos: ${procedimentos}
+ACHADOS (não são procedimentos — descrevem o problema, não a intervenção): cárie, pulpite, necrose, fratura, mobilidade, retração gengival, abscesso, tártaro. Ao ver um achado, o procedimento é a intervenção correspondente (cárie→restauração, pulpite→endodontia, tártaro→raspagem/profilaxia).
 Sempre converter número verbal para FDI: "vinte e seis" → 26, "trinta e seis" → 36
 `.trim();
 }
