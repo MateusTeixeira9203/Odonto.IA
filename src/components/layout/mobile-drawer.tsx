@@ -1,20 +1,20 @@
 'use client';
 
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   LayoutDashboard, Users, Calendar, Wallet, Settings,
-  X, LogOut, Sun, Moon, Lock,
+  X, LogOut, Sun, Moon, Lock, Loader2,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { createClient } from '@/lib/supabase/client';
 import { temFeature } from '@/lib/planos';
 import type { DentistaRole } from '@/types/database';
 import type { PlanoId } from '@/lib/planos';
 import { OdontoIALogo } from '@/components/ui/dent-ia-logo';
+import { useLogout } from '@/hooks/use-logout';
 
 interface MobileDrawerProps {
   open: boolean;
@@ -31,28 +31,21 @@ const NAV_ITEMS = [
   { href: '/dashboard/pacientes',    icon: Users,           label: 'Pacientes' },
   { href: '/dashboard/agendamentos', icon: Calendar,        label: 'Agenda' },
   { href: '/dashboard/financeiro',   icon: Wallet,          label: 'Financeiro', requiresFeature: 'financeiro' as const },
-  { href: '/dashboard/configuracoes',icon: Settings,        label: 'Configurações', adminOnly: true },
+  { href: '/dashboard/configuracoes',icon: Settings,        label: 'Configurações', hideFromSecretaria: true },
 ] as const;
 
 export function MobileDrawer({ open, onClose, nome, clinicaNome, role, avatarUrl, plano }: MobileDrawerProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const { logout, isLoggingOut } = useLogout();
 
   useEffect(() => { setMounted(true); }, []);
-
-  const handleLogout = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push('/login');
-    router.refresh();
-  };
 
   const avatarInitials = nome.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
   const financeiroLocked = !temFeature(plano ?? 'SOLO', 'financeiro');
 
-  const visibleItems = NAV_ITEMS.filter(item => !('adminOnly' in item && item.adminOnly && role !== 'admin'));
+  const visibleItems = NAV_ITEMS.filter(item => !('hideFromSecretaria' in item && item.hideFromSecretaria && role === 'secretaria'));
 
   return (
     <AnimatePresence>
@@ -159,11 +152,14 @@ export function MobileDrawer({ open, onClose, nome, clinicaNome, role, avatarUrl
                 </span>
               </button>
               <button
-                onClick={() => { void handleLogout(); }}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl w-full text-red-400 hover:bg-red-400/10 hover:text-red-300 transition-colors"
+                onClick={() => { void logout(); }}
+                disabled={isLoggingOut}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl w-full text-red-400 hover:bg-red-400/10 hover:text-red-300 transition-colors disabled:opacity-60 disabled:cursor-wait"
               >
-                <LogOut style={{ width: 18, height: 18 }} />
-                <span className="text-[14px] font-medium">Sair</span>
+                {isLoggingOut
+                  ? <Loader2 style={{ width: 18, height: 18 }} className="animate-spin" />
+                  : <LogOut style={{ width: 18, height: 18 }} />}
+                <span className="text-[14px] font-medium">{isLoggingOut ? 'Saindo...' : 'Sair'}</span>
               </button>
             </div>
           </motion.div>

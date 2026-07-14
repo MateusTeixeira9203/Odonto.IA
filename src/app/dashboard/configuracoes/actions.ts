@@ -2,6 +2,7 @@
 
 import { requireClinicContext } from "@/server/auth/clinic";
 import { requirePermission } from "@/server/authorization/guards";
+import { requireRole } from "@/server/auth/roles";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { sairDaClinica } from "@/server/services/team";
@@ -37,7 +38,9 @@ export interface ClinicaFormData {
 export async function salvarClinica(
   data: ClinicaFormData
 ): Promise<{ error?: string }> {
-  const { supabase, clinicId } = await requirePermission('configuracoes');
+  // Dados gerais da clínica (nome, contato, pagamento) continuam exclusivos do admin,
+  // mesmo com 'configuracoes' agora aberto pra dentista (procedimentos/horários/plano/perfil).
+  const { supabase, clinicId } = await requireRole(['admin']);
 
   const { error } = await supabase
     .from("configuracoes_clinica")
@@ -216,7 +219,7 @@ export async function criarProcedimento(
 }
 
 export async function salvarLogoUrl(logoUrl: string): Promise<{ error?: string }> {
-  const { supabase, clinicId } = await requirePermission('configuracoes');
+  const { supabase, clinicId } = await requireRole(['admin']);
 
   const { error } = await supabase
     .from('configuracoes_clinica')

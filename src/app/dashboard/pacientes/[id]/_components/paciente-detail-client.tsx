@@ -76,6 +76,7 @@ import {
   type StatusOrcamento,
 } from '@/app/dashboard/orcamentos/actions';
 import { criarAgendamento } from '@/app/dashboard/agendamentos/actions';
+import { buildClinicDatetime } from '@/app/dashboard/agendamentos/_components/date-helpers';
 import type { Paciente } from '@/types/database';
 import type { TimelineEvent } from '@/server/patients/get-visible-timeline-events';
 import { format, parseISO, differenceInCalendarDays } from 'date-fns';
@@ -1023,7 +1024,10 @@ export function PacienteDetailClient({
     }
     setConsultaError(null);
     setConsultaSaving(true);
-    const dataHora = `${consultaForm.data}T${consultaForm.hora}:00`;
+    // Sem offset explícito, o Postgres grava esse horário como UTC — 3h adiantado em
+    // relação ao horário real da clínica (BRT). buildClinicDatetime é a mesma função
+    // que o modal da própria agenda usa para não repetir esse bug.
+    const dataHora = buildClinicDatetime(consultaForm.data, consultaForm.hora);
     const result = await criarAgendamento({
       pacienteId: paciente.id,
       dataHora,

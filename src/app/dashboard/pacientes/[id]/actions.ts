@@ -181,14 +181,18 @@ export async function gerarPlanejamentoIA(
   }
 }
 
-// #2 — Cadastro rápido de paciente no fluxo walk-in ("Atender agora"): quando a busca
-// não acha ninguém, cria com o mínimo (nome + telefone) e devolve o id pra iniciar o
-// encaixe/consulta na hora. Nasce no clinica_id ativo e vinculado ao dentista da sessão.
+// #2 — Cadastro rápido de paciente: quando a busca não acha ninguém, cria com o
+// mínimo (nome, e opcionalmente telefone) e devolve o id. Usado no walk-in ("Atender
+// agora") e no autocomplete de "Novo Agendamento"/Encaixe — ali a secretária pode
+// estar agendando para OUTRO dentista, então dentistaId deixa explícito de quem é o
+// paciente (RLS de pacientes é siloado por dentista_id; sem isso o cadastro nasceria
+// preso ao perfil da secretária, e o dentista não veria o paciente dele depois).
 export async function criarPacienteRapido(dados: {
   nome: string;
   telefone: string | null;
+  dentistaId?: string;
 }): Promise<{ error?: string; id?: string }> {
-  const { supabase, user, clinicId } = await requireClinicContext();
+  const { supabase, user, clinicId, role } = await requireClinicContext();
 
   const nome = dados.nome.trim();
   if (!nome) return { error: "Informe o nome do paciente." };
@@ -202,11 +206,23 @@ export async function criarPacienteRapido(dados: {
 
   if (!dentistaPerfil) return { error: "Perfil de dentista não encontrado." };
 
+  let dentistaAlvo = dentistaPerfil.id;
+  if (dados.dentistaId && dados.dentistaId !== dentistaPerfil.id) {
+    if (role !== 'secretaria') return { error: "Sem permissão para atribuir a outro dentista." };
+    const { count } = await supabase
+      .from('dentistas')
+      .select('id', { count: 'exact', head: true })
+      .eq('id', dados.dentistaId)
+      .eq('clinica_id', clinicId);
+    if ((count ?? 0) === 0) return { error: "Dentista não encontrado." };
+    dentistaAlvo = dados.dentistaId;
+  }
+
   const { data, error } = await supabase
     .from("pacientes")
     .insert({
       clinica_id:  clinicId,
-      dentista_id: dentistaPerfil.id,
+      dentista_id: dentistaAlvo,
       nome,
       telefone:    dados.telefone?.trim() || null,
     })

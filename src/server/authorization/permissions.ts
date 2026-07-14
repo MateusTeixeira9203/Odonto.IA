@@ -26,7 +26,7 @@ const PERMISSIONS: Record<Module, readonly ClinicRole[]> = {
   whatsapp:         ['admin', 'dentista', 'secretaria'],
   whatsapp_config:  ['admin', 'secretaria'],
   financeiro:       ['admin', 'dentista', 'secretaria'],
-  configuracoes:    ['admin'],
+  configuracoes:    ['admin', 'dentista'],
   equipe:           ['admin'],
   convites:         ['admin'],
 };

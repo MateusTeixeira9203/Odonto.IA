@@ -73,14 +73,16 @@ export default async function ConfiguracoesPage({
         horarios={(horariosRaw as HorarioDisponivel[]) ?? []}
         procedimentos={(procedimentosRaw as Procedimento[]) ?? []}
         abaInicial={abaInicial}
-        equipe={{
+        // Roster de equipe + convites pendentes (e-mails) só vai pro client se for admin —
+        // dentista não precisa ver essa lista, e o prop ausente já esconde a aba Equipe.
+        equipe={meuRole === 'admin' ? {
           usuarios: (usuariosRaw as Array<{ id: string; nome: string; email: string | null; role: DentistaRole; ativo: boolean; created_at: string }>) ?? [],
           convitesPendentes: (convitesRaw as Array<{ id: string; email: string; role: DentistaRole; expires_at: string; created_at: string }>) ?? [],
           meuId: dentistaPerfil?.id ?? '',
           meuRole: meuRole as DentistaRole,
           limiteDentistas,
           convitesRestantes,
-        }}
+        } : undefined}
       />
     </PageTransition>
   );

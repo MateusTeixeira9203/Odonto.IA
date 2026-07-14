@@ -73,7 +73,9 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
   const isSolo = !plano || plano === 'SOLO' || (plano as string) === 'BASICO';
   const planoConfig = getPlano(plano);
 
-  const ABAS = [
+  // "Clínica" (dados gerais/pagamento) e "Equipe" (convites/roster) continuam exclusivas
+  // do admin — dentista vê perfil, horários, procedimentos e plano (pediu acesso a essas 4).
+  const ABAS_TODAS = [
     { id: 'perfil'        as const, label: 'Meu Perfil',      icon: UserCircle  },
     { id: 'clinica'       as const, label: labelContexto,      icon: isSolo ? Stethoscope : Building2 },
     { id: 'horarios'      as const, label: 'Horários',         icon: Clock       },
@@ -81,8 +83,12 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
     { id: 'equipe'        as const, label: 'Equipe',           icon: Users       },
     { id: 'plano'         as const, label: 'Plano',            icon: CreditCard  },
   ];
+  const ABAS = dentista.role === 'admin'
+    ? ABAS_TODAS
+    : ABAS_TODAS.filter(a => a.id !== 'clinica' && a.id !== 'equipe');
+  const abaPadrao: Aba = ABAS[0]?.id ?? 'perfil';
   const router = useRouter();
-  const [abaAtiva, setAbaAtiva] = useState<Aba>((ABAS.some(a => a.id === abaInicial) ? abaInicial : 'clinica') as Aba);
+  const [abaAtiva, setAbaAtiva] = useState<Aba>((ABAS.some(a => a.id === abaInicial) ? abaInicial : abaPadrao) as Aba);
   const [isPending, startTransition] = useTransition();
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);

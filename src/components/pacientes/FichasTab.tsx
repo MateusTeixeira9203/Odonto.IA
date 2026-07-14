@@ -1107,13 +1107,17 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
                         >
                           <Download className="w-4 h-4" />
                         </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(evo.id); }}
-                          title="Excluir"
-                          className="p-2 hover:bg-surface-alt rounded-lg transition-colors text-text-secondary hover:text-red-500"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {/* Excluir é escrita clínica — a RLS já barra a secretária; escondemos
+                            o botão pra não dar a falsa impressão de que apagou (update otimista). */}
+                        {canWrite && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(evo.id); }}
+                            title="Excluir"
+                            className="p-2 hover:bg-surface-alt rounded-lg transition-colors text-text-secondary hover:text-red-500"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
 
                         <div className={`p-1 text-text-secondary/40 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
                           <ChevronRight className="w-4 h-4 -rotate-90" />
@@ -1340,13 +1344,21 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
                                               const meta = STATUS_META[status] ?? STATUS_META.nao_iniciado;
                                               return (
                                                 <div key={i} className="flex items-center gap-2">
-                                                  <button
-                                                    onClick={() => void updateProcStatus(evo.id, evo.procedimentosStatus, procKey, STATUS_CYCLE[status])}
-                                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold flex-shrink-0 transition-all border ${meta.className}`}
-                                                  >
-                                                    <meta.icon className="w-3 h-3" />
-                                                    {meta.label}
-                                                  </button>
+                                                  {canWrite ? (
+                                                    <button
+                                                      onClick={() => void updateProcStatus(evo.id, evo.procedimentosStatus, procKey, STATUS_CYCLE[status])}
+                                                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold flex-shrink-0 transition-all border ${meta.className}`}
+                                                    >
+                                                      <meta.icon className="w-3 h-3" />
+                                                      {meta.label}
+                                                    </button>
+                                                  ) : (
+                                                    // Secretária vê o status, não altera (escrita clínica — RLS barra).
+                                                    <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold flex-shrink-0 border ${meta.className} cursor-default`}>
+                                                      <meta.icon className="w-3 h-3" />
+                                                      {meta.label}
+                                                    </span>
+                                                  )}
                                                   <span className={`text-xs leading-tight ${status === 'concluido' ? 'line-through text-text-secondary' : 'text-text-primary'}`}>{note}</span>
                                                 </div>
                                               );

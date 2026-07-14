@@ -15,7 +15,11 @@ import type { AgendamentoStatus } from '@/types/database';
 
 const HOUR_START  = 7;
 const HOUR_END    = 20;
-const SLOT_HEIGHT = 72;
+// Escala vertical maior (era 72): dá respiro pra consultas de 30min não se
+// espremerem, e é o "maior" que a secretária pediu pra enxergar/clicar melhor.
+const SLOT_HEIGHT = 96;
+// Piso de altura por card — garante hora+status / nome / ações sem corte.
+const MIN_APT_HEIGHT = 52;
 
 
 interface DayViewProps {
@@ -55,14 +59,54 @@ export function DayView({
       .sort((a, b) => a.data_hora.localeCompare(b.data_hora));
   }, [agendamentos, selectedDate]);
 
-  function getAptStyle(apt: AgendamentoRow) {
-    const d           = parseISO(apt.data_hora);
-    const hourDecimal = d.getHours() + d.getMinutes() / 60;
-    const top         = (hourDecimal - HOUR_START) * SLOT_HEIGHT;
-    // Piso de 46px garante as 2 linhas essenciais (hora+status / nome) sem cortar — antes 40px cortava o nome em consultas curtas.
-    const height      = Math.max((apt.duracao_minutos / 60) * SLOT_HEIGHT - 6, 46);
-    const { bg, border, text } = (STATUS_CONFIG[apt.status as AgendamentoStatus] ?? STATUS_CONFIG.scheduled).timeline;
-    return { top, height, bg, border, text };
+  // Layout com colunas: agendamentos cujas CAIXAS se sobrepõem visualmente (não só
+  // no tempo — o piso de altura infla consultas curtas) vão lado a lado, em vez de
+  // empilhados um sobre o outro. Resolve o amontoado quando a secretária vê vários
+  // dentistas no mesmo dia, ou consultas com horários próximos.
+  const aptLayouts = useMemo(() => {
+    const boxes = dayApts.map(apt => {
+      const d           = parseISO(apt.data_hora);
+      const hourDecimal = d.getHours() + d.getMinutes() / 60;
+      const top         = (hourDecimal - HOUR_START) * SLOT_HEIGHT;
+      const height      = Math.max((apt.duracao_minutos / 60) * SLOT_HEIGHT - 6, MIN_APT_HEIGHT);
+      return { id: apt.id, top, bottom: top + height, height };
+    });
+
+    const layout = new Map<string, { top: number; height: number; leftPct: number; widthPct: number }>();
+    let i = 0;
+    while (i < boxes.length) {
+      // Cluster = conjunto de caixas encadeadas por sobreposição visual.
+      let clusterEnd = boxes[i].bottom;
+      let j = i + 1;
+      while (j < boxes.length && boxes[j].top < clusterEnd) {
+        clusterEnd = Math.max(clusterEnd, boxes[j].bottom);
+        j++;
+      }
+      const cluster = boxes.slice(i, j);
+      // Alocação gulosa: cada caixa vai pra 1ª coluna cuja última caixa já terminou.
+      const colEnds: number[] = [];
+      const colOf = cluster.map(b => {
+        let col = colEnds.findIndex(end => b.top >= end - 0.5);
+        if (col === -1) { col = colEnds.length; colEnds.push(b.bottom); }
+        else { colEnds[col] = b.bottom; }
+        return col;
+      });
+      const totalCols = colEnds.length;
+      cluster.forEach((b, k) => {
+        layout.set(b.id, {
+          top: b.top,
+          height: b.height,
+          leftPct: (colOf[k] / totalCols) * 100,
+          widthPct: (1 / totalCols) * 100,
+        });
+      });
+      i = j;
+    }
+    return layout;
+  }, [dayApts]);
+
+  function getAptColors(apt: AgendamentoRow) {
+    return (STATUS_CONFIG[apt.status as AgendamentoStatus] ?? STATUS_CONFIG.scheduled).timeline;
   }
 
   return (
@@ -158,20 +202,66 @@ export function DayView({
             )}
 
             {dayApts.map(apt => {
-              const { top, height, bg, border, text } = getAptStyle(apt);
+              const lay = aptLayouts.get(apt.id);
+              if (!lay) return null;
+              const { top, height, leftPct, widthPct } = lay;
+              const { bg, border, text } = getAptColors(apt);
               const isTerminal  = ['cancelled', 'no_show', 'completed'].includes(apt.status);
               const canConfirm  = isSecretaria && apt.status === 'scheduled';
               const canCheckIn  = isSecretaria && (apt.status === 'scheduled' || apt.status === 'confirmed');
               const canNoShow   = isSecretaria && (apt.status === 'scheduled' || apt.status === 'confirmed');
               const canCancel   = isSecretaria && !isTerminal;
-              const showActions = canConfirm || canCheckIn || canNoShow || canCancel || !!apt.paciente;
               const statusLabel = STATUS_CONFIG[apt.status as AgendamentoStatus]?.label ?? apt.status;
+
+              // Card largo (coluna única) mostra botões COM RÓTULO — claros pra quem não é
+              // da tecnologia. Card estreito (agendamentos sobrepostos) volta pro ícone,
+              // e o clique abre o modal de detalhe (que também tem as ações rotuladas).
+              const isWide = widthPct > 65;
+              const actions = [
+                {
+                  key: 'confirm', show: canConfirm, onClick: () => onConfirm(apt.id),
+                  label: 'Confirmar', title: 'Confirmar consulta', Icon: ThumbsUp,
+                  labeledCls: 'bg-teal/15 text-teal border border-teal/30 hover:bg-teal/25',
+                  iconCls: 'bg-teal/20 text-teal border border-teal/30 hover:bg-teal/30',
+                },
+                {
+                  key: 'checkin', show: canCheckIn, onClick: () => onCheckIn(apt.id),
+                  label: 'Chegou', title: 'Paciente chegou (check-in)', Icon: CheckCircle2,
+                  labeledCls: 'bg-teal text-white border border-teal hover:bg-teal-lt',
+                  iconCls: 'bg-teal text-white hover:opacity-80',
+                },
+                {
+                  key: 'noshow', show: canNoShow, onClick: () => onNoShow(apt.id),
+                  label: 'Faltou', title: 'Paciente faltou', Icon: AlertTriangle,
+                  labeledCls: 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 hover:bg-red-500/20',
+                  iconCls: 'bg-red-50 text-red-500 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30',
+                },
+                {
+                  key: 'cancel', show: canCancel, onClick: () => onCancel(apt),
+                  label: 'Cancelar', title: 'Cancelar consulta', Icon: XIcon,
+                  labeledCls: 'bg-surface-alt text-text-secondary border border-border hover:text-text-primary',
+                  iconCls: 'bg-surface-alt text-text-secondary border border-border hover:bg-surface',
+                },
+                {
+                  key: 'ficha', show: !!apt.paciente, onClick: () => { if (apt.paciente) onVerFicha(apt.paciente.id); },
+                  label: 'Ficha', title: 'Ver ficha do paciente', Icon: FileText,
+                  labeledCls: 'bg-surface-alt text-text-secondary border border-border hover:text-text-primary',
+                  iconCls: 'bg-surface-alt text-text-secondary border border-border hover:bg-surface',
+                },
+              ].filter(a => a.show);
 
               return (
                 <div
                   key={apt.id}
-                  className="absolute left-2 right-2 rounded-xl overflow-hidden"
-                  style={{ top: `${top}px`, height: `${height}px`, background: bg, border: `1.5px solid ${border}` }}
+                  className="absolute rounded-xl overflow-hidden"
+                  style={{
+                    top: `${top}px`,
+                    height: `${height}px`,
+                    left: `calc(${leftPct}% + 6px)`,
+                    width: `calc(${widthPct}% - 10px)`,
+                    background: bg,
+                    border: `1.5px solid ${border}`,
+                  }}
                 >
                   <div className="flex h-full">
                     {/* Main clickable area */}
@@ -216,58 +306,35 @@ export function DayView({
                       )}
                     </button>
 
-                    {/* Quick actions — right column */}
-                    {showActions && (
+                    {/* Ações rápidas — botões rotulados (card largo) ou ícones (estreito) */}
+                    {actions.length > 0 && (
                       <div
-                        className="flex flex-col gap-1 justify-center px-1.5 shrink-0 border-l"
+                        className={`flex gap-1.5 justify-center px-2 shrink-0 border-l ${isWide ? 'flex-row items-center' : 'flex-col'}`}
                         style={{ borderColor: border }}
                         onClick={e => e.stopPropagation()}
                       >
-                        {canConfirm && (
-                          <button
-                            onClick={() => onConfirm(apt.id)}
-                            title="Confirmar consulta"
-                            className="w-7 h-7 rounded-lg flex items-center justify-center bg-teal/20 text-teal hover:bg-teal/30 transition-colors border border-teal/30"
-                          >
-                            <ThumbsUp className="w-3 h-3" />
-                          </button>
-                        )}
-                        {canCheckIn && (
-                          <button
-                            onClick={() => onCheckIn(apt.id)}
-                            title="Check-in — paciente chegou"
-                            className="w-7 h-7 rounded-lg flex items-center justify-center bg-teal text-white hover:opacity-80 transition-colors"
-                          >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                        {canNoShow && (
-                          <button
-                            onClick={() => onNoShow(apt.id)}
-                            title="Faltou"
-                            className="w-7 h-7 rounded-lg flex items-center justify-center bg-red-50 text-red-500 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 transition-colors"
-                          >
-                            <AlertTriangle className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                        {canCancel && (
-                          <button
-                            onClick={() => onCancel(apt)}
-                            title="Cancelar"
-                            className="w-7 h-7 rounded-lg flex items-center justify-center bg-surface-alt hover:bg-surface border border-border transition-colors"
-                          >
-                            <XIcon className="w-3 h-3 text-text-secondary" />
-                          </button>
-                        )}
-                        {apt.paciente && (
-                          <button
-                            onClick={() => onVerFicha(apt.paciente!.id)}
-                            title="Ver ficha do paciente"
-                            className="w-7 h-7 rounded-lg flex items-center justify-center bg-surface-alt hover:bg-surface border border-border transition-colors"
-                          >
-                            <FileText className="w-3 h-3 text-text-secondary" />
-                          </button>
-                        )}
+                        {actions.map(a => (
+                          isWide ? (
+                            <button
+                              key={a.key}
+                              onClick={a.onClick}
+                              title={a.title}
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap ${a.labeledCls}`}
+                            >
+                              <a.Icon className="w-3.5 h-3.5 shrink-0" />
+                              {a.label}
+                            </button>
+                          ) : (
+                            <button
+                              key={a.key}
+                              onClick={a.onClick}
+                              title={a.title}
+                              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${a.iconCls}`}
+                            >
+                              <a.Icon className="w-3.5 h-3.5" />
+                            </button>
+                          )
+                        ))}
                       </div>
                     )}
                   </div>

@@ -5,6 +5,7 @@ import { format, parseISO, differenceInMinutes } from 'date-fns';
 import { Clock, AlertCircle, FileText, ArrowRight } from 'lucide-react';
 import { motion } from 'motion/react';
 import { ConsultaCtaButton } from './consulta-cta-button';
+import { MarkAttendedButton } from './mark-attended-button';
 
 type HeroState = 'empty' | 'concluded' | 'active' | 'waiting' | 'critical' | 'near' | 'imminent' | 'approaching' | 'distant';
 type FilledState = Exclude<HeroState, 'empty' | 'concluded'>;
@@ -493,6 +494,7 @@ export function NextAppointmentHero({ agendamento, now, allConcluded, orcamentos
           >
             <ConsultaCtaButton agendamentoId={agendamento.id} />
           </motion.div>
+          <MarkAttendedButton agendamentoId={agendamento.id} />
           <Link
             href={`/dashboard/pacientes/${paciente.id}`}
             className="text-center text-xs font-semibold text-text-secondary hover:text-text-primary transition-colors"

@@ -11,13 +11,13 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useTheme } from 'next-themes';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { createClient } from '@/lib/supabase/client';
 import { temFeature } from '@/lib/planos';
 import type { DentistaRole } from '@/types/database';
 import type { PlanoId } from '@/lib/planos';
 import { DockNavItem } from './dock-nav-item';
 import { NotificationBell } from './notification-bell';
 import { useClinicSwitcher } from '@/hooks/use-clinic-switcher';
+import { useLogout } from '@/hooks/use-logout';
 
 interface FloatingDockProps {
   nome: string;
@@ -39,7 +39,7 @@ const NAV_ITEMS = [
   { href: '/dashboard/pacientes',    icon: Users,           label: 'Pacientes',  id: 'pacientes' },
   { href: '/dashboard/agendamentos', icon: Calendar,        label: 'Agenda',     id: 'agenda' },
   { href: '/dashboard/financeiro',   icon: Wallet,          label: 'Financeiro', id: 'financeiro', requiresFeature: 'financeiro' as const },
-  { href: '/dashboard/configuracoes',icon: Settings,        label: 'Config',     id: 'config',     adminOnly: true },
+  { href: '/dashboard/configuracoes',icon: Settings,        label: 'Config',     id: 'config',     hideFromSecretaria: true },
 ] as const;
 
 export function FloatingDock({ nome, clinicaNome, activeClinicId, role, avatarUrl, plano }: FloatingDockProps) {
@@ -52,19 +52,13 @@ export function FloatingDock({ nome, clinicaNome, activeClinicId, role, avatarUr
   useEffect(() => { setMounted(true); }, []);
 
   const canSwitch = clinicas.length > 1;
-
-  const handleLogout = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push('/login');
-    router.refresh();
-  };
+  const { logout, isLoggingOut } = useLogout();
 
   const avatarInitials = nome.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
   const financeiroLocked = !temFeature(plano ?? 'SOLO', 'financeiro');
 
   const visibleItems = NAV_ITEMS.filter(item => {
-    if ('adminOnly' in item && item.adminOnly && role !== 'admin') return false;
+    if ('hideFromSecretaria' in item && item.hideFromSecretaria && role === 'secretaria') return false;
     return true;
   });
 
@@ -252,14 +246,17 @@ export function FloatingDock({ nome, clinicaNome, activeClinicId, role, avatarUr
 
             {/* Sair */}
             <DropdownMenu.Item
-              onSelect={() => { void handleLogout(); }}
-              className="flex items-center gap-2.5 px-2 py-2 text-sm text-white/40 hover:text-red-400 hover:bg-red-400/[0.08] rounded-xl outline-none cursor-pointer transition-all group"
+              onSelect={(e) => { e.preventDefault(); void logout(); }}
+              disabled={isLoggingOut}
+              className="flex items-center gap-2.5 px-2 py-2 text-sm text-white/40 hover:text-red-400 hover:bg-red-400/[0.08] rounded-xl outline-none cursor-pointer transition-all group disabled:opacity-60 disabled:cursor-wait"
             >
               <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors group-hover:bg-red-400/[0.12]"
                 style={{ background: 'rgba(255,255,255,0.05)' }}>
-                <LogOut className="w-3.5 h-3.5" />
+                {isLoggingOut
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <LogOut className="w-3.5 h-3.5" />}
               </div>
-              Sair
+              {isLoggingOut ? 'Saindo...' : 'Sair'}
             </DropdownMenu.Item>
           </DropdownMenu.Content>
         </DropdownMenu.Portal>

@@ -20,6 +20,8 @@ import {
   CalendarCheck,
   Clock,
   X,
+  ThumbsUp,
+  UserPlus,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 const AssinaturaRecepcaoModal = dynamic(
@@ -86,6 +88,7 @@ import {
   criarEncaixe,
   type StatusAgendamento,
 } from '../actions';
+import { criarPacienteRapido } from '@/app/dashboard/pacientes/[id]/actions';
 import { createClient } from '@/lib/supabase/client';
 import { HelpTooltip } from '@/components/ui/help-tooltip';
 import type { DentistaRole, AgendamentoStatus } from '@/types/database';
@@ -256,6 +259,7 @@ export function AgendamentosClient({
   });
   const [pacienteSugestoes, setPacienteSugestoes] = useState<{ id: string; nome: string }[]>([]);
   const [showSugestoes, setShowSugestoes] = useState(false);
+  const [criandoPacienteNovo, setCriandoPacienteNovo] = useState(false);
 
   type ViewMode = 'day' | 'week' | 'month';
   const [viewMode, setViewMode] = useState<ViewMode>('day');
@@ -284,6 +288,7 @@ export function AgendamentosClient({
   const [encaixeSaving, setEncaixeSaving] = useState(false);
   const [encaixeError, setEncaixeError] = useState<string | null>(null);
   const [encaixeConflito, setEncaixeConflito] = useState(false);
+  const [criandoPacienteEncaixe, setCriandoPacienteEncaixe] = useState(false);
 
   // Agendamentos filtrados pelo dentista selecionado (somente secretária)
   const agendamentosFiltrados = useMemo(() => {
@@ -405,6 +410,26 @@ export function AgendamentosClient({
       if (!controller.signal.aborted) setPacienteSugestoes(data ?? []);
     }, 300);
   }, []);
+
+  // Cadastro rápido — busca não achou; cria só com o nome e já seleciona pro
+  // agendamento. Vincula ao dentista-alvo (não a quem está logado) pra secretária
+  // conseguir agendar pra outro profissional e ele achar o paciente depois.
+  const handleCriarPacienteRapidoNovo = async () => {
+    const nome = novoForm.pacienteSearch.trim();
+    if (!nome) return;
+    setCriandoPacienteNovo(true);
+    const dentistaAlvo = isSecretaria ? novoForm.dentistaId : dentistaAtualId;
+    const res = await criarPacienteRapido({ nome, telefone: null, dentistaId: dentistaAlvo || undefined });
+    setCriandoPacienteNovo(false);
+    if (res.error || !res.id) {
+      toast.error(res.error ?? 'Não foi possível cadastrar o paciente.');
+      return;
+    }
+    setNovoForm((f) => ({ ...f, pacienteSearch: nome, pacienteId: res.id!, pacienteNome: nome }));
+    setShowSugestoes(false);
+    setPacienteSugestoes([]);
+    toast.success(`Paciente "${nome}" cadastrado. Complete os dados dele quando quiser.`);
+  };
 
   // Atualiza status do agendamento via server action
   const handleStatusChange = useCallback(async (id: string, status: string) => {
@@ -671,6 +696,23 @@ export function AgendamentosClient({
       if (!controller.signal.aborted) setEncaixeSugestoes(data ?? []);
     }, 300);
   }, []);
+
+  const handleCriarPacienteRapidoEncaixe = async () => {
+    const nome = encaixeForm.pacienteSearch.trim();
+    if (!nome) return;
+    setCriandoPacienteEncaixe(true);
+    const dentistaAlvo = isSecretaria ? encaixeForm.dentistaId : dentistaAtualId;
+    const res = await criarPacienteRapido({ nome, telefone: null, dentistaId: dentistaAlvo || undefined });
+    setCriandoPacienteEncaixe(false);
+    if (res.error || !res.id) {
+      toast.error(res.error ?? 'Não foi possível cadastrar o paciente.');
+      return;
+    }
+    setEncaixeForm((f) => ({ ...f, pacienteSearch: nome, pacienteId: res.id!, pacienteNome: nome }));
+    setShowEncaixeSugestoes(false);
+    setEncaixeSugestoes([]);
+    toast.success(`Paciente "${nome}" cadastrado. Complete os dados dele quando quiser.`);
+  };
 
   const handleCriarEncaixe = async (forcar = false) => {
     if (!encaixeForm.pacienteId) { setEncaixeError('Selecione um paciente.'); return; }
@@ -1035,7 +1077,7 @@ export function AgendamentosClient({
                   className="rounded-xl bg-surface-alt border-border text-text-primary pl-10 focus:border-teal/40 transition-all"
                 />
               </div>
-              {showSugestoes && pacienteSugestoes.length > 0 && (
+              {showSugestoes && novoForm.pacienteSearch.trim().length >= 2 && (pacienteSugestoes.length > 0 || !novoForm.pacienteId) && (
                 <div className="absolute z-50 w-full bg-surface border border-border rounded-xl shadow-lg mt-1 overflow-hidden">
                   {pacienteSugestoes.map((p) => (
                     <button
@@ -1056,6 +1098,19 @@ export function AgendamentosClient({
                       {p.nome}
                     </button>
                   ))}
+                  {!novoForm.pacienteId && (
+                    <button
+                      type="button"
+                      onClick={() => void handleCriarPacienteRapidoNovo()}
+                      disabled={criandoPacienteNovo}
+                      className={`w-full px-4 py-2.5 text-sm text-left flex items-center gap-2 font-semibold text-teal hover:bg-teal/5 transition-colors disabled:opacity-60 ${pacienteSugestoes.length > 0 ? 'border-t border-border' : ''}`}
+                    >
+                      {criandoPacienteNovo
+                        ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" />
+                        : <UserPlus className="w-4 h-4 shrink-0" />}
+                      Cadastrar &ldquo;{novoForm.pacienteSearch.trim()}&rdquo; como novo paciente
+                    </button>
+                  )}
                 </div>
               )}
               {novoForm.pacienteId && (
@@ -1375,7 +1430,7 @@ export function AgendamentosClient({
                 onBlur={() => setTimeout(() => setShowEncaixeSugestoes(false), 150)}
                 className="rounded-xl bg-surface-alt border-border text-text-primary"
               />
-              {showEncaixeSugestoes && encaixeSugestoes.length > 0 && (
+              {showEncaixeSugestoes && encaixeForm.pacienteSearch.trim().length >= 2 && (encaixeSugestoes.length > 0 || !encaixeForm.pacienteId) && (
                 <div className="absolute z-50 w-full bg-surface border border-border rounded-xl shadow-lg mt-1 overflow-hidden">
                   {encaixeSugestoes.map(p => (
                     <button key={p.id} type="button"
@@ -1383,6 +1438,19 @@ export function AgendamentosClient({
                       className="w-full px-4 py-2.5 text-sm text-left hover:bg-surface-alt transition-colors text-text-primary"
                     >{p.nome}</button>
                   ))}
+                  {!encaixeForm.pacienteId && (
+                    <button
+                      type="button"
+                      onClick={() => void handleCriarPacienteRapidoEncaixe()}
+                      disabled={criandoPacienteEncaixe}
+                      className={`w-full px-4 py-2.5 text-sm text-left flex items-center gap-2 font-semibold text-teal hover:bg-teal/5 transition-colors disabled:opacity-60 ${encaixeSugestoes.length > 0 ? 'border-t border-border' : ''}`}
+                    >
+                      {criandoPacienteEncaixe
+                        ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" />
+                        : <UserPlus className="w-4 h-4 shrink-0" />}
+                      Cadastrar &ldquo;{encaixeForm.pacienteSearch.trim()}&rdquo; como novo paciente
+                    </button>
+                  )}
                 </div>
               )}
               {encaixeForm.pacienteId && (
@@ -1559,15 +1627,57 @@ export function AgendamentosClient({
                       </div>
                     )}
 
-                    {/* Alterar Status */}
+                    {/* Alterar Status — botões rotulados pras transições comuns; o
+                        dropdown abaixo cobre os casos raros (reverter, forçar manualmente). */}
                     <div className="space-y-2 pt-1">
                       <Label className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Alterar Status</Label>
+                      {(() => {
+                        const st = selectedApt.status;
+                        const isTerminal = ['cancelled', 'no_show', 'completed'].includes(st);
+                        const quickActions = [
+                          {
+                            key: 'confirm', show: st === 'scheduled', label: 'Confirmar', Icon: ThumbsUp,
+                            onClick: () => void handleStatusChange(selectedApt.id, 'confirmed'),
+                            cls: 'bg-teal/15 text-teal border border-teal/30 hover:bg-teal/25',
+                          },
+                          {
+                            key: 'checkin', show: st === 'scheduled' || st === 'confirmed', label: 'Chegou', Icon: CheckCircle2,
+                            onClick: () => void handleStatusChange(selectedApt.id, 'checked_in'),
+                            cls: 'bg-teal text-white border border-teal hover:bg-teal-lt',
+                          },
+                          {
+                            key: 'noshow', show: st === 'scheduled' || st === 'confirmed', label: 'Faltou', Icon: AlertTriangle,
+                            onClick: () => void handleNoShow(selectedApt.id),
+                            cls: 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 hover:bg-red-500/20',
+                          },
+                          {
+                            key: 'cancel', show: !isTerminal, label: 'Cancelar', Icon: X,
+                            onClick: () => { setCancelDialog({ aptId: selectedApt.id, aptNome: selectedApt.paciente?.nome ?? '' }); setCancelMotivo(''); setIsDetailModalOpen(false); },
+                            cls: 'bg-surface-alt text-text-secondary border border-border hover:text-text-primary',
+                          },
+                        ].filter(a => a.show);
+
+                        return quickActions.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {quickActions.map(a => (
+                              <button
+                                key={a.key}
+                                onClick={a.onClick}
+                                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-bold transition-colors ${a.cls}`}
+                              >
+                                <a.Icon className="w-4 h-4 shrink-0" />
+                                {a.label}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null;
+                      })()}
                       <Select
                         value={selectedApt.status}
                         onValueChange={(val) => val && void handleStatusChange(selectedApt.id, val)}
                       >
-                        <SelectTrigger className="rounded-xl bg-surface-alt border-border text-text-primary">
-                          <SelectValue>{STATUS_PT[selectedApt.status] ?? selectedApt.status}</SelectValue>
+                        <SelectTrigger className="rounded-xl bg-surface-alt border-border text-text-secondary text-xs h-9">
+                          <SelectValue>Outro status: {STATUS_PT[selectedApt.status] ?? selectedApt.status}</SelectValue>
                         </SelectTrigger>
                         <SelectContent className="bg-surface border-border">
                           <SelectItem value="scheduled">Agendado</SelectItem>
