@@ -11,6 +11,9 @@ export type Pagamento = {
   status: string;
   forma_pagamento: string | null;
   data_pagamento: string | null;
+  data_vencimento: string | null;
+  parcela_numero: number | null;
+  total_parcelas: number | null;
   marcado_por: { nome: string } | null;
 };
 
@@ -21,6 +24,7 @@ export type OrcamentoComItens = {
   created_at: string;
   validade_dias: number;
   condicoes_pagamento: string | null;
+  dentista_id: string | null;
   itens: OrcamentoItem[];
   pagamentos: Pagamento[];
   aprovado_por: { nome: string } | null;

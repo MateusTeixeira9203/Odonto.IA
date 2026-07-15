@@ -67,6 +67,7 @@ import {
   editarOrcamento,
   excluirOrcamento,
   criarProcedimentoRapido,
+  gerarParcelas,
   type FormaPagamento,
   type StatusOrcamento,
 } from '../actions';
@@ -170,6 +171,10 @@ export function OrcamentosClient({
   });
   const [pagSaving, setPagSaving] = useState(false);
   const [pagError, setPagError] = useState<string | null>(null);
+  const [parcelasMode, setParcelasMode] = useState(false);
+  const [parcelasForm, setParcelasForm] = useState({ numero: '3', primeiroVencimento: '' });
+  const [parcelasSaving, setParcelasSaving] = useState(false);
+  const [parcelasError, setParcelasError] = useState<string | null>(null);
 
   // Edição de orçamento
   const [editMode, setEditMode] = useState(false);
@@ -479,6 +484,8 @@ export function OrcamentosClient({
         forma_pagamento: isAgendado ? null : pagForm.formaPagamento,
         data_pagamento: isAgendado ? null : pagForm.data,
         data_vencimento: pagForm.dataVencimento || null,
+        parcela_numero: null,
+        total_parcelas: null,
         marcado_por: null,
       };
       setOrcamentos((prev) =>
@@ -504,6 +511,65 @@ export function OrcamentosClient({
       router.refresh();
     }
     setPagSaving(false);
+  };
+
+  // Gera N parcelas de uma vez no orçamento selecionado — mesma ideia do "Registrar
+  // Pagamento" único, mas em lote (evita repetir o formulário N vezes).
+  const handleGerarParcelas = async () => {
+    if (!selected) return;
+    const numero = parseInt(parcelasForm.numero, 10);
+    // Mesma definição de "Preencher restante": total - pago (não é o total cheio).
+    const pago = selected.pagamentos.filter((p) => p.status === 'pago').reduce((s, p) => s + p.valor, 0);
+    const valorTotal = Math.max(0, (selected.total ?? 0) - pago);
+    if (!numero || numero < 2 || numero > 24) {
+      setParcelasError('Informe entre 2 e 24 parcelas.');
+      return;
+    }
+    if (!parcelasForm.primeiroVencimento) {
+      setParcelasError('Informe o primeiro vencimento.');
+      return;
+    }
+    if (!valorTotal || valorTotal <= 0) {
+      setParcelasError('Não há saldo restante para parcelar.');
+      return;
+    }
+    setParcelasError(null);
+    setParcelasSaving(true);
+
+    const result = await gerarParcelas({
+      orcamentoId: selected.id,
+      pacienteId: selected.paciente?.id ?? '',
+      valorTotal,
+      numeroParcelas: numero,
+      primeiroVencimento: parcelasForm.primeiroVencimento,
+      dentistaId: selected.dentista?.id,
+    });
+
+    if (result.error || !result.parcelas) {
+      setParcelasError(result.error ?? 'Não foi possível gerar as parcelas.');
+    } else {
+      const novasPag: PagamentoRow[] = result.parcelas.map((p) => ({
+        id: p.id,
+        orcamento_id: selected.id,
+        valor: p.valor,
+        status: 'pendente',
+        forma_pagamento: null,
+        data_pagamento: null,
+        data_vencimento: p.data_vencimento,
+        parcela_numero: p.parcela_numero,
+        total_parcelas: p.total_parcelas,
+        marcado_por: null,
+      }));
+      setOrcamentos((prev) =>
+        prev.map((o) => (o.id === selected.id ? { ...o, pagamentos: [...o.pagamentos, ...novasPag] } : o))
+      );
+      setSelected((prev) => (prev ? { ...prev, pagamentos: [...prev.pagamentos, ...novasPag] } : prev));
+      setParcelasMode(false);
+      setParcelasForm({ numero: '3', primeiroVencimento: '' });
+      toast.success(`${numero} parcelas geradas.`);
+      router.refresh();
+    }
+    setParcelasSaving(false);
   };
 
   // Cadastra no catálogo um procedimento digitado que não bateu com nenhum item existente —
@@ -673,6 +739,8 @@ export function OrcamentosClient({
         forma_pagamento: formaPagamento,
         data_pagamento: hoje,
         data_vencimento: null,
+        parcela_numero: null,
+        total_parcelas: null,
         marcado_por: null,
       };
       setOrcamentos((prev) =>
@@ -1367,7 +1435,12 @@ export function OrcamentosClient({
                             }`}
                           >
                             <div className="min-w-0">
-                              <div className="font-mono text-sm font-semibold text-text-primary">
+                              <div className="font-mono text-sm font-semibold text-text-primary flex items-center gap-1.5 flex-wrap">
+                                {pag.parcela_numero && pag.total_parcelas && (
+                                  <span className="text-[10px] font-bold uppercase tracking-wider text-teal bg-teal/10 px-1.5 py-0.5 rounded-md shrink-0">
+                                    {pag.parcela_numero}/{pag.total_parcelas}
+                                  </span>
+                                )}
                                 {formatCurrency(pag.valor)}
                               </div>
                               <div className="text-xs text-text-secondary mt-0.5 flex items-center gap-2 flex-wrap">
@@ -1413,22 +1486,73 @@ export function OrcamentosClient({
                   const restante = Math.max(0, (selected.total ?? 0) - pago);
                   return (
                 <div className="bg-surface-alt/40 border border-border rounded-2xl p-5 space-y-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
                     <label className="font-mono text-xs text-text-secondary uppercase tracking-widest flex items-center gap-2">
-                      <CreditCard className="w-3 h-3" /> Registrar Pagamento
+                      <CreditCard className="w-3 h-3" /> {parcelasMode ? 'Dividir em Parcelas' : 'Registrar Pagamento'}
                     </label>
-                    {restante > 0 && (
+                    <div className="flex items-center gap-3">
+                      {!parcelasMode && restante > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setPagForm(f => ({ ...f, valor: restante.toFixed(2) }))}
+                          className="text-xs font-bold text-teal hover:text-teal-lt transition-colors uppercase tracking-wider"
+                        >
+                          Preencher restante
+                        </button>
+                      )}
                       <button
                         type="button"
-                        onClick={() => setPagForm(f => ({ ...f, valor: restante.toFixed(2) }))}
-                        className="text-xs font-bold text-teal hover:text-teal-lt transition-colors uppercase tracking-wider"
+                        onClick={() => setParcelasMode(!parcelasMode)}
+                        className="text-xs font-bold text-text-secondary hover:text-teal transition-colors uppercase tracking-wider"
                       >
-                        Preencher restante
+                        {parcelasMode ? 'Pagamento único' : 'Dividir em parcelas'}
                       </button>
-                    )}
+                    </div>
                   </div>
 
-                  {(() => {
+                  {parcelasMode ? (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <Label className="text-text-primary text-xs">Nº de parcelas</Label>
+                          <Input
+                            type="number" min={2} max={24}
+                            value={parcelasForm.numero}
+                            onChange={(e) => setParcelasForm((f) => ({ ...f, numero: e.target.value }))}
+                            className="rounded-xl bg-surface-alt border-border text-text-primary"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-text-primary text-xs">1º vencimento</Label>
+                          <Input
+                            type="date" min={hoje}
+                            value={parcelasForm.primeiroVencimento}
+                            onChange={(e) => setParcelasForm((f) => ({ ...f, primeiroVencimento: e.target.value }))}
+                            className="rounded-xl bg-surface-alt border-border text-text-primary"
+                          />
+                        </div>
+                      </div>
+                      {(() => {
+                        const n = parseInt(parcelasForm.numero, 10);
+                        if (!n || n < 2 || !restante) return null;
+                        return (
+                          <p className="text-xs text-text-secondary bg-surface rounded-xl px-3 py-2">
+                            Saldo restante: {formatCurrency(restante)} — {n}x de {formatCurrency(restante / n)}, vencimentos no mesmo dia, mês a mês.
+                          </p>
+                        );
+                      })()}
+                      {parcelasError && (
+                        <p className="text-xs text-red-500 bg-red-500/10 rounded-lg px-3 py-2">{parcelasError}</p>
+                      )}
+                      <Button
+                        onClick={() => void handleGerarParcelas()}
+                        disabled={parcelasSaving || !parcelasForm.primeiroVencimento}
+                        className="w-full bg-teal text-white hover:bg-teal-lt rounded-xl disabled:opacity-50"
+                      >
+                        {parcelasSaving ? 'Gerando...' : 'Gerar Parcelas'}
+                      </Button>
+                    </div>
+                  ) : (() => {
                     const todayStr = new Date().toISOString().split('T')[0];
                     const isAgendado = pagForm.dataVencimento && pagForm.dataVencimento > todayStr;
                     return (

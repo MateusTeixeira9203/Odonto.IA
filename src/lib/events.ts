@@ -14,6 +14,7 @@ export const EVENTS = {
 
   // ── Pagamentos ─────────────────────────────────────────────────────────────
   PAGAMENTO_REGISTRADO: 'pagamento.registrado',
+  PAGAMENTO_PARCELADO:  'pagamento.parcelado',
   PAGAMENTO_CANCELADO:  'pagamento.cancelado',
   PAGAMENTO_EDITADO:    'pagamento.editado',
   PAGAMENTO_EXCLUIDO:   'pagamento.excluido',

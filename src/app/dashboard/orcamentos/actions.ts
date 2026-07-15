@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { inserirNotificacao } from "@/lib/notificacoes";
 import { registrarLog } from "@/lib/activity-log";
+import { addMonths, format, parseISO } from "date-fns";
 
 export type FormaPagamento =
   | "dinheiro"
@@ -110,6 +111,101 @@ export async function atualizarStatusOrcamento(
   }
 
   return {};
+}
+
+export interface ParcelaGerada {
+  id: string;
+  valor: number;
+  data_vencimento: string;
+  parcela_numero: number;
+  total_parcelas: number;
+}
+
+/**
+ * Gera N parcelas de uma vez (todas 'pendente'), em vez do dentista/secretária
+ * repetir "Registrar Pagamento" uma por uma. Divide o valor em centavos pra não
+ * gerar drift de arredondamento — a sobra de centavos (se houver) vai pra última
+ * parcela. Vencimentos avançam por MÊS CALENDÁRIO (não +30 dias fixos), pra "todo
+ * dia 10" continuar caindo dia 10 mesmo em fevereiro. Cada linha nasce com
+ * parcela_numero/total_parcelas — é o que a UI usa pra rotular "2/3" e, no futuro,
+ * o que os alertas de vencimento vão consultar (idx_pagamentos_data_vencimento).
+ */
+export async function gerarParcelas(dados: {
+  orcamentoId: string;
+  pacienteId: string;
+  valorTotal: number;
+  numeroParcelas: number;
+  primeiroVencimento: string;
+  dentistaId?: string;
+}): Promise<{ error?: string; parcelas?: ParcelaGerada[] }> {
+  const { supabase, user, clinicId } = await requireClinicContext();
+
+  if (!Number.isInteger(dados.numeroParcelas) || dados.numeroParcelas < 2 || dados.numeroParcelas > 24) {
+    return { error: "Número de parcelas deve ser entre 2 e 24." };
+  }
+  if (!dados.valorTotal || dados.valorTotal <= 0) {
+    return { error: "Informe um valor total válido." };
+  }
+  if (!dados.primeiroVencimento) {
+    return { error: "Informe a data do primeiro vencimento." };
+  }
+
+  const { data: dentistaPerfil } = await supabase
+    .from("dentistas")
+    .select("id, nome")
+    .eq("user_id", user.id)
+    .eq("clinica_id", clinicId)
+    .maybeSingle();
+
+  if (!dentistaPerfil) redirect("/onboarding");
+
+  const dentistaId = dados.dentistaId ?? dentistaPerfil.id;
+
+  const totalCentavos = Math.round(dados.valorTotal * 100);
+  const baseCentavos = Math.floor(totalCentavos / dados.numeroParcelas);
+  const restoCentavos = totalCentavos - baseCentavos * dados.numeroParcelas;
+  const primeiraData = parseISO(dados.primeiroVencimento);
+
+  const linhas = Array.from({ length: dados.numeroParcelas }, (_, i) => {
+    const ultimaParcela = i === dados.numeroParcelas - 1;
+    const valorCentavos = baseCentavos + (ultimaParcela ? restoCentavos : 0);
+    return {
+      clinica_id:      clinicId,
+      orcamento_id:    dados.orcamentoId,
+      paciente_id:     dados.pacienteId,
+      dentista_id:     dentistaId,
+      valor:           valorCentavos / 100,
+      status:          "pendente" as const,
+      data_vencimento: format(addMonths(primeiraData, i), "yyyy-MM-dd"),
+      parcela_numero:  i + 1,
+      total_parcelas:  dados.numeroParcelas,
+    };
+  });
+
+  const { data, error } = await supabase
+    .from("pagamentos")
+    .insert(linhas)
+    .select("id, valor, data_vencimento, parcela_numero, total_parcelas");
+
+  if (error) {
+    console.error("Erro ao gerar parcelas:", error);
+    return { error: "Não foi possível gerar as parcelas. Tente novamente." };
+  }
+
+  registrarLog(supabase, {
+    clinicaId:  clinicId,
+    actorId:    dentistaPerfil.id,
+    actorNome:  dentistaPerfil.nome,
+    pacienteId: dados.pacienteId,
+    entityType: "orcamento",
+    entityId:   dados.orcamentoId,
+    action:     "pagamento.parcelado",
+    metadata:   { numero_parcelas: dados.numeroParcelas, valor_total: dados.valorTotal },
+  });
+
+  revalidatePath("/dashboard/orcamentos");
+  revalidatePath("/dashboard/financeiro");
+  return { parcelas: (data ?? []) as unknown as ParcelaGerada[] };
 }
 
 export async function marcarPagamentoPago(

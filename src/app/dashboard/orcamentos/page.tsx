@@ -21,6 +21,8 @@ export type PagamentoRow = {
   forma_pagamento: string | null;
   data_pagamento: string | null;
   data_vencimento: string | null;
+  parcela_numero: number | null;
+  total_parcelas: number | null;
   marcado_por: { nome: string } | null;
 };
 
@@ -85,7 +87,7 @@ export default async function OrcamentosPage() {
       .eq('clinica_id', dentista.clinica_id),
     supabase
       .from('pagamentos')
-      .select('id, orcamento_id, valor, status, forma_pagamento, data_pagamento, data_vencimento, marcado_por:dentistas!pagamentos_marcado_por_id_fkey(nome)')
+      .select('id, orcamento_id, valor, status, forma_pagamento, data_pagamento, data_vencimento, parcela_numero, total_parcelas, marcado_por:dentistas!pagamentos_marcado_por_id_fkey(nome)')
       .eq('clinica_id', dentista.clinica_id),
   ]);
 

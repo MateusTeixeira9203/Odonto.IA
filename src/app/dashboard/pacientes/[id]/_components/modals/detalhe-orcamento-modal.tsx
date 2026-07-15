@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import {
   Edit2, Trash2, CircleDollarSign, Plus, CheckCircle2,
   XCircle, Loader2, CreditCard, Clock, Banknote, Smartphone,
-  Receipt, ArrowUpRight, User, Send,
+  Receipt, ArrowUpRight, User, Send, CalendarClock, Layers,
 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogTitle, DialogDescription,
@@ -78,7 +78,11 @@ const FORMA_ICON: Record<string, React.ElementType> = {
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
-type PagForm = { valor: string; formaPagamento: FormaPagamento; data: string };
+type PagForm = { valor: string; formaPagamento: FormaPagamento; data: string; dataVencimento: string };
+// editarPagamento não altera vencimento — edição de um pagamento existente fica
+// restrita a valor/forma/data, sem o campo de agendamento futuro.
+type EditPagForm = { valor: string; formaPagamento: FormaPagamento; data: string };
+type ParcelasForm = { numero: string; primeiroVencimento: string };
 
 interface Props {
   detalheOrc: OrcamentoComItens | null;
@@ -88,6 +92,13 @@ interface Props {
   setPagForm: React.Dispatch<React.SetStateAction<PagForm>>;
   pagSaving: boolean;
   pagError: string | null;
+  parcelasMode: boolean;
+  setParcelasMode: (v: boolean) => void;
+  parcelasForm: ParcelasForm;
+  setParcelasForm: React.Dispatch<React.SetStateAction<ParcelasForm>>;
+  parcelasSaving: boolean;
+  parcelasError: string | null;
+  onGerarParcelas: () => void;
   orcEditMode: boolean;
   setOrcEditMode: (v: boolean) => void;
   orcEditItens: OrcEditItem[];
@@ -101,8 +112,8 @@ interface Props {
   onRegistrarPagamento: () => void;
   onDeleteClick: (id: string | null) => void;
   editingPagId: string | null;
-  editPagForm: PagForm;
-  setEditPagForm: React.Dispatch<React.SetStateAction<PagForm>>;
+  editPagForm: EditPagForm;
+  setEditPagForm: React.Dispatch<React.SetStateAction<EditPagForm>>;
   editPagSaving: boolean;
   editPagError: string | null;
   onIniciarEdicaoPagamento: (pg: Pagamento) => void;
@@ -119,6 +130,7 @@ interface Props {
 export function DetalheOrcamentoModal({
   detalheOrc, detalheOrcId, onClose,
   pagForm, setPagForm, pagSaving, pagError,
+  parcelasMode, setParcelasMode, parcelasForm, setParcelasForm, parcelasSaving, parcelasError, onGerarParcelas,
   orcEditMode, setOrcEditMode, orcEditItens, setOrcEditItens,
   orcEditSaving, orcEditError, setOrcEditError,
   onOpenEditOrc, onSalvarEdicaoOrc,
@@ -127,6 +139,7 @@ export function DetalheOrcamentoModal({
   onIniciarEdicaoPagamento, onCancelarEdicaoPagamento, onSalvarEdicaoPagamento,
   confirmDeletePagId, setConfirmDeletePagId, pagDeleteSaving, onExcluirPagamento,
 }: Props) {
+  const hoje = new Date().toISOString().split('T')[0];
   const [isApprovingLocal, setIsApprovingLocal] = useState(false);
   const [justApproved, setJustApproved] = useState(false);
   const [isChangingStatus, setIsChangingStatus] = useState(false);
@@ -151,6 +164,7 @@ export function DetalheOrcamentoModal({
     orcamento_enviado:  'Enviado ao paciente',
     orcamento_recusado: 'Recusado',
     'pagamento.registrado': 'Pagamento registrado',
+    'pagamento.parcelado': 'Parcelamento gerado',
     'pagamento.editado': 'Pagamento editado',
     'pagamento.excluido': 'Pagamento excluído',
     status_alterado: 'Status alterado',
@@ -163,8 +177,8 @@ export function DetalheOrcamentoModal({
     setTimeout(() => setIsChangingStatus(false), 1200);
   }
 
-  const { totalPago, totalPendente, pctPago, quitado } = useMemo(() => {
-    if (!detalheOrc) return { totalPago: 0, totalPendente: 0, pctPago: 0, quitado: false };
+  const { totalPago, totalPendente, pctPago, quitado, restante } = useMemo(() => {
+    if (!detalheOrc) return { totalPago: 0, totalPendente: 0, pctPago: 0, quitado: false, restante: 0 };
     const pago    = detalheOrc.pagamentos.filter(p => p.status === 'pago').reduce((s, p) => s + p.valor, 0);
     const pendente= detalheOrc.pagamentos.filter(p => p.status === 'pendente').reduce((s, p) => s + p.valor, 0);
     const total   = detalheOrc.total ?? 0;
@@ -173,6 +187,9 @@ export function DetalheOrcamentoModal({
       totalPendente: pendente,
       pctPago:      total > 0 ? Math.min(100, (pago / total) * 100) : 0,
       quitado:      total > 0 && pago >= total,
+      // Mesma definição de "Preencher restante" já usada na página de Orçamentos:
+      // total - pago (não desconta pendências já agendadas separadamente).
+      restante:     Math.max(0, total - pago),
     };
   }, [detalheOrc]);
 
@@ -463,6 +480,10 @@ export function DetalheOrcamentoModal({
                       {detalheOrc.pagamentos.map(pg => {
                         const Icon = FORMA_ICON[pg.forma_pagamento ?? 'outro'] ?? CircleDollarSign;
                         const isPago = pg.status === 'pago';
+                        const isVencido = !isPago && !!pg.data_vencimento && pg.data_vencimento < hoje;
+                        const parcelaLabel = pg.parcela_numero && pg.total_parcelas
+                          ? `Parcela ${pg.parcela_numero}/${pg.total_parcelas}`
+                          : null;
 
                         if (editingPagId === pg.id) {
                           return (
@@ -546,25 +567,37 @@ export function DetalheOrcamentoModal({
                             className={`group flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors ${
                               isPago
                                 ? 'border-teal/20 bg-teal/5'
-                                : 'border-border bg-surface-alt/40'
+                                : isVencido
+                                  ? 'border-red-300 dark:border-red-800/50 bg-red-50 dark:bg-red-900/10'
+                                  : 'border-border bg-surface-alt/40'
                             }`}
                           >
                             <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                              isPago ? 'bg-teal/15 text-teal' : 'bg-surface-alt text-text-secondary'
+                              isPago ? 'bg-teal/15 text-teal' : isVencido ? 'bg-red-500/10 text-red-500' : 'bg-surface-alt text-text-secondary'
                             }`}>
                               <Icon className="w-4 h-4" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-text-primary">
-                                {FORMA_LABEL[pg.forma_pagamento ?? 'outro'] ?? 'Pagamento'}
+                              <p className="text-sm font-medium text-text-primary flex items-center gap-1.5 flex-wrap">
+                                {parcelaLabel && (
+                                  <span className="text-[10px] font-bold uppercase tracking-wider text-teal bg-teal/10 px-1.5 py-0.5 rounded-md shrink-0">
+                                    {parcelaLabel}
+                                  </span>
+                                )}
+                                {isPago ? (FORMA_LABEL[pg.forma_pagamento ?? 'outro'] ?? 'Pagamento') : 'A receber'}
                               </p>
-                              <p className="text-[11px] text-text-secondary">
-                                {isPago ? 'Pago' : 'Pendente'}
+                              <p className={`text-[11px] ${isVencido ? 'text-red-500 font-semibold' : 'text-text-secondary'}`}>
+                                {isPago
+                                  ? <>Pago em {pg.data_pagamento ? format(parseISO(pg.data_pagamento), 'dd/MM/yyyy', { locale: ptBR }) : '—'}</>
+                                  : pg.data_vencimento
+                                    ? <>{isVencido ? 'Venceu' : 'Vence'} em {format(parseISO(pg.data_vencimento), 'dd/MM/yyyy', { locale: ptBR })}</>
+                                    : 'Pendente'
+                                }
                                 {pg.marcado_por && ` · por ${pg.marcado_por.nome.split(' ')[0]}`}
                               </p>
                             </div>
                             <div className="text-right shrink-0">
-                              <p className={`font-mono text-sm font-semibold ${isPago ? 'text-teal' : 'text-text-secondary'}`}>
+                              <p className={`font-mono text-sm font-semibold ${isPago ? 'text-teal' : isVencido ? 'text-red-500' : 'text-text-secondary'}`}>
                                 R$ {fmt(pg.valor)}
                               </p>
                               {isPago
@@ -659,65 +692,144 @@ export function DetalheOrcamentoModal({
                   {/* Registrar pagamento */}
                   {!orcEditMode && (
                     <div className="space-y-3">
-                      <p className="text-xs font-bold uppercase tracking-widest text-teal flex items-center gap-1.5">
-                        <ArrowUpRight className="w-3 h-3" />
-                        Registrar Pagamento
-                      </p>
-                      <div className="space-y-2">
-                        <div className="space-y-1.5">
-                          <Label className="text-xs text-text-secondary">Valor (R$)</Label>
-                          <Input
-                            type="text" inputMode="decimal" placeholder="0,00"
-                            value={pagForm.valor}
-                            onChange={e => setPagForm(f => ({ ...f, valor: e.target.value }))}
-                            onBlur={e => {
-                              const parsed = parseValorBR(e.target.value);
-                              setPagForm(f => ({ ...f, valor: parsed > 0 ? formatValorBR(parsed) : f.valor }));
-                            }}
-                            className="rounded-xl bg-surface-alt border-border text-text-primary font-mono"
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-xs text-text-secondary">Data do recebimento</Label>
-                          <Input
-                            type="date" value={pagForm.data}
-                            onChange={e => setPagForm(f => ({ ...f, data: e.target.value }))}
-                            className="rounded-xl bg-surface-alt border-border text-text-primary"
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-xs text-text-secondary">Forma de pagamento</Label>
-                          <Select
-                            value={pagForm.formaPagamento}
-                            onValueChange={v => v && setPagForm(f => ({ ...f, formaPagamento: v as FormaPagamento }))}
-                          >
-                            <SelectTrigger className="rounded-xl bg-surface-alt border-border text-text-primary">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent className="bg-surface border-border">
-                              <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                              <SelectItem value="pix">PIX</SelectItem>
-                              <SelectItem value="cartao_credito">Cartão de Crédito</SelectItem>
-                              <SelectItem value="cartao_debito">Cartão de Débito</SelectItem>
-                              <SelectItem value="boleto">Boleto</SelectItem>
-                              <SelectItem value="outro">Outro</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        {pagError && (
-                          <p className="text-xs text-red-500 bg-red-500/10 rounded-xl px-3 py-2">{pagError}</p>
-                        )}
-                        <Button
-                          onClick={onRegistrarPagamento}
-                          disabled={pagSaving || !pagForm.valor}
-                          className="w-full bg-teal text-white hover:bg-teal-lt rounded-xl disabled:opacity-50 font-semibold"
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-bold uppercase tracking-widest text-teal flex items-center gap-1.5">
+                          <ArrowUpRight className="w-3 h-3" />
+                          {parcelasMode ? 'Dividir em Parcelas' : 'Registrar Pagamento'}
+                        </p>
+                        <button
+                          onClick={() => setParcelasMode(!parcelasMode)}
+                          className="flex items-center gap-1 text-[11px] font-semibold text-text-secondary hover:text-teal transition-colors"
                         >
-                          {pagSaving
-                            ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Salvando...</>
-                            : 'Confirmar Pagamento'
-                          }
-                        </Button>
+                          <Layers className="w-3 h-3" />
+                          {parcelasMode ? 'Pagamento único' : 'Dividir em parcelas'}
+                        </button>
                       </div>
+
+                      {parcelasMode ? (
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-text-secondary">Nº de parcelas</Label>
+                              <Input
+                                type="number" min={2} max={24}
+                                value={parcelasForm.numero}
+                                onChange={e => setParcelasForm(f => ({ ...f, numero: e.target.value }))}
+                                className="rounded-xl bg-surface-alt border-border text-text-primary font-mono"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-text-secondary">1º vencimento</Label>
+                              <Input
+                                type="date" min={hoje}
+                                value={parcelasForm.primeiroVencimento}
+                                onChange={e => setParcelasForm(f => ({ ...f, primeiroVencimento: e.target.value }))}
+                                className="rounded-xl bg-surface-alt border-border text-text-primary"
+                              />
+                            </div>
+                          </div>
+                          {(() => {
+                            const n = parseInt(parcelasForm.numero, 10);
+                            if (!n || n < 2 || !restante) return null;
+                            return (
+                              <p className="text-[11px] text-text-secondary bg-surface-alt rounded-xl px-3 py-2">
+                                Saldo restante: R$ {fmt(restante)} — {n}x de R$ {fmt(restante / n)}, vencimentos no mesmo dia, mês a mês.
+                              </p>
+                            );
+                          })()}
+                          {parcelasError && (
+                            <p className="text-xs text-red-500 bg-red-500/10 rounded-xl px-3 py-2">{parcelasError}</p>
+                          )}
+                          <Button
+                            onClick={onGerarParcelas}
+                            disabled={parcelasSaving || !parcelasForm.primeiroVencimento}
+                            className="w-full bg-teal text-white hover:bg-teal-lt rounded-xl disabled:opacity-50 font-semibold"
+                          >
+                            {parcelasSaving
+                              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Gerando...</>
+                              : 'Gerar Parcelas'
+                            }
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="space-y-1.5">
+                            <Label className="text-xs text-text-secondary">Valor (R$)</Label>
+                            <Input
+                              type="text" inputMode="decimal" placeholder="0,00"
+                              value={pagForm.valor}
+                              onChange={e => setPagForm(f => ({ ...f, valor: e.target.value }))}
+                              onBlur={e => {
+                                const parsed = parseValorBR(e.target.value);
+                                setPagForm(f => ({ ...f, valor: parsed > 0 ? formatValorBR(parsed) : f.valor }));
+                              }}
+                              className="rounded-xl bg-surface-alt border-border text-text-primary font-mono"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs text-text-secondary flex items-center gap-1.5">
+                              Vencimento <span className="text-text-secondary/60 font-normal">(deixe vazio se já recebeu)</span>
+                            </Label>
+                            <Input
+                              type="date" min={hoje}
+                              value={pagForm.dataVencimento}
+                              onChange={e => setPagForm(f => ({ ...f, dataVencimento: e.target.value }))}
+                              className="rounded-xl bg-surface-alt border-border text-text-primary"
+                            />
+                          </div>
+                          {pagForm.dataVencimento && pagForm.dataVencimento > hoje ? (
+                            <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-xl px-3 py-2.5">
+                              <CalendarClock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                              <p className="text-xs text-amber-700 dark:text-amber-400">
+                                Vencimento futuro — será registrado como <strong>pendente</strong>.
+                              </p>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="space-y-1.5">
+                                <Label className="text-xs text-text-secondary">Data do recebimento</Label>
+                                <Input
+                                  type="date" value={pagForm.data}
+                                  onChange={e => setPagForm(f => ({ ...f, data: e.target.value }))}
+                                  className="rounded-xl bg-surface-alt border-border text-text-primary"
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <Label className="text-xs text-text-secondary">Forma de pagamento</Label>
+                                <Select
+                                  value={pagForm.formaPagamento}
+                                  onValueChange={v => v && setPagForm(f => ({ ...f, formaPagamento: v as FormaPagamento }))}
+                                >
+                                  <SelectTrigger className="rounded-xl bg-surface-alt border-border text-text-primary">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent className="bg-surface border-border">
+                                    <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                                    <SelectItem value="pix">PIX</SelectItem>
+                                    <SelectItem value="cartao_credito">Cartão de Crédito</SelectItem>
+                                    <SelectItem value="cartao_debito">Cartão de Débito</SelectItem>
+                                    <SelectItem value="boleto">Boleto</SelectItem>
+                                    <SelectItem value="outro">Outro</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </>
+                          )}
+                          {pagError && (
+                            <p className="text-xs text-red-500 bg-red-500/10 rounded-xl px-3 py-2">{pagError}</p>
+                          )}
+                          <Button
+                            onClick={onRegistrarPagamento}
+                            disabled={pagSaving || !pagForm.valor}
+                            className="w-full bg-teal text-white hover:bg-teal-lt rounded-xl disabled:opacity-50 font-semibold"
+                          >
+                            {pagSaving
+                              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Salvando...</>
+                              : (pagForm.dataVencimento && pagForm.dataVencimento > hoje) ? 'Agendar Parcela' : 'Confirmar Pagamento'
+                            }
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

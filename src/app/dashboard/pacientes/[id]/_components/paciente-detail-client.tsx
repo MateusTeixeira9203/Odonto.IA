@@ -72,6 +72,7 @@ import {
   editarOrcamento,
   excluirOrcamento,
   criarProcedimentoRapido,
+  gerarParcelas,
   type FormaPagamento,
   type StatusOrcamento,
 } from '@/app/dashboard/orcamentos/actions';
@@ -249,7 +250,12 @@ export function PacienteDetailClient({
     valor: '',
     formaPagamento: 'pix' as FormaPagamento,
     data: new Date().toISOString().split('T')[0],
+    dataVencimento: '',
   });
+  const [parcelasMode, setParcelasMode] = useState(false);
+  const [parcelasForm, setParcelasForm] = useState({ numero: '3', primeiroVencimento: '' });
+  const [parcelasSaving, setParcelasSaving] = useState(false);
+  const [parcelasError, setParcelasError] = useState<string | null>(null);
   const [orcSaving, setOrcSaving] = useState(false);
   const [pagSaving, setPagSaving] = useState(false);
   const [orcError, setOrcError] = useState<string | null>(null);
@@ -624,12 +630,17 @@ export function PacienteDetailClient({
     setPagError(null);
     setPagSaving(true);
 
+    const hoje = new Date().toISOString().split('T')[0];
+    const isAgendado = pagForm.dataVencimento && pagForm.dataVencimento > hoje;
+
     const result = await registrarPagamento({
       orcamentoId: detalheOrcId,
       pacienteId: paciente.id,
       valor,
       formaPagamento: pagForm.formaPagamento,
       data: pagForm.data,
+      dataVencimento: pagForm.dataVencimento || undefined,
+      dentistaId: detalheOrc?.dentista_id ?? undefined,
     });
 
     if (result.error) {
@@ -638,9 +649,12 @@ export function PacienteDetailClient({
       const novoPag: Pagamento = {
         id:              result.id ?? crypto.randomUUID(),
         valor,
-        status:          'pago',
-        forma_pagamento: pagForm.formaPagamento,
-        data_pagamento:  pagForm.data,
+        status:          isAgendado ? 'pendente' : 'pago',
+        forma_pagamento: isAgendado ? null : pagForm.formaPagamento,
+        data_pagamento:  isAgendado ? null : pagForm.data,
+        data_vencimento: pagForm.dataVencimento || null,
+        parcela_numero:  null,
+        total_parcelas:  null,
         marcado_por:     null,
       };
       setOrcamentosState((prev) =>
@@ -654,9 +668,68 @@ export function PacienteDetailClient({
         valor: '',
         formaPagamento: 'pix',
         data: new Date().toISOString().split('T')[0],
+        dataVencimento: '',
       });
     }
     setPagSaving(false);
+  };
+
+  const handleGerarParcelas = async () => {
+    if (!detalheOrcId) return;
+    const numero = parseInt(parcelasForm.numero, 10);
+    // Divide o SALDO RESTANTE, não o total — senão duplica o que já foi pago.
+    const pago = (detalheOrc?.pagamentos ?? []).filter((p) => p.status === 'pago').reduce((s, p) => s + p.valor, 0);
+    const valorTotal = Math.max(0, (detalheOrc?.total ?? 0) - pago);
+    if (!numero || numero < 2 || numero > 24) {
+      setParcelasError('Informe entre 2 e 24 parcelas.');
+      return;
+    }
+    if (!parcelasForm.primeiroVencimento) {
+      setParcelasError('Informe o primeiro vencimento.');
+      return;
+    }
+    if (!valorTotal || valorTotal <= 0) {
+      setParcelasError('Não há saldo restante para parcelar.');
+      return;
+    }
+    setParcelasError(null);
+    setParcelasSaving(true);
+
+    const result = await gerarParcelas({
+      orcamentoId: detalheOrcId,
+      pacienteId: paciente.id,
+      valorTotal,
+      numeroParcelas: numero,
+      primeiroVencimento: parcelasForm.primeiroVencimento,
+      dentistaId: detalheOrc?.dentista_id ?? undefined,
+    });
+
+    if (result.error || !result.parcelas) {
+      setParcelasError(result.error ?? 'Não foi possível gerar as parcelas.');
+    } else {
+      const novasPag: Pagamento[] = result.parcelas.map((p) => ({
+        id:              p.id,
+        valor:           p.valor,
+        status:          'pendente',
+        forma_pagamento: null,
+        data_pagamento:  null,
+        data_vencimento: p.data_vencimento,
+        parcela_numero:  p.parcela_numero,
+        total_parcelas:  p.total_parcelas,
+        marcado_por:     null,
+      }));
+      setOrcamentosState((prev) =>
+        prev.map((o) =>
+          o.id === detalheOrcId
+            ? { ...o, pagamentos: [...o.pagamentos, ...novasPag] }
+            : o
+        )
+      );
+      setParcelasMode(false);
+      setParcelasForm({ numero: '3', primeiroVencimento: '' });
+      toast.success(`${numero} parcelas geradas.`);
+    }
+    setParcelasSaving(false);
   };
 
   const handleIniciarEdicaoPagamento = (pg: Pagamento) => {
@@ -909,6 +982,7 @@ export function PacienteDetailClient({
         created_at: new Date().toISOString(),
         validade_dias: 30,
         condicoes_pagamento: null,
+        dentista_id: dentistaId,
         itens: itensValidos.map((i, idx) => ({
           id: `temp-${idx}`,
           descricao: i.descricao,
@@ -1657,15 +1731,25 @@ export function PacienteDetailClient({
           setPagError(null);
           setOrcEditMode(false);
           setOrcEditError(null);
-          setPagForm({ valor: '', formaPagamento: 'pix', data: new Date().toISOString().split('T')[0] });
+          setPagForm({ valor: '', formaPagamento: 'pix', data: new Date().toISOString().split('T')[0], dataVencimento: '' });
           setEditingPagId(null);
           setEditPagError(null);
           setConfirmDeletePagId(null);
+          setParcelasMode(false);
+          setParcelasForm({ numero: '3', primeiroVencimento: '' });
+          setParcelasError(null);
         }}
         pagForm={pagForm}
         setPagForm={setPagForm}
         pagSaving={pagSaving}
         pagError={pagError}
+        parcelasMode={parcelasMode}
+        setParcelasMode={setParcelasMode}
+        parcelasForm={parcelasForm}
+        setParcelasForm={setParcelasForm}
+        parcelasSaving={parcelasSaving}
+        parcelasError={parcelasError}
+        onGerarParcelas={handleGerarParcelas}
         orcEditMode={orcEditMode}
         setOrcEditMode={setOrcEditMode}
         orcEditItens={orcEditItens}

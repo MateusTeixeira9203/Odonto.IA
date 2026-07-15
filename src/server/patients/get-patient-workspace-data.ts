@@ -33,6 +33,9 @@ export type Pagamento = {
   status: string;
   forma_pagamento: string | null;
   data_pagamento: string | null;
+  data_vencimento: string | null;
+  parcela_numero: number | null;
+  total_parcelas: number | null;
   marcado_por: { nome: string } | null;
 };
 
@@ -43,6 +46,7 @@ export type OrcamentoComItens = {
   created_at: string;
   validade_dias: number;
   condicoes_pagamento: string | null;
+  dentista_id: string | null;
   itens: OrcamentoItem[];
   pagamentos: Pagamento[];
   aprovado_por: { nome: string } | null;
@@ -99,7 +103,7 @@ export async function getPatientWorkspaceData({
         supabase
           .from('orcamentos')
           .select(
-            'id, status, total, created_at, validade_dias, condicoes_pagamento, aprovado_em, aprovado_por:dentistas!orcamentos_aprovado_por_id_fkey(nome), itens:orcamento_itens(id, descricao, preco_total, quantidade), pagamentos(id, valor, status, forma_pagamento, data_pagamento, marcado_por:dentistas!pagamentos_marcado_por_id_fkey(nome))'
+            'id, status, total, created_at, validade_dias, condicoes_pagamento, dentista_id, aprovado_em, aprovado_por:dentistas!orcamentos_aprovado_por_id_fkey(nome), itens:orcamento_itens(id, descricao, preco_total, quantidade), pagamentos(id, valor, status, forma_pagamento, data_pagamento, data_vencimento, parcela_numero, total_parcelas, marcado_por:dentistas!pagamentos_marcado_por_id_fkey(nome))'
           )
           .eq('paciente_id', patientId)
           .eq('clinica_id', clinicId)
