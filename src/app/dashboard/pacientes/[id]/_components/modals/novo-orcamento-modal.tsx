@@ -43,6 +43,10 @@ interface NovoOrcamentoModalProps {
   onSelecionarFicha: (fichaId: string | null) => void;
   onCadastrarProcedimento: (idx: number) => void;
   registeringProcIdx: number | null;
+  isSecretaria: boolean;
+  dentistasClinica: { id: string; nome: string }[];
+  dentistaAlvoId: string;
+  onDentistaAlvoChange: (id: string) => void;
 }
 
 export function NovoOrcamentoModal({
@@ -64,6 +68,10 @@ export function NovoOrcamentoModal({
   onSelecionarFicha,
   onCadastrarProcedimento,
   registeringProcIdx,
+  isSecretaria,
+  dentistasClinica,
+  dentistaAlvoId,
+  onDentistaAlvoChange,
 }: NovoOrcamentoModalProps) {
   const [valorFinalTexto, setValorFinalTexto] = useState(
     novoOrcValorFinal !== null ? formatValorBR(novoOrcValorFinal) : ''
@@ -144,6 +152,21 @@ export function NovoOrcamentoModal({
 
             {/* Coluna esquerda — itens */}
             <div className="flex-1 min-w-0 overflow-y-auto p-6 space-y-4">
+              {isSecretaria && (
+                <div className="space-y-1">
+                  <Label className="text-xs text-text-secondary">Dentista responsável *</Label>
+                  <Select value={dentistaAlvoId} onValueChange={(v) => v && onDentistaAlvoChange(v)}>
+                    <SelectTrigger className="rounded-xl bg-surface border-border text-text-primary">
+                      <SelectValue placeholder="Selecione o dentista..." />
+                    </SelectTrigger>
+                    <SelectContent className="bg-surface border-border">
+                      {dentistasClinica.map((d) => (
+                        <SelectItem key={d.id} value={d.id}>{d.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               {novoOrcItens.map((item, idx) => (
                 <div key={idx} className={`bg-surface-alt rounded-2xl border p-4 space-y-3 transition-all duration-200 ${
                   parseValorBR(item.preco) > 0 ? 'border-l-2 border-l-teal/50 border-t-border border-r-border border-b-border' : 'border-border'

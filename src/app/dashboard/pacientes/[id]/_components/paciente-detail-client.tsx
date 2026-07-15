@@ -206,6 +206,8 @@ export function PacienteDetailClient({
 
   // Encaminhamento (hierarquia §3) — só a secretária reatribui o dentista responsável.
   const [dentistasClinica, setDentistasClinica] = useState<{ id: string; nome: string }[]>([]);
+  // Dentista responsável pelo orçamento que a secretária está criando (spec 2026-07-15).
+  const [novoOrcDentistaAlvoId, setNovoOrcDentistaAlvoId] = useState('');
   useEffect(() => {
     if (role !== 'secretaria') return;
     const supabase = createClient();
@@ -216,7 +218,10 @@ export function PacienteDetailClient({
       .neq('role', 'secretaria')
       .eq('ativo', true)
       .order('nome')
-      .then(({ data }) => setDentistasClinica(data ?? []));
+      .then(({ data }) => {
+        setDentistasClinica(data ?? []);
+        setNovoOrcDentistaAlvoId((prev) => prev || (data?.[0]?.id ?? ''));
+      });
   }, [role, clinicaId]);
 
   // Dados exibíveis do paciente — atualizados localmente após edição (sem router.refresh)
@@ -516,19 +521,26 @@ export function PacienteDetailClient({
     });
   };
 
-  // Busca procedimentos da clínica, fichas recentes e pendências ao montar.
-  // Catálogo de procedimentos é privado por dentista — filtra pelo dono da sessão.
+  // Catálogo de procedimentos é privado por dentista. Pra secretária, o dono relevante
+  // é o dentista-alvo selecionado no modal de orçamento, não o perfil dela (ela nunca
+  // é dona de procedimentos) — reconsulta quando a seleção muda.
+  const procedimentosDonoId = role === 'secretaria' ? novoOrcDentistaAlvoId : dentistaId;
   useEffect(() => {
+    if (!procedimentosDonoId) return;
     const supabase = createClient();
     void supabase
       .from('procedimentos')
       .select('id, nome, preco_padrao')
       .eq('clinica_id', clinicaId)
-      .eq('dentista_id', dentistaId)
+      .eq('dentista_id', procedimentosDonoId)
       .eq('ativo', true)
       .order('nome')
       .then(({ data }) => setProcedimentosClinica(data ?? []));
+  }, [clinicaId, procedimentosDonoId]);
 
+  // Busca fichas recentes e pendências ao montar.
+  useEffect(() => {
+    const supabase = createClient();
     if (!canViewClinical) return;
 
     // fichasRecentes já foram carregadas no servidor — evita roundtrip desnecessário
@@ -926,7 +938,11 @@ export function PacienteDetailClient({
     if (!nome) return;
     setRegisteringProcIdx(idx);
     const precoNum = parseValorBR(item.preco);
-    const result = await criarProcedimentoRapido({ nome, precoPadrao: precoNum > 0 ? precoNum : null });
+    const result = await criarProcedimentoRapido({
+      nome,
+      precoPadrao: precoNum > 0 ? precoNum : null,
+      dentistaId: role === 'secretaria' ? novoOrcDentistaAlvoId : undefined,
+    });
     if (result.error || !result.id) {
       toast.error(result.error ?? 'Não foi possível cadastrar o procedimento.');
     } else {
@@ -953,6 +969,10 @@ export function PacienteDetailClient({
       setOrcError('Atenção: alguns procedimentos estão sem valor. Defina o preço antes de continuar.');
       return;
     }
+    if (role === 'secretaria' && !novoOrcDentistaAlvoId) {
+      setOrcError('Selecione o dentista responsável.');
+      return;
+    }
     setOrcError(null);
     setOrcSaving(true);
 
@@ -964,6 +984,7 @@ export function PacienteDetailClient({
       pacienteId: paciente.id,
       desconto:   descontoValor,
       fichaId:    fichaOrcId,
+      dentistaId: role === 'secretaria' ? novoOrcDentistaAlvoId : undefined,
       itens: itensValidos.map((i) => ({
         procedimentoId: i.procedimentoId || null,
         descricao: i.descricao,
@@ -982,7 +1003,7 @@ export function PacienteDetailClient({
         created_at: new Date().toISOString(),
         validade_dias: 30,
         condicoes_pagamento: null,
-        dentista_id: dentistaId,
+        dentista_id: role === 'secretaria' ? novoOrcDentistaAlvoId : dentistaId,
         itens: itensValidos.map((i, idx) => ({
           id: `temp-${idx}`,
           descricao: i.descricao,
@@ -1454,20 +1475,18 @@ export function PacienteDetailClient({
                     <span className="text-sm text-text-secondary font-medium">
                       {orcamentosState.length} orçamento{orcamentosState.length !== 1 ? 's' : ''}
                     </span>
-                    {role !== 'secretaria' && (
-                      <button
-                        onClick={() => void abrirNovoOrcamento()}
-                        disabled={isLoadingFichaParaOrc}
-                        className="bg-teal text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 hover:bg-teal-lt transition-all shadow-md disabled:opacity-60"
-                      >
-                        {isLoadingFichaParaOrc ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Plus className="w-3.5 h-3.5" />
-                        )}
-                        Novo Orçamento
-                      </button>
-                    )}
+                    <button
+                      onClick={() => void abrirNovoOrcamento()}
+                      disabled={isLoadingFichaParaOrc}
+                      className="bg-teal text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 hover:bg-teal-lt transition-all shadow-md disabled:opacity-60"
+                    >
+                      {isLoadingFichaParaOrc ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Plus className="w-3.5 h-3.5" />
+                      )}
+                      Novo Orçamento
+                    </button>
                   </div>
 
                   {orcamentosState.length === 0 ? (
@@ -1827,6 +1846,10 @@ export function PacienteDetailClient({
         onSelecionarFicha={selecionarFichaParaOrc}
         onCadastrarProcedimento={(idx) => void handleCadastrarProcedimento(idx)}
         registeringProcIdx={registeringProcIdx}
+        isSecretaria={role === 'secretaria'}
+        dentistasClinica={dentistasClinica}
+        dentistaAlvoId={novoOrcDentistaAlvoId}
+        onDentistaAlvoChange={setNovoOrcDentistaAlvoId}
       />
     </PageContainer>
   );

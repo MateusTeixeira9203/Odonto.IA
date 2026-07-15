@@ -262,12 +262,29 @@ export async function criarOrcamento(dados: {
 
   const { data: dentistaPerfil } = await supabase
     .from("dentistas")
-    .select("id")
+    .select("id, role")
     .eq("user_id", user.id)
     .eq("clinica_id", clinicId)
     .maybeSingle();
 
   if (!dentistaPerfil) redirect("/onboarding");
+
+  if (dentistaPerfil.role === "secretaria") {
+    if (!dados.dentistaId) {
+      return { error: "Selecione o dentista responsável pelo orçamento." };
+    }
+    const { data: alvo } = await supabase
+      .from("dentistas")
+      .select("id")
+      .eq("id", dados.dentistaId)
+      .eq("clinica_id", clinicId)
+      .eq("ativo", true)
+      .neq("role", "secretaria")
+      .maybeSingle();
+    if (!alvo) {
+      return { error: "Dentista selecionado inválido." };
+    }
+  }
 
   const dentistaAlvoId = dados.dentistaId ?? dentistaPerfil.id;
 
@@ -690,6 +707,7 @@ export async function excluirOrcamento(
 export async function criarProcedimentoRapido(dados: {
   nome: string;
   precoPadrao: number | null;
+  dentistaId?: string;
 }): Promise<{ error?: string; id?: string }> {
   const { supabase, user, clinicId } = await requireClinicContext();
 
@@ -698,18 +716,37 @@ export async function criarProcedimentoRapido(dados: {
 
   const { data: dentistaPerfil } = await supabase
     .from("dentistas")
-    .select("id")
+    .select("id, role")
     .eq("user_id", user.id)
     .eq("clinica_id", clinicId)
     .maybeSingle();
 
   if (!dentistaPerfil) return { error: "Perfil de dentista não encontrado." };
 
+  if (dentistaPerfil.role === "secretaria") {
+    if (!dados.dentistaId) {
+      return { error: "Selecione o dentista responsável pelo orçamento." };
+    }
+    const { data: alvo } = await supabase
+      .from("dentistas")
+      .select("id")
+      .eq("id", dados.dentistaId)
+      .eq("clinica_id", clinicId)
+      .eq("ativo", true)
+      .neq("role", "secretaria")
+      .maybeSingle();
+    if (!alvo) {
+      return { error: "Dentista selecionado inválido." };
+    }
+  }
+
+  const dentistaAlvoId = dados.dentistaId ?? dentistaPerfil.id;
+
   const { data, error } = await supabase
     .from("procedimentos")
     .insert({
       clinica_id:   clinicId,
-      dentista_id:  dentistaPerfil.id,
+      dentista_id:  dentistaAlvoId,
       nome,
       preco_padrao: dados.precoPadrao,
     })

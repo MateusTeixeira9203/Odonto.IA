@@ -103,7 +103,7 @@ export default async function OrcamentosPage() {
 
   // Solo: dentista cria orçamentos manualmente. BASICO/CLINICA: cria via perfil do paciente.
   // Secretária sempre pode criar orçamentos independente do plano.
-  const canEdit = !isUserOverride && dentista.plano === 'SOLO';
+  const canEdit = !isUserOverride && (dentista.plano === 'SOLO' || dentista.role === 'secretaria');
 
   return (
     <PageTransition>

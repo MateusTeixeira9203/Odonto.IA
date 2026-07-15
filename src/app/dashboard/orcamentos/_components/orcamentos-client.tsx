@@ -581,7 +581,11 @@ export function OrcamentosClient({
     if (!nome) return;
     setRegisteringProcIdx(idx);
     const precoNum = parseValorBR(item.preco);
-    const result = await criarProcedimentoRapido({ nome, precoPadrao: precoNum > 0 ? precoNum : null });
+    const result = await criarProcedimentoRapido({
+      nome,
+      precoPadrao: precoNum > 0 ? precoNum : null,
+      dentistaId: isSecretaria ? novoOrcDentistaId : undefined,
+    });
     if (result.error || !result.id) {
       toast.error(result.error ?? 'Não foi possível cadastrar o procedimento.');
     } else {
