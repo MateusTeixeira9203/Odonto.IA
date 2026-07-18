@@ -502,12 +502,21 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
 
       const assinadoEm = new Date().toISOString();
 
-      const { error: dbErr } = await supabase
+      const { data: signed, error: dbErr } = await supabase
         .from('fichas')
         .update({ assinatura_url: storagePath, assinado_em: assinadoEm })
         .eq('id', signingFichaId)
-        .eq('clinica_id', clinicaId);
+        .eq('clinica_id', clinicaId)
+        .select('id');
       if (dbErr) throw dbErr;
+      // .select() vazio = RLS barrou (ficha de outro autor). O botão já é gated (defesa em
+      // profundidade), mas se chegar aqui: remove o PNG órfão que subiu antes do update e
+      // falha alto — nunca o "Assinatura salva com sucesso" falso (invariante #9).
+      if (!signed?.length) {
+        await supabase.storage.from('fichas').remove([storagePath]);
+        toast.error('Só o dentista autor pode assinar esta ficha.');
+        return;
+      }
 
       setEvolutions((prev) =>
         prev.map((e) =>
@@ -1101,13 +1110,20 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
                                 Gerar orçamento
                               </button>
                             )}
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setSigningFichaId(evo.id); }}
-                              className="flex items-center gap-1.5 px-3 py-1.5 min-h-[36px] rounded-lg text-[10px] font-bold border border-border text-text-secondary hover:border-teal hover:text-teal transition-colors"
-                            >
-                              <Signature className="w-3.5 h-3.5" />
-                              Assinar
-                            </button>
+                            {/* Assinar escreve na ficha (assinatura_url) — é ESCRITA clínica, só o
+                                autor (migration 099). Antes aparecia pra qualquer um: o não-autor (outro
+                                dentista ou secretária) assinava, o PNG subia pro storage (bucket por
+                                clínica), mas o UPDATE era barrado pela RLS em silêncio → "Assinatura
+                                salva" falso + PNG órfão. Gate igual ao editar/excluir. */}
+                            {podeEditarFicha(evo) && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setSigningFichaId(evo.id); }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 min-h-[36px] rounded-lg text-[10px] font-bold border border-border text-text-secondary hover:border-teal hover:text-teal transition-colors"
+                              >
+                                <Signature className="w-3.5 h-3.5" />
+                                Assinar
+                              </button>
+                            )}
                           </>
                         )}
 
