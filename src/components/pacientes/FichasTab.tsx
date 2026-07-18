@@ -17,7 +17,6 @@ import {
   Pencil,
   Signature,
   CircleDollarSign,
-  CalendarClock,
   Clock,
   Circle,
   ChevronRight,
@@ -102,10 +101,11 @@ interface Evolution {
   procedimentosStatus: Record<string, ProcStatus>;
   procedimentos: string[];
   conduta: string | null;
-  retornoSugerido: string | null;
   assinaturaUrl: string | null;
   assinadoEm: string | null;
   tratamentoId: string | null;
+  /** Autor da ficha. A ficha é lida por toda a clínica; só o autor escreve (migration 099). */
+  dentistaId: string;
 }
 
 type FichaDB = {
@@ -116,12 +116,12 @@ type FichaDB = {
   dentes_afetados: number[];
   dentes_observacoes: Record<string, string>;
   status: string;
+  dentista_id: string;
   dentista?: { nome: string } | null;
   procedimentos_concluidos: string[];
   procedimentos_status: Record<string, ProcStatus> | null;
   procedimentos: string[] | null;
   conduta: string | null;
-  retorno_sugerido: string | null;
   assinatura_url: string | null;
   assinado_em: string | null;
   tratamento_id: string | null;
@@ -146,6 +146,7 @@ const mapFichaToEvolution = (f: FichaDB): Evolution => ({
     return { tooth: t, notes: parts.length > 0 ? parts : [''] };
   }),
   professional: f.dentista?.nome ?? "Profissional",
+  dentistaId: f.dentista_id,
   files: [],
   procedimentosConcluidos: f.procedimentos_concluidos ?? [],
   procedimentosStatus: (() => {
@@ -159,14 +160,15 @@ const mapFichaToEvolution = (f: FichaDB): Evolution => ({
   })(),
   procedimentos: f.procedimentos ?? [],
   conduta: f.conduta || null,
-  retornoSugerido: f.retorno_sugerido ?? null,
   assinaturaUrl: f.assinatura_url ?? null,
   assinadoEm: f.assinado_em ?? null,
   tratamentoId: f.tratamento_id ?? null,
 });
 
 // Ficha enlatada do perfil demo (K · spec 3.3) — coerente com o seed da consulta demo (João Silva, dente 46).
-const DEMO_EVOLUTION: Evolution = {
+// `dentistaId` fica de fora: é injetado no uso com o dentista real logado, pra a demo continuar
+// editável (professional: 'Você'). Sem isso ela cairia no caminho de "ficha de outro dentista".
+const DEMO_EVOLUTION: Omit<Evolution, 'dentistaId'> = {
   id: 'demo-ficha',
   date: new Date().toLocaleString('pt-BR', {
     day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
@@ -182,7 +184,6 @@ const DEMO_EVOLUTION: Evolution = {
   procedimentosStatus: { 'Restauração de compósito (dente 46)': 'nao_iniciado', 'Profilaxia': 'nao_iniciado' },
   procedimentos: ['Restauração de compósito (dente 46)', 'Profilaxia'],
   conduta: 'Substituir a restauração do dente 46 e realizar profilaxia. Reavaliar sensibilidade em 30 dias.',
-  retornoSugerido: '30 dias',
   assinaturaUrl: null,
   assinadoEm: null,
   tratamentoId: null,
@@ -197,11 +198,17 @@ interface FichasTabProps {
   canWrite?: boolean;
   /** #6 — abre o modal de orçamento no pai, já mirado nesta ficha. */
   onGerarOrcamento?: (fichaId: string) => void;
-  /** #10 — abre "Nova Consulta" no pai, pré-preenchida com o prazo de retorno. */
-  onAgendarRetorno?: (fichaId: string, prazo: string | null) => void;
 }
 
-export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName, canWrite = true, onGerarOrcamento, onAgendarRetorno }: FichasTabProps) {
+export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName, canWrite = true, onGerarOrcamento }: FichasTabProps) {
+  // O histórico é da CLÍNICA (todo dentista lê), o trabalho é do AUTOR (só ele escreve) —
+  // migration 099. `canWrite` cobre papel/plano; a autoria é uma segunda condição, não a
+  // mesma. Esconder o controle é conveniência: quem barra de verdade é a RLS (invariante #9).
+  const podeEditarFicha = React.useCallback(
+    (evo: Evolution) => canWrite && evo.dentistaId === dentistaId,
+    [canWrite, dentistaId],
+  );
+
   const [evolutions, setEvolutions] = React.useState<Evolution[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSaving, setIsSaving] = React.useState(false);
@@ -234,7 +241,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
   const fetchFichas = React.useCallback(async () => {
     // Perfil demo: ficha enlatada, sem tocar no banco (K · spec 3.3).
     if (patientId === 'demo') {
-      setEvolutions([DEMO_EVOLUTION]);
+      setEvolutions([{ ...DEMO_EVOLUTION, dentistaId }]);
       setIsLoading(false);
       return;
     }
@@ -243,7 +250,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
       const supabase = createClient();
       const { data, error } = await supabase
         .from("fichas")
-        .select("id, created_at, queixa_principal, anotacoes, dentes_afetados, dentes_observacoes, status, procedimentos_concluidos, procedimentos_status, procedimentos, conduta, retorno_sugerido, assinatura_url, assinado_em, tratamento_id, dentista:dentistas(nome)")
+        .select("id, created_at, queixa_principal, anotacoes, dentes_afetados, dentes_observacoes, status, procedimentos_concluidos, procedimentos_status, procedimentos, conduta, assinatura_url, assinado_em, tratamento_id, dentista_id, dentista:dentistas(nome)")
         .eq("paciente_id", patientId)
         .eq("clinica_id", clinicaId)
         .order("created_at", { ascending: false });
@@ -255,7 +262,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
     } finally {
       setIsLoading(false);
     }
-  }, [patientId, clinicaId]);
+  }, [patientId, clinicaId, dentistaId]);
 
   React.useEffect(() => {
     if (patientId && clinicaId) {
@@ -535,12 +542,20 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
     setEvolutions((prev) => prev.map((e) => e.id === fichaId ? { ...e, procedimentosStatus: updatedStatus } : e));
     setViewingEvo((prev) => prev?.id === fichaId ? { ...prev, procedimentosStatus: updatedStatus } : prev);
     const supabase = createClient();
-    const { error } = await supabase
+    // .select() é obrigatório: a ficha agora é LIDA por toda a clínica mas só o autor
+    // escreve (migration 099), e um UPDATE barrado por RLS não retorna erro — devolve
+    // sucesso com 0 linhas. Sem isso a tela afirmaria o que o banco negou (invariante #9).
+    const { data: afetadas, error } = await supabase
       .from('fichas')
       .update({ procedimentos_status: updatedStatus })
       .eq('id', fichaId)
-      .eq('clinica_id', clinicaId);
-    if (error) console.error('[proc-status]', error);
+      .eq('clinica_id', clinicaId)
+      .select('id');
+    if (error ?? !afetadas?.length) {
+      console.error('[proc-status] recusado — revertendo', error);
+      setEvolutions((prev) => prev.map((e) => e.id === fichaId ? { ...e, procedimentosStatus: currentStatus } : e));
+      setViewingEvo((prev) => prev?.id === fichaId ? { ...prev, procedimentosStatus: currentStatus } : prev);
+    }
   };
 
   const handleEdit = (evolution: Evolution) => {
@@ -1045,6 +1060,15 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
                         </div>
                         <div className="flex items-center gap-2 text-[10px] text-text-secondary font-medium">
                           <User className="w-3 h-3" /> {evo.professional}
+                          {/* Só marca o que foge do esperado: a ficha do colega. A própria fica
+                              discreta como sempre foi, e numa clínica de um dentista o badge
+                              nunca aparece. Ausência dos botões de editar não é sinal rápido
+                              o bastante — o gate é distinguir sem clicar (spec §9). */}
+                          {canWrite && evo.dentistaId !== dentistaId && (
+                            <span className="px-1.5 py-0.5 rounded border border-border bg-surface-alt text-[9px] font-bold uppercase tracking-wide">
+                              Somente leitura
+                            </span>
+                          )}
                         </div>
                       </div>
 
@@ -1090,8 +1114,10 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
                         {/* Divisor */}
                         <div className="w-px h-6 bg-border/60 mx-0.5" />
 
-                        {/* Ações secundárias — ícones (#5) */}
-                        {canWrite && (
+                        {/* Ações secundárias — ícones (#5). Editar/Excluir só na ficha própria:
+                            a de outro dentista é leitura (migration 099). Baixar o PDF continua
+                            liberado — ler é o ponto de abrir o histórico pra clínica. */}
+                        {podeEditarFicha(evo) && (
                           <button
                             onClick={(e) => { e.stopPropagation(); handleEdit(evo); }}
                             title="Editar"
@@ -1107,9 +1133,9 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
                         >
                           <Download className="w-4 h-4" />
                         </button>
-                        {/* Excluir é escrita clínica — a RLS já barra a secretária; escondemos
-                            o botão pra não dar a falsa impressão de que apagou (update otimista). */}
-                        {canWrite && (
+                        {/* Excluir é escrita clínica — a RLS já barra a secretária e o não-autor;
+                            escondemos o botão pra não dar a falsa impressão de que apagou (update otimista). */}
+                        {podeEditarFicha(evo) && (
                           <button
                             onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(evo.id); }}
                             title="Excluir"
@@ -1150,31 +1176,10 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
                         </div>
                       )}
 
-                      {(evo.conduta || evo.retornoSugerido) && (
-                        <div className="mb-4 space-y-2">
-                          {evo.conduta && (
-                            <div className="rounded-xl border border-border/50 px-3 py-2.5 bg-surface-alt/60">
-                              <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary/60 mb-1">Conduta</p>
-                              <p className="text-xs text-text-secondary leading-relaxed">{evo.conduta}</p>
-                            </div>
-                          )}
-                          {evo.retornoSugerido && (
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border border-border/50 bg-surface-alt text-text-secondary">
-                                <Clock className="w-3 h-3" />
-                                Retorno em {evo.retornoSugerido}
-                              </div>
-                              {onAgendarRetorno && (
-                                <button
-                                  onClick={() => onAgendarRetorno(evo.id, evo.retornoSugerido)}
-                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border border-teal/40 text-teal hover:bg-teal/10 transition-colors"
-                                >
-                                  <CalendarClock className="w-3 h-3" />
-                                  Agendar retorno
-                                </button>
-                              )}
-                            </div>
-                          )}
+                      {evo.conduta && (
+                        <div className="mb-4 rounded-xl border border-border/50 px-3 py-2.5 bg-surface-alt/60">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary/60 mb-1">Conduta</p>
+                          <p className="text-xs text-text-secondary leading-relaxed">{evo.conduta}</p>
                         </div>
                       )}
 
@@ -1227,29 +1232,10 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
                               <p className="text-sm leading-relaxed flex-1 min-w-[200px] text-text-secondary">
                                 {evo.observation || <span className="italic text-text-secondary/40">Sem observações registradas.</span>}
                               </p>
-                              {(evo.conduta || evo.retornoSugerido) && (
-                                <div className="flex items-center gap-4 flex-wrap flex-shrink-0">
-                                  {evo.conduta && (
-                                    <div className="flex items-center gap-1.5 text-sm text-text-secondary">
-                                      <FileText className="w-3.5 h-3.5 text-teal flex-shrink-0" />
-                                      <span><span className="font-bold text-text-primary">Conduta:</span> {evo.conduta}</span>
-                                    </div>
-                                  )}
-                                  {evo.retornoSugerido && (
-                                    <div className="flex items-center gap-1.5 text-sm text-text-secondary">
-                                      <Clock className="w-3.5 h-3.5 text-teal flex-shrink-0" />
-                                      <span><span className="font-bold text-text-primary">Retorno:</span> {evo.retornoSugerido}</span>
-                                      {onAgendarRetorno && (
-                                        <button
-                                          onClick={() => onAgendarRetorno(evo.id, evo.retornoSugerido)}
-                                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border border-teal/40 text-teal hover:bg-teal/10 transition-colors flex-shrink-0"
-                                        >
-                                          <CalendarClock className="w-3 h-3" />
-                                          Agendar retorno
-                                        </button>
-                                      )}
-                                    </div>
-                                  )}
+                              {evo.conduta && (
+                                <div className="flex items-center gap-1.5 text-sm text-text-secondary flex-shrink-0">
+                                  <FileText className="w-3.5 h-3.5 text-teal flex-shrink-0" />
+                                  <span><span className="font-bold text-text-primary">Conduta:</span> {evo.conduta}</span>
                                 </div>
                               )}
                             </div>
@@ -1313,6 +1299,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
                                     patientId={patientId}
                                     clinicaId={clinicaId}
                                     patientName={patientName ?? ''}
+                                    dentistaId={dentistaId}
                                     fichaId={evo.id}
                                     compact
                                   />
@@ -1344,7 +1331,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
                                               const meta = STATUS_META[status] ?? STATUS_META.nao_iniciado;
                                               return (
                                                 <div key={i} className="flex items-center gap-2">
-                                                  {canWrite ? (
+                                                  {podeEditarFicha(evo) ? (
                                                     <button
                                                       onClick={() => void updateProcStatus(evo.id, evo.procedimentosStatus, procKey, STATUS_CYCLE[status])}
                                                       className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold flex-shrink-0 transition-all border ${meta.className}`}
@@ -1353,8 +1340,12 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
                                                       {meta.label}
                                                     </button>
                                                   ) : (
-                                                    // Secretária vê o status, não altera (escrita clínica — RLS barra).
-                                                    <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold flex-shrink-0 border ${meta.className} cursor-default`}>
+                                                    // Vê o status, não altera. Vale pra secretária (papel) E pro dentista
+                                                    // que não é o autor da ficha (migration 099) — a RLS barra os dois.
+                                                    <span
+                                                      title={canWrite && evo.dentistaId !== dentistaId ? `Registrado por ${evo.professional}` : undefined}
+                                                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold flex-shrink-0 border ${meta.className} cursor-default`}
+                                                    >
                                                       <meta.icon className="w-3 h-3" />
                                                       {meta.label}
                                                     </span>

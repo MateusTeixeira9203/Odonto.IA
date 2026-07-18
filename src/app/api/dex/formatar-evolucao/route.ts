@@ -15,7 +15,6 @@ export interface EvolucaoFormatada {
   // Campos novos:
   procedimentos:       string[];
   conduta:             string;
-  retorno_sugerido:    string | null;
   alerta_novo:         string | null;
 }
 
@@ -29,7 +28,6 @@ interface EvolucaoWire {
   dentes_observacoes:  Array<{ dente: string; observacao: string }>;
   procedimentos:       string[];
   conduta:             string;
-  retorno_sugerido:    string | null;
   alerta_novo:         string | null;
 }
 
@@ -54,7 +52,6 @@ const EVOLUCAO_SCHEMA: Schema = {
     },
     procedimentos:    { type: Type.ARRAY, items: { type: Type.STRING } },
     conduta:          { type: Type.STRING },
-    retorno_sugerido: { type: Type.STRING, nullable: true },
     alerta_novo:      { type: Type.STRING, nullable: true },
   },
 };
@@ -100,7 +97,6 @@ Retorne SOMENTE um JSON válido, sem markdown, com exatamente esta estrutura:
   "dentes_observacoes": [{"dente": "13", "observacao": "Tratamento de canal\\nPino\\nProvisório\\nCoroa de porcelana"}, {"dente": "98", "observacao": "PPR (prótese parcial removível)"}],
   "procedimentos": ["lista resumida dos procedimentos realizados — ex: Tratamento endodôntico, Radiografia periapical"],
   "conduta": "orientações ao paciente, cuidados pós-procedimento, prescrições mencionadas. String vazia se não mencionado.",
-  "retorno_sugerido": "prazo de retorno se mencionado (ex: 7 dias, 1 mês) ou null",
   "alerta_novo": "se o dentista mencionar nova alergia ou medicamento novo do paciente, registrar aqui. null se nenhum"
 }
 
@@ -119,7 +115,6 @@ Regras críticas:
 - O diagnóstico e o raciocínio clínico (ex: "pulpite irreversível confirmada por teste de vitalidade") entram em anotacoes — registrar, não descartar.
 - GENERALIZAÇÃO: termo clínico fora do glossário → use o nome clínico padrão brasileiro do procedimento; o glossário ancora nomenclatura, não limita cobertura.
 - conduta: string vazia "" se não houver orientações mencionadas
-- retorno_sugerido: null se não mencionado
 - alerta_novo: null se não mencionado
 - Não repetir nome do paciente nas anotações
 - Português brasileiro, linguagem técnica mas clara`;
@@ -180,7 +175,6 @@ Regras críticas:
         ? (wire.procedimentos as unknown[]).filter((p): p is string => typeof p === 'string')
         : [],
       conduta:            typeof wire.conduta === 'string' ? wire.conduta : '',
-      retorno_sugerido:   typeof wire.retorno_sugerido === 'string' ? wire.retorno_sugerido : null,
       alerta_novo:        typeof wire.alerta_novo === 'string' ? wire.alerta_novo : null,
     };
 

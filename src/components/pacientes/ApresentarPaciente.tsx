@@ -12,6 +12,8 @@ interface ApresentarPacienteProps {
   patientId: string;
   clinicaId: string;
   patientName: string;
+  /** Autor das seções de planejamento criadas aqui (migration 099). */
+  dentistaId: string;
   /** Modo direto: apresenta esta ficha. Modo picker: ignorado (escolhido na lista). */
   fichaId?: string;
   /** 'direct' (default) abre o painel direto; 'picker' abre o seletor de fichas antes. */
@@ -43,6 +45,7 @@ export function ApresentarPaciente({
   patientId,
   clinicaId,
   patientName,
+  dentistaId,
   fichaId,
   mode = 'direct',
   fichas,
@@ -57,7 +60,7 @@ export function ApresentarPaciente({
   const [selectedFichaId, setSelectedFichaId] = useState<string | undefined>(fichaId);
 
   // Hook só roda quando o painel abre; no picker o fichaId vem da seleção (invariante 3 da spec).
-  const plan = usePlanejamentoPaciente(patientId, clinicaId, patientName, panelOpen, selectedFichaId);
+  const plan = usePlanejamentoPaciente(patientId, clinicaId, patientName, dentistaId, panelOpen, selectedFichaId);
 
   // Auto-gerar o rascunho ao abrir (spec 2.3) — só quando não há plano ainda,
   // dados já carregados e nenhuma geração em curso. Ref evita disparo duplo.

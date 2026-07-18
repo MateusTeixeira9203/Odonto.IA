@@ -22,6 +22,8 @@ import {
   X,
   ThumbsUp,
   UserPlus,
+  CalendarClock,
+  ChevronRight,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 const AssinaturaRecepcaoModal = dynamic(
@@ -75,7 +77,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { AgendamentoRow } from '../page';
+import type { AgendamentoRow, ForaDaJanela } from '../page';
 import {
   atualizarStatusAgendamento,
   atualizarAgendamento,
@@ -129,6 +131,8 @@ interface Props {
   canEdit: boolean;
   /** Auto-abre o drawer de novo agendamento (via ?novo=1 na URL) */
   autoOpenNovo?: boolean;
+  /** Agendamentos ativos além do mês exibido — null quando não há nenhum. */
+  foraDaJanela: ForaDaJanela | null;
 }
 
 export function AgendamentosClient({
@@ -142,6 +146,7 @@ export function AgendamentosClient({
   mesAtual,
   canEdit,
   autoOpenNovo = false,
+  foraDaJanela,
 }: Props) {
   const router = useRouter();
   const isSecretaria = role === 'secretaria';
@@ -901,6 +906,38 @@ export function AgendamentosClient({
           )}
         </div>
       </motion.header>
+
+      {/* ── Fora da janela ────────────────────────────────────────────────
+          A agenda mostra um mês por vez: o que cai fora fica invisível. Foi assim que um
+          retorno marcado em 28/04 pra 14/05 passou 3 meses sem ninguém ver. O toast de
+          "Marcar retorno" avisa e some — isto é o que dá descoberta depois.
+          Fica acima das views porque vale nos 3 modos, e some sozinho quando não há nada
+          fora do mês (numa clínica que só agenda pra semana que vem, ninguém vê isso). */}
+      {foraDaJanela && (
+        <motion.button
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          onClick={() => goToMonth(parseISO(`${foraDaJanela.proximoMes}-01`))}
+          className="w-full flex items-center justify-between gap-3 mb-4 px-4 py-2.5 rounded-xl border border-border bg-surface-alt/60 hover:bg-surface-alt hover:border-teal/40 transition-colors group text-left"
+        >
+          <span className="flex items-center gap-2 text-xs text-text-secondary">
+            <CalendarClock className="w-3.5 h-3.5 text-teal flex-shrink-0" />
+            <span>
+              <span className="font-bold text-text-primary">
+                {foraDaJanela.total} {foraDaJanela.total === 1 ? 'agendamento' : 'agendamentos'}
+              </span>
+              {' '}depois deste mês — o próximo em{' '}
+              <span className="font-bold text-text-primary">
+                {format(parseISO(foraDaJanela.proximaData), "d 'de' MMMM", { locale: ptBR })}
+              </span>
+            </span>
+          </span>
+          <span className="flex items-center gap-1 text-[11px] font-bold text-teal flex-shrink-0 group-hover:gap-1.5 transition-all">
+            Ver
+            <ChevronRight className="w-3.5 h-3.5" />
+          </span>
+        </motion.button>
+      )}
 
       {/* ── Views ─────────────────────────────────────────────────────── */}
       <AnimatePresence mode="wait">

@@ -97,8 +97,12 @@ const DEMO_MOCK_PROCS: PlanProc[] = [
  * Motor de planejamento por paciente (seções + procedimentos + orçamento + documentos).
  * Extraído do antigo PlanejamentoTab — agora nível paciente (modelo 1 ficha = 1 tratamento):
  * os procedimentos derivam de TODAS as fichas do paciente, sem filtro de tratamento.
+ *
+ * `dentistaId` é o AUTOR das seções criadas aqui: a seção é lida por toda a clínica,
+ * mas só o autor edita (migration 099 / spec 2026-07-16, invariante #1). Os procedimentos
+ * não precisam de autor próprio — derivam da ficha, e a autoria deles é `fichas.dentista_id`.
  */
-export function usePlanejamentoPaciente(patientId: string, clinicaId: string, patientName: string, enabled = true, fichaId?: string) {
+export function usePlanejamentoPaciente(patientId: string, clinicaId: string, patientName: string, dentistaId: string, enabled = true, fichaId?: string) {
   const [sections, setSections] = useState<PlanSection[]>([]);
   const [documents, setDocuments] = useState<PlanDocument[]>([]);
   const [budgetProcedures, setBudgetProcedures] = useState<PlanBudgetProcedure[]>([]);
@@ -228,15 +232,22 @@ export function usePlanejamentoPaciente(patientId: string, clinicaId: string, pa
       const supabase = createClient();
       const idx = sectionsRef.current.findIndex((s) => s.id === sectionId);
       if (isUUID(section.id)) {
-        await supabase.from('planejamento_secoes').upsert({
-          id: section.id, clinica_id: clinicaId, paciente_id: patientId,
+        // .select() confirma que a linha foi mesmo afetada: UPDATE barrado por RLS
+        // (seção de outro dentista) volta 0 linhas SEM erro — invariante #9.
+        const { data: updated } = await supabase.from('planejamento_secoes').upsert({
+          id: section.id, clinica_id: clinicaId, paciente_id: patientId, dentista_id: dentistaId,
           titulo: section.title, conteudo: section.content, imagem_ids: section.imageIds,
           ordem: idx, status: section.status, data_estimada: section.dataEstimada || null,
           updated_at: new Date().toISOString(),
-        });
+        }).select('id');
+        if (!updated?.length) {
+          console.error('[usePlanejamentoPaciente] saveSectionToDb: RLS recusou (seção de outro dentista?)');
+          await fetchGlobalData();
+        }
       } else {
         const { data } = await supabase.from('planejamento_secoes').insert({
-          clinica_id: clinicaId, paciente_id: patientId, titulo: section.title, conteudo: section.content,
+          clinica_id: clinicaId, paciente_id: patientId, dentista_id: dentistaId,
+          titulo: section.title, conteudo: section.content,
           imagem_ids: section.imageIds, ordem: idx, status: section.status, data_estimada: section.dataEstimada || null,
         }).select('id').single();
         if (data) {
@@ -249,7 +260,7 @@ export function usePlanejamentoPaciente(patientId: string, clinicaId: string, pa
     } finally {
       setSavingIds((prev) => { const next = new Set(prev); next.delete(sectionId); return next; });
     }
-  }, [clinicaId, patientId]);
+  }, [clinicaId, patientId, dentistaId, fetchGlobalData]);
 
   const updateSection = useCallback((id: string, field: keyof PlanSection, value: string | string[]) => {
     setSections((prev) => prev.map((s) => (s.id === id ? { ...s, [field]: value } : s)));
@@ -270,7 +281,7 @@ export function usePlanejamentoPaciente(patientId: string, clinicaId: string, pa
     const supabase = createClient();
     const newOrder = sectionsRef.current.length;
     const { data, error } = await supabase.from('planejamento_secoes').insert({
-      clinica_id: clinicaId, paciente_id: patientId, titulo: '', conteudo: '',
+      clinica_id: clinicaId, paciente_id: patientId, dentista_id: dentistaId, titulo: '', conteudo: '',
       imagem_ids: [], ordem: newOrder, status: 'pendente', data_estimada: null,
     }).select('id').single();
     if (error ?? !data) { console.error('[usePlanejamentoPaciente] addSection:', error); return; }
@@ -278,7 +289,7 @@ export function usePlanejamentoPaciente(patientId: string, clinicaId: string, pa
       id: (data as Record<string, unknown>).id as string,
       title: '', content: '', imageIds: [], status: 'pendente', dataEstimada: null,
     }]);
-  }, [clinicaId, patientId]);
+  }, [clinicaId, patientId, dentistaId]);
 
   const removeSection = useCallback(async (id: string): Promise<void> => {
     if (!window.confirm('Remover esta seção do planejamento?')) return;

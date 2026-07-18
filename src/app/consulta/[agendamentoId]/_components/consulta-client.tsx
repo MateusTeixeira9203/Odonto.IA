@@ -53,7 +53,10 @@ interface ConsultaClientProps {
   agendamentoId: string;
   clinicaId: string;
   isDemo?: boolean;
-  dentistaId?: string;
+  /** Autor do registro clínico. Obrigatório: a ficha e as seções de planejamento
+   *  nascem com este dono (migration 099). No demo é um dentista real — só o paciente
+   *  é fictício, e o hook curto-circuita antes de escrever. */
+  dentistaId: string;
   paciente: Paciente;
   hora: string;
   observacoesAgendamento: string | null;
@@ -364,7 +367,6 @@ export function ConsultaClient({
       dentes_observacoes: evolucao.dentes_observacoes,
       procedimentos:      evolucao.procedimentos,
       conduta:            evolucao.conduta,
-      retorno_sugerido:   evolucao.retorno_sugerido,
       alerta_novo:        evolucao.alerta_novo,
     });
     if (result.error) { toast.error(result.error); setIsSaving(false); return; }
@@ -741,6 +743,7 @@ export function ConsultaClient({
                       patientId={paciente.id}
                       clinicaId={clinicaId}
                       patientName={paciente.nome}
+                      dentistaId={dentistaId}
                       fichaId={savedFichaId}
                       mode="direct"
                       autoGenerate
@@ -902,17 +905,6 @@ export function ConsultaClient({
                     <p className="text-xs text-text-secondary mt-1">
                       Será registrado nas anotações da ficha. Atualize manualmente o cadastro do paciente se necessário.
                     </p>
-                  </DraftPendingCard>
-                )}
-
-                {/* Retorno sugerido */}
-                {evolucao.retorno_sugerido && (
-                  <DraftPendingCard label="Retorno sugerido">
-                    <input
-                      value={evolucao.retorno_sugerido}
-                      onChange={e => setEvolucao({ ...evolucao, retorno_sugerido: e.target.value })}
-                      className="w-full text-sm font-semibold text-text-primary bg-transparent outline-none border-b border-border focus:border-teal pb-1 transition-colors"
-                    />
                   </DraftPendingCard>
                 )}
 

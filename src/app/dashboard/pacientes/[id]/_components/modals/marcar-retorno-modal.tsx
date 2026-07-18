@@ -14,93 +14,93 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-type ConsultaForm = {
-  data: string;
-  hora: string;
-  duracao: string;
+export interface MarcarRetornoForm {
+  data: string;         // yyyy-MM-dd
+  hora: string;         // HH:mm
+  duracao: string;      // minutos
   observacoes: string;
-};
+}
 
-interface NovaConsultaModalProps {
+interface MarcarRetornoModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   pacienteNome: string;
-  consultaForm: ConsultaForm;
-  setConsultaForm: React.Dispatch<React.SetStateAction<ConsultaForm>>;
-  consultaError: string | null;
-  consultaSaving: boolean;
-  onNovaConsulta: () => void;
+  form: MarcarRetornoForm;
+  setForm: React.Dispatch<React.SetStateAction<MarcarRetornoForm>>;
+  error: string | null;
+  saving: boolean;
+  onMarcarRetorno: () => void;
 }
 
-export function NovaConsultaModal({
+export function MarcarRetornoModal({
   open,
   onOpenChange,
   pacienteNome,
-  consultaForm,
-  setConsultaForm,
-  consultaError,
-  consultaSaving,
-  onNovaConsulta,
-}: NovaConsultaModalProps) {
+  form,
+  setForm,
+  error,
+  saving,
+  onMarcarRetorno,
+}: MarcarRetornoModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md rounded-2xl bg-surface border-border">
         <DialogHeader>
           <DialogTitle className="font-heading font-semibold text-xl text-text-primary">
-            Nova Consulta
+            Marcar retorno
           </DialogTitle>
           <DialogDescription className="text-text-secondary">
-            Agende uma consulta para {pacienteNome}.
+            Agende o retorno de {pacienteNome}.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="consulta-data">Data</Label>
+              <Label htmlFor="retorno-data">Data</Label>
               <Input
-                id="consulta-data"
+                id="retorno-data"
                 type="date"
-                value={consultaForm.data}
-                onChange={(e) => setConsultaForm((f) => ({ ...f, data: e.target.value }))}
+                value={form.data}
+                onChange={(e) => setForm((f) => ({ ...f, data: e.target.value }))}
                 className="rounded-xl bg-surface-alt border-border text-text-primary"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="consulta-hora">Hora</Label>
+              <Label htmlFor="retorno-hora">Hora</Label>
               <Input
-                id="consulta-hora"
+                id="retorno-hora"
                 type="time"
-                value={consultaForm.hora}
-                onChange={(e) => setConsultaForm((f) => ({ ...f, hora: e.target.value }))}
+                value={form.hora}
+                onChange={(e) => setForm((f) => ({ ...f, hora: e.target.value }))}
                 className="rounded-xl bg-surface-alt border-border text-text-primary"
               />
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="consulta-duracao">Duração (minutos)</Label>
+            <Label htmlFor="retorno-duracao">Duração (minutos)</Label>
             <Input
-              id="consulta-duracao"
+              id="retorno-duracao"
               type="number"
               min="15"
               step="15"
-              value={consultaForm.duracao}
-              onChange={(e) => setConsultaForm((f) => ({ ...f, duracao: e.target.value }))}
+              value={form.duracao}
+              onChange={(e) => setForm((f) => ({ ...f, duracao: e.target.value }))}
               className="rounded-xl bg-surface-alt border-border text-text-primary"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="consulta-obs">Observações</Label>
+            <Label htmlFor="retorno-obs">Observações</Label>
             <Input
-              id="consulta-obs"
+              id="retorno-obs"
               placeholder="Ex: Consulta de rotina, limpeza..."
-              value={consultaForm.observacoes}
-              onChange={(e) => setConsultaForm((f) => ({ ...f, observacoes: e.target.value }))}
+              value={form.observacoes}
+              onChange={(e) => setForm((f) => ({ ...f, observacoes: e.target.value }))}
               className="rounded-xl bg-surface-alt border-border text-text-primary"
             />
           </div>
-          {consultaError && (
+          {error && (
             <p className="text-xs text-red-500 bg-red-500/10 rounded-lg px-3 py-2">
-              {consultaError}
+              {error}
             </p>
           )}
         </div>
@@ -113,14 +113,14 @@ export function NovaConsultaModal({
             Cancelar
           </Button>
           <Button
-            onClick={onNovaConsulta}
-            disabled={consultaSaving}
+            onClick={onMarcarRetorno}
+            disabled={saving}
             className="bg-teal text-white hover:bg-teal-lt rounded-xl disabled:opacity-50 flex items-center gap-2"
           >
-            {consultaSaving ? (
+            {saving ? (
               <><Loader2 className="w-4 h-4 animate-spin" /> Salvando...</>
             ) : (
-              'Agendar Consulta'
+              'Marcar retorno'
             )}
           </Button>
         </DialogFooter>

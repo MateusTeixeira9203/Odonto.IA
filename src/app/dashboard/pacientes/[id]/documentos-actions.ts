@@ -69,6 +69,7 @@ export async function emitirDocumento(params: {
   const { data: docRow, error: dbErr } = await supabase.from('paciente_documentos').insert({
     clinica_id: clinicId,
     paciente_id: params.pacienteId,
+    dentista_id: dentistaId,
     nome,
     url: storagePath,
     categoria: 'Documentos',

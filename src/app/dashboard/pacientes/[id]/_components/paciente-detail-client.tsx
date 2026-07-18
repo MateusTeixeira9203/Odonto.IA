@@ -90,7 +90,7 @@ import type { OrcamentoComItens, OrcamentoItem, Pagamento, FichaParaOrc, Procedi
 import { EditarPacienteModal } from './modals/editar-paciente-modal';
 import { DetalheOrcamentoModal } from './modals/detalhe-orcamento-modal';
 import { ConfirmarDeleteOrcModal } from './modals/confirmar-delete-orc-modal';
-import { NovaConsultaModal } from './modals/nova-consulta-modal';
+import { MarcarRetornoModal, type MarcarRetornoForm } from './modals/marcar-retorno-modal';
 import { EmitirDocumentoModal } from '@/components/pacientes/EmitirDocumentoModal';
 import { NovoOrcamentoModal } from './modals/novo-orcamento-modal';
 import { ApresentarPaciente } from '@/components/pacientes/ApresentarPaciente';
@@ -296,17 +296,17 @@ export function PacienteDetailClient({
 
   // Contato dropdown (⋯)
 
-  // Nova Consulta
-  const [isNovaConsultaOpen, setIsNovaConsultaOpen] = useState(false);
+  // Marcar retorno
+  const [isMarcarRetornoOpen, setIsMarcarRetornoOpen] = useState(false);
   const [isEmitirOpen, setIsEmitirOpen] = useState(false);
-  const [consultaForm, setConsultaForm] = useState({
+  const [retornoForm, setRetornoForm] = useState<MarcarRetornoForm>({
     data: '',
     hora: '',
     duracao: '30',
     observacoes: '',
   });
-  const [consultaSaving, setConsultaSaving] = useState(false);
-  const [consultaError, setConsultaError] = useState<string | null>(null);
+  const [retornoSaving, setRetornoSaving] = useState(false);
+  const [retornoError, setRetornoError] = useState<string | null>(null);
 
   // Atividades recentes (visão geral) — inicializado do SSR, sem roundtrip extra ao montar
   const [fichasRecentes, setFichasRecentes] = useState<FichaRecente[]>(fichasRecentesSSR ?? []);
@@ -1085,59 +1085,42 @@ export function PacienteDetailClient({
     setOrcDeleteSaving(false);
   };
 
-  // #10 — parse do prazo pt-BR ("30 dias", "1 mês", "7 dias"...) → data absoluta (yyyy-mm-dd).
-  // Não parseou → default +30 dias. Sempre sugestão; o dentista confirma o slot.
-  const calcularDataRetorno = (prazo: string | null): string => {
-    const base = new Date();
-    const p = (prazo ?? '').toLowerCase();
-    const mesMatch = p.match(/(\d+)\s*m[eê]s/);
-    const diaMatch = p.match(/(\d+)\s*dia/);
-    if (mesMatch) {
-      base.setMonth(base.getMonth() + parseInt(mesMatch[1], 10));
-    } else if (diaMatch) {
-      base.setDate(base.getDate() + parseInt(diaMatch[1], 10));
-    } else {
-      base.setDate(base.getDate() + 30);
-    }
-    // format (local) e não toISOString (UTC): à noite em BRT o UTC vira o dia
-    // seguinte e o retorno sairia com 1 dia a mais.
-    return format(base, 'yyyy-MM-dd');
-  };
-
-  // #10 — abre "Nova Consulta" pré-preenchida (paciente já conhecido + data = hoje + prazo);
-  // o dentista ajusta o horário e confirma. Reusa handleNovaConsulta → criarAgendamento.
-  const agendarRetornoParaFicha = (prazo: string | null) => {
-    setConsultaError(null);
-    setConsultaForm({ data: calcularDataRetorno(prazo), hora: '', duracao: '30', observacoes: '' });
-    setIsNovaConsultaOpen(true);
-  };
-
-  const handleNovaConsulta = async () => {
-    if (!consultaForm.data || !consultaForm.hora) {
-      setConsultaError('Informe data e hora.');
+  const handleMarcarRetorno = async () => {
+    if (!retornoForm.data || !retornoForm.hora) {
+      setRetornoError('Informe data e hora.');
       return;
     }
-    setConsultaError(null);
-    setConsultaSaving(true);
+    setRetornoError(null);
+    setRetornoSaving(true);
     // Sem offset explícito, o Postgres grava esse horário como UTC — 3h adiantado em
     // relação ao horário real da clínica (BRT). buildClinicDatetime é a mesma função
     // que o modal da própria agenda usa para não repetir esse bug.
-    const dataHora = buildClinicDatetime(consultaForm.data, consultaForm.hora);
+    const dataHora = buildClinicDatetime(retornoForm.data, retornoForm.hora);
     const result = await criarAgendamento({
       pacienteId: paciente.id,
       dataHora,
-      duracaoMinutos: parseInt(consultaForm.duracao, 10) || 30,
-      observacoes: consultaForm.observacoes || null,
+      duracaoMinutos: parseInt(retornoForm.duracao, 10) || 30,
+      observacoes: retornoForm.observacoes || null,
     });
     if (result.error) {
-      setConsultaError(result.error);
+      setRetornoError(result.error);
     } else {
-      setIsNovaConsultaOpen(false);
-      setConsultaForm({ data: '', hora: '', duracao: '30', observacoes: '' });
+      // A agenda filtra por mês e, sem ?mes= na URL, abre no corrente: um retorno marcado
+      // pra outro mês existe e não aparece. Um retorno de 30 dias cai no mês seguinte por
+      // definição — então o toast diz a data e, quando ela sai do mês, leva até lá.
+      // Ler antes de limpar o form.
+      const mes = retornoForm.data.slice(0, 7);
+      const quando = `${format(parseISO(retornoForm.data), 'dd/MM/yyyy')} às ${retornoForm.hora}`;
+      setIsMarcarRetornoOpen(false);
+      setRetornoForm({ data: '', hora: '', duracao: '30', observacoes: '' });
       setAgendamentosTabData(null); // força recarregar a aba Agenda na próxima abertura
-      toast.success('Consulta agendada.');
+      toast.success(`Retorno marcado para ${quando}`, {
+        action: mes !== format(new Date(), 'yyyy-MM')
+          ? { label: 'Ver na agenda', onClick: () => router.push(`/dashboard/agendamentos?mes=${mes}`) }
+          : undefined,
+      });
     }
-    setConsultaSaving(false);
+    setRetornoSaving(false);
   };
 
   return (
@@ -1188,6 +1171,7 @@ export function PacienteDetailClient({
                 patientId={paciente.id}
                 clinicaId={clinicaId}
                 patientName={displayNome}
+                dentistaId={dentistaId}
                 mode="picker"
                 fichas={fichasRecentes}
                 variant="header"
@@ -1195,11 +1179,11 @@ export function PacienteDetailClient({
               />
             )}
             <button
-              onClick={() => { setConsultaError(null); setIsNovaConsultaOpen(true); }}
+              onClick={() => { setRetornoError(null); setIsMarcarRetornoOpen(true); }}
               className="flex items-center gap-2 px-4 py-2.5 bg-teal text-white rounded-xl text-xs font-bold hover:bg-teal-lt transition-colors shadow-md"
             >
               <Calendar className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Nova Consulta</span>
+              <span className="hidden sm:inline">Marcar retorno</span>
             </button>
           </div>
         </div>
@@ -1463,7 +1447,6 @@ export function PacienteDetailClient({
                         patientName={displayNome}
                         canWrite={canWriteClinical}
                         onGerarOrcamento={role !== 'secretaria' ? (fichaId) => void abrirOrcamentoParaFicha(fichaId) : undefined}
-                        onAgendarRetorno={(_fichaId, prazo) => agendarRetornoParaFicha(prazo)}
                       />
                     )}
                   </TabsContent>
@@ -1623,11 +1606,11 @@ export function PacienteDetailClient({
                       Histórico de consultas
                     </span>
                     <button
-                      onClick={() => { setConsultaError(null); setIsNovaConsultaOpen(true); }}
+                      onClick={() => { setRetornoError(null); setIsMarcarRetornoOpen(true); }}
                       className="bg-teal text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 hover:bg-teal-lt transition-all shadow-md"
                     >
                       <Plus className="w-3.5 h-3.5" />
-                      Nova Consulta
+                      Marcar retorno
                     </button>
                   </div>
 
@@ -1704,7 +1687,7 @@ export function PacienteDetailClient({
                 {/* Arquivos */}
                 <TabsContent value="arquivos" className="mt-0">
                   {mountedTabs.has('arquivos') && (
-                    <DocumentosTab patientId={paciente.id} clinicaId={clinicaId} />
+                    <DocumentosTab patientId={paciente.id} clinicaId={clinicaId} dentistaId={dentistaId} />
                   )}
                 </TabsContent>
               </div>
@@ -1803,18 +1786,18 @@ export function PacienteDetailClient({
         onExcluir={handleExcluirOrc}
       />
 
-      <NovaConsultaModal
-        open={isNovaConsultaOpen}
+      <MarcarRetornoModal
+        open={isMarcarRetornoOpen}
         onOpenChange={(open) => {
-          setIsNovaConsultaOpen(open);
-          if (!open) setConsultaError(null);
+          setIsMarcarRetornoOpen(open);
+          if (!open) setRetornoError(null);
         }}
         pacienteNome={displayNome}
-        consultaForm={consultaForm}
-        setConsultaForm={setConsultaForm}
-        consultaError={consultaError}
-        consultaSaving={consultaSaving}
-        onNovaConsulta={handleNovaConsulta}
+        form={retornoForm}
+        setForm={setRetornoForm}
+        error={retornoError}
+        saving={retornoSaving}
+        onMarcarRetorno={handleMarcarRetorno}
       />
 
       <EmitirDocumentoModal

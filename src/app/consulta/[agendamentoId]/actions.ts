@@ -16,7 +16,6 @@ export async function salvarFichaConsulta(params: {
   // Novos campos opcionais:
   procedimentos?:     string[];
   conduta?:           string;
-  retorno_sugerido?:  string | null;
   alerta_novo?:       string | null;
 }): Promise<{ fichaId?: string; error?: string }> {
   const { supabase, user, clinicId, role } = await requireClinicContext();
@@ -43,7 +42,6 @@ export async function salvarFichaConsulta(params: {
     // Novos campos:
     ...(params.procedimentos !== undefined && { procedimentos: params.procedimentos }),
     ...(params.conduta !== undefined && { conduta: params.conduta }),
-    ...(params.retorno_sugerido !== undefined && { retorno_sugerido: params.retorno_sugerido }),
     ...(params.alerta_novo != null && { alerta_novo: params.alerta_novo }),
     status:              'concluida',
     origem:              'modo_consulta',

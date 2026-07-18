@@ -24,6 +24,15 @@ export type AgendamentoRow = {
   criador: { id: string; nome: string } | null;
 };
 
+/** Agendamentos ativos além do mês exibido — a agenda filtra por mês e os esconderia. */
+export type ForaDaJanela = {
+  total: number;
+  /** ISO do mais próximo. */
+  proximaData: string;
+  /** 'yyyy-MM' do mais próximo — destino do link. */
+  proximoMes: string;
+};
+
 interface PageProps {
   searchParams: Promise<{ mes?: string; novo?: string }>;
 }
@@ -60,8 +69,26 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
     query.eq('dentista_id', dentista.id);
   }
 
-  // Dados em paralelo: agendamentos + contagem de secretárias
-  const [{ data: agendamentosRaw }, { count: secretariaCount }] =
+  // Agendamentos ativos DEPOIS da janela exibida.
+  //
+  // A agenda mostra um mês por vez, então tudo que cai fora fica invisível — foi assim que um
+  // retorno marcado em 28/04 para 14/05 passou 3 meses sem ninguém ver. O toast de "Marcar
+  // retorno" avisa no instante da criação e some; isto é o que dá DESCOBERTA depois, e importa
+  // mais do que parece: retorno de 30 dias cai no mês seguinte por definição.
+  const proximosQuery = supabase
+    .from('agendamentos')
+    .select('data_hora')
+    .eq('clinica_id', dentista.clinica_id)
+    .in('status', ['scheduled', 'confirmed'])
+    .gt('data_hora', fimMes)
+    .order('data_hora', { ascending: true });
+
+  if (!isSecretaria) {
+    proximosQuery.eq('dentista_id', dentista.id);
+  }
+
+  // Dados em paralelo: agendamentos + contagem de secretárias + o que está fora da janela
+  const [{ data: agendamentosRaw }, { count: secretariaCount }, { data: proximosRaw }] =
     await Promise.all([
       query,
       supabase
@@ -70,9 +97,20 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
         .eq('clinica_id', dentista.clinica_id)
         .eq('role', 'secretaria')
         .eq('ativo', true),
+      proximosQuery,
     ]);
 
   const temSecretaria = (secretariaCount ?? 0) > 0;
+
+  const proximos = proximosRaw ?? [];
+  const foraDaJanela: ForaDaJanela | null =
+    proximos.length > 0
+      ? {
+          total: proximos.length,
+          proximaData: proximos[0].data_hora as string,
+          proximoMes: format(parseISO(proximos[0].data_hora as string), 'yyyy-MM'),
+        }
+      : null;
 
   // Lista de dentistas + mapa de GCal conectado (apenas para secretária)
   let dentistasClinica: { id: string; nome: string }[] = [];
@@ -110,6 +148,7 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
         mesAtual={mesAtual}
         canEdit={canEdit}
         autoOpenNovo={novo === '1'}
+        foraDaJanela={foraDaJanela}
       />
     </PageTransition>
   );

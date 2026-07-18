@@ -9,7 +9,7 @@ interface Props {
 
 export default async function ConsultaPage({ params }: Props) {
   const { agendamentoId } = await params;
-  const { supabase, clinicId } = await requireClinicContext();
+  const { supabase, clinicId, dentistaId } = await requireClinicContext();
   const dentista = await getDentistaCached();
 
   // Secretária não atende — Modo Consulta é só pra quem tem CRO
@@ -127,6 +127,7 @@ export default async function ConsultaPage({ params }: Props) {
     <ConsultaClient
       agendamentoId={agendamentoId}
       clinicaId={clinicId}
+      dentistaId={dentistaId}
       dentistaFoco={dentista?.foco_principal ?? null}
       paciente={{ ...paciente, idadeStr }}
       hora={hora}

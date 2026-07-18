@@ -76,9 +76,11 @@ const getCategoryFromFile = (file: File): Document['category'] => {
 interface DocumentosTabProps {
   patientId: string;
   clinicaId: string;
+  /** Autor do upload. O documento é lido pela clínica, mas só o autor edita/apaga (migration 099). */
+  dentistaId: string;
 }
 
-export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
+export function DocumentosTab({ patientId, clinicaId, dentistaId }: DocumentosTabProps) {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterMonth, setFilterMonth] = useState('');
@@ -209,6 +211,7 @@ export function DocumentosTab({ patientId, clinicaId }: DocumentosTabProps) {
           .insert({
             paciente_id: patientId,
             clinica_id: clinicaId,
+            dentista_id: dentistaId,
             nome: file.name,
             url: storagePath,
             categoria: getCategoryFromFile(file),

@@ -72,25 +72,56 @@ export async function tornarPrincipal(
   tratamentoId: string,
   pacienteId: string
 ): Promise<{ error?: string }> {
-  const { supabase, clinicId, role } = await requireClinicContext();
+  const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
   if (role === "secretaria") return { error: "Sem permissão" };
 
-  // Coloca o principal atual em pausa
-  await supabase
+  // Trocar o principal mexe em DUAS linhas: rebaixa o atual e promove o alvo. A leitura é
+  // clínica (todo dentista vê), mas a escrita é do autor (migration 099) — só o dono rebaixa
+  // ou promove o próprio tratamento. Se o principal atual for de OUTRO dentista, a RLS barra o
+  // rebaixamento em SILÊNCIO (0 linhas, sem erro) e a promoção criaria um segundo principal.
+  // Por isso validamos a autoria das duas pontas ANTES de escrever e abortamos limpo — nunca
+  // deixando o paciente com dois principais.
+  const { data: tratsRaw, error: errLer } = await supabase
     .from("tratamentos")
-    .update({ status: "pendente" })
+    .select("id, dentista_id, status")
     .eq("clinica_id", clinicId)
-    .eq("paciente_id", pacienteId)
-    .eq("status", "principal");
+    .eq("paciente_id", pacienteId);
+  if (errLer) return { error: errLer.message };
 
-  // Promove o selecionado a principal
-  const { error } = await supabase
+  const trats = (tratsRaw ?? []) as Array<{ id: string; dentista_id: string | null; status: string }>;
+
+  const alvo = trats.find((t) => t.id === tratamentoId);
+  if (!alvo) return { error: "Tratamento não encontrado." };
+  if (alvo.dentista_id !== dentistaId) {
+    return { error: "Só o dentista dono do tratamento pode torná-lo principal." };
+  }
+
+  const outrosPrincipais = trats.filter((t) => t.status === "principal" && t.id !== tratamentoId);
+  if (outrosPrincipais.some((t) => t.dentista_id !== dentistaId)) {
+    return { error: "O tratamento principal atual é de outro dentista — peça a ele para pausá-lo antes." };
+  }
+
+  // Todos os outros principais são meus → a troca é segura e a RLS deixa passar. Rebaixa todos
+  // de uma vez (defende contra o estado corrompido de >1 principal que este bug podia criar).
+  if (outrosPrincipais.length > 0) {
+    const { error: errRebaixar } = await supabase
+      .from("tratamentos")
+      .update({ status: "pendente" })
+      .in("id", outrosPrincipais.map((t) => t.id))
+      .eq("clinica_id", clinicId);
+    if (errRebaixar) return { error: errRebaixar.message };
+  }
+
+  // .select() confirma que a promoção pegou (autoria já checada, mas fecha contra corrida).
+  const { data: promovido, error: errPromover } = await supabase
     .from("tratamentos")
     .update({ status: "principal" })
     .eq("id", tratamentoId)
-    .eq("clinica_id", clinicId);
+    .eq("clinica_id", clinicId)
+    .select("id");
+  if (errPromover) return { error: errPromover.message };
+  if (!promovido?.length) return { error: "Não foi possível tornar principal. Tente novamente." };
 
-  if (error) return { error: error.message };
   revalidatePath(`/dashboard/pacientes/${pacienteId}`);
   return {};
 }
@@ -104,7 +135,7 @@ export async function criarTratamento(
   nome: string | null,
   fichaIds: string[]
 ): Promise<{ id?: string; error?: string }> {
-  const { supabase, clinicId, role } = await requireClinicContext();
+  const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
 
   if (role === "secretaria") return { error: "Sem permissão para criar tratamentos" };
 
@@ -120,12 +151,15 @@ export async function criarTratamento(
   // Se há um principal, o novo entra como 'pendente'; caso contrário, já nasce como 'principal'
   const novoStatus = existente ? "pendente" : "principal";
 
-  // Cria o tratamento
+  // Cria o tratamento. dentista_id = dono do CONTAINER: só ele renomeia/encerra.
+  // O tratamento em si é compartilhado — qualquer dentista da clínica lê e anexa
+  // a própria ficha nele (migration 099, spec 2026-07-16 §3).
   const { data: novo, error: errInsert } = await supabase
     .from("tratamentos")
     .insert({
       clinica_id: clinicId,
       paciente_id: pacienteId,
+      dentista_id: dentistaId,
       nome: nome?.trim() || null,
       status: novoStatus,
     })

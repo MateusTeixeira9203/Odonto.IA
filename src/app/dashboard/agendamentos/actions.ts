@@ -54,14 +54,35 @@ export async function criarAgendamento(dados: {
   const novoFimMs = novoInicioMs + dados.duracaoMinutos * 60_000;
   const dateOnly = dados.dataHora.split('T')[0];
 
-  const { data: agendamentosNoDia } = await supabase
-    .from('agendamentos')
-    .select('data_hora, duracao_minutos')
-    .eq('dentista_id', dentistaAlvo)
-    .eq('clinica_id', clinicId)
-    .in('status', ['scheduled', 'confirmed', 'checked_in', 'in_progress', 'completed'])
-    .gte('data_hora', `${dateOnly}T00:00:00.000Z`)
-    .lt('data_hora', `${dateOnly}T23:59:59.999Z`);
+  // Duas checagens independentes, em paralelo:
+  //  1. Agenda do DENTISTA-alvo — visível pra este client (é a dele, ou ele é secretária).
+  //  2. Agenda do PACIENTE — invisível: o paciente virou da clínica (migration 099), então
+  //     outro dentista pode tê-lo agendado, e a RLS da agenda continua silo estrito. Por isso
+  //     RPC SECURITY DEFINER: devolve só boolean, nunca com quem nem o quê (invariante #3).
+  const [{ data: agendamentosNoDia }, { data: pacienteOcupado, error: conflitoErr }] = await Promise.all([
+    supabase
+      .from('agendamentos')
+      .select('data_hora, duracao_minutos')
+      .eq('dentista_id', dentistaAlvo)
+      .eq('clinica_id', clinicId)
+      .in('status', ['scheduled', 'confirmed', 'checked_in', 'in_progress', 'completed'])
+      .gte('data_hora', `${dateOnly}T00:00:00.000Z`)
+      .lt('data_hora', `${dateOnly}T23:59:59.999Z`),
+    supabase.rpc('paciente_tem_conflito_agenda', {
+      p_paciente_id: dados.pacienteId,
+      p_inicio: dados.dataHora,
+      p_duracao_min: dados.duracaoMinutos,
+    }),
+  ]);
+
+  // FALHA FECHADO. Sem isto, um erro na RPC deixa pacienteOcupado = null, o `=== true` dá
+  // false, e o agendamento nasce SEM checagem nenhuma — em silêncio. Numa trava que não tem
+  // override, agendar às cegas é pior do que recusar: o paciente apareceria em dois
+  // consultórios no mesmo horário e ninguém saberia até ele chegar.
+  if (conflitoErr) {
+    console.error('[criarAgendamento] paciente_tem_conflito_agenda falhou:', conflitoErr.message);
+    return { error: 'Não foi possível verificar a agenda do paciente. Tente novamente.' };
+  }
 
   for (const ag of agendamentosNoDia ?? []) {
     const agInicioMs = new Date(ag.data_hora).getTime();
@@ -69,6 +90,11 @@ export async function criarAgendamento(dados: {
     if (agInicioMs < novoFimMs && agFimMs > novoInicioMs) {
       return { error: 'Este horário conflita com outro agendamento existente. Escolha outro horário.' };
     }
+  }
+
+  // Sem override: dois dentistas não atendem o mesmo paciente ao mesmo tempo.
+  if (pacienteOcupado === true) {
+    return { error: 'Este paciente já tem um horário nesse intervalo.' };
   }
 
   const { data, error } = await supabase
@@ -199,6 +225,39 @@ export async function atualizarAgendamento(
   }
 ): Promise<{ error?: string }> {
   const { supabase, clinicId } = await requireClinicContext();
+
+  // Reagendar não pode ser a porta dos fundos da invariante do criar: com o paciente
+  // aberto pra clínica (migration 099), mover um agendamento pode colidir com o de outro
+  // dentista — que este client não enxerga. Só revalida quando algo que afeta o intervalo
+  // muda; chamada que só mexe no status não paga a query.
+  if (dados.dataHora || dados.pacienteId || dados.duracaoMinutos) {
+    const { data: atual } = await supabase
+      .from("agendamentos")
+      .select("paciente_id, data_hora, duracao_minutos")
+      .eq("id", id)
+      .eq("clinica_id", clinicId)
+      .maybeSingle<{ paciente_id: string; data_hora: string; duracao_minutos: number }>();
+
+    if (!atual) return { error: "Agendamento não encontrado." };
+
+    const { data: pacienteOcupado, error: conflitoErr } = await supabase.rpc('paciente_tem_conflito_agenda', {
+      p_paciente_id: dados.pacienteId ?? atual.paciente_id,
+      p_inicio:      dados.dataHora ?? atual.data_hora,
+      p_duracao_min: dados.duracaoMinutos ?? atual.duracao_minutos,
+      p_ignorar_id:  id, // não conflita consigo mesmo
+    });
+
+    // Falha fechado — ver criarAgendamento. Reagendar às cegas tem o mesmo estrago que
+    // agendar às cegas: dois dentistas com o mesmo paciente no mesmo horário.
+    if (conflitoErr) {
+      console.error('[atualizarAgendamento] paciente_tem_conflito_agenda falhou:', conflitoErr.message);
+      return { error: 'Não foi possível verificar a agenda do paciente. Tente novamente.' };
+    }
+
+    if (pacienteOcupado === true) {
+      return { error: 'Este paciente já tem um horário nesse intervalo.' };
+    }
+  }
 
   const { error } = await supabase
     .from("agendamentos")
@@ -497,14 +556,36 @@ export async function criarEncaixe(dados: {
   const novoEnd = novoStart + dados.duracaoMinutos * 60_000;
   const dateOnly = dados.dataHora.split('T')[0];
 
-  const { data: existing } = await supabase
-    .from('agendamentos')
-    .select('data_hora, duracao_minutos')
-    .eq('dentista_id', dentistaAlvo)
-    .eq('clinica_id', clinicId)
-    .in('status', ['scheduled', 'confirmed', 'checked_in', 'in_progress'])
-    .gte('data_hora', `${dateOnly}T00:00:00.000Z`)
-    .lt('data_hora', `${dateOnly}T23:59:59.999Z`);
+  const [{ data: existing }, { data: pacienteOcupado, error: conflitoErr }] = await Promise.all([
+    supabase
+      .from('agendamentos')
+      .select('data_hora, duracao_minutos')
+      .eq('dentista_id', dentistaAlvo)
+      .eq('clinica_id', clinicId)
+      .in('status', ['scheduled', 'confirmed', 'checked_in', 'in_progress'])
+      .gte('data_hora', `${dateOnly}T00:00:00.000Z`)
+      .lt('data_hora', `${dateOnly}T23:59:59.999Z`),
+    supabase.rpc('paciente_tem_conflito_agenda', {
+      p_paciente_id: dados.pacienteId,
+      p_inicio: dados.dataHora,
+      p_duracao_min: dados.duracaoMinutos,
+    }),
+  ]);
+
+  // Falha fechado — ver criarAgendamento. Aqui é ainda mais importante: o encaixe TEM um
+  // override (`forcarEncaixe`), e o conflito de paciente é justamente o que ele NÃO pode
+  // furar. Deixar a checagem sumir em silêncio transformaria o encaixe na porta dos fundos.
+  if (conflitoErr) {
+    console.error('[criarEncaixe] paciente_tem_conflito_agenda falhou:', conflitoErr.message);
+    return { error: 'Não foi possível verificar a agenda do paciente. Tente novamente.' };
+  }
+
+  // Conflito do PACIENTE é intransponível — checado ANTES do forcarEncaixe de propósito.
+  // "Encaixar" resolve agenda cheia do dentista (ele decide se dá conta); não resolve o
+  // paciente estar fisicamente na cadeira de outro dentista. Sem override (spec §5.1).
+  if (pacienteOcupado === true) {
+    return { error: 'Este paciente já tem um horário nesse intervalo.' };
+  }
 
   const temConflito = (existing ?? []).some(a => {
     const aStart = new Date(a.data_hora).getTime();
