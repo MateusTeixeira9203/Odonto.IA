@@ -35,6 +35,25 @@ function procIsAchado(proc, achadoTerm) {
   return first === norm(achadoTerm);
 }
 
+// ── Comparadores de odontograma_eventos (§7 v3) ──
+/** faces do evento (ancora.faces) casam com as esperadas, ignorando ordem. */
+function facesMatch(ev, expFaces) {
+  if (!expFaces) return true;
+  const got = (ev?.ancora?.faces ?? []).map(String).sort();
+  const want = expFaces.map(String).sort();
+  return got.length === want.length && got.every((f, i) => f === want[i]);
+}
+/** Um evento casa a espera por tipo (+status/dente/faces quando declarados). */
+function eventoMatch(ev, exp) {
+  if (!ev || norm(ev.tipo) !== norm(exp.tipo)) return false;
+  if (exp.status && norm(ev.status) !== norm(exp.status)) return false;
+  if (exp.dente != null && Number(ev?.ancora?.dente) !== Number(exp.dente)) return false;
+  return facesMatch(ev, exp.faces);
+}
+function descEvento(exp) {
+  return `{tipo:${exp.tipo}, status:${exp.status ?? '*'}, dente:${exp.dente ?? '*'}${exp.faces ? ', faces:' + exp.faces.join('') : ''}}`;
+}
+
 async function login(page) {
   await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
   await page.fill('input[type="email"]', DENTIST.email);
@@ -43,13 +62,13 @@ async function login(page) {
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
 }
 
-async function chamar(ctx, texto) {
+async function chamar(ctx, texto, modo) {
   for (let tentativa = 0; tentativa < 2; tentativa++) {
     let res;
     try {
       // 45s > teto de 30s da rota: capturamos o 500 da rota em vez de estourar antes dela.
       res = await ctx.request.post(`${BASE}/api/dex/formatar-evolucao`, {
-        data: { texto },
+        data: modo ? { texto, modo } : { texto },
         timeout: 45000,
       });
     } catch (err) {
@@ -117,6 +136,31 @@ function avaliar(resp, espera) {
     const ofensor = (resp.procedimentos ?? []).find((p) => norm(p).startsWith(norm(prefixo)));
     if (ofensor) falhas.push(`procedimentos contém item de coordenação "${ofensor}" (prefixo proibido: "${prefixo}")`);
   }
+
+  // ── Odontograma v3 (§7 da spec spec-modo-consulta-v3-odontograma) ──
+  const eventos = Array.isArray(resp.odontograma_eventos) ? resp.odontograma_eventos : [];
+  for (const exp of espera.odontograma_eventos_contem ?? []) {
+    if (!eventos.some((ev) => eventoMatch(ev, exp))) falhas.push(`odontograma_eventos não contém ${descEvento(exp)}`);
+  }
+  for (const exp of espera.odontograma_eventos_nao_contem ?? []) {
+    if (eventos.some((ev) => eventoMatch(ev, exp))) falhas.push(`odontograma_eventos NÃO deveria conter ${descEvento(exp)}`);
+  }
+  // grupo_consistente: todos os dentes desse tipo devem cair sob UM único grupo_id (Fatia B).
+  for (const g of espera.grupo_consistente ?? []) {
+    const evs = eventos.filter((ev) => norm(ev.tipo) === norm(g.tipo) && g.dentes.includes(Number(ev?.ancora?.dente)));
+    const ids = new Set(evs.map((ev) => ev.grupo_id).filter(Boolean));
+    if (evs.length < g.dentes.length || ids.size !== 1) falhas.push(`grupo_consistente falhou p/ ${g.tipo} [${g.dentes.join(',')}] (grupos distintos: ${ids.size})`);
+  }
+  if (espera.orto_manutencao_nao_null && !(resp.orto_manutencao && typeof resp.orto_manutencao === 'object')) {
+    falhas.push('orto_manutencao veio null (esperado preenchido)');
+  }
+  if (espera.odontograma_eventos_vazio && eventos.length > 0) {
+    falhas.push(`odontograma_eventos deveria ser [] (veio ${eventos.length})`);
+  }
+  if (espera.origem_todos) {
+    const off = eventos.filter((ev) => ev.origem !== espera.origem_todos);
+    if (off.length) falhas.push(`${off.length} evento(s) com origem != "${espera.origem_todos}"`);
+  }
   return { falhas, orphans, alucinacoes };
 }
 
@@ -130,10 +174,11 @@ async function main() {
   const resultado = { tag: TAG, base: BASE, quando: new Date().toISOString(), casos: [] };
 
   for (const caso of casos) {
+    if (caso.skip) { console.log(`\n[SKIP] ${caso.id}  (${caso.skip})`); continue; }
     const rodadas = [];
     for (let i = 0; i < RUNS_PER_CASE; i++) {
       const t0 = Date.now();
-      const r = await chamar(ctx, caso.texto);
+      const r = await chamar(ctx, caso.texto, caso.modo);
       const latMs = Date.now() - t0;
       if (r.erro) {
         rodadas.push({ erro: r.erro, latMs });

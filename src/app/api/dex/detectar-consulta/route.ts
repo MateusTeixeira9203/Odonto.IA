@@ -20,6 +20,7 @@ import { isArch } from '@/lib/arcadas';
 export interface ProcedimentoDetectado {
   descricao: string;
   dentes: number[];
+  status: 'indicado' | 'realizado';   // NOVO (§3.2) — dirige a cor do chip (coral/teal) ao vivo
 }
 
 const DETECCAO_SCHEMA: Schema = {
@@ -30,10 +31,11 @@ const DETECCAO_SCHEMA: Schema = {
       type: Type.ARRAY,
       items: {
         type: Type.OBJECT,
-        required: ['descricao', 'dentes'],
+        required: ['descricao', 'dentes', 'status'],
         properties: {
           descricao: { type: Type.STRING },
           dentes:    { type: Type.ARRAY, items: { type: Type.INTEGER } },
+          status:    { type: Type.STRING, enum: ['indicado', 'realizado'] },
         },
       },
     },
@@ -81,6 +83,7 @@ Liste TODOS os procedimentos mencionados até aqui — realizados, indicados/pla
 
 Regras:
 - descricao: nome clínico curto do procedimento (ex: "Tratamento endodôntico", "Exodontia simples").
+- status: "realizado" se o dentista falou no passado / que já fez; "indicado" se é a fazer, planejado, ou apenas o achado (intervenção ainda não feita). Na dúvida, "indicado".
 - ACHADO ≠ procedimento: cárie/pulpite/fratura são achados — liste a intervenção correspondente (cárie → Restauração), nunca o achado.
 - Arcada/boca inteira: use sentinelas em dentes (99 boca toda, 97 arcada superior, 98 arcada inferior). Não liste dentes individuais nesses casos.
 - Nota de planejamento/coordenação (preparo, encaminhamento, avaliação futura, sem intervenção executável): descricao prefixada com "Planejamento: ".
@@ -97,11 +100,12 @@ Regras:
 
     const procedimentos = (Array.isArray(result.data.procedimentos) ? result.data.procedimentos : [])
       .filter((p): p is ProcedimentoDetectado => !!p && typeof p.descricao === 'string' && !!p.descricao.trim())
-      .map((p) => ({
+      .map((p): ProcedimentoDetectado => ({
         descricao: p.descricao.trim(),
         dentes: (Array.isArray(p.dentes) ? p.dentes : [])
           .map(Number)
           .filter((d) => !isNaN(d) && (isValidFDI(d) || isArch(d))),
+        status: p.status === 'realizado' ? 'realizado' : 'indicado', // default seguro: a fazer
       }));
 
     logAICall({

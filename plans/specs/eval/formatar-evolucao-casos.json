@@ -117,6 +117,105 @@
         "procedimentos_nao_contem_prefixo": ["planejamento"],
         "retorno_sugerido_nao_null": true
       }
+    },
+    {
+      "id": "mod-multiface-36",
+      "provenance": "construido",
+      "_v3": "odontograma: restauração multi-face é UM evento com faces MOD, não vários (§3.1.2 regra 2)",
+      "texto": "Restaurei o trinta e seis com resina, cavidade MOD — mésio-ocluso-distal, tudo num bloco só.",
+      "espera": {
+        "dentes_afetados_contem": [36],
+        "dentes_permitidos": [36],
+        "odontograma_eventos_contem": [{ "tipo": "carie_restauracao", "status": "realizado", "dente": 36, "faces": ["M", "O", "D"] }]
+      }
+    },
+    {
+      "id": "exame-inicial-preexistentes",
+      "provenance": "construido",
+      "modo": "exame_inicial",
+      "_v3": "modo exame_inicial força origem=preexistente em TODOS os eventos (§3.1.3)",
+      "texto": "Avaliação inicial do paciente novo. Ele já chega com uma coroa no vinte e seis, um implante no quarenta e seis, e uma restauração antiga de amálgama na oclusal do quatorze.",
+      "espera": {
+        "dentes_permitidos": [26, 46, 14],
+        "origem_todos": "preexistente",
+        "odontograma_eventos_contem": [
+          { "tipo": "coroa", "dente": 26 },
+          { "tipo": "implante", "dente": 46 },
+          { "tipo": "carie_restauracao", "dente": 14, "faces": ["O"] }
+        ]
+      }
+    },
+    {
+      "id": "orto-manutencao-arcada",
+      "provenance": "construido",
+      "_v3": "manutenção de aparelho preenche orto_manutencao e NÃO pinta odontograma (§1.5)",
+      "texto": "Manutenção do aparelho fixo dela hoje: troquei o arco superior, ativei e troquei as borrachinhas. Só isso.",
+      "espera": {
+        "orto_manutencao_nao_null": true,
+        "odontograma_eventos_vazio": true
+      }
+    },
+    {
+      "id": "deciduo-restauracao-74",
+      "provenance": "construido",
+      "_v3": "decíduo usa o MESMO catálogo, ancorado em número decíduo",
+      "texto": "Restaurei o setenta e quatro com ionômero de vidro hoje, cárie oclusal na Alice.",
+      "espera": {
+        "dentes_afetados_contem": [74],
+        "dentes_permitidos": [74],
+        "procedimentos_nao_contem_achado": ["cárie"],
+        "odontograma_eventos_contem": [{ "tipo": "carie_restauracao", "status": "realizado", "dente": 74 }]
+      }
+    },
+    {
+      "id": "negacao-canal-so-curativo",
+      "provenance": "construido",
+      "_v3": "negação nunca vira evento 'realizado' pro que foi negado (§3.1.2 regra 5)",
+      "texto": "No quarenta e seis eu não fiz o canal hoje, só abri e coloquei o curativo de demora com hidróxido de cálcio. O canal fica pra próxima sessão.",
+      "espera": {
+        "dentes_afetados_contem": [46],
+        "dentes_permitidos": [46],
+        "odontograma_eventos_nao_contem": [{ "tipo": "endodontia", "status": "realizado" }]
+      }
+    },
+    {
+      "id": "fratura-trauma-11",
+      "provenance": "construido",
+      "_v3": "trauma gera 'fratura' (achado, indicado), não uma restauração fantasma realizada (§7)",
+      "texto": "O paciente caiu de bicicleta e fraturou o onze, fratura coronária de esmalte e dentina. Vou avaliar a conduta na próxima.",
+      "espera": {
+        "dentes_afetados_contem": [11],
+        "dentes_permitidos": [11],
+        "procedimentos_nao_contem_achado": ["fratura"],
+        "odontograma_eventos_contem": [{ "tipo": "fratura", "dente": 11 }],
+        "odontograma_eventos_nao_contem": [{ "tipo": "carie_restauracao", "status": "realizado", "dente": 11 }]
+      }
+    },
+    {
+      "id": "pino-nucleo-13",
+      "provenance": "construido",
+      "_v3": "pino/núcleo intrarradicular — tipo aprovado 16/07, ancora em dente (raiz)",
+      "texto": "Cimentei o pino de fibra de vidro no treze e reconstruí o núcleo, o dente já tinha o canal tratado. Fica pronto pra coroa.",
+      "espera": {
+        "dentes_afetados_contem": [13],
+        "dentes_permitidos": [13],
+        "odontograma_eventos_contem": [{ "tipo": "pino_nucleo", "status": "realizado", "dente": 13 }]
+      }
+    },
+    {
+      "id": "ponte-13-15",
+      "provenance": "construido",
+      "skip": "Fatia B — 'ponte' só entra no enum quando a UI desenha o bracket (invariante #11)",
+      "texto": "Fiz o preparo pra uma ponte fixa do treze ao quinze, pilares no treze e no quinze, pôntico no quatorze que ela não tem.",
+      "espera": {
+        "dentes_permitidos": [13, 14, 15],
+        "grupo_consistente": [{ "tipo": "ponte", "dentes": [13, 14, 15] }],
+        "odontograma_eventos_contem": [
+          { "tipo": "ponte", "dente": 13 },
+          { "tipo": "ponte", "dente": 14 },
+          { "tipo": "ponte", "dente": 15 }
+        ]
+      }
     }
   ]
 }

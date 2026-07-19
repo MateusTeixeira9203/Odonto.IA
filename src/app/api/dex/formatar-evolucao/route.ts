@@ -6,16 +6,29 @@ import { generateStructuredGemini } from '@/lib/ai/provider';
 import { logAICall } from '@/lib/ai/logger';
 import { buildDentalContext } from '@/lib/odonto-dictionary';
 import { isArch } from '@/lib/arcadas';
+import type {
+  OdontogramaEventoInput,
+  TipoRegistroOdontograma,
+  StatusRegistro,
+  NivelAncora,
+  FaceDental,
+  Arcada,
+  QuadranteFDI,
+  AncoraClinica,
+  OrtoManutencaoInfo,
+} from '@/types/odontograma';
 
 export interface EvolucaoFormatada {
   queixa_principal:    string;
   anotacoes:           string;
   dentes_afetados:     number[];
   dentes_observacoes:  Record<string, string>;
-  // Campos novos:
   procedimentos:       string[];
   conduta:             string;
   alerta_novo:         string | null;
+  // Camada visual v3 (odontograma) — aditiva. Contrato v2 acima permanece intacto.
+  odontograma_eventos: OdontogramaEventoInput[];
+  orto_manutencao:     OrtoManutencaoInfo | null;
 }
 
 // Formato que o MODELO devolve (spec fase1-5 §C2): schema estrito não aceita chaves
@@ -29,12 +42,58 @@ interface EvolucaoWire {
   procedimentos:       string[];
   conduta:             string;
   alerta_novo:         string | null;
+  odontograma_eventos: OdontogramaEventoWire[];
+  orto_manutencao:     OrtoManutencaoWire | null;
 }
 
+/** Evento como o modelo emite: origem e papel_no_grupo NÃO vêm do modelo (a rota decide). */
+interface OdontogramaEventoWire {
+  tipo:       string;
+  status:     string;
+  nivel:      string;
+  arcada?:    string | null;
+  quadrante?: number | null;
+  dente?:     number | null;
+  faces:      string[];
+  grupo_id?:  string | null;
+  observacao: string;
+}
+
+interface OrtoManutencaoWire {
+  arcada:                string;
+  fio?:                  string | null;
+  ativacao?:             string | null;
+  elastico_corrente?:    string | null;
+  elastico_intermaxilar?: string | null;
+}
+
+// Fatia A: 'ponte' e 'esfoliacao' NÃO entram no enum do modelo (só na Fatia B, quando a
+// UI sabe renderizá-los — invariante #11). 'fratura'/'pino_nucleo' entram na A.
+const ODONTOGRAMA_EVENTO_SCHEMA: Schema = {
+  type: Type.OBJECT,
+  required: ['tipo', 'status', 'nivel', 'faces', 'observacao'],
+  properties: {
+    tipo: {
+      type: Type.STRING,
+      enum: ['carie_restauracao', 'exodontia', 'endodontia', 'lesao_periapical',
+             'implante', 'coroa', 'selante', 'inclusao', 'fratura', 'pino_nucleo'],
+    },
+    status:    { type: Type.STRING, enum: ['indicado', 'realizado'] },
+    nivel:     { type: Type.STRING, enum: ['arcada', 'quadrante', 'dente', 'face'] },
+    arcada:    { type: Type.STRING, enum: ['superior', 'inferior'], nullable: true },
+    quadrante: { type: Type.INTEGER, nullable: true },
+    dente:     { type: Type.INTEGER, nullable: true },
+    faces:     { type: Type.ARRAY, items: { type: Type.STRING, enum: ['O', 'M', 'D', 'V', 'L'] } },
+    grupo_id:  { type: Type.STRING, nullable: true },
+    observacao: { type: Type.STRING },
+  },
+};
+
 // Schema imposto pela API do Gemini — validado no bake-off 13/07 (plans/specs/eval/).
+// v3: ganha odontograma_eventos + orto_manutencao. Nenhum campo v2 muda de tipo/obrigatoriedade.
 const EVOLUCAO_SCHEMA: Schema = {
   type: Type.OBJECT,
-  required: ['queixa_principal', 'anotacoes', 'dentes_afetados', 'dentes_observacoes', 'procedimentos', 'conduta'],
+  required: ['queixa_principal', 'anotacoes', 'dentes_afetados', 'dentes_observacoes', 'procedimentos', 'conduta', 'odontograma_eventos'],
   properties: {
     queixa_principal: { type: Type.STRING },
     anotacoes:        { type: Type.STRING },
@@ -53,8 +112,110 @@ const EVOLUCAO_SCHEMA: Schema = {
     procedimentos:    { type: Type.ARRAY, items: { type: Type.STRING } },
     conduta:          { type: Type.STRING },
     alerta_novo:      { type: Type.STRING, nullable: true },
+    odontograma_eventos: { type: Type.ARRAY, items: ODONTOGRAMA_EVENTO_SCHEMA },
+    orto_manutencao: {
+      type: Type.OBJECT,
+      nullable: true,
+      properties: {
+        arcada:                { type: Type.STRING, enum: ['superior', 'inferior', 'ambas'] },
+        fio:                   { type: Type.STRING, nullable: true },
+        ativacao:              { type: Type.STRING, nullable: true },
+        elastico_corrente:     { type: Type.STRING, nullable: true },
+        elastico_intermaxilar: { type: Type.STRING, nullable: true },
+      },
+    },
   },
 };
+
+// FDI estrito: permanentes q1–4 dentes 1–8; decíduos q5–8 dentes 1–5.
+const isValidFDI = (d: number): boolean => {
+  const q = Math.floor(d / 10);
+  const t = d % 10;
+  if (q >= 1 && q <= 4) return t >= 1 && t <= 8;
+  if (q >= 5 && q <= 8) return t >= 1 && t <= 5;
+  return false;
+};
+
+const TIPOS_FATIA_A = new Set<TipoRegistroOdontograma>([
+  'carie_restauracao', 'exodontia', 'endodontia', 'lesao_periapical',
+  'implante', 'coroa', 'selante', 'inclusao', 'fratura', 'pino_nucleo',
+]);
+const FACES_VALIDAS = new Set<FaceDental>(['O', 'M', 'D', 'V', 'L']);
+
+/**
+ * Pós-processamento dos eventos (§3.1.4): filtra enum, valida FDI, garante coerência de
+ * âncora (mesma regra da constraint SQL — invariante #8), resolve tag curta de grupo_id
+ * para uuid, e força origem='preexistente' quando modo='exame_inicial' (§3.1.3).
+ * Evento malformado é DESCARTADO — nunca derruba a resposta (os campos v2 seguem válidos).
+ */
+function parseEventos(wire: unknown, modo: 'consulta' | 'exame_inicial'): OdontogramaEventoInput[] {
+  if (!Array.isArray(wire)) return [];
+  const origem = modo === 'exame_inicial' ? 'preexistente' : 'clinica';
+  const grupoMap = new Map<string, string>(); // tag curta do modelo ("g1") -> uuid real
+  const out: OdontogramaEventoInput[] = [];
+
+  for (const raw of wire) {
+    if (!raw || typeof raw !== 'object') continue;
+    const w = raw as OdontogramaEventoWire;
+
+    if (!TIPOS_FATIA_A.has(w.tipo as TipoRegistroOdontograma)) continue;
+    if (w.status !== 'indicado' && w.status !== 'realizado') continue;
+    if (!['arcada', 'quadrante', 'dente', 'face'].includes(w.nivel)) continue;
+
+    const nivel = w.nivel as NivelAncora;
+    const dente = w.dente != null ? Number(w.dente) : undefined;
+    const faces = (Array.isArray(w.faces) ? w.faces : []).filter((f): f is FaceDental => FACES_VALIDAS.has(f as FaceDental));
+
+    // Coerência de âncora — espelha odontograma_eventos_ancora_valida (constraint SQL).
+    const ancora: AncoraClinica = { nivel };
+    if (nivel === 'arcada') {
+      if (w.arcada !== 'superior' && w.arcada !== 'inferior') continue;
+      ancora.arcada = w.arcada as Arcada;
+    } else if (nivel === 'quadrante') {
+      if (w.quadrante == null || w.quadrante < 1 || w.quadrante > 8) continue;
+      ancora.quadrante = w.quadrante as QuadranteFDI;
+    } else if (nivel === 'dente') {
+      if (dente == null || !isValidFDI(dente)) continue;
+      ancora.dente = dente; // faces fica vazio por definição
+    } else { // face
+      if (dente == null || !isValidFDI(dente) || faces.length === 0) continue;
+      ancora.dente = dente;
+      ancora.faces = faces;
+    }
+
+    let grupo_id: string | null = null;
+    if (w.grupo_id) {
+      const tag = String(w.grupo_id);
+      if (!grupoMap.has(tag)) grupoMap.set(tag, crypto.randomUUID());
+      grupo_id = grupoMap.get(tag)!;
+    }
+
+    out.push({
+      tipo:           w.tipo as TipoRegistroOdontograma,
+      status:         w.status as StatusRegistro,
+      origem,
+      ancora,
+      grupo_id,
+      papel_no_grupo: null, // ponte/pilar-pôntico é Fatia B
+      observacao:     typeof w.observacao === 'string' ? w.observacao.trim() : '',
+    });
+  }
+  return out;
+}
+
+function parseOrto(wire: unknown): OrtoManutencaoInfo | null {
+  if (!wire || typeof wire !== 'object') return null;
+  const w = wire as OrtoManutencaoWire;
+  if (w.arcada !== 'superior' && w.arcada !== 'inferior' && w.arcada !== 'ambas') return null;
+  const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);
+  return {
+    arcada:                w.arcada,
+    fio:                   str(w.fio),
+    ativacao:              str(w.ativacao),
+    elastico_corrente:     str(w.elastico_corrente),
+    elastico_intermaxilar: str(w.elastico_intermaxilar),
+  };
+}
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const limited = await withRateLimit(req, 'dex:formatar-evolucao', 20, 60_000);
@@ -68,14 +229,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'GEMINI_API_KEY não configurada' }, { status: 500 });
     }
 
-    let body: { texto: string; pacienteNome?: string };
+    let body: { texto: string; pacienteNome?: string; modo?: 'consulta' | 'exame_inicial' };
     try {
-      body = (await req.json()) as { texto: string; pacienteNome?: string };
+      body = (await req.json()) as { texto: string; pacienteNome?: string; modo?: 'consulta' | 'exame_inicial' };
     } catch {
       return NextResponse.json({ error: 'Body inválido' }, { status: 400 });
     }
 
     if (!body.texto?.trim()) return NextResponse.json({ error: 'Texto vazio' }, { status: 400 });
+
+    const modo: 'consulta' | 'exame_inicial' = body.modo === 'exame_inicial' ? 'exame_inicial' : 'consulta';
 
     const prompt = `Você é um assistente clínico odontológico especializado em documentação.
 Analise o relato livre do dentista e extraia SOMENTE o que é clinicamente relevante — sinal, não ruído.
@@ -97,7 +260,9 @@ Retorne SOMENTE um JSON válido, sem markdown, com exatamente esta estrutura:
   "dentes_observacoes": [{"dente": "13", "observacao": "Tratamento de canal\\nPino\\nProvisório\\nCoroa de porcelana"}, {"dente": "98", "observacao": "PPR (prótese parcial removível)"}],
   "procedimentos": ["lista resumida dos procedimentos realizados — ex: Tratamento endodôntico, Radiografia periapical"],
   "conduta": "orientações ao paciente, cuidados pós-procedimento, prescrições mencionadas. String vazia se não mencionado.",
-  "alerta_novo": "se o dentista mencionar nova alergia ou medicamento novo do paciente, registrar aqui. null se nenhum"
+  "alerta_novo": "se o dentista mencionar nova alergia ou medicamento novo do paciente, registrar aqui. null se nenhum",
+  "odontograma_eventos": [{"tipo": "carie_restauracao", "status": "realizado", "nivel": "face", "dente": 14, "faces": ["O"], "grupo_id": null, "observacao": "resina composta"}],
+  "orto_manutencao": null
 }
 
 Regras críticas:
@@ -117,7 +282,23 @@ Regras críticas:
 - conduta: string vazia "" se não houver orientações mencionadas
 - alerta_novo: null se não mencionado
 - Não repetir nome do paciente nas anotações
-- Português brasileiro, linguagem técnica mas clara`;
+- Português brasileiro, linguagem técnica mas clara
+
+ODONTOGRAMA (camada visual — além dos campos acima):
+Para CADA achado/procedimento que você registrou em dentes_observacoes, emita TAMBÉM o(s) evento(s) visual(is) correspondente(s) em "odontograma_eventos". Um evento descreve o estado clínico de um dente ou face.
+- tipo (escolha o mais específico): "carie_restauracao" (cárie a restaurar OU restauração feita — ancora em FACE), "endodontia" (canal), "exodontia" (extração), "coroa" (coroa total protética), "implante", "selante" (sempre face O), "lesao_periapical" (achado radiográfico no ápice), "inclusao" (dente incluso/impactado), "fratura" (trauma dentário), "pino_nucleo" (pino/núcleo intrarradicular).
+- status: "indicado" (a fazer/planejado — MESMA regra do PLANEJADO acima) ou "realizado" (feito / verbo no passado). NEGAÇÃO ("não fiz o canal, só o curativo") NUNCA gera evento "realizado" para o que foi negado — no máximo "indicado".
+- nivel decide os campos da âncora:
+  · "face": preencha dente (FDI) e faces (array de "O"/"M"/"D"/"V"/"L"). Use para cárie/restauração/selante.
+  · "dente": preencha dente, deixe faces []. Use para endodontia/exodontia/coroa/implante/lesao_periapical/inclusao/fratura/pino_nucleo.
+  · "arcada": preencha arcada. · "quadrante": preencha quadrante (1-8).
+- MOD e multi-face: uma restauração que cobre várias faces é UM evento com faces:["M","O","D"], NUNCA vários eventos de 1 face.
+- observacao do evento: material/detalhe curto (ex: "resina", "amálgama", "coroa de zircônia", "faceta/lente de contato", "fratura coronária", "pulpotomia"). "" se nada a acrescentar.
+- NÃO emita tipo "ponte" nem "esfoliacao" (ainda não suportados nesta versão). NÃO invente evento sem dente/face citado. Se nenhum registro dentário: odontograma_eventos: [].
+
+orto_manutencao (SÓ manutenção de aparelho ortodôntico):
+Se o relato for APENAS manutenção de aparelho (troca de arco, ativação, borrachinhas/ligaduras, elásticos), preencha orto_manutencao e deixe "odontograma_eventos": []. Caso contrário orto_manutencao: null.
+- arcada: "superior"/"inferior"/"ambas". fio: bitola/tipo do arco (ex: "0.018 NiTi"). ativacao: descrição da ativação (inclui troca de ligadura). elastico_corrente: cadeia elastomérica na MESMA arcada (ex: "corrente de 13 a 23"). elastico_intermaxilar: elástico ENTRE arcadas (ex: "3/16 Classe II").`;
 
     const result = await generateStructuredGemini<EvolucaoWire>({
       prompt,
@@ -126,17 +307,6 @@ Regras críticas:
     });
 
     const wire = result.data;
-
-    // Validação FDI estrita por quadrante:
-    //   Permanentes: quadrantes 1–4, dentes 1–8  → 11–18, 21–28, 31–38, 41–48
-    //   Decíduos:    quadrantes 5–8, dentes 1–5  → 51–55, 61–65, 71–75, 81–85
-    const isValidFDI = (d: number): boolean => {
-      const q = Math.floor(d / 10); // quadrante (1–8)
-      const t = d % 10;             // número do dente dentro do quadrante
-      if (q >= 1 && q <= 4) return t >= 1 && t <= 8; // permanentes
-      if (q >= 5 && q <= 8) return t >= 1 && t <= 5; // decíduos
-      return false;
-    };
 
     const dentesAfetados = (wire.dentes_afetados ?? [])
       .map((d) => Number(d))
@@ -176,6 +346,8 @@ Regras críticas:
         : [],
       conduta:            typeof wire.conduta === 'string' ? wire.conduta : '',
       alerta_novo:        typeof wire.alerta_novo === 'string' ? wire.alerta_novo : null,
+      odontograma_eventos: parseEventos(wire.odontograma_eventos, modo),
+      orto_manutencao:     parseOrto(wire.orto_manutencao),
     };
 
     logAICall({
