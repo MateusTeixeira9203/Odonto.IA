@@ -22,7 +22,19 @@ export type FichaExport = {
   procedimentos_concluidos: string[] | null;
   assinatura_url: string | null;
   assinado_em: string | null;
-  dentista: { nome: string } | null;
+  dentista: { nome: string; cro?: string | null } | null;
+};
+
+/** v3 §1.10 — evento do odontograma no documento impresso (fiscalização CRO). */
+export type EventoFichaPdf = {
+  tipo: string;
+  status: string;
+  origem: string;
+  dente: number | null;
+  faces: string[] | null;
+  observacao: string | null;
+  realizado_em: string | null;   // date 'YYYY-MM-DD'
+  registrado_em: string;         // date 'YYYY-MM-DD'
 };
 
 export type OrcamentoExport = {
@@ -71,6 +83,49 @@ function esc(s: string | null | undefined): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+/** Data-only ('YYYY-MM-DD') → 'DD/MM/YYYY' SEM passar por Date (evita o shift de fuso UTC−3). */
+function fmtDateOnly(d: string | null): string {
+  if (!d) return '—';
+  const [y, m, day] = d.split('-');
+  return `${day}/${m}/${y}`;
+}
+
+const TIPO_EVENTO_PDF: Record<string, string> = {
+  carie_restauracao: 'Restauração', exodontia: 'Extração', endodontia: 'Tratamento de canal',
+  lesao_periapical: 'Lesão periapical', implante: 'Implante', coroa: 'Coroa total',
+  ponte: 'Ponte', selante: 'Selante', inclusao: 'Dente incluso', esfoliacao: 'Esfoliação',
+  fratura: 'Fratura dentária', pino_nucleo: 'Pino/núcleo',
+};
+
+/** v3 §1.10 — tabela de eventos do odontograma: o quê · onde · situação · data. */
+function renderEventosOdontograma(eventos: EventoFichaPdf[]): string {
+  if (eventos.length === 0) return '';
+  const rows = eventos.map((ev) => {
+    const label = TIPO_EVENTO_PDF[ev.tipo] ?? ev.tipo;
+    const onde = ev.dente != null
+      ? `Dente ${ev.dente}${(ev.faces ?? []).length ? ` · faces ${(ev.faces ?? []).join(', ')}` : ''}`
+      : '—';
+    const situacao = ev.status === 'indicado'
+      ? 'Indicado'
+      : ev.origem === 'preexistente' ? 'Pré-existente' : 'Realizado';
+    const data = ev.status !== 'realizado'
+      ? '—'
+      : ev.realizado_em ? fmtDateOnly(ev.realizado_em) : 'anterior ao cadastro';
+    return `<div class="tooth-row">
+      <span class="tooth-num">${esc(label)}</span>
+      <span class="tooth-note">${esc(onde)}${ev.observacao ? ` — ${esc(ev.observacao)}` : ''}</span>
+      <span class="badge badge-teal" style="margin-left:auto">${esc(situacao)}</span>
+      <span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#555;white-space:nowrap">${esc(data)}</span>
+    </div>`;
+  }).join('');
+  return `
+  <div class="section">
+    <div class="section-title">Odontograma — procedimentos <span class="section-count">${eventos.length}</span></div>
+    ${rows}
+    <div style="font-size:10px;color:#999;margin-top:6px">Data = dia clínico da execução informado pelo profissional; registros indicados ainda não foram executados.</div>
+  </div>`;
 }
 
 function calcIdade(dataNascimento: string): number {
@@ -177,7 +232,7 @@ function renderFichaCard(f: FichaExport): string {
       <div class="card-header">
         <span class="card-date">${esc(fmtDateTime(f.created_at))}</span>
         <span class="badge badge-teal">${esc(f.queixa_principal ?? 'Evolução')}</span>
-        <span class="card-prof">Dr(a). ${esc(f.dentista?.nome ?? 'Profissional')}</span>
+        <span class="card-prof">Dr(a). ${esc(f.dentista?.nome ?? 'Profissional')}${f.dentista?.cro ? ` · CRO ${esc(f.dentista.cro)}` : ''}</span>
       </div>
       ${f.anotacoes ? `<div class="field"><div class="field-lbl">Anotações</div><div class="field-val">${esc(f.anotacoes)}</div></div>` : ''}
       ${dentesHtml}
@@ -397,7 +452,7 @@ export function buildProntuarioHTML(
 </html>`;
 }
 
-export function buildFichaHTML(f: FichaComPaciente): string {
+export function buildFichaHTML(f: FichaComPaciente, eventos: EventoFichaPdf[] = []): string {
   const now = fmtDateTime(new Date().toISOString());
   const pacienteNome = f.paciente?.nome ?? 'Paciente';
   const idade = f.paciente?.data_nascimento ? calcIdade(f.paciente.data_nascimento) : null;
@@ -424,7 +479,7 @@ export function buildFichaHTML(f: FichaComPaciente): string {
     <div class="ph-name">${esc(pacienteNome)}</div>
     <div class="ph-grid">
       ${f.paciente?.data_nascimento ? `<div><div class="ph-lbl">Nascimento</div><div class="ph-val">${fmtDate(f.paciente.data_nascimento)}${idade !== null ? ` (${idade} anos)` : ''}</div></div>` : ''}
-      <div><div class="ph-lbl">Profissional</div><div class="ph-val">Dr(a). ${esc(f.dentista?.nome ?? '—')}</div></div>
+      <div><div class="ph-lbl">Profissional</div><div class="ph-val">Dr(a). ${esc(f.dentista?.nome ?? '—')}${f.dentista?.cro ? ` · CRO ${esc(f.dentista.cro)}` : ''}</div></div>
       <div><div class="ph-lbl">Gerado em</div><div class="ph-val">${now}</div></div>
     </div>
   </div>
@@ -433,6 +488,8 @@ export function buildFichaHTML(f: FichaComPaciente): string {
     <div class="section-title">Registro de Atendimento</div>
     ${renderFichaCard(f)}
   </div>
+
+  ${renderEventosOdontograma(eventos)}
 
   <div class="footer">Gerado em ${now} via Odonto.IA · Dados confidenciais — uso exclusivo do profissional de saúde</div>
 </div>

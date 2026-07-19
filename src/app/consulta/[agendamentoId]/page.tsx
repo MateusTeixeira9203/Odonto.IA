@@ -52,7 +52,7 @@ export default async function ConsultaPage({ params }: Props) {
 
   if (!paciente) redirect('/dashboard/agendamentos');
 
-  const [{ data: fichas }, { data: orcamentos }, { data: planejamentoRaw }, { data: procedimentosRaw }] = await Promise.all([
+  const [{ data: fichas }, { data: orcamentos }, { data: planejamentoRaw }, { data: procedimentosRaw }, { count: eventosCount }] = await Promise.all([
     supabase
       .from('fichas')
       .select('created_at, queixa_principal, anotacoes, dentes_afetados, procedimentos, alergias, historico_medico, medicamentos_em_uso, historico_dental')
@@ -82,6 +82,12 @@ export default async function ConsultaPage({ params }: Props) {
       .select('nome')
       .eq('clinica_id', clinicId)
       .eq('ativo', true),
+    // v3 — paciente já tem registro de odontograma? Decide se o toggle "Exame inicial" aparece.
+    supabase
+      .from('odontograma_eventos')
+      .select('id', { count: 'exact', head: true })
+      .eq('paciente_id', paciente.id)
+      .eq('clinica_id', clinicId),
   ]);
 
   const hora = new Date(ag.data_hora as string).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -149,6 +155,7 @@ export default async function ConsultaPage({ params }: Props) {
       agendamentoStatus={(ag.status as string)}
       alertasClinicos={alertasClinicos}
       procedimentosClinica={procedimentosClinica}
+      temHistoricoOdontograma={(eventosCount ?? 0) > 0}
       planejamento={planejamentoRaw ? {
         id: (planejamentoRaw as {id: string}).id,
         titulo: (planejamentoRaw as {titulo: string}).titulo,

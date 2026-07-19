@@ -23,8 +23,11 @@ import { BotaoMensagemIA } from '@/components/orcamentos/botao-mensagem-ia';
 import { VoiceUX } from './voice-ux';
 import { DraftPendingCard } from './draft-pending-card';
 import { Odontograma } from '@/components/odontograma/Odontograma';
+import { ToothDetailPanel } from '@/components/odontograma/ToothDetailPanel';
+import { ToothGroupList } from './tooth-group-list';
+import { TIPO_LABEL, type OdontogramaEventoDraft } from '@/types/odontograma';
 import { ArchChips } from './arch-chips';
-import { denteLabel } from '@/lib/arcadas';
+import { denteLabel, isArch } from '@/lib/arcadas';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -76,7 +79,16 @@ interface ConsultaClientProps {
   retornoOnboarding?: boolean;
   /** Persona do dentista — calibra a recompensa pós-ficha (Workstream B1). */
   dentistaFoco?: FocoPrincipal | null;
+  /** v3 — paciente já tem eventos de odontograma? Esconde o toggle "Exame inicial" (§Fluxo b). */
+  temHistoricoOdontograma?: boolean;
 }
+
+/**
+ * Fase única da consulta (fix do "flash preto", spec v3 Fatia A): sidebar E chave do
+ * AnimatePresence derivam DESTE valor — nunca de booleanos soltos que se movem em
+ * renders diferentes. 'organizando' compartilha o bloco visual da captura (overlay).
+ */
+type FaseConsulta = 'captura' | 'organizando' | 'confirmando' | 'salvo';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -135,16 +147,22 @@ export function ConsultaClient({
   planejamento,
   retornoOnboarding = false,
   dentistaFoco = null,
+  temHistoricoOdontograma = false,
 }: ConsultaClientProps) {
   const router = useRouter();
+  const [fase, setFase] = useState<FaseConsulta>('captura');
   const [textoLivre, setTextoLivre] = useState('');
-  const [isFormatando, setIsFormatando] = useState(false);
   const [formatLabel, setFormatLabel] = useState('Organizar com DEX');
   const formatTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const [evolucao, setEvolucao] = useState<EvolucaoFormatada | null>(null);
+  // v3 — rascunho dos eventos do odontograma (a IA propõe; o dentista revisa por toque)
+  const [eventosDraft, setEventosDraft] = useState<OdontogramaEventoDraft[]>([]);
+  const [denteAberto, setDenteAberto] = useState<number | null>(null);
+  const [exameInicial, setExameInicial] = useState(false);
+  const [dataProcedimento, setDataProcedimento] = useState(() => new Date().toLocaleDateString('en-CA'));
   const [isSaving, setIsSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [savedFichaId, setSavedFichaId] = useState<string | null>(null);
+  const isFormatando = fase === 'organizando';
   const [showSignature, setShowSignature] = useState(false);
   const [showEmitir, setShowEmitir] = useState(false);
   const [demoSignOpen, setDemoSignOpen] = useState(false); // assinatura mock da demo (K · spec 3.1/3.2)
@@ -157,7 +175,10 @@ export function ConsultaClient({
   const [aptStatus, setAptStatus] = useState(agendamentoStatus);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [liveTranscript, setLiveTranscript] = useState('');
-  const [confirmedTeeth, setConfirmedTeeth] = useState<number[]>([]);
+  // v3 (unificação 18/07): o dente entra na ficha se tem >=1 evento revisado no
+  // odontograma — o painel É a confirmação. Sentinelas de arcada/boca (97/98/99)
+  // não têm evento individual; ficam neste estado próprio (chips de arcada).
+  const [sentinelasSel, setSentinelasSel] = useState<number[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -201,8 +222,8 @@ export function ConsultaClient({
 
   // Detecção ao vivo de procedimentos enquanto o dentista escreve (só na fase de captura).
   useEffect(() => {
-    // Não roda em demo (sem clínica real) nem após a evolução já estar montada.
-    if (isDemo || evolucao || saved) { setDetectedProcs([]); setIsDetecting(false); return; }
+    // Não roda em demo (sem clínica real) nem fora da fase de captura.
+    if (isDemo || fase !== 'captura') { setDetectedProcs([]); setIsDetecting(false); return; }
 
     const texto = textoLivre.trim();
     if (detectDebounceRef.current) clearTimeout(detectDebounceRef.current);
@@ -232,7 +253,7 @@ export function ConsultaClient({
     }, 2000);
 
     return () => { if (detectDebounceRef.current) clearTimeout(detectDebounceRef.current); };
-  }, [textoLivre, isDemo, evolucao, saved]);
+  }, [textoLivre, isDemo, fase]);
 
   // Cleanup de timers ao desmontar
   useEffect(() => {
@@ -286,7 +307,7 @@ export function ConsultaClient({
     if (!texto) return;
 
     // Inicia feedback progressivo
-    setIsFormatando(true);
+    setFase('organizando');
     setFormatLabel(FORMATAR_ETAPAS[0].label);
     formatTimersRef.current.forEach(clearTimeout);
     formatTimersRef.current = FORMATAR_ETAPAS.slice(1).map(({ ms, label }) =>
@@ -297,27 +318,80 @@ export function ConsultaClient({
       const res = await fetch('/api/dex/formatar-evolucao', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ texto, pacienteNome: paciente.nome }),
+        body: JSON.stringify({
+          texto,
+          pacienteNome: paciente.nome,
+          modo: exameInicial ? 'exame_inicial' : 'consulta',
+        }),
       });
       const data = await res.json() as EvolucaoFormatada & { error?: string };
       if (!res.ok || data.error) throw new Error(data.error ?? 'Erro ao formatar');
       setEvolucao(data);
-      // Auto-confirma dentes detectados pela IA — dentista pode desselecionar manualmente se necessário
-      setConfirmedTeeth(data.dentes_afetados);
+      // v3 — eventos viram rascunho editável; data clínica default = campo da confirmação
+      // (a IA NUNCA propõe data — invariante #13).
+      setEventosDraft(
+        (data.odontograma_eventos ?? []).map((ev) => ({
+          ...ev,
+          realizado_em: ev.status === 'realizado' && ev.origem === 'clinica' ? dataProcedimento : null,
+        })),
+      );
+      setDenteAberto(null);
+      // Sentinelas de arcada/boca entram auto-confirmadas (têm chip próprio pra remover);
+      // dentes individuais entram pela existência de EVENTO (revisável no painel).
+      setSentinelasSel(data.dentes_afetados.filter(isArch));
+      setFase('confirmando');
     } catch (err) {
       console.error('[consulta] formatar-evolucao:', err);
       toast.error('O Dex não conseguiu organizar as anotações. Tente novamente.');
+      setFase('captura');
     } finally {
       formatTimersRef.current.forEach(clearTimeout);
       formatTimersRef.current = [];
-      setIsFormatando(false);
       setFormatLabel('Organizar com DEX');
     }
   };
 
-  // Alterna um dente/sentinela em confirmedTeeth (usado pelo odontograma e pelos chips de arcada).
-  const toggleTooth = (t: number) =>
-    setConfirmedTeeth(prev => (prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]));
+  // Alterna uma sentinela de arcada/boca (97/98/99) nos chips.
+  const toggleSentinela = (t: number) =>
+    setSentinelasSel(prev => (prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]));
+
+  // v3 — derivações da unificação: dentes com evento + sentinelas = o que entra na ficha.
+  const dentesComEvento = useMemo(
+    () => [...new Set(eventosDraft.map(e => e.ancora.dente).filter((d): d is number => d != null))].sort((a, b) => a - b),
+    [eventosDraft],
+  );
+  const dentesConfirmados = useMemo(
+    () => [...new Set([...dentesComEvento, ...sentinelasSel])].sort((a, b) => a - b),
+    [dentesComEvento, sentinelasSel],
+  );
+  // Citado no relato mas sem evento no desenho — aviso clicável (guard anti-alucinação:
+  // sem registro visual revisado, o dente NÃO entra na ficha).
+  const dentesSemEvento = useMemo(
+    () => (evolucao?.dentes_afetados ?? []).filter(d => !isArch(d) && !dentesComEvento.includes(d)),
+    [evolucao, dentesComEvento],
+  );
+  // v3 §1.10 — o que o paciente atesta ao assinar: realizados + data clínica.
+  const procedimentosAssinatura = useMemo(
+    () =>
+      eventosDraft
+        .filter(ev => ev.status === 'realizado')
+        .map(ev => ({
+          label: `${TIPO_LABEL[ev.tipo]}${ev.ancora.dente != null ? ` — dente ${ev.ancora.dente}` : ''}${(ev.ancora.faces ?? []).length > 0 ? ` (${(ev.ancora.faces ?? []).join('')})` : ''}`,
+          data: ev.realizado_em,
+        })),
+    [eventosDraft],
+  );
+
+  // v3 — "Data do procedimento" (§1.10): campo único aplicado a todos os eventos
+  // realizado-da-clínica; override por evento no ToothDetailPanel.
+  const aplicarDataProcedimento = (d: string) => {
+    if (!d) return;
+    setDataProcedimento(d);
+    setEventosDraft(prev =>
+      prev.map(ev => (ev.status === 'realizado' && ev.origem === 'clinica' ? { ...ev, realizado_em: d } : ev)),
+    );
+  };
+  const hoje = new Date().toLocaleDateString('en-CA');
 
   // Procedimentos por dente — `dentes_observacoes[dente]` guarda "proc1\nproc2..." (\n-separado).
   // A UI edita cada procedimento como uma linha própria e junta com \n ao gravar, mantendo o
@@ -339,7 +413,7 @@ export function ConsultaClient({
 
     if (isDemo) {
       await new Promise(r => setTimeout(r, 800));
-      setSaved(true);
+      setFase('salvo');
       setSavedFichaId('demo');
       setIsSaving(false);
       if (typeof window !== 'undefined') {
@@ -349,9 +423,8 @@ export function ConsultaClient({
       return;
     }
 
-    // Fix #2: usa só dentes confirmados pelo dentista (não union com IA)
-    // Dentista DEVE confirmar clicando — amber não confirmado = não salvo
-    const dentesConfirmados = confirmedTeeth;
+    // Fix #2 (v3): dentes salvos = os com EVENTO revisado + sentinelas confirmadas
+    // (derivado acima) — o painel do odontograma é a superfície de confirmação.
 
     // Fix #1: alerta_novo — incluir nas anotações para não perder dado clínico
     const anotacoesFinais = evolucao.alerta_novo
@@ -368,10 +441,11 @@ export function ConsultaClient({
       procedimentos:      evolucao.procedimentos,
       conduta:            evolucao.conduta,
       alerta_novo:        evolucao.alerta_novo,
+      odontograma_eventos: eventosDraft,
     });
     if (result.error) { toast.error(result.error); setIsSaving(false); return; }
     if (result.fichaId) setSavedFichaId(result.fichaId);
-    setSaved(true);
+    setFase('salvo');
   };
 
   // Recompensa pós-ficha por persona (Workstream B1). Heurística: ~180 caracteres
@@ -440,9 +514,9 @@ export function ConsultaClient({
       <div className="flex flex-col md:flex-row flex-1 md:overflow-hidden">
 
         {/* ── Coluna esquerda: Sidebar ──────────────────────────────────── */}
-        {/* Some na confirmação (adendo 13/07 §I): o briefing vazio ocupava ~1/3 da tela
-            justo no momento de maior densidade de informação. */}
-        {!(evolucao && !saved) && (
+        {/* Some na confirmação (adendo 13/07 §I). Visibilidade derivada da MESMA `fase`
+            que dirige o AnimatePresence — elimina o frame de tela preta (spec v3 Fatia A). */}
+        {fase !== 'confirmando' && (
           <ConsultationSidebar
             agendamentoId={agendamentoId}
             pacienteNome={paciente.nome}
@@ -462,8 +536,8 @@ export function ConsultaClient({
         <main className="flex-1 flex flex-col p-4 md:p-6 overflow-y-auto min-h-0">
           <AnimatePresence mode="wait">
 
-            {/* ── Texto livre ── */}
-            {!evolucao && !saved && (
+            {/* ── Texto livre (captura + organizando compartilham o bloco; overlay cobre) ── */}
+            {(fase === 'captura' || fase === 'organizando') && (
               <motion.div
                 key="input"
                 initial={{ opacity: 0, y: 8 }}
@@ -542,7 +616,29 @@ export function ConsultaClient({
                         <p className="text-xs text-text-secondary truncate">Fale ou digite — eu monto a ficha</p>
                       </div>
                     </div>
-                    <span className="text-xs text-text-secondary font-mono shrink-0">{textoLivre.length} car.</span>
+                    <div className="flex items-center gap-3 shrink-0">
+                      {/* v3 — Exame inicial: só aparece pra paciente sem registro de odontograma (§Fluxo b) */}
+                      {!temHistoricoOdontograma && (
+                        <button
+                          type="button"
+                          onClick={() => setExameInicial(v => !v)}
+                          aria-pressed={exameInicial}
+                          title="Exame inicial: tudo que você narrar entra como PRÉ-EXISTENTE (cinza) — a condição em que o paciente chegou. Narre o exame, desligue, e narre o trabalho de hoje numa segunda passada."
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all outline-none focus-visible:ring-1 focus-visible:ring-teal"
+                          style={exameInicial
+                            ? { background: 'color-mix(in srgb, var(--color-slate) 18%, var(--color-surface-alt))', borderColor: 'var(--color-slate)', color: 'var(--color-slate)' }
+                            : { background: 'var(--color-surface-alt)', borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+                        >
+                          <span
+                            className="w-1.5 h-1.5 rounded-full"
+                            style={{ background: exameInicial ? 'var(--color-slate)' : 'var(--color-border)' }}
+                            aria-hidden="true"
+                          />
+                          Exame inicial
+                        </button>
+                      )}
+                      <span className="text-xs text-text-secondary font-mono">{textoLivre.length} car.</span>
+                    </div>
                   </div>
 
                 {/* ── Detecção ao vivo (chips) ── */}
@@ -660,7 +756,7 @@ export function ConsultaClient({
             )}
 
             {/* ── Salvo — Demo ── */}
-            {saved && isDemo && (
+            {fase === 'salvo' && isDemo && (
               <motion.div
                 key="saved-demo"
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -702,7 +798,7 @@ export function ConsultaClient({
             )}
 
             {/* ── Salvo — Normal ── */}
-            {saved && !isDemo && (
+            {fase === 'salvo' && !isDemo && (
               <motion.div
                 key="saved"
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -789,7 +885,7 @@ export function ConsultaClient({
             )}
 
             {/* ── Confirmação / Evolução formatada ── */}
-            {evolucao && !saved && (
+            {fase === 'confirmando' && evolucao && (
               <motion.div
                 key="confirm"
                 initial={{ opacity: 0, y: 8 }}
@@ -802,7 +898,7 @@ export function ConsultaClient({
                     <p className="text-sm text-text-secondary">Revise os campos detectados pela IA antes de salvar.</p>
                   </div>
                   <button
-                    onClick={() => setEvolucao(null)}
+                    onClick={() => { setDenteAberto(null); setFase('captura'); }}
                     className="flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors"
                   >
                     <Edit2 className="w-4 h-4" /> Editar relato
@@ -911,46 +1007,134 @@ export function ConsultaClient({
                 </div>{/* /coluna esquerda */}
                 <div className="flex flex-col gap-5">
 
-                {/* Odontograma — Fix #2: salva só confirmedTeeth; botão "Confirmar todos" */}
-                <DraftPendingCard label={
-                  confirmedTeeth.length > 0
-                    ? `Dentes confirmados — ${confirmedTeeth.map(denteLabel).join(', ')}`
-                    : evolucao.dentes_afetados.length > 0
-                      ? `Dentes detectados — ${evolucao.dentes_afetados.length} aguardando confirmação`
-                      : 'Dentes afetados'
-                }>
-                  <Odontograma
-                    selectedTeeth={confirmedTeeth}
-                    detectedTeeth={evolucao.dentes_afetados.filter(t => !confirmedTeeth.includes(t))}
-                    onToothToggle={toggleTooth}
-                    compact
-                    hideFilters
+                {/* ── v3: o odontograma ÚNICO — pintado pelos eventos, tocar abre o painel ── */}
+                {(eventosDraft.length > 0 || dentesSemEvento.length > 0) && (
+                  <DraftPendingCard
+                    label={
+                      dentesConfirmados.length > 0
+                        ? `Odontograma — ${dentesConfirmados.map(denteLabel).join(', ')}`
+                        : 'Odontograma'
+                    }
+                  >
+                    <Odontograma
+                      eventos={eventosDraft}
+                      selectedTeeth={[]}
+                      onToothToggle={setDenteAberto}
+                      compact
+                      hideFilters
+                    />
+                    <ArchChips
+                      selected={sentinelasSel}
+                      detected={evolucao.dentes_afetados}
+                      onToggle={toggleSentinela}
+                    />
+                    {/* Guard anti-alucinação (Fix #2, v3): citado sem evento NÃO entra na ficha. */}
+                    {dentesSemEvento.length > 0 && (
+                      <div
+                        className="mt-3 flex items-start gap-2 rounded-xl border px-3 py-2.5"
+                        style={{
+                          background: 'color-mix(in srgb, var(--color-warning) 8%, var(--color-surface))',
+                          borderColor: 'color-mix(in srgb, var(--color-warning) 35%, var(--color-border))',
+                        }}
+                      >
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: 'var(--color-warning)' }} />
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-semibold text-text-primary mb-1">
+                            Citados no relato, sem registro no desenho:
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {dentesSemEvento.map(d => (
+                              <button
+                                key={d}
+                                type="button"
+                                onClick={() => setDenteAberto(d)}
+                                className="px-2 py-0.5 rounded-md text-[10.5px] font-bold font-mono border transition-colors outline-none focus-visible:ring-1 focus-visible:ring-teal"
+                                style={{
+                                  background: 'var(--color-surface-alt)',
+                                  borderColor: 'color-mix(in srgb, var(--color-warning) 45%, var(--color-border))',
+                                  color: 'var(--color-warning)',
+                                }}
+                              >
+                                dente {d}
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-[10px] text-text-secondary mt-1.5">
+                            Toque pra registrar no painel — sem registro, o dente não entra na ficha.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    <div className="mt-3 flex items-center gap-3 flex-wrap">
+                      <label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">
+                        Data do procedimento
+                      </label>
+                      <input
+                        type="date"
+                        value={dataProcedimento}
+                        max={hoje}
+                        onChange={e => aplicarDataProcedimento(e.target.value)}
+                        className="text-xs font-mono rounded-lg px-2.5 py-1.5 outline-none border bg-surface-alt border-border text-text-primary focus:border-teal transition-colors"
+                        aria-label="Data clínica dos procedimentos realizados"
+                      />
+                      <span className="text-[10px] text-text-secondary">
+                        aplica aos realizados · ajuste fino por dente no painel
+                      </span>
+                    </div>
+                  </DraftPendingCard>
+                )}
+
+                {denteAberto != null && (
+                  <ToothDetailPanel
+                    dente={denteAberto}
+                    eventos={eventosDraft}
+                    onChange={setEventosDraft}
+                    onClose={() => setDenteAberto(null)}
+                    dataPadrao={dataProcedimento}
                   />
-                  <ArchChips
-                    selected={confirmedTeeth}
-                    detected={evolucao.dentes_afetados}
-                    onToggle={toggleTooth}
-                  />
-                  {/* Atalho para confirmar todos os dentes detectados */}
-                  {evolucao.dentes_afetados.filter(t => !confirmedTeeth.includes(t)).length > 0 && (
-                    <button
-                      onClick={() => setConfirmedTeeth([...new Set([...confirmedTeeth, ...evolucao.dentes_afetados])])}
-                      className="mt-3 text-[11px] text-teal font-semibold hover:opacity-75 transition-opacity"
-                    >
-                      ✓ Confirmar todos os dentes detectados
-                    </button>
-                  )}
-                </DraftPendingCard>
+                )}
+
+                {eventosDraft.length > 0 && (
+                  <ToothGroupList eventos={eventosDraft} onDenteClick={setDenteAberto} />
+                )}
+
+                {/* ── v3: manutenção de orto — chips no lugar de odontograma vazio (§Fluxo d) ── */}
+                {evolucao.orto_manutencao && eventosDraft.length === 0 && (
+                  <DraftPendingCard label="Manutenção ortodôntica">
+                    <div className="flex flex-wrap gap-2">
+                      {([
+                        ['Arcada', evolucao.orto_manutencao.arcada],
+                        ['Arco', evolucao.orto_manutencao.fio],
+                        ['Ativação', evolucao.orto_manutencao.ativacao],
+                        ['Elástico corrente', evolucao.orto_manutencao.elastico_corrente],
+                        ['Intermaxilar', evolucao.orto_manutencao.elastico_intermaxilar],
+                      ] as const).map(([rotulo, valor]) =>
+                        valor ? (
+                          <span
+                            key={rotulo}
+                            className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border bg-surface-alt border-border"
+                          >
+                            <span className="text-[9px] font-bold uppercase tracking-wide text-text-secondary">{rotulo}</span>
+                            <span className="font-semibold text-text-primary">{valor}</span>
+                          </span>
+                        ) : null,
+                      )}
+                    </div>
+                    <p className="text-[10px] text-text-secondary mt-2">
+                      Manutenção é registro da arcada — não pinta o odontograma.
+                    </p>
+                  </DraftPendingCard>
+                )}
 
                 {/* Procedimentos por dente — cada procedimento numa linha própria (multi-proc por dente) */}
-                {confirmedTeeth.length > 0 && (
+                {dentesConfirmados.length > 0 && (
                   <div className="bg-surface rounded-2xl border border-border p-5">
                     <label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest block mb-3">
                       Procedimentos por dente
                     </label>
                     {/* Grade interna em 2 colunas (md+) quando muitos dentes — corta o paredão de scroll */}
-                    <div className={confirmedTeeth.length > 4 ? 'grid gap-4 md:grid-cols-2' : 'space-y-4'}>
-                      {confirmedTeeth.map(dente => {
+                    <div className={dentesConfirmados.length > 4 ? 'grid gap-4 md:grid-cols-2' : 'space-y-4'}>
+                      {dentesConfirmados.map(dente => {
                         const procs = getDenteProcs(dente);
                         return (
                           <div key={dente}>
@@ -1032,6 +1216,7 @@ export function ConsultaClient({
           pacienteId={paciente.id}
           pacienteNome={paciente.nome}
           onSigned={() => router.push(`/dashboard/pacientes/${paciente.id}`)}
+          procedimentosRealizados={procedimentosAssinatura}
         />
       )}
 

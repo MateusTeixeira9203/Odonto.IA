@@ -17,12 +17,18 @@ interface ConsultaAssinaturaModalProps {
   onSigned?: () => void;
   /** Demo: simula sucesso sem gravar no banco (spec 3.2). */
   isDemo?: boolean;
+  /**
+   * v3 §1.10 (fiscalização): procedimentos REALIZADOS com data clínica, listados acima
+   * da assinatura — o paciente atesta conteúdo explícito, não uma ficha genérica.
+   */
+  procedimentosRealizados?: { label: string; data: string | null }[];
 }
 
 type Step = 'assinar' | 'salvando' | 'sucesso' | 'erro';
 
 export function ConsultaAssinaturaModal({
   open, onClose, fichaId, pacienteId, pacienteNome, onSigned, isDemo = false,
+  procedimentosRealizados = [],
 }: ConsultaAssinaturaModalProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const padRef    = useRef<SignaturePadLib | null>(null);
@@ -151,6 +157,27 @@ export function ConsultaAssinaturaModal({
                   Ao assinar abaixo, o paciente confirma que está ciente do tratamento realizado e autoriza o registro na ficha clínica.
                 </p>
               </div>
+
+              {/* v3 §1.10 — o paciente atesta conteúdo explícito: realizados + datas */}
+              {procedimentosRealizados.length > 0 && (
+                <div className="px-7 pb-4">
+                  <div className="rounded-xl border border-border bg-surface-alt/50 px-4 py-3 max-h-36 overflow-y-auto">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary mb-2">
+                      Procedimentos realizados
+                    </p>
+                    <div className="flex flex-col gap-1">
+                      {procedimentosRealizados.map((p, i) => (
+                        <div key={i} className="flex items-baseline justify-between gap-3 text-xs">
+                          <span className="text-text-primary font-medium truncate">{p.label}</span>
+                          <span className="font-mono text-[10.5px] text-text-secondary shrink-0">
+                            {p.data ? p.data.split('-').reverse().join('/') : '—'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="px-7">
                 <div
