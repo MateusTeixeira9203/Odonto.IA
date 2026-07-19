@@ -21,7 +21,8 @@ import { dirname, join } from 'node:path';
 const BASE = process.env.EVAL_BASE ?? 'http://localhost:3000';
 const RUNS_PER_CASE = 3;
 const THROTTLE_MS = 3500; // gentileza com o rate-limit (20/60s por IP) — 8 casos x 3 runs = 24 chamadas
-const DENTIST = { email: 'test-diag-0712@example.com', password: 'TesteDiag2026!' };
+// Conta QA reusável (clínica odontoia-test.local) — a test-diag-0712@ foi limpa de prod em 07/2026.
+const DENTIST = { email: 'qa-teste-dentista2@odontoia-test.local', password: 'QaTeste2026!' };
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const tagArg = process.argv.indexOf('--tag');
@@ -59,7 +60,7 @@ async function login(page) {
   await page.fill('input[type="email"]', DENTIST.email);
   await page.fill('input[type="password"]', DENTIST.password);
   await page.click('button:has-text("Entrar")');
-  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  await page.waitForURL(/\/dashboard/, { timeout: 30000 });
 }
 
 async function chamar(ctx, texto, modo) {
