@@ -144,6 +144,19 @@ insert into horarios_disponiveis (clinica_id, dentista_id, dia_semana, hora_inic
   ('a0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-0000000000a1', 1, '08:00', '12:00'),
   ('a0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-0000000000b1', 1, '08:00', '12:00');
 
+-- notificacoes (migration 103): destinatário-PESSOA vs broadcast por role.
+-- notif_a → pessoa dentista A · notif_b → pessoa dentista B · notif_sec → broadcast 'secretaria'.
+insert into notificacoes (id, clinica_id, para_role, para_dentista_id, tipo, titulo, mensagem) values
+  ('a0000000-0000-4000-8000-0000000000ca', 'a0000000-0000-4000-8000-000000000001', 'dentista',   'a0000000-0000-4000-8000-0000000000a1', 'agendamento_criado', '__MATRIZ_NOTIF_A__',   'notif pessoa A'),
+  ('a0000000-0000-4000-8000-0000000000cb', 'a0000000-0000-4000-8000-000000000001', 'dentista',   'a0000000-0000-4000-8000-0000000000b1', 'agendamento_criado', '__MATRIZ_NOTIF_B__',   'notif pessoa B'),
+  ('a0000000-0000-4000-8000-0000000000cc', 'a0000000-0000-4000-8000-000000000001', 'secretaria', null,                                   'orcamento_enviado',  '__MATRIZ_NOTIF_SEC__', 'broadcast secretaria');
+
+-- odontograma_eventos (migration 101): registro clínico compartilhado. evento_a e evento_b
+-- no MESMO paciente A, autores diferentes → prova o acumulado cross-autor (§3.4) + silo de escrita.
+insert into odontograma_eventos (id, clinica_id, paciente_id, dentista_id, ficha_id, tipo, status, origem, nivel, dente, faces, realizado_em) values
+  ('a0000000-0000-4000-8000-0000000000d1', 'a0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-0000000000a2', 'a0000000-0000-4000-8000-0000000000a1', 'a0000000-0000-4000-8000-0000000000a3', 'carie_restauracao', 'realizado', 'clinica', 'face',  11, '{O}', current_date),
+  ('a0000000-0000-4000-8000-0000000000d2', 'a0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-0000000000a2', 'a0000000-0000-4000-8000-0000000000b1', null,                                   'endodontia',        'realizado', 'clinica', 'dente', 46, '{}',  current_date);
+
 -- tabela de resultados: acumula TODAS as assertivas (não para no primeiro erro)
 create temp table matriz_results (
   id      serial primary key,
@@ -266,6 +279,20 @@ begin
   perform pg_temp.matriz_assert('dentista_a', 'planejamento_etapas: vê a própria (fora de escopo)', '1', v_n, v_n = 1);
   select count(*) into v_n from planejamento_etapas where planejamento_id = 'a0000000-0000-4000-8000-0000000000b5';
   perform pg_temp.matriz_assert('dentista_a', 'planejamento_etapas: vê 0 de B (fora de escopo, siloed)', '0', v_n, v_n = 0);
+
+  -- ══ NOTIFICAÇÕES — destinatário-pessoa (migration 103) ══
+  select count(*) into v_n from notificacoes where id = 'a0000000-0000-4000-8000-0000000000ca';
+  perform pg_temp.matriz_assert('dentista_a', 'notificacoes: VÊ a endereçada a ele (pessoa)', '1', v_n, v_n = 1);
+  select count(*) into v_n from notificacoes where id = 'a0000000-0000-4000-8000-0000000000cb';
+  perform pg_temp.matriz_assert('dentista_a', 'notificacoes: NÃO vê a endereçada ao B (leak fechado)', '0', v_n, v_n = 0);
+  select count(*) into v_n from notificacoes where id = 'a0000000-0000-4000-8000-0000000000cc';
+  perform pg_temp.matriz_assert('dentista_a', 'notificacoes: NÃO vê broadcast de secretaria (role alheio)', '0', v_n, v_n = 0);
+
+  -- ══ ODONTOGRAMA_EVENTOS — clínica lê (acumulado precisa), autor escreve (migration 101) ══
+  select count(*) into v_n from odontograma_eventos where id = 'a0000000-0000-4000-8000-0000000000d1';
+  perform pg_temp.matriz_assert('dentista_a', 'odontograma_eventos: vê o próprio', '1', v_n, v_n = 1);
+  select count(*) into v_n from odontograma_eventos where id = 'a0000000-0000-4000-8000-0000000000d2';
+  perform pg_temp.matriz_assert('dentista_a', 'odontograma_eventos: VÊ o de B no mesmo paciente (acumulado)', '1', v_n, v_n = 1);
 end $$;
 
 -- ---------------------------------------------------------------------
@@ -310,6 +337,33 @@ begin
   update tratamentos set nome = '__MATRIZ_HACK__' where id = 'a0000000-0000-4000-8000-0000000000b6';
   get diagnostics v_affected = row_count;
   perform pg_temp.matriz_assert('dentista_a', 'UPDATE tratamento de B → 0 linhas (furo fechado)', '0', v_affected, v_affected = 0);
+
+  -- migration 103: antes, notificacoes_update_own era belongs_to_active_clinic SOLTO
+  -- → A marcava como lida a notificação de B. Agora barra (mesmo predicado do SELECT).
+  update notificacoes set lida = true where id = 'a0000000-0000-4000-8000-0000000000cb';
+  get diagnostics v_affected = row_count;
+  perform pg_temp.matriz_assert('dentista_a', 'UPDATE (marcar lida) notificação de B → 0 linhas', '0', v_affected, v_affected = 0);
+
+  -- migration 101: A vê o evento de B (acumulado) mas NÃO escreve nele; e escreve o próprio.
+  update odontograma_eventos set observacao = '__MATRIZ_HACK__' where id = 'a0000000-0000-4000-8000-0000000000d2';
+  get diagnostics v_affected = row_count;
+  perform pg_temp.matriz_assert('dentista_a', 'UPDATE evento de odontograma de B → 0 linhas', '0', v_affected, v_affected = 0);
+
+  begin
+    insert into odontograma_eventos (clinica_id, paciente_id, dentista_id, tipo, status, origem, nivel, dente, faces)
+    values ('a0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-0000000000a2', 'a0000000-0000-4000-8000-0000000000b1', 'coroa', 'indicado', 'clinica', 'dente', 21, '{}');
+    v_rejeitado := false;
+  exception when insufficient_privilege or check_violation then v_rejeitado := true;
+  end;
+  perform pg_temp.matriz_assert_bool('dentista_a', 'INSERT evento de odontograma com dentista_id de B → rejeitado', true, v_rejeitado);
+
+  begin
+    insert into odontograma_eventos (clinica_id, paciente_id, dentista_id, tipo, status, origem, nivel, dente, faces)
+    values ('a0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-0000000000a2', 'a0000000-0000-4000-8000-0000000000a1', 'coroa', 'indicado', 'clinica', 'dente', 21, '{}');
+    v_rejeitado := false;
+  exception when others then v_rejeitado := true;
+  end;
+  perform pg_temp.matriz_assert_bool('dentista_a', 'INSERT evento de odontograma próprio → PERMITIDO', false, v_rejeitado);
 
   -- INSERT com dentista_id alheio: WITH CHECK deve rejeitar (invariante #7).
   begin
@@ -411,6 +465,19 @@ begin
   update tratamentos set nome = '__MATRIZ_HACK__' where id = 'a0000000-0000-4000-8000-0000000000a6';
   get diagnostics v_affected = row_count;
   perform pg_temp.matriz_assert('dentista_b', 'UPDATE tratamento de A → 0 linhas', '0', v_affected, v_affected = 0);
+
+  -- migration 103: a asserção-chave da spec — B NÃO lê a notificação endereçada ao A.
+  select count(*) into v_n from notificacoes where id = 'a0000000-0000-4000-8000-0000000000ca';
+  perform pg_temp.matriz_assert('dentista_b', 'notificacoes: NÃO vê a endereçada ao A (leak fechado)', '0', v_n, v_n = 0);
+  select count(*) into v_n from notificacoes where id = 'a0000000-0000-4000-8000-0000000000cb';
+  perform pg_temp.matriz_assert('dentista_b', 'notificacoes: VÊ a endereçada a ele (pessoa)', '1', v_n, v_n = 1);
+
+  -- migration 101: espelho — B vê o evento de A (acumulado), não escreve nele.
+  select count(*) into v_n from odontograma_eventos where id = 'a0000000-0000-4000-8000-0000000000d1';
+  perform pg_temp.matriz_assert('dentista_b', 'odontograma_eventos: VÊ o de A (acumulado)', '1', v_n, v_n = 1);
+  update odontograma_eventos set observacao = '__MATRIZ_HACK__' where id = 'a0000000-0000-4000-8000-0000000000d1';
+  get diagnostics v_affected = row_count;
+  perform pg_temp.matriz_assert('dentista_b', 'UPDATE evento de odontograma de A → 0 linhas', '0', v_affected, v_affected = 0);
 end $$;
 
 -- ---------------------------------------------------------------------
@@ -463,6 +530,18 @@ begin
 
   select count(*) into v_n from tratamentos where clinica_id = 'a0000000-0000-4000-8000-000000000001';
   perform pg_temp.matriz_assert('secretaria', 'tratamentos: vê tudo da clínica', '2', v_n, v_n = 2);
+
+  -- migration 103: broadcast de role continua legível pra ela (invariante #5 — não regride);
+  -- mas as PESSOA-endereçadas de dentistas não são dela.
+  select count(*) into v_n from notificacoes where id = 'a0000000-0000-4000-8000-0000000000cc';
+  perform pg_temp.matriz_assert('secretaria', 'notificacoes: VÊ o broadcast dela (role legível)', '1', v_n, v_n = 1);
+  select count(*) into v_n from notificacoes
+   where para_dentista_id is not null and clinica_id = 'a0000000-0000-4000-8000-000000000001';
+  perform pg_temp.matriz_assert('secretaria', 'notificacoes: NÃO vê as pessoa-endereçadas de dentistas', '0', v_n, v_n = 0);
+
+  -- migration 101: secretária lê o registro clínico (2 do seed + 1 inserido por A em §4 = 3).
+  select count(*) into v_n from odontograma_eventos where clinica_id = 'a0000000-0000-4000-8000-000000000001';
+  perform pg_temp.matriz_assert('secretaria', 'odontograma_eventos: vê tudo da clínica', '3', v_n, v_n = 3);
 end $$;
 
 -- ---------------------------------------------------------------------
@@ -492,7 +571,8 @@ begin
     from pg_policies
    where schemaname = 'public'
      and tablename in ('fichas','pacientes','planejamento_procedimentos',
-                       'planejamento_secoes','paciente_documentos','tratamentos')
+                       'planejamento_secoes','paciente_documentos','tratamentos',
+                       'odontograma_eventos')
      and cmd in ('SELECT','ALL')
      and qual like '%belongs_to_active_clinic%'
      and qual not like '%is_clinic_staff%'
