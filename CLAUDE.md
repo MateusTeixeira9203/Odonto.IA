@@ -586,7 +586,9 @@ Toda tela ou componente novo passa pelo pipeline abaixo. Pular etapas é a causa
 ### 5. Ritual de sessão (abre e fecha)
 - **Abertura:** quando eu cumprimentar pra começar ("bom dia", "boa tarde", "boa noite", "tudo bem Claude"), rode a skill `session-start` — leia o último handoff em `plans/handoffs/` e me dê o recap (onde paramos, próximo passo, erros em aberto, o que eu cogitava) antes de tocar em código.
 - **Fechamento:** quando eu disser que vou parar ("vou dormir", "terminamos por hoje", "encerra"), rode a skill `handoff` e salve em `plans/handoffs/` — o que concluímos, os erros, **como eu estava pensando em resolver**, o que ficou e o que eu cogitava.
-- A pasta `plans/` é **append-only** — é a memória do projeto, nunca apague. Organizada por tipo: `plans/handoffs/` (handoffs de sessão), `plans/specs/` (contratos técnicos), `plans/roadmap/` (planos mestres).
+- A pasta `plans/` é **append-only** — é a memória do projeto, nunca apague. Organizada por tipo: `plans/handoffs/` (handoffs de sessão), `plans/specs/` (contratos técnicos), `plans/roadmap/` (planos mestres), `plans/concluidos/` (arquivo).
+- **`plans/concluidos/` — arquivar, nunca apagar.** Spec/roadmap/auditoria concluído sai da pasta ativa e vai pra `plans/concluidos/`, pra a visão do que está vivo não competir com o que já passou. Isso **não** é exceção ao append-only: nada some, só muda de gaveta. **Handoffs nunca se movem** — são o log.
+- **Roadmap é mapa, spec é conteúdo.** O roadmap diz o que vem, em que ordem, e aponta pra spec. Quando uma frente ganha spec própria, o detalhe dela **sai** do roadmap e vira link — detalhe duplicado nos dois diverge, e aí nenhum dos dois é confiável.
 
 ### 6. Modos de trabalho — discussão, planejamento, execução
 Existem três modos, e eles **não se misturam** (o atrito nº1 é discutir, planejar e codar meio a meio na mesma sessão). **Quem ativa o modo é o usuário**, quando achar necessário — eu não tento adivinhar pela saudação nem pelo handoff anterior.

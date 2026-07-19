@@ -77,6 +77,15 @@ orto → perio) e se HOF entra no dicionário/ficha.
     (alimenta a visão Fase 3 — apresentação visual de conversão)
 22. "O paciente entende o odontograma quando vocês mostram? Ajuda a fechar orçamento?"
 
+## Bloco 8 — Vocabulário de campo *(adicionado 16/07, pós-aprovação da spec)*
+
+23. ⭐ **Anotar os termos EXATOS que eles falam em voz alta durante o atendimento** —
+    materiais, elásticos ("corrente"? "intermaxilar"? outro nome?), técnicas, medidas.
+    É o insumo direto do glossário do organizador (converte fala → chip/evento certo).
+    Não perguntar — OBSERVAR e transcrever como falam.
+24. "Que variável vocês anotariam SEMPRE se não custasse tempo?" (separa a variável
+    que falta da variável que só parece faltar)
+
 ---
 
 ## Depois da visita

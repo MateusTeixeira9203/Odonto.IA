@@ -1,6 +1,11 @@
 # Spec — Modo Consulta v3: Odontograma Multi-Especialidade
 
-> **Status:** aguardando aprovação
+> **Status:** **APROVADA pelo Mateus em 16/07** — após revisão do mesmo dia: modelo de
+> acesso 099 (núcleo clínico), validação por pesquisa (Manual CFO 2026 · SDCEP · AAP/EFP
+> 2018 — §Fontes), catálogo estendido pra 12 tipos (`fratura`, `pino_nucleo`), perio com
+> recessão/sítio + CAL + supuração, orto com elásticos corrente/intermaxilar + atalho
+> "igual à última", seção Cobertura por especialidade e mapeamentos por observação.
+> Design de referência aprovado em artifact (16/07). **1ª execução pós-gate da 099.**
 > **Data:** 2026-07-13
 > **Modelo de execução:** Sonnet (padrão do projeto) como base das **3 fatias** — toda
 > decisão ambígua (arquitetura do event-log, caminho técnico do ditado perio, cor do
@@ -10,7 +15,7 @@
 > Se durante a execução aparecer uma decisão que este documento não cobre, a regra do
 > projeto vale: volta pro planejamento antes de codar.
 >
-> **Estende:** `plans/specs/spec-fase1-5-consulta-ia-v2.md` (implementada, em produção —
+> **Estende:** `plans/concluidos/spec-fase1-5-consulta-ia-v2.md` (implementada, em produção —
 > transcrição, organizador Gemini, dicionário, fluxo de conclusão). Este documento **não
 > re-abre** nenhuma decisão de lá; o Motor A descrito abaixo é um adendo aditivo ao
 > organizador já existente (`/api/dex/formatar-evolucao`).
@@ -45,9 +50,15 @@ decisão registrada no handoff da sessão.
 ## Visão
 
 O odontograma vira o **hub visual do registro clínico**: em vez de uma lista de texto por
-dente, a boca do paciente se pinta sozinha conforme o dentista narra ou dita a consulta,
-cobrindo as 8 especialidades do CFO (dentística, cirurgia, endodontia, implantodontia,
-prótese, odontopediatria, ortodontia, periodontia). Dois motores de IA alimentam esse
+dente, a boca do paciente se pinta sozinha conforme o dentista narra ou dita a consulta.
+
+> **Enquadramento corrigido em 16/07 (pesquisa):** o CFO reconhece **23 especialidades**
+> (não 8 — [Simples Dental](https://www.simplesdental.com/blog/areas-da-odontologia/); a
+> contagem varia com adições recentes como Odontologia Hospitalar/2024). O que o v3 cobre
+> é o **núcleo dente-registrável** — as ~9 especialidades cujo registro clínico ancora em
+> dente/face e por isso pinta odontograma. As demais ou são **contextos de prática** (usam a
+> mesma ficha, sem símbolo novo) ou registram em **tecido mole/articulação/face** (fora do
+> odontograma por natureza). O mapa completo está na seção **"Cobertura por especialidade"**. Dois motores de IA alimentam esse
 desenho: um narrativo (prosa -> JSON -> pintura) e um determinístico exclusivo da sondagem
 periodontal (número falado -> célula, zero inferência de LLM). O resultado esperado:
 o dentista fala/dita como já faz hoje, a ficha e o odontograma se organizam sozinhos, e o
@@ -63,6 +74,15 @@ paciente enxerga a própria boca — não uma tabela — quando o plano é apres
 | Backfill de fichas antigas sem odontograma | Fichas existentes (`dentes_afetados`/`dentes_observacoes` legado) ficam como estão. Nenhuma migração de dados retroativa gera `odontograma_eventos` a partir de texto histórico — ver Riscos. |
 | Materializar o "estado atual" do odontograma em tabela própria | Decisão tomada: reduce por query (`DISTINCT ON`), não tabela de cache. Ver Modelo de dados. |
 | Triagem por sextante (PSR) como alternativa ao perio completo | O Mateus confirmou (decisão #5) que o exame é sondagem completa de 6 pontos. |
+| **Prótese removível (PPR/PT) como símbolo visual** *(adicionado 16/07)* | Não ancora em dente individual — segue registrada em texto na ficha via sentinelas de arcada (97/98), como hoje. Desenhá-la no odontograma tem valor clínico baixo vs. custo; se demanda real aparecer, é extensão do catálogo, não desta spec. |
+| ~~Supuração na sondagem perio~~ | **ENTROU em 16/07** — o checklist de especialidades do Mateus pediu explicitamente ("sangramento e supuração"). Ver §1.6. |
+| **Braquetes/bandas/attachments por dente, apinhamento, diastema, giroversão** *(16/07)* | É documentação ortodôntica (aparelho/oclusão), não estado clínico do dente — pertence à spec futura do módulo orto, junto de fotos/cefalometria. Braquete descolado no mensal vai em observação da manutenção. |
+| **Enxerto ósseo / levantamento de seio como marcação visual** *(16/07)* | Registro em REGIÃO (não dente) exigiria camada de render nova (overlay de gengiva/osso). V1: ficha texto + tomografia anexa. Revisitar se implantodontistas do piloto pedirem. |
+| **Mantenedor de espaço (pedo) como símbolo** *(16/07)* | Aparelho multi-dente, não estado do dente. Ficha texto no v1. |
+| **Estados transitórios (sutura pós-cirúrgica)** *(16/07)* | O event-log registra estado DURÁVEL; sutura se resolve em dias — é acompanhamento (ficha + marcar retorno), não odontograma. Poluir o log permanente com efêmero quebra a leitura pericial. |
+| **Desgaste de bruxismo / faceta de desgaste como símbolo** *(16/07)* | Achado de DTM — texto na ficha no v1; candidato a tipo futuro se houver demanda de campo. |
+| **Faceta/lente de contato como símbolo próprio** *(16/07)* | Mapeia `carie_restauracao` na face V + observação "faceta/lente" (pinta a face V igual). Símbolo distinto só se o piloto estético pedir. |
+| **Cálculo/tártaro e flúor como marcação visual** *(16/07)* | Procedimento/achado sem estado durável no dente — ficha (`procedimentos`) e índice de placa do perio cobrem. |
 
 ## Assunções (para o Mateus validar; nenhuma bloqueia a Fatia A)
 
@@ -74,6 +94,54 @@ paciente enxerga a própria boca — não uma tabela — quando o plano é apres
   teste com ditado real antes de virar o único caminho.
 - Clínicas do Mateus operam em desktop/Chrome no consultório (não Safari/Firefox) — premissa
   necessária para a Fatia C funcionar sem fallback manual como caminho principal.
+
+---
+
+## Cobertura por especialidade *(adicionado 16/07, com pesquisa)*
+
+Das **23 especialidades reconhecidas pelo CFO**, o v3 cobre integralmente as que registram
+no dente, cobre parcialmente 2 por decisão deliberada, e deixa fora as que não são
+dente-ancoradas. Este mapa é a resposta canônica a "o odontograma atende quais
+especialidades e de que forma":
+
+| Especialidade | O v3 registra | De que forma | Cobertura |
+|---|---|---|---|
+| **Dentística / Clínico Geral** | Cárie/restauração por face (5 faces), selante, **fratura** e **pino/núcleo intracanal** (aprovados 16/07 — kit do clínico geral, decisão do Mateus) | Eventos `carie_restauracao`/`selante` em face; `fratura` (achado) e `pino_nucleo` (raiz) em dente; MOD = 1 evento multi-face | ✅ total |
+| **Endodontia** | Canal a tratar/tratado, lesão periapical | `endodontia` (linha na raiz, tracejada→sólida), `lesao_periapical` (círculo no ápice) | ✅ total |
+| **Cirurgia (nível dente)** | Extração indicada/feita, dente incluso | `exodontia` (X → ausente), `inclusao` (contorno tracejado) | ✅ no dente · cirurgia de tecido mole/osso vai em texto na ficha |
+| **Implantodontia** | Implante planejado/instalado | `implante` (parafuso na raiz) | ✅ total · peri-implantite = refinamento futuro registrado |
+| **Prótese dentária (fixa)** | Coroa, ponte pilar-pôntico | `coroa` (contorno duplo), `ponte` (bracket multi-dente, Fatia B) | ✅ fixa · **removível (PPR/PT) fora do visual** — ver Não-escopo |
+| **Periodontia** | Sondagem 6 sítios, BOP, placa, recessão/sítio, **CAL derivado**, mobilidade, furca + selo de bolsa no odontograma | Fatia C — `perio_exames`/`perio_medidas`, Motor B determinístico | ✅ total (com o ajuste de CAL de 16/07 — §1.6) |
+| **Odontopediatria** | Decíduos 51–85 com o mesmo catálogo + esfoliação + dentição mista | Abas Permanentes/Decíduos + evento `esfoliacao` (Fatia B) | ✅ total |
+| **Ortodontia** | Manutenção mensal (arco, ativação, elástico) por arcada | `orto_manutencao` (chips na ficha, não pinta odontograma) | 🟡 parcial deliberado — documentação inicial (Angle, apinhamento, fotos) é spec própria futura |
+| **Radiologia (achados dentários)** | Lesão periapical e achados que ancoram em dente | Via narrativa → eventos | 🟡 achados; laudo radiológico completo fora |
+| **Odontologia Legal** | — (não registra tipo novo) | **É servida pelo v3, não coberta**: odontograma anatômico preciso + event-log imutável + autoria por evento = exatamente o que perícia/identificação pede ([Manual CFO 2026](https://website.cfo.org.br/wp-content/uploads/2026/03/CFO_Manual_do_Prontuario_Ebook.pdf), §Odontograma) | ✅ como consumidora |
+| Estomatologia · Patologia Oral | Lesões de mucosa/tecido mole | Não ancoram em dente — ficam em texto (`anotacoes`); módulo de mucosa é possível futuro, não v3 | ⛔ fora por natureza |
+| DTM e Dor Orofacial | Articulação/músculo | Idem — texto | ⛔ fora por natureza |
+| HOF · Prótese buco-maxilo-facial | Face | Já era não-escopo (D7 fase1-5) | ⛔ fora por natureza |
+| Odontogeriatria · Pacientes especiais · Esporte · Trabalho · Saúde Coletiva · Hospitalar · Estética · Laserterapia · Homeopatia · Acupuntura | — | São **contextos de prática**, não tipos de registro dentário: usam a mesma ficha e o mesmo odontograma quando tocam dente | — n/a |
+
+**Leitura honesta do claim:** o v3 não "atende 23 especialidades" — ele atende **todas as
+que têm registro dente-ancorado** (o núcleo clínico do dia a dia de uma clínica geral
+multi-especialidade), serve a odontologia legal por consequência da arquitetura, e nomeia
+explicitamente o que fica fora e por quê.
+
+### Mapeamentos por observação *(16/07 — checklist de especialidades)*
+
+Itens do dia a dia que **não ganham símbolo próprio** mas têm registro canônico: o evento
+certo + a informação na `observacao` (o prompt do Motor A ensina cada um; a execução os
+adiciona ao glossário):
+
+| Narrativa | Evento canônico | Observação carrega |
+|---|---|---|
+| "restaurei com **amálgama/resina/ionômero**" | `carie_restauracao` realizado | o material |
+| "restauração **infiltrada/defeituosa** no 25" | evento antigo fica; NOVO `carie_restauracao` **indicado** (troca) | "substituição — infiltração" |
+| "extração do 14 **pra ganhar espaço** (orto)" | `exodontia` indicado | "finalidade ortodôntica" |
+| "siso **mesioangulado** incluso" | `inclusao` | classificação (Winter) |
+| "implante **Straumann 4.1×10** no 36" | `implante` realizado | marca/diâmetro/comprimento (estruturar = refinamento futuro) |
+| "**pulpotomia** no 74" | `endodontia` realizado (decíduo) | "pulpotomia" |
+| "**coroa de aço** no 75" | `coroa` realizado | "coroa de aço" |
+| "**faceta/lente** no 11" | `carie_restauracao` face V | "faceta/lente de contato" |
 
 ---
 
@@ -112,12 +180,20 @@ export interface AncoraClinica {
 ```
 
 ```ts
-/** Rótulo de face contextual ao dente (superior -> Palatina, inferior -> Lingual). */
+/**
+ * Rótulo de face contextual ao dente (superior -> Palatina, inferior -> Lingual;
+ * anteriores -> Incisal em vez de Oclusal — revisado 16/07, checklist de especialidades).
+ * Mesma zona geométrica, rótulo contextual — não é estado novo.
+ */
 export function faceLabel(face: FaceDental, dente: number): string {
   const labels: Record<FaceDental, string> = { O: 'Oclusal', M: 'Mesial', D: 'Distal', V: 'Vestibular', L: 'Lingual' };
   if (face === 'L') {
     const superior = (dente >= 11 && dente <= 28) || (dente >= 51 && dente <= 65);
     return superior ? 'Palatina' : 'Lingual';
+  }
+  if (face === 'O') {
+    const anterior = dente % 10 >= 1 && dente % 10 <= 3; // incisivos e caninos
+    return anterior ? 'Incisal' : 'Oclusal';
   }
   return labels[face];
 }
@@ -163,7 +239,9 @@ export type TipoRegistroOdontograma =
   | 'ponte'                // MULTI-DENTE — grupo_id/papel_no_grupo. Fatia B liga o render.
   | 'selante'              // preventivo, quase sempre 'realizado'. Ancora em face (sempre 'O').
   | 'inclusao'             // achado estrutural (dente incluso/impactado). Ancora em dente.
-  | 'esfoliacao';          // decíduo caiu — Fatia B. Ancora em dente (51-85).
+  | 'esfoliacao'           // decíduo caiu — Fatia B. Ancora em dente (51-85).
+  | 'fratura'              // trauma dentário (achado, como lesao_periapical) — aprovado 16/07. Ancora em dente.
+  | 'pino_nucleo';         // pino intrarradicular/núcleo — aprovado 16/07. Ancora em dente (raiz).
 
 export type PapelNoGrupo = 'pilar' | 'pontico';
 ```
@@ -230,8 +308,14 @@ volume real algum dia justificar cache, isso é otimização de fase futura, nã
 export interface OrtoManutencaoInfo {
   arcada: 'superior' | 'inferior' | 'ambas';
   fio: string | null;
+  /** Inclui a troca de ligadura ("borrachinhas") — rotina que acompanha a ativação. */
   ativacao: string | null;
-  elastico: string | null;
+  /**
+   * Dois tipos de elástico DISTINTOS (correção do Mateus, 16/07 — mecânicas e registros
+   * diferentes; um campo único misturava os dois):
+   */
+  elastico_corrente: string | null;      // cadeia elastomérica na arcada (ex: "corrente de 13 a 23")
+  elastico_intermaxilar: string | null;  // entre arcadas, uso domiciliar (ex: "3/16 Classe II, 13→46")
 }
 ```
 
@@ -254,6 +338,18 @@ export interface PerioMedidaSitio {
   profundidade_mm: number;
   sangramento: boolean;
   placa: boolean;
+  /** Supuração no sítio. ENTROU em 16/07 (checklist de especialidades do Mateus — antes
+   *  estava em não-escopo). Indicador visual próprio; cores dos 3 pontos (sangramento/
+   *  supuração/placa) fecham no design-brief da Fatia C. */
+  supuracao: boolean;
+  /**
+   * Recessão gengival do sítio (mm). REVISADO 16/07: era 1 valor por dente — insuficiente.
+   * Sem recessão por sítio não existe CAL por sítio, e o estadiamento de periodontite
+   * (AAP/EFP 2018) é dirigido por CAL INTERDENTAL (1–2mm=I, 3–4=II, ≥5=III/IV).
+   * Opcional: preenchida por TOQUE na revisão (não entra no ditado contínuo — o fluxo
+   * de voz da sondagem continua só profundidade+modificadores).
+   */
+  recessao_mm: number | null;
 }
 
 export interface PerioMedidaDente {
@@ -262,7 +358,15 @@ export interface PerioMedidaDente {
   sitios: PerioMedidaSitio[];
   mobilidade: 0 | 1 | 2 | 3 | null;
   furca: 0 | 1 | 2 | 3 | null;
-  recessao_mm: number | null;
+}
+
+/**
+ * CAL (nível de inserção clínica) = profundidade + recessão — DERIVADO, nunca persistido.
+ * "Most computerised clinical systems will calculate CAL automatically" (SDCEP).
+ * Null quando a recessão do sítio não foi medida.
+ */
+export function calDoSitio(s: PerioMedidaSitio): number | null {
+  return s.recessao_mm == null ? null : s.profundidade_mm + s.recessao_mm;
 }
 ```
 
@@ -291,13 +395,23 @@ export function temBolsaAtiva(m: PerioMedidaDente): boolean {
 
 ### 1.7 Schema SQL — migração aditiva (Fatia A)
 
-RLS segue o padrão **silo por dentista já vivo em produção**
-(`supabase/migrations/20260705000000_089_hierarquia_silo_rls.sql`): `belongs_to_active_clinic(clinica_id)`
-+ `is_own_clinical_record(dentista_id)` pra SELECT (dono OU secretária vê tudo), e
-`dentista_id = get_my_dentista_id()` pra escrita — mesmo padrão de `fichas`/`orcamentos`.
-Não inventar um padrão de RLS novo. Número de migração sugerido: **097** (confirmar o
-último número em `supabase/migrations/` no momento de aplicar — outras specs podem ter
-avançado o contador).
+> **⚠️ REVISADO 16/07 — modelo de acesso trocado.** Esta seção foi escrita (13/07) sobre o
+> silo por dentista, que **morreu em 16/07** (Spec 1 / migration 099): registro clínico é
+> da CLÍNICA (todo staff lê), trabalho é do AUTOR (só ele escreve). Além de acompanhar a
+> 099, há um motivo clínico próprio: o **acumulado (Fatia B) reduz eventos de TODOS os
+> dentistas** pra desenhar a boca — regra #3 do núcleo, "o dente tem UM estado clínico,
+> não um por dentista". Com silo no SELECT, o odontograma do dentista B esconderia o canal
+> que A fez: **a boca renderizada mentiria**.
+
+RLS segue o modelo do **núcleo clínico compartilhado** (migration
+`20260716000000_099_hierarquia_nucleo_clinico_compartilhado.sql`):
+`belongs_to_active_clinic(clinica_id) and is_clinic_staff()` pra SELECT (dentistas +
+secretária; o protético — Spec 3 Fatia B — fica fora do prontuário), e
+`dentista_id = get_my_dentista_id()` pra escrita — mesmo padrão de `fichas` pós-099.
+Não inventar um padrão de RLS novo. As tabelas novas ganham **asserções no harness
+`supabase/tests/matriz_acesso_clinico.sql`** (leitura cruzada permitida, escrita cruzada
+negada) quando a fatia for executada. Número de migração: **próximo disponível** (na data
+desta revisão: 100 é do Job A → odontograma = 101, perio = 102).
 
 ```sql
 -- 097_odontograma_eventos.sql
@@ -310,7 +424,8 @@ create table if not exists public.odontograma_eventos (
   grupo_id uuid,
   tipo text not null check (tipo in (
     'carie_restauracao','exodontia','endodontia','lesao_periapical',
-    'implante','coroa','ponte','selante','inclusao','esfoliacao'
+    'implante','coroa','ponte','selante','inclusao','esfoliacao',
+    'fratura','pino_nucleo'
   )),
   status text not null check (status in ('indicado','realizado')),
   origem text not null default 'clinica' check (origem in ('clinica','preexistente')),
@@ -366,8 +481,9 @@ create index if not exists idx_odontograma_eventos_acumulado on public.odontogra
 alter table public.odontograma_eventos enable row level security;
 
 drop policy if exists "odontograma_eventos_select" on public.odontograma_eventos;
+-- Núcleo clínico (099): a clínica lê — o acumulado precisa ver eventos de TODOS os dentistas.
 create policy "odontograma_eventos_select" on public.odontograma_eventos for select
-  using (belongs_to_active_clinic(clinica_id) and is_own_clinical_record(dentista_id));
+  using (belongs_to_active_clinic(clinica_id) and is_clinic_staff());
 
 drop policy if exists "odontograma_eventos_write_own" on public.odontograma_eventos;
 create policy "odontograma_eventos_write_own" on public.odontograma_eventos for all
@@ -412,8 +528,9 @@ create index if not exists idx_perio_exames_clinica on public.perio_exames(clini
 
 alter table public.perio_exames enable row level security;
 drop policy if exists "perio_exames_select" on public.perio_exames;
+-- Núcleo clínico (099): exame perio é registro clínico — a clínica lê, o autor escreve.
 create policy "perio_exames_select" on public.perio_exames for select
-  using (belongs_to_active_clinic(clinica_id) and is_own_clinical_record(dentista_id));
+  using (belongs_to_active_clinic(clinica_id) and is_clinic_staff());
 drop policy if exists "perio_exames_write_own" on public.perio_exames;
 create policy "perio_exames_write_own" on public.perio_exames for all
   using (belongs_to_active_clinic(clinica_id) and dentista_id = get_my_dentista_id())
@@ -432,10 +549,11 @@ create table if not exists public.perio_medidas (
   exame_id uuid not null references public.perio_exames(id) on delete cascade,
   dente smallint not null,
   ausente boolean not null default false,
-  sitios jsonb not null default '[]',  -- [{sitio, profundidade_mm, sangramento, placa}] x6
+  -- [{sitio, profundidade_mm, sangramento, placa, recessao_mm}] x6 · recessao_mm nullable
+  -- (REVISADO 16/07: recessão POR SÍTIO — CAL deriva na leitura, nunca persiste)
+  sitios jsonb not null default '[]',
   mobilidade smallint check (mobilidade between 0 and 3),
   furca smallint check (furca between 0 and 3),
-  recessao_mm numeric(4,1),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (exame_id, dente)
@@ -446,10 +564,9 @@ create index if not exists idx_perio_medidas_clinica on public.perio_medidas(cli
 
 alter table public.perio_medidas enable row level security;
 drop policy if exists "perio_medidas_select" on public.perio_medidas;
+-- Leitura herda o modelo da tabela-mãe: clínica lê (099); a linha não carrega dentista_id.
 create policy "perio_medidas_select" on public.perio_medidas for select
-  using (belongs_to_active_clinic(clinica_id) and exists (
-    select 1 from perio_exames e where e.id = perio_medidas.exame_id and is_own_clinical_record(e.dentista_id)
-  ));
+  using (belongs_to_active_clinic(clinica_id) and is_clinic_staff());
 drop policy if exists "perio_medidas_write_own" on public.perio_medidas;
 create policy "perio_medidas_write_own" on public.perio_medidas for all
   using (belongs_to_active_clinic(clinica_id) and exists (
@@ -495,6 +612,28 @@ pra registrar o novo uso de `--color-coral` em pendência de odontograma, e docu
 Prontuário odontológico em fiscalização (CRO) ou disputa judicial precisa responder, por
 procedimento: **o que foi feito, em que data, por quem, e com que atestado**. O modelo
 cobre isso com três datas de papéis distintos + a cadeia de assinatura já existente:
+
+> **Validação normativa (pesquisa 16/07)** — o [Manual do Prontuário do CFO (1ª ed., 2026)](https://website.cfo.org.br/wp-content/uploads/2026/03/CFO_Manual_do_Prontuario_Ebook.pdf)
+> confirma este desenho ponto a ponto:
+> - A evolução deve conter *"a data de execução do trabalho, o dente ou região, o
+>   procedimento em si, o profissional executor e vistos/assinaturas, principalmente do
+>   paciente, mas também do Cirurgião-dentista (nome e número de inscrição no CRO)"* —
+>   é exatamente `realizado_em` + `dentista_id` + a assinatura por ficha + nome/CRO no PDF.
+> - Registro clínico *"sem emendas ou rasuras"*; digitalização deve proteger contra
+>   *"alteração não autorizada"* — é o event-log append-only (invariantes #4/#14).
+> - O odontograma **anatômico** é o ideal: *"um modelo que exponha as cinco faces
+>   coronárias e possibilite a visualização integral de coroa e raiz"* — é o
+>   `ToothDetailPanel` (5 zonas + raiz) sobre o componente anatômico existente.
+> - Recomenda **dois odontogramas** — Inicial (condição em que o paciente chegou) e Final
+>   (planejado + executado), *"para que valham como provas específicas e não se macule
+>   cada um dos registros"* — é o eixo `origem: preexistente|clinica` + `status:
+>   indicado|realizado` + modo `exame_inicial` (3.1.3).
+> - O registro preciso importa em *"análises sobre o tratamento de cada Cirurgião-dentista
+>   que tenha assistido o paciente, assim como se um terceiro interferiu"* — é o
+>   `dentista_id` por evento no modelo do núcleo clínico (099).
+> - Moldura legal do prontuário digital: **Lei 13.787/2018 + LGPD**; guarda mínima de
+>   **20 anos** a partir do último registro (manual recomenda guarda por tempo
+>   indeterminado — ex.: identificação humana). Reforça a decisão de nunca deletar eventos.
 
 | Campo | Papel | Quem preenche |
 |---|---|---|
@@ -580,7 +719,7 @@ nesta clínica) · **slate** = `--color-slate` (pré-existente) · **neutro** = 
 | 6 | Extraído / ausente | dente | Coroa e raiz ocultas — só contorno tracejado fino, sem preenchimento ("buraco" na arcada) | neutro (`--color-border`) | "o quarenta e seis é resto radicular, extraí" | Toque reabre o dente (desfaz "ausente") |
 | 7 | Incluso (contorno tracejado) | dente | Contorno TRACEJADO em `--color-text-secondary`, preenchimento normal por baixo | neutro | "o trinta e oito está incluso, indicação de exposição cirúrgica" | Toque abre painel → toggle "Incluso" + associar exodontia/exposição se houver indicação |
 | 8 | Canal a tratar | dente (raiz) | Linha vertical fina TRACEJADA no meio da raiz estilizada | coral | "pulpite no quarenta e seis, vou fazer o canal" | Toque na raiz no painel de detalhe alterna estado do canal |
-| 9 | Canal tratado | dente (raiz) | Mesma linha, mas CONTÍNUA (sólida) | teal (feito aqui) / slate (pré-existente) | "terminei o canal do quarenta e seis hoje" / exame inicial: "já tem canal tratado no vinte e seis" | Idem #8 |
+| 9 | Canal tratado | dente (raiz) | Mesma linha, mas CONTÍNUA (sólida) | teal (feito aqui) / slate (pré-existente) | "terminei o canal do quarenta e seis hoje" / exame inicial: "já tem canal tratado no vinte e seis" | Idem #8. **Retratamento** *(16/07)*: novo evento `indicado` sobre um `realizado` anterior — a arcada volta a tracejado coral e o painel rotula "Retratamento" **derivando do log** (existe realizado anterior), sem símbolo novo |
 | 10 | Lesão periapical (círculo no ápice) | dente (ápice) | Círculo VAZADO (só contorno) na ponta da raiz | coral | "radiografia mostrou lesão periapical no vinte e cinco" | Toque na região do ápice no painel de detalhe |
 | 11 | Implante (parafuso na raiz) | dente | Raiz estilizada substituída por ícone de parafuso/rosca (retângulo com linhas horizontais, afunilado na ponta) | coral indicado / teal feito / slate pré-existente | "implante osseointegrado no trinta e seis" / "planejar implante no espaço do trinta e sete" | Toque no dente no painel de detalhe |
 | 12 | Coroa total (coroa preenchida) | dente | Coroa inteira com contorno DUPLO/mais grosso (+2px) além do fill de cor — distingue de restauração de face | coral/teal/slate conforme status/origem | "coroa de zircônia no vinte e seis" / exame inicial: "paciente já tem coroa no vinte e seis" | Toque no dente |
@@ -589,6 +728,8 @@ nesta clínica) · **slate** = `--color-slate` (pré-existente) · **neutro** = 
 | 15 | Decíduo presente | — (contexto de aba) | Sem símbolo próprio — dentes 51-85 usam o MESMO catálogo acima (cárie/restauração/coroa/etc.), só ancorados em números decíduos | conforme o registro | — | Aba "Decíduos" do componente (já existe) |
 | 16 | Esfoliado | dente (decíduo) | Mesmo tratamento de "ausente" (#6) + badge pequeno de seta indicando sucessor permanente ativo | neutro | "o setenta e quatro já caiu, o permanente já irrompeu" | Toque → deep-link pra aba Permanentes destacando o dente correspondente — **Fatia B** |
 | 17 | Selo perio (bolsa >=4mm) | dente | Badge extra no canto da coroa (pontinho/anel) — NÃO é `odontograma_eventos`, é derivado de `perio_medidas` | warning | (não vem de narração — vem do exame perio estruturado) | Toque abre o exame perio daquele dente — **Fatia C** |
+| 18 | Fratura dentária *(aprovado 16/07)* | dente | Traço em zigue-zague sobre a coroa; achado como #10 (quase sempre `indicado` — o tratamento vira evento próprio: restauração/coroa/exo). `observacao` distingue coronária/radicular | coral | "o paciente caiu e fraturou o onze" / "fratura coronária no vinte e um" | Toque no dente no painel de detalhe |
+| 19 | Pino/núcleo intrarradicular *(aprovado 16/07)* | dente (raiz) | Retângulo estreito vertical no terço coronal da raiz estilizada — convive com a linha de canal (#8/#9) | coral indicado / teal feito / slate pré-existente | "cimentei pino no treze" / exame inicial: "já tem núcleo no vinte e cinco" | Toque na raiz no painel de detalhe |
 
 ---
 
@@ -596,8 +737,9 @@ nesta clínica) · **slate** = `--color-slate` (pré-existente) · **neutro** = 
 
 ### 3.1 `POST /api/dex/formatar-evolucao` — Motor A estendido
 
-Todos os campos v2 (`queixa_principal`, `anotacoes`, `dentes_afetados`, `dentes_observacoes`,
-`procedimentos`, `conduta`, `retorno_sugerido`, `alerta_novo`) **permanecem intactos** —
+Todos os campos v2 vivos (`queixa_principal`, `anotacoes`, `dentes_afetados`, `dentes_observacoes`,
+`procedimentos`, `conduta`, `alerta_novo` — `retorno_sugerido` foi **extinto em 16/07** pela
+Fatia A da Spec 3, quem decide retorno é o dentista) **permanecem intactos** —
 esta é uma extensão aditiva, não uma troca de contrato. `dentes_afetados`/`dentes_observacoes`
 continuam alimentando orçamento e sidebar exatamente como hoje; `odontograma_eventos` é a
 camada nova, rica, que alimenta o componente visual.
@@ -641,8 +783,9 @@ const ODONTOGRAMA_EVENTO_SCHEMA: Schema = {
   properties: {
     tipo: { type: Type.STRING, enum: [
       'carie_restauracao','exodontia','endodontia','lesao_periapical',
-      'implante','coroa','selante','inclusao',
-    ] }, // 'ponte' e 'esfoliacao' só entram no enum a partir da Fatia B (ver 1.4)
+      'implante','coroa','selante','inclusao','fratura','pino_nucleo',
+    ] }, // 'ponte' e 'esfoliacao' só entram no enum a partir da Fatia B (ver 1.4);
+         // 'fratura'/'pino_nucleo' entram na A (dente único, painel já desenha)
     status: { type: Type.STRING, enum: ['indicado', 'realizado'] },
     nivel: { type: Type.STRING, enum: ['arcada', 'quadrante', 'dente', 'face'] },
     arcada: { type: Type.STRING, enum: ['superior', 'inferior'], nullable: true },
@@ -665,7 +808,8 @@ orto_manutencao: {
     arcada: { type: Type.STRING, enum: ['superior', 'inferior', 'ambas'] },
     fio: { type: Type.STRING, nullable: true },
     ativacao: { type: Type.STRING, nullable: true },
-    elastico: { type: Type.STRING, nullable: true },
+    elastico_corrente: { type: Type.STRING, nullable: true },
+    elastico_intermaxilar: { type: Type.STRING, nullable: true },
   },
 },
 ```
@@ -764,8 +908,9 @@ Response: `{ ok: true }` ou `400 { error: 'dentes incompletos: [...]' }`.
 | Rate limit | não (CRUD puro) |
 
 **Erros comuns às 5 rotas:** 401 não autenticado · 403 secretária tentando escrever · 404
-exame/paciente fora do silo do dentista (RLS bloqueia — nunca vaza existência) · 400 body
-inválido ou (na rota de concluir) grade incompleta.
+exame/paciente fora da **clínica ativa** (RLS bloqueia — nunca vaza existência; dentro da
+clínica todo staff lê, modelo 099) · 400 body inválido ou (na rota de concluir) grade
+incompleta.
 
 ### 3.4 `GET /api/pacientes/[id]/odontograma-acumulado` — Fatia B
 
@@ -802,8 +947,8 @@ interface OdontogramaAcumuladoResponse {
 | Auth | obrigatório |
 | Rate limit | não (leitura, sem LLM) |
 
-**Erros:** 401 não autenticado · 404 paciente não encontrado ou fora do silo do dentista
-(RLS — nunca 403 explícito, pra não confirmar existência de paciente de outro dono).
+**Erros:** 401 não autenticado · 404 paciente não encontrado ou fora da clínica ativa
+(RLS — nunca 403 explícito, pra não confirmar existência de paciente de outra clínica).
 
 ---
 
@@ -849,10 +994,15 @@ direto do perfil do paciente, fora de uma consulta ativa (`fichaId: null`).
 
 ### (d) Manutenção de orto por arcada
 
-1. Dentista dita "troquei o arco superior, ativei, troquei as borrachinhas".
-2. `formatar-evolucao` preenche `orto_manutencao` (1.5) — chips fio/ativação/elástico na
-   ficha, âncora = arcada.
+1. Dentista dita "troquei o arco superior, ativei, troquei as borrachinhas, corrente do
+   treze ao vinte e três, mantive o intermaxilar três dezesseis".
+2. `formatar-evolucao` preenche `orto_manutencao` (1.5) — chips fio/ativação/corrente/
+   intermaxilar na ficha, âncora = arcada.
 3. **Nenhum** `odontograma_evento` é gerado.
+3b. **Atalho "igual à última"** *(proposto 16/07 — dor de campo: "mal têm tempo de
+   preencher ficha")*: um toque pré-preenche os chips com a manutenção anterior do
+   paciente; o dentista ajusta só o que mudou. A consulta mensal recorrente vira 2 toques
+   + salvar. Sem última manutenção, o atalho não aparece.
 4. Tela de confirmação: coluna direita mostra os chips de manutenção, **não mostra o
    odontograma vazio** — condição explícita: `odontograma_eventos.length === 0 && orto_manutencao != null` esconde o card do odontograma e substitui por um card compacto de
    manutenção (evita "boca vazia inútil" citado no briefing).
@@ -892,9 +1042,17 @@ sítios vestibulares (MV, V, DV) numa sub-linha, 3 linguais/palatinos (DL, L, ML
 espelhando fisicamente como o dentista sonda (lado de fora, depois lado de dentro). Cada
 célula mostra: profundidade em mm (número grande), e 2 indicadores pequenos
 (sangramento = ponto vermelho, placa = ponto amarelo). Dente ausente colapsa as 6 células
-numa faixa cinza "ausente" (não ocupa espaço de sondagem). Mobilidade/furca/recessão ficam
-num mini-resumo abaixo de cada dente (fora da grade de 6 pontos), preenchíveis por toque
-(não fazem parte do ditado numérico contínuo).
+numa faixa cinza "ausente" (não ocupa espaço de sondagem). Mobilidade/furca ficam num
+mini-resumo abaixo de cada dente (fora da grade de 6 pontos), preenchíveis por toque (não
+fazem parte do ditado numérico contínuo). **Recessão é POR SÍTIO** (revisado 16/07 — ver
+§1.6): linha opcional na grade preenchível por toque na sondagem ou na revisão; quando
+preenchida, a célula exibe também o **CAL derivado** (`profundidade + recessão`) — nunca
+digitado, nunca persistido. A gramática de voz (5.3) NÃO ganha token de recessão: o ditado
+contínuo segue sendo só profundidade + modificadores, pra não dobrar o ritmo da sondagem.
+**Linhas gengivais** *(16/07)*: com PD + recessão por sítio, os dados sustentam desenhar a
+**margem gengival e a linha de CAL** sobre os dentes (o visual clássico de periograma que
+periodontistas esperam — ex. perio-tools). Se o v1 desenha as linhas ou fica na grade
+numérica é decisão do **design-brief da Fatia C** — o modelo de dados já habilita as duas.
 
 ### 5.2 Caminho técnico do ditado — Web Speech API, não Whisper
 
@@ -983,9 +1141,11 @@ Lista testável — cada item deve ser verificável por eval, teste manual ou le
    (5.5) — nunca só uma das duas camadas.
 4. **`odontograma_eventos` é conceitualmente append-only** — correção de erro clínico
    confirmado é um evento novo, não um `UPDATE` do passado (1.4/1.7).
-5. **Toda query nas tabelas novas passa por `clinica_id` + RLS silo por dentista**
-   (`belongs_to_active_clinic` + `is_own_clinical_record`/`get_my_dentista_id`) — nunca
-   uma query sem esse filtro, nem em rota de API nem em Server Action.
+5. **Toda query nas tabelas novas passa por `clinica_id` + o modelo do núcleo clínico
+   (099)** — SELECT: `belongs_to_active_clinic` + `is_clinic_staff()` (a clínica lê;
+   o acumulado depende de ver eventos de todos os dentistas); escrita:
+   `dentista_id = get_my_dentista_id()` (só o autor). Nunca uma query sem esse filtro,
+   nem em rota de API nem em Server Action. *(Revisado 16/07 — era "silo por dentista".)*
 6. **Dark mode obrigatório** — todo componente novo usa tokens (`bg-surface`,
    `text-text-primary`, `--color-coral`/`--color-teal`/`--color-slate`/`--color-warning`),
    nunca hex hardcoded nem `dark:` condicional.
@@ -1030,10 +1190,13 @@ pra negação), `grupo_consistente` (todos os eventos de um `grupo_id` compartil
 | `deciduo-restauracao-74` | "restaurei o setenta e quatro com ionômero" → evento âncora dente 74 (decíduo), mesmo `tipo` de um permanente |
 | `reab-boca-20-procedimentos` (reusa o caso pesado 17-dentes já existente, estendido) | `odontograma_eventos` cobre os mesmos dentes de `dentes_afetados`, sem órfão nem duplicata |
 | `negacao-canal-so-curativo` | "não fiz o canal, só o curativo" → `odontograma_eventos_nao_contem: [{tipo:'endodontia', status:'realizado'}]` |
+| `fratura-trauma-11` *(16/07)* | "paciente caiu e fraturou o onze" → evento `fratura`, dente 11, `status:'indicado'` — e NÃO gera `carie_restauracao` fantasma |
+| `pino-nucleo-13` *(16/07)* | "cimentei pino no treze" → evento `pino_nucleo`, dente 13, `status:'realizado'` |
 
 **Critérios de PASS** (mesmo espírito do gate já em produção — spec fase1-5 §F):
-- >= 6/7 casos novos PASS · zero órfão em `odontograma_eventos` (evento com `dente` fora
-  de `dentes_afetados` quando aplicável) · zero alucinação de `tipo`/`status`/`face` fora
+- >= 8/9 casos novos PASS (eram 7; `fratura-trauma-11` e `pino-nucleo-13` entraram em
+  16/07) · zero órfão em `odontograma_eventos` (evento com `dente` fora de
+  `dentes_afetados` quando aplicável) · zero alucinação de `tipo`/`status`/`face` fora
   do enum.
 - Latência p95 da rota continua < 6s (mesmo gate — o campo novo não deve estourar o
   teto já validado; se estourar, primeira ação é revisar `maxOutputTokens`, não relaxar o
@@ -1141,6 +1304,46 @@ existente). Fraco acoplamento com Fatia B (não depende do acumulado nem de pont
 em ambiente real — ver 5.2. Mitigação dupla: toque sempre disponível + gate de teste real
 antes de declarar a fatia pronta.
 
+### Fatia D — Ficha endodôntica / odontometria *(escopo novo, decidido 18/07)*
+
+> **Origem:** o Mateus apontou (18/07) que a spec modelava endodontia como **um evento só**
+> (a linha do canal, catálogo #8/#9) e faltava a **ficha endodôntica** — a odontometria dos
+> canais, por dente. Decisão: entra no v3 como **Fatia D**, paralela ao Perio (Fatia C) —
+> ambos são "fichas clínicas detalhadas" que o evento do odontograma resume.
+>
+> **A distinção que dirige o design (analogia do Mateus):** Perio = "alicerce/terreno" (osso,
+> gengiva, ligamento — **boca inteira**, 6 pontos por dente). Endo = "encanamento" (polpa e
+> canais **dentro de um dente** — um dente por vez). Tabelas e fluxos completamente distintos.
+
+**Entrega:** tabela de odontometria por dente + persistência + linha vermelha nos canais
+(o desenho já nasce na Fatia A como evento `endodontia`; a Fatia D adiciona o **detalhe**).
+
+**Modelo de dados (espelha o do perio — 1.8):**
+- `endo_tratamentos` (por dente/ficha): `paciente_id`, `dentista_id`, `ficha_id`, `dente`,
+  `ponto_referencia`, `tecnica_obturacao`, `cimento`, `status`, `data`, `concluido_em`.
+  RLS = núcleo clínico (099): clínica lê, autor escreve. Mesmo padrão de `perio_exames`.
+- `endo_canais` (linhas): `tratamento_id`, `canal` (nome: MV/DV/Palatino/…),
+  `comprimento_raiz_mm` (**decisão do Mateus 18/07:** UMA medida só — substitui o par
+  CAD/CRD da proposta original), `ct_mm` (trabalho), `lima_final`.
+  `ct` NÃO é derivado no banco (é decisão clínica ≈ comprimento−1mm, mas o dentista define).
+- **Visual do canal (decisão 18/07, feedback sobre o preview):** o canal NÃO é uma linha
+  fina — é a silhueta do canal **desenhada por inteiro dentro da raiz** + a raiz tingida
+  pelo estado: contorno vazio coral = a tratar · preenchido teal = tratado aqui · preenchido
+  slate = pré-existente. Legibilidade para qualquer idade/tela — linha fina reprovada.
+
+**Contratos (a detalhar pós-validação):** rotas CRUD `/api/endo/tratamentos*` no molde das
+rotas perio (§3.3), sem LLM. Componente `EndoOdontometria` (painel por-dente, abre do
+`ToothDetailPanel` via ação "Tratamento de canal"). Migração aditiva (próximo número livre).
+
+**Invariantes herdadas:** #5 (RLS núcleo clínico), #6 (dark/tokens), #7 (TS estrito),
+#13 (dado clínico não nasce de IA — a odontometria é digitada/medida, zero Gemini).
+
+**⚠️ PENDENTE — validação de campo (18/07):** o design das tabelas (Endo + Perio) e o
+catálogo anatômico foram para os **dentistas do piloto** avaliarem (preview em artifact,
+2026-07-18). As colunas exatas da odontometria, o fluxo e o layout **congelam depois das
+observações deles** — endodontistas variam na ficha. Não executar a Fatia D (nem finalizar
+a UI da A) antes desse retorno. **Dependências:** Fatia A (evento + `ToothDetailPanel`).
+
 ---
 
 ## Parte 9 — Pipeline de design
@@ -1170,3 +1373,20 @@ qualquer outra feature — não é um passo extra desta spec, é o gate padrão 
 | Query de acumulado (Fatia B) degradar em paciente com histórico muito longo | baixa | Índice dedicado (1.7) + reduce por query é suficiente no volume real; materializar é válvula de escape já registrada, não pré-otimização |
 | `origem:'preexistente'` forçado por toggle (não por item) classificar errado um procedimento feito na mesma sessão do exame inicial | baixa-média | Orientação de UX explícita (narrar em 2 passadas, cenário b) — troca-se confiabilidade de um switch binário por uma inferência de LLM por-item, que erraria mais |
 | Ordem real dos 6 sítios de sondagem divergir da convenção assumida | média | Constante nomeada (`SEQUENCIA_SITIOS_PADRAO`), 1 linha pra corrigir após a visita à clínica piloto — não está espalhada pelo código |
+
+---
+
+## Fontes — validação de 16/07 (pesquisa)
+
+| Fonte | O que sustenta |
+|---|---|
+| [Manual do Prontuário do Paciente em Odontologia — CFO, 1ª ed., 2026](https://website.cfo.org.br/wp-content/uploads/2026/03/CFO_Manual_do_Prontuario_Ebook.pdf) | Odontograma anatômico (5 faces + coroa/raiz) como ideal · dois odontogramas Inicial/Final · evolução com data, executor, CRO e assinatura do paciente · "sem emendas ou rasuras" · FDI 2 dígitos · Lei 13.787/2018 + LGPD · guarda ≥20 anos (recomendada indeterminada) |
+| [SDCEP — Full periodontal examination: periodontal parameters](https://www.periodontalcare.sdcep.org.uk/guidance/assessment/special-tests/full-periodontal-examination/what-should-be-recorded/periodontal-parameters/) | Sondagem em 6 sítios/dente · CAL = profundidade + recessão (a partir da JCE) · "sistemas informatizados calculam CAL automaticamente" · supuração como registro opcional |
+| [Tonetti, Greenwell, Kornman — Staging and grading of periodontitis (J Periodontol, 2018)](https://aap.onlinelibrary.wiley.com/doi/full/10.1002/JPER.18-0006) · [guia Periospot](https://www.periospot.com/blog/the-2018-aapefp-periodontal-classification-a-clinicians-complete-guide-to-staging-and-grading) | Estadiamento I–IV dirigido por **CAL interdental** (1–2mm=I, 3–4=II, ≥5=III/IV) — a razão do ajuste de recessão por sítio (§1.6) |
+| [Simples Dental — 23 áreas reconhecidas pelo CFO](https://www.simplesdental.com/blog/areas-da-odontologia/) | Contagem e lista das especialidades (base da seção "Cobertura por especialidade"); contagem varia com reconhecimentos recentes |
+
+**Nota de confiança:** convenção de cores de odontograma (vermelho=a fazer / azul=feito)
+**não é normatizada pelo CFO** (ausente do manual — verificado) — coral/teal/slate é escolha
+livre de produto; o slate (pré-existente) tem apoio indireto no interesse pericial do manual
+em distinguir o trabalho de cada profissional. A ordem exata dos 6 sítios na sondagem segue
+como assunção a validar em campo (constante nomeada).
