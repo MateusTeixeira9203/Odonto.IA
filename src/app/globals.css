@@ -47,9 +47,13 @@
   --color-teal-pale: #e4f4f1;
   --color-teal-dark: #1e7060;
 
-  /* Coral — substitui rose/red nos valores financeiros negativos */
+  /* Coral — substitui rose/red nos valores financeiros negativos; tb. "a fazer" no odontograma (v3) */
   --color-coral: #e57373;
   --color-coral-pale: #fce8e8;
+
+  /* Slate — histórico/pré-existente: trabalho de outro profissional no odontograma (v3, §1.9) */
+  --color-slate: #64748b;
+  --color-slate-pale: #e2e8f0;
 
   /* Warning — alertas, avisos, estados de atenção */
   --color-warning: #f59e0b;
@@ -116,6 +120,10 @@
   --color-coral: #ef9a9a;
   --color-coral-pale: #3d1f1f;
 
+  /* Slate — pré-existente no odontograma (dark) */
+  --color-slate: #94a3b8;
+  --color-slate-pale: #334155;
+
   /* Warning mais brilhante em dark mode */
   --color-warning: #fbbf24;
   --color-warning-pale: #451a03;
@@ -164,6 +172,10 @@
   /* Coral — cor canônica para negativos/despesas */
   --color-coral: var(--color-coral);
   --color-coral-pale: var(--color-coral-pale);
+
+  /* Slate — pré-existente no odontograma (text-slate, bg-slate-pale) */
+  --color-slate: var(--color-slate);
+  --color-slate-pale: var(--color-slate-pale);
 
   /* Brand aliases disponíveis via text-brand-*, bg-brand-* */
   --color-brand-offwhite: var(--color-brand-offwhite);

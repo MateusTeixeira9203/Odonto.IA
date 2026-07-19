@@ -1,12 +1,17 @@
 'use client';
 
-import { useState, Fragment } from 'react';
+import { useMemo, useState, Fragment } from 'react';
 import { List } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   ARCH_SUPERIOR, ARCH_INFERIOR, ARCH_COMPLETA,
   QUAD_SUP_DIREITO, QUAD_SUP_ESQUERDO, QUAD_INF_DIREITO, QUAD_INF_ESQUERDO,
 } from '@/lib/arcadas';
+import {
+  TOOTH_CLASS, TOOTH_FAMILY, DIMS,
+  crownPathOcclusalTop, crownPathOcclusalBottom, rootPathDown, rootPathUp, canalPaths,
+} from './tooth-geometry';
+import { corDoRegistro, type OdontogramaEventoDraft } from '@/types/odontograma';
 
 // ─── FDI tooth layout ────────────────────────────────────────────────────────
 export const TEETH_UPPER = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
@@ -42,271 +47,80 @@ export function getQuadrantLabel(tooth: number): string {
   return 'Dec. · Inf. Direito';
 }
 
-// ─── Tooth class ──────────────────────────────────────────────────────────────
-type ToothClass =
-  | 'central' | 'lateral' | 'canine' | 'premolar'
-  | 'molar1' | 'molar2' | 'molar3'
-  | 'dec_incisor' | 'dec_canine' | 'dec_molar';
-
-interface Dim { w: number; crownH: number; rootH: number; isMolar: boolean }
-
-const TOOTH_CLASS: Record<number, ToothClass> = {
-  11: 'central',  21: 'central',  31: 'central',  41: 'central',
-  12: 'lateral',  22: 'lateral',  32: 'lateral',  42: 'lateral',
-  13: 'canine',   23: 'canine',   33: 'canine',   43: 'canine',
-  14: 'premolar', 24: 'premolar', 34: 'premolar', 44: 'premolar',
-  15: 'premolar', 25: 'premolar', 35: 'premolar', 45: 'premolar',
-  16: 'molar1',   26: 'molar1',   36: 'molar1',   46: 'molar1',
-  17: 'molar2',   27: 'molar2',   37: 'molar2',   47: 'molar2',
-  18: 'molar3',   28: 'molar3',   38: 'molar3',   48: 'molar3',
-  51: 'dec_incisor', 52: 'dec_incisor', 61: 'dec_incisor', 62: 'dec_incisor',
-  71: 'dec_incisor', 72: 'dec_incisor', 81: 'dec_incisor', 82: 'dec_incisor',
-  53: 'dec_canine',  63: 'dec_canine',  73: 'dec_canine',  83: 'dec_canine',
-  54: 'dec_molar',   55: 'dec_molar',   64: 'dec_molar',   65: 'dec_molar',
-  74: 'dec_molar',   75: 'dec_molar',   84: 'dec_molar',   85: 'dec_molar',
-};
-
-// ─── Dimensions (1.6× scaled) ─────────────────────────────────────────────────
-const DIMS: Record<ToothClass, Dim> = {
-  central:     { w: 35, crownH: 48, rootH: 35, isMolar: false },
-  lateral:     { w: 29, crownH: 43, rootH: 32, isMolar: false },
-  canine:      { w: 32, crownH: 51, rootH: 42, isMolar: false },
-  premolar:    { w: 37, crownH: 45, rootH: 34, isMolar: false },
-  molar1:      { w: 51, crownH: 45, rootH: 29, isMolar: true  },
-  molar2:      { w: 48, crownH: 42, rootH: 27, isMolar: true  },
-  molar3:      { w: 43, crownH: 38, rootH: 24, isMolar: true  },
-  dec_incisor: { w: 24, crownH: 32, rootH: 24, isMolar: false },
-  dec_canine:  { w: 26, crownH: 35, rootH: 27, isMolar: false },
-  dec_molar:   { w: 35, crownH: 34, rootH: 22, isMolar: true  },
-};
-
-// ─── Tooth family ─────────────────────────────────────────────────────────────
-type ToothFamily = 'anterior' | 'canine' | 'premolar' | 'molar';
-
-const TOOTH_FAMILY: Record<ToothClass, ToothFamily> = {
-  central:     'anterior',
-  lateral:     'anterior',
-  canine:      'canine',
-  premolar:    'premolar',
-  molar1:      'molar',
-  molar2:      'molar',
-  molar3:      'molar',
-  dec_incisor: 'anterior',
-  dec_canine:  'canine',
-  dec_molar:   'molar',
-};
-
-// ─── SVG path generators (anatomical) ────────────────────────────────────────
-const CERVICAL = 0.78;
-const q = (n: number) => n.toFixed(1);
-
-// Upper crown: incisal/occlusal at top (y=0), cervical at bottom (y=h)
-function upperCrownPath(w: number, h: number, family: ToothFamily): string {
-  const neck = w * CERVICAL;
-  const nL   = (w - neck) / 2;
-  const nR   = nL + neck;
-  const bul  = w * 0.045;
-
-  if (family === 'canine') {
-    const cx = w / 2;
-    return (
-      `M ${q(nL)} ${h} ` +
-      `C ${q(nL - bul)} ${q(h * 0.58)} ${q(nL * 0.12)} ${q(h * 0.28)} ${q(cx)} 0 ` +
-      `C ${q(w - nL * 0.12)} ${q(h * 0.28)} ${q(nR + bul)} ${q(h * 0.58)} ${q(nR)} ${h} Z`
-    );
-  }
-
-  if (family === 'molar') {
-    const cH  = h * 0.16;
-    const tip = cH * 0.42;
-    const val = cH;
-    const lx  = w * 0.25;
-    const rx2 = w * 0.75;
-    const tw  = w * 0.055;
-    return (
-      `M ${q(nL)} ${h} ` +
-      `C ${q(nL - bul)} ${q(h * 0.62)} ${q(nL * 0.1)} ${q(h * 0.35)} ${q(w * 0.07)} ${q(val)} ` +
-      `C ${q(w * 0.07)} ${q(val - cH * 0.42)} ${q(lx - tw)} ${q(tip)} ${q(lx)} ${q(tip)} ` +
-      `C ${q(lx + tw)} ${q(tip)} ${q(w / 2)} ${q(val - cH * 0.42)} ${q(w / 2)} ${q(val)} ` +
-      `C ${q(w / 2)} ${q(val - cH * 0.42)} ${q(rx2 - tw)} ${q(tip)} ${q(rx2)} ${q(tip)} ` +
-      `C ${q(rx2 + tw)} ${q(tip)} ${q(w * 0.93)} ${q(val - cH * 0.42)} ${q(w * 0.93)} ${q(val)} ` +
-      `C ${q(w - nL * 0.1)} ${q(h * 0.35)} ${q(nR + bul)} ${q(h * 0.62)} ${q(nR)} ${h} Z`
-    );
-  }
-
-  if (family === 'premolar') {
-    const cH  = h * 0.10;
-    const tip = cH * 0.38;
-    const val = cH;
-    const cx  = w / 2;
-    const tw  = w * 0.06;
-    return (
-      `M ${q(nL)} ${h} ` +
-      `C ${q(nL - bul)} ${q(h * 0.60)} 0 ${q(h * 0.30)} ${q(w * 0.07)} ${q(val)} ` +
-      `C ${q(w * 0.07)} ${q(val - cH * 0.5)} ${q(cx - tw)} ${q(tip)} ${q(cx)} ${q(tip)} ` +
-      `C ${q(cx + tw)} ${q(tip)} ${q(w * 0.93)} ${q(val - cH * 0.5)} ${q(w * 0.93)} ${q(val)} ` +
-      `C ${q(w)} ${q(h * 0.30)} ${q(nR + bul)} ${q(h * 0.60)} ${q(nR)} ${h} Z`
-    );
-  }
-
-  // anterior: straight incisal, convex sides
-  const ir = w * 0.06;
-  return (
-    `M ${q(nL)} ${h} ` +
-    `C ${q(nL - bul)} ${q(h * 0.60)} 0 ${q(h * 0.28)} ${q(ir)} ${q(ir)} ` +
-    `L ${q(w - ir)} ${q(ir)} ` +
-    `C ${q(w)} ${q(h * 0.28)} ${q(nR + bul)} ${q(h * 0.60)} ${q(nR)} ${h} Z`
-  );
-}
-
-// Lower crown: incisal/occlusal at bottom (y = rootH + crownH), cervical at top (y = rootH)
-function lowerCrownPath(w: number, crownH: number, rootH: number, family: ToothFamily): string {
-  const neck = w * CERVICAL;
-  const nL   = (w - neck) / 2;
-  const nR   = nL + neck;
-  const y0   = rootH;
-  const y1   = rootH + crownH;
-  const bul  = w * 0.045;
-
-  if (family === 'canine') {
-    const cx = w / 2;
-    return (
-      `M ${q(nL)} ${y0} ` +
-      `C ${q(nL - bul)} ${q(y0 + crownH * 0.42)} ${q(nL * 0.12)} ${q(y0 + crownH * 0.72)} ${q(cx)} ${y1} ` +
-      `C ${q(w - nL * 0.12)} ${q(y0 + crownH * 0.72)} ${q(nR + bul)} ${q(y0 + crownH * 0.42)} ${q(nR)} ${y0} Z`
-    );
-  }
-
-  if (family === 'molar') {
-    const cH  = crownH * 0.16;
-    const tip = y1 - cH * 0.42;
-    const val = y1 - cH;
-    const lx  = w * 0.25;
-    const rx2 = w * 0.75;
-    const tw  = w * 0.055;
-    return (
-      `M ${q(nL)} ${y0} ` +
-      `C ${q(nL - bul)} ${q(y0 + crownH * 0.38)} ${q(nL * 0.1)} ${q(y0 + crownH * 0.65)} ${q(w * 0.07)} ${q(val)} ` +
-      `C ${q(w * 0.07)} ${q(val + cH * 0.42)} ${q(lx - tw)} ${q(tip)} ${q(lx)} ${q(tip)} ` +
-      `C ${q(lx + tw)} ${q(tip)} ${q(w / 2)} ${q(val + cH * 0.42)} ${q(w / 2)} ${q(val)} ` +
-      `C ${q(w / 2)} ${q(val + cH * 0.42)} ${q(rx2 - tw)} ${q(tip)} ${q(rx2)} ${q(tip)} ` +
-      `C ${q(rx2 + tw)} ${q(tip)} ${q(w * 0.93)} ${q(val + cH * 0.42)} ${q(w * 0.93)} ${q(val)} ` +
-      `C ${q(w - nL * 0.1)} ${q(y0 + crownH * 0.65)} ${q(nR + bul)} ${q(y0 + crownH * 0.38)} ${q(nR)} ${y0} Z`
-    );
-  }
-
-  if (family === 'premolar') {
-    const cH  = crownH * 0.10;
-    const tip = y1 - cH * 0.38;
-    const val = y1 - cH;
-    const cx  = w / 2;
-    const tw  = w * 0.06;
-    return (
-      `M ${q(nL)} ${y0} ` +
-      `C ${q(nL - bul)} ${q(y0 + crownH * 0.40)} 0 ${q(y0 + crownH * 0.70)} ${q(w * 0.07)} ${q(val)} ` +
-      `C ${q(w * 0.07)} ${q(val + cH * 0.5)} ${q(cx - tw)} ${q(tip)} ${q(cx)} ${q(tip)} ` +
-      `C ${q(cx + tw)} ${q(tip)} ${q(w * 0.93)} ${q(val + cH * 0.5)} ${q(w * 0.93)} ${q(val)} ` +
-      `C ${q(w)} ${q(y0 + crownH * 0.70)} ${q(nR + bul)} ${q(y0 + crownH * 0.40)} ${q(nR)} ${y0} Z`
-    );
-  }
-
-  // anterior
-  const ir = w * 0.06;
-  return (
-    `M ${q(nL)} ${y0} ` +
-    `C ${q(nL - bul)} ${q(y0 + crownH * 0.40)} 0 ${q(y0 + crownH * 0.72)} ${q(ir)} ${q(y1 - ir)} ` +
-    `L ${q(w - ir)} ${q(y1 - ir)} ` +
-    `C ${q(w)} ${q(y0 + crownH * 0.72)} ${q(nR + bul)} ${q(y0 + crownH * 0.40)} ${q(nR)} ${y0} Z`
-  );
-}
-
-// Upper root: points down from cervical
-function upperRootPath(w: number, crownH: number, rootH: number, family: ToothFamily): string {
-  const neck   = w * CERVICAL;
-  const nL     = (w - neck) / 2;
-  const nR     = nL + neck;
-  const totalH = crownH + rootH;
-
-  if (family === 'molar') {
-    const furcY  = crownH + rootH * 0.36;
-    const notchY = crownH + rootH * 0.22;
-    const rW     = neck * 0.42;
-    const lL = nL;          const lR = nL + rW;
-    const rL = nR - rW;     const rR = nR;
-    const lCx = (lL + lR) / 2;
-    const rCx = (rL + rR) / 2;
-    return (
-      `M ${q(nL)} ${crownH} ` +
-      `C ${q(nL + neck * 0.04)} ${q(crownH + rootH * 0.16)} ${q(lL + neck * 0.02)} ${q(furcY - rootH * 0.08)} ${q(lL)} ${q(furcY)} ` +
-      `C ${q(lL - 0.5)} ${q(furcY + rootH * 0.32)} ${q(lCx - 2)} ${q(totalH - 5)} ${q(lCx)} ${totalH} ` +
-      `C ${q(lCx + 2)} ${q(totalH - 5)} ${q(lR + 0.5)} ${q(furcY + rootH * 0.32)} ${q(lR)} ${q(furcY)} ` +
-      `C ${q(lR)} ${q(notchY)} ${q(rL)} ${q(notchY)} ${q(rL)} ${q(furcY)} ` +
-      `C ${q(rL - 0.5)} ${q(furcY + rootH * 0.32)} ${q(rCx - 2)} ${q(totalH - 5)} ${q(rCx)} ${totalH} ` +
-      `C ${q(rCx + 2)} ${q(totalH - 5)} ${q(rR + 0.5)} ${q(furcY + rootH * 0.32)} ${q(rR)} ${q(furcY)} ` +
-      `C ${q(nR - neck * 0.02)} ${q(furcY - rootH * 0.08)} ${q(nR - neck * 0.04)} ${q(crownH + rootH * 0.16)} ${q(nR)} ${crownH} Z`
-    );
-  }
-
-  // single root
-  const rW = neck * 0.54;
-  const rL = (w - rW) / 2;
-  const rR = rL + rW;
-  const cx = w / 2;
-  return (
-    `M ${q(nL)} ${crownH} ` +
-    `C ${q(nL)} ${q(crownH + rootH * 0.22)} ${q(rL)} ${q(crownH + rootH * 0.40)} ${q(rL)} ${q(crownH + rootH * 0.44)} ` +
-    `C ${q(rL - 0.5)} ${q(crownH + rootH * 0.74)} ${q(cx - 2)} ${q(totalH - 5)} ${q(cx)} ${totalH} ` +
-    `C ${q(cx + 2)} ${q(totalH - 5)} ${q(rR + 0.5)} ${q(crownH + rootH * 0.74)} ${q(rR)} ${q(crownH + rootH * 0.44)} ` +
-    `C ${q(rR)} ${q(crownH + rootH * 0.40)} ${q(nR)} ${q(crownH + rootH * 0.22)} ${q(nR)} ${crownH} Z`
-  );
-}
-
-// Lower root: points up from cervical (y0 = rootH, apex at y = 0)
-function lowerRootPath(w: number, crownH: number, rootH: number, family: ToothFamily): string {
-  const neck  = w * CERVICAL;
-  const nL    = (w - neck) / 2;
-  const nR    = nL + neck;
-  const y0    = rootH;
-  const furcY = rootH * 0.64;
-
-  if (family === 'molar') {
-    const notchY = rootH * 0.78;
-    const rW     = neck * 0.42;
-    const lL = nL;          const lR = nL + rW;
-    const rL = nR - rW;     const rR = nR;
-    const lCx = (lL + lR) / 2;
-    const rCx = (rL + rR) / 2;
-    return (
-      `M ${q(nL)} ${y0} ` +
-      `C ${q(nL + neck * 0.04)} ${q(y0 - rootH * 0.16)} ${q(lL + neck * 0.02)} ${q(furcY + rootH * 0.08)} ${q(lL)} ${q(furcY)} ` +
-      `C ${q(lL - 0.5)} ${q(furcY - rootH * 0.32)} ${q(lCx - 2)} 5 ${q(lCx)} 0 ` +
-      `C ${q(lCx + 2)} 5 ${q(lR + 0.5)} ${q(furcY - rootH * 0.32)} ${q(lR)} ${q(furcY)} ` +
-      `C ${q(lR)} ${q(notchY)} ${q(rL)} ${q(notchY)} ${q(rL)} ${q(furcY)} ` +
-      `C ${q(rL - 0.5)} ${q(furcY - rootH * 0.32)} ${q(rCx - 2)} 5 ${q(rCx)} 0 ` +
-      `C ${q(rCx + 2)} 5 ${q(rR + 0.5)} ${q(furcY - rootH * 0.32)} ${q(rR)} ${q(furcY)} ` +
-      `C ${q(nR - neck * 0.02)} ${q(furcY + rootH * 0.08)} ${q(nR - neck * 0.04)} ${q(y0 - rootH * 0.16)} ${q(nR)} ${y0} Z`
-    );
-  }
-
-  // single root
-  const rW = neck * 0.54;
-  const rL = (w - rW) / 2;
-  const rR = rL + rW;
-  const cx = w / 2;
-  return (
-    `M ${q(nL)} ${y0} ` +
-    `C ${q(nL)} ${q(y0 - rootH * 0.22)} ${q(rL)} ${q(y0 - rootH * 0.40)} ${q(rL)} ${q(y0 - rootH * 0.44)} ` +
-    `C ${q(rL - 0.5)} ${q(y0 - rootH * 0.74)} ${q(cx - 2)} 5 ${q(cx)} 0 ` +
-    `C ${q(cx + 2)} 5 ${q(rR + 0.5)} ${q(y0 - rootH * 0.74)} ${q(rR)} ${q(y0 - rootH * 0.44)} ` +
-    `C ${q(rR)} ${q(y0 - rootH * 0.40)} ${q(nR)} ${q(y0 - rootH * 0.22)} ${q(nR)} ${y0} Z`
-  );
-}
-
-// ─── State type ───────────────────────────────────────────────────────────────
+// ─── State types ──────────────────────────────────────────────────────────────
 type ToothState = 'default' | 'historical' | 'shared' | 'selected' | 'detected';
 
 /** Status de acompanhamento de tratamento (ficha unificada, #16 D3). */
 export type ToothStatus = 'nao_iniciado' | 'em_andamento' | 'concluido';
+
+// ─── v3: resumo clínico por dente (reduce dos eventos propostos/salvos) ──────
+type CorClinica = 'coral' | 'teal' | 'slate';
+
+const COR_TOKEN: Record<CorClinica, string> = {
+  coral: 'var(--color-coral)',
+  teal:  'var(--color-teal)',
+  slate: 'var(--color-slate)',
+};
+
+export interface ResumoDente {
+  cor: CorClinica | null;       // dominante: coral (a fazer) > teal (feito aqui) > slate (pré-existente)
+  ausente: boolean;             // exodontia realizada / esfoliação
+  exodontiaIndicada: boolean;
+  incluso: boolean;
+  canal: CorClinica | null;
+  lesao: boolean;
+  implante: CorClinica | null;
+  coroa: CorClinica | null;
+  pino: CorClinica | null;
+  selante: CorClinica | null;
+  fratura: boolean;
+}
+
+const RESUMO_VAZIO: ResumoDente = {
+  cor: null, ausente: false, exodontiaIndicada: false, incluso: false,
+  canal: null, lesao: false, implante: null, coroa: null, pino: null,
+  selante: null, fratura: false,
+};
+
+/** coral vence teal, que vence slate (a pendência é o que não pode sumir da vista). */
+function corDominante(a: CorClinica | null, b: CorClinica): CorClinica {
+  if (a === 'coral' || b === 'coral') return 'coral';
+  if (a === 'teal' || b === 'teal') return 'teal';
+  return 'slate';
+}
+
+export function buildResumos(eventos: OdontogramaEventoDraft[]): Map<number, ResumoDente> {
+  const map = new Map<number, ResumoDente>();
+  for (const ev of eventos) {
+    const dente = ev.ancora.dente;
+    if (dente == null) continue; // âncoras de arcada/quadrante não pintam dente individual
+    const r = map.get(dente) ?? { ...RESUMO_VAZIO };
+    const cor = corDoRegistro(ev.status, ev.origem);
+    r.cor = corDominante(r.cor, cor);
+    switch (ev.tipo) {
+      case 'exodontia':
+        if (ev.status === 'realizado') r.ausente = true;
+        else r.exodontiaIndicada = true;
+        break;
+      case 'esfoliacao':
+        if (ev.status === 'realizado') r.ausente = true;
+        break;
+      case 'inclusao':          r.incluso = true; break;
+      case 'endodontia':        r.canal = corDominante(r.canal, cor); break;
+      case 'lesao_periapical':  r.lesao = true; break;
+      case 'implante':          r.implante = corDominante(r.implante, cor); break;
+      case 'coroa':             r.coroa = corDominante(r.coroa, cor); break;
+      case 'pino_nucleo':       r.pino = corDominante(r.pino, cor); break;
+      case 'selante':           r.selante = corDominante(r.selante, cor); break;
+      case 'fratura':           r.fratura = true; break;
+      case 'carie_restauracao':
+      case 'ponte':
+        break; // contribuem só pra cor dominante (ponte ganha bracket na Fatia B)
+    }
+    map.set(dente, r);
+  }
+  return map;
+}
 
 // ─── Individual tooth SVG ─────────────────────────────────────────────────────
 interface ToothSVGProps {
@@ -317,25 +131,59 @@ interface ToothSVGProps {
   showCheckbox: boolean;
   /** Anel de destaque independente do preenchimento — usado pra indicar filtro ativo em colorMode='status'. */
   ringed?: boolean;
+  /** v3: resumo clínico do dente — quando presente, dirige o visual (cores/marcas do catálogo). */
+  resumo?: ResumoDente | null;
 }
 
-function ToothSVG({ num, isUpper, state, hovered, showCheckbox, ringed = false }: ToothSVGProps) {
+export function ToothSVG({ num, isUpper, state, hovered, showCheckbox, ringed = false, resumo = null }: ToothSVGProps) {
   const cls    = TOOTH_CLASS[num] ?? 'premolar';
   const family = TOOTH_FAMILY[cls];
   const { w, crownH, rootH } = DIMS[cls];
   const totalH = crownH + rootH;
 
+  // Orientação de boca (decisão 18/07): superiores com a raiz pra CIMA e a coroa pra
+  // baixo; inferiores o inverso — as oclusais se encontram no plano oclusal do meio.
+  const crownPath = isUpper
+    ? crownPathOcclusalBottom(w, crownH, rootH, family)
+    : crownPathOcclusalTop(w, crownH, family);
+  const rootPath = isUpper
+    ? rootPathUp(w, crownH, rootH, family)
+    : rootPathDown(w, crownH, rootH, family);
+
+  // Regiões (dependem da orientação) — usadas pelas marcas do catálogo v3.
+  const crownTop = isUpper ? rootH : 0;
+  const crownBot = isUpper ? totalH : crownH;
+  const apexY    = isUpper ? 5 : totalH - 5;
+  const occluY   = isUpper ? totalH - 8 : 8;
+
   const isActive = state === 'selected' || state === 'shared';
 
-  const crownFill =
-    state === 'selected'    ? 'var(--color-teal)'
+  // ── v3: dente AUSENTE — só o contorno tracejado ("vaga" na arcada) ──
+  if (resumo?.ausente) {
+    return (
+      <svg width={w} height={totalH} viewBox={`0 0 ${w} ${totalH}`} style={{ display: 'block', overflow: 'visible' }}>
+        <path d={rootPath} style={{ fill: 'none', stroke: 'var(--color-border)', strokeWidth: 1, strokeDasharray: '3 3', opacity: 0.8 }} />
+        <path d={crownPath} style={{ fill: 'none', stroke: 'var(--color-text-muted)', strokeWidth: 1.2, strokeDasharray: '3 3' }} />
+      </svg>
+    );
+  }
+
+  const clinico = resumo != null;
+  const rootTint = resumo?.implante ?? resumo?.canal ?? resumo?.pino ?? null;
+
+  const crownFill = clinico
+    ? (resumo.cor
+        ? `color-mix(in srgb, ${COR_TOKEN[resumo.cor]} 30%, var(--color-surface-alt))`
+        : 'var(--color-surface-alt)')
+    : state === 'selected'    ? 'var(--color-teal)'
     : state === 'shared'    ? 'color-mix(in srgb, var(--color-teal) 25%, var(--color-surface-alt))'
     : state === 'detected'  ? 'color-mix(in srgb, var(--color-warning) 18%, var(--color-surface-alt))'
     : state === 'historical' ? 'color-mix(in srgb, var(--color-teal) 20%, var(--color-surface-alt))'
     : 'var(--color-surface-alt)';
 
-  const crownStroke = ringed
-    ? 'var(--color-teal)'
+  const crownStroke = clinico
+    ? (hovered ? 'var(--color-teal)' : resumo.incluso ? 'var(--color-text-secondary)' : resumo.cor ? COR_TOKEN[resumo.cor] : 'var(--color-border)')
+    : ringed ? 'var(--color-teal)'
     : hovered                   ? 'var(--color-teal)'
     : state === 'selected'    ? 'var(--color-teal)'
     : state === 'shared'      ? 'color-mix(in srgb, var(--color-teal) 70%, var(--color-border))'
@@ -343,44 +191,43 @@ function ToothSVG({ num, isUpper, state, hovered, showCheckbox, ringed = false }
     : state === 'historical'  ? 'color-mix(in srgb, var(--color-teal) 55%, var(--color-border))'
     : 'var(--color-border)';
 
-  const strokeW = ringed ? 2.5 : state === 'selected' ? 2 : (state === 'shared' || state === 'detected' || hovered) ? 1.5 : 1;
+  const strokeW = ringed ? 2.5 : state === 'selected' && !clinico ? 2 : (state === 'shared' || state === 'detected' || hovered) ? 1.5 : clinico && resumo.cor ? 1.4 : 1;
 
-  const crownFilter =
-    state === 'selected'
-      ? 'drop-shadow(0 0 4px color-mix(in srgb, var(--color-teal) 45%, transparent))'
-      : state === 'detected'
-      ? 'drop-shadow(0 0 3px color-mix(in srgb, var(--color-warning) 40%, transparent))'
-      : 'none';
+  const crownFilter = !clinico && state === 'selected'
+    ? 'drop-shadow(0 0 4px color-mix(in srgb, var(--color-teal) 45%, transparent))'
+    : !clinico && state === 'detected'
+    ? 'drop-shadow(0 0 3px color-mix(in srgb, var(--color-warning) 40%, transparent))'
+    : 'none';
 
-  const rootFill =
-    state === 'selected'
-      ? 'color-mix(in srgb, var(--color-teal) 18%, var(--color-surface-alt))'
-      : hovered
-      ? 'color-mix(in srgb, var(--color-teal) 12%, var(--color-surface-alt))'
-      : 'var(--color-surface-alt)';
+  const rootFill = clinico
+    ? (rootTint
+        ? `color-mix(in srgb, ${COR_TOKEN[rootTint]} 16%, var(--color-surface-alt))`
+        : 'var(--color-surface-alt)')
+    : state === 'selected'
+    ? 'color-mix(in srgb, var(--color-teal) 18%, var(--color-surface-alt))'
+    : hovered
+    ? 'color-mix(in srgb, var(--color-teal) 12%, var(--color-surface-alt))'
+    : 'var(--color-surface-alt)';
 
-  const rootStroke =
-    hovered
-      ? 'color-mix(in srgb, var(--color-teal) 35%, var(--color-border))'
-      : 'var(--color-border)';
+  const rootStroke = clinico && rootTint
+    ? `color-mix(in srgb, ${COR_TOKEN[rootTint]} 55%, var(--color-border))`
+    : hovered
+    ? 'color-mix(in srgb, var(--color-teal) 35%, var(--color-border))'
+    : 'var(--color-border)';
 
-  const rootOpacity =
-    state === 'selected' ? 0.40
+  const rootOpacity = clinico ? 0.8
+    : state === 'selected' ? 0.40
     : state === 'shared' ? 0.58
     : state === 'detected' ? 0.58
     : 0.72;
 
   const cbX = w - 9;
-  const cbY = isUpper ? 4 : rootH + 4;
+  const cbY = 4;
   const isChecked = isActive;
 
-  const crownPath = isUpper
-    ? upperCrownPath(w, crownH, family)
-    : lowerCrownPath(w, crownH, rootH, family);
-
-  const rootPath = isUpper
-    ? upperRootPath(w, crownH, rootH, family)
-    : lowerRootPath(w, crownH, rootH, family);
+  const needsDots = clinico && (resumo.cor === 'slate' || resumo.coroa === 'slate');
+  const dotsId = `odx-dots-${num}`;
+  const dash = clinico && resumo.incluso ? '4 3' : undefined;
 
   return (
     <svg
@@ -389,17 +236,71 @@ function ToothSVG({ num, isUpper, state, hovered, showCheckbox, ringed = false }
       viewBox={`0 0 ${w} ${totalH}`}
       style={{ display: 'block', overflow: 'visible' }}
     >
-      {/* Root */}
-      <path
-        d={rootPath}
-        style={{
-          fill: rootFill,
-          stroke: rootStroke,
-          strokeWidth: 0.6,
-          opacity: rootOpacity,
-          transition: 'fill 0.15s, opacity 0.15s, stroke 0.15s',
-        }}
-      />
+      {needsDots && (
+        <defs>
+          <pattern id={dotsId} width="4" height="4" patternUnits="userSpaceOnUse">
+            <circle cx="1" cy="1" r="0.8" fill="var(--color-surface)" />
+          </pattern>
+        </defs>
+      )}
+
+      {/* Root — o implante substitui a raiz pelo parafuso */}
+      {!(clinico && resumo.implante) && (
+        <path
+          d={rootPath}
+          style={{
+            fill: rootFill,
+            stroke: rootStroke,
+            strokeWidth: 0.6,
+            strokeDasharray: dash,
+            opacity: rootOpacity,
+            transition: 'fill 0.15s, opacity 0.15s, stroke 0.15s',
+          }}
+        />
+      )}
+
+      {/* v3: silhueta do canal — vazia (contorno) = a tratar · preenchida = tratado */}
+      {clinico && resumo.canal && !resumo.implante &&
+        canalPaths(num, isUpper).map((d, i) => (
+          <path
+            key={i}
+            d={d}
+            style={
+              resumo.canal === 'coral'
+                ? { fill: 'none', stroke: COR_TOKEN.coral, strokeWidth: 1.4 }
+                : { fill: COR_TOKEN[resumo.canal!], stroke: 'none' }
+            }
+          />
+        ))}
+
+      {/* v3: parafuso do implante no lugar da raiz */}
+      {clinico && resumo.implante && (
+        <g style={{ stroke: COR_TOKEN[resumo.implante], strokeWidth: 2, strokeLinecap: 'round' }}>
+          {[0, 1, 2, 3, 4].map((i) => {
+            const t = i / 4;
+            const y = isUpper ? rootH - 4 - t * (rootH - 12) : crownH + 4 + t * (rootH - 12);
+            const half = w * 0.24 * (1 - t * 0.55);
+            return <line key={i} x1={w / 2 - half} y1={y} x2={w / 2 + half} y2={y} />;
+          })}
+        </g>
+      )}
+
+      {/* v3: pino/núcleo no terço coronal da raiz */}
+      {clinico && resumo.pino && !resumo.implante && (
+        <rect
+          x={w / 2 - 3.5}
+          y={isUpper ? rootH - rootH * 0.36 - 2 : crownH + 2}
+          width={7}
+          height={rootH * 0.36}
+          rx={2}
+          style={{ fill: COR_TOKEN[resumo.pino] }}
+        />
+      )}
+
+      {/* v3: lesão periapical — círculo vazado no ápice */}
+      {clinico && resumo.lesao && (
+        <circle cx={w / 2} cy={apexY} r={4.5} style={{ fill: 'none', stroke: 'var(--color-coral)', strokeWidth: 1.8 }} />
+      )}
 
       {/* Crown */}
       <path
@@ -408,10 +309,42 @@ function ToothSVG({ num, isUpper, state, hovered, showCheckbox, ringed = false }
           fill: crownFill,
           stroke: crownStroke,
           strokeWidth: strokeW,
+          strokeDasharray: dash,
           filter: crownFilter,
           transition: 'fill 0.15s ease, stroke 0.15s ease, stroke-width 0.15s ease, filter 0.15s ease',
         }}
       />
+
+      {/* v3: textura pontilhada do pré-existente (reforço não-só-cor) */}
+      {needsDots && (
+        <path d={crownPath} style={{ fill: `url(#${dotsId})`, opacity: 0.5, pointerEvents: 'none' }} />
+      )}
+
+      {/* v3: coroa total — contorno duplo */}
+      {clinico && resumo.coroa && (
+        <path d={crownPath} style={{ fill: 'none', stroke: COR_TOKEN[resumo.coroa], strokeWidth: 2.4 }} />
+      )}
+
+      {/* v3: selante — ponto na oclusal */}
+      {clinico && resumo.selante && (
+        <circle cx={w / 2} cy={occluY} r={3} style={{ fill: COR_TOKEN[resumo.selante] }} />
+      )}
+
+      {/* v3: fratura — zigue-zague na coroa */}
+      {clinico && resumo.fratura && (
+        <path
+          d={`M ${w * 0.30} ${crownTop + crownH * 0.12} L ${w * 0.56} ${crownTop + crownH * 0.38} L ${w * 0.40} ${crownTop + crownH * 0.60} L ${w * 0.66} ${crownTop + crownH * 0.88}`}
+          style={{ fill: 'none', stroke: 'var(--color-coral)', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' }}
+        />
+      )}
+
+      {/* v3: extração indicada — X sobre a coroa */}
+      {clinico && resumo.exodontiaIndicada && (
+        <g style={{ stroke: 'var(--color-coral)', strokeWidth: 2.6, strokeLinecap: 'round' }}>
+          <line x1={w * 0.18} y1={crownTop + 5} x2={w * 0.82} y2={crownBot - 5} />
+          <line x1={w * 0.82} y1={crownTop + 5} x2={w * 0.18} y2={crownBot - 5} />
+        </g>
+      )}
 
       {/* Checkbox (multi-select mode) */}
       {showCheckbox && (
@@ -469,6 +402,12 @@ export interface OdontogramaProps {
   colorMode?: 'selection' | 'status';
   /** Status por dente/sentinela — só usado quando `colorMode='status'`. */
   statusTeeth?: Partial<Record<number, ToothStatus>>;
+  /**
+   * v3 — camada clínica: eventos de odontograma (propostos ou salvos). Quando presente,
+   * o componente vira o "mapa pintado": cor dominante por dente + marcas do catálogo
+   * (canal, implante, coroa, X, ausente…). Ignora selection/status.
+   */
+  eventos?: OdontogramaEventoDraft[];
 }
 
 export function Odontograma({
@@ -483,6 +422,7 @@ export function Odontograma({
   hideFilters = false,
   colorMode = 'selection',
   statusTeeth = {},
+  eventos,
 }: OdontogramaProps) {
   const [hoveredTooth, setHoveredTooth]   = useState<number | null>(null);
   const [tab, setTab]                     = useState<'permanent' | 'deciduous'>('permanent');
@@ -490,11 +430,16 @@ export function Odontograma({
   const [activeFilterId, setActiveFilterId] = useState<string>('arcadas');
   const [legendOpen, setLegendOpen]       = useState(false);
 
+  const clinico = eventos != null;
+  const resumos = useMemo(() => buildResumos(eventos ?? []), [eventos]);
+
   const upperTeeth = tab === 'permanent' ? TEETH_UPPER : TEETH_UPPER_DEC;
   const lowerTeeth = tab === 'permanent' ? TEETH_LOWER : TEETH_LOWER_DEC;
 
   // Contagem de dentes ativos por dentição — indicador nas abas (torna decíduo detectado descobrível)
-  const activeTeeth = colorMode === 'status'
+  const activeTeeth = clinico
+    ? Array.from(resumos.keys())
+    : colorMode === 'status'
     ? Object.keys(statusTeeth).map(Number)
     : [...selectedTeeth, ...detectedTeeth];
   const tabCounts: Record<'permanent' | 'deciduous', number> = {
@@ -503,6 +448,7 @@ export function Odontograma({
   };
 
   function getState(tooth: number): ToothState {
+    if (clinico) return 'default'; // o visual clínico vem do resumo, não do state
     if (colorMode === 'status') {
       const st = statusTeeth[tooth];
       if (st === 'concluido') return 'selected';
@@ -542,12 +488,14 @@ export function Odontograma({
     return teeth.map((num) => {
       const isMidlineStart = num === 21 || num === 31 || num === 61 || num === 71;
       const state  = getState(num);
+      const resumo = clinico ? resumos.get(num) ?? null : null;
       const isHov  = hoveredTooth === num;
       const isActive = state === 'selected' || state === 'shared';
-      const numWeight = (state === 'selected' || state === 'shared' || state === 'detected') ? 800 : 700;
+      const numWeight = (state === 'selected' || state === 'shared' || state === 'detected' || resumo?.cor) ? 800 : 700;
 
-      const numColor =
-        state === 'selected'    ? 'var(--color-teal)'
+      const numColor = resumo?.cor
+        ? COR_TOKEN[resumo.cor]
+        : state === 'selected'    ? 'var(--color-teal)'
         : state === 'shared'    ? 'var(--color-teal)'
         : state === 'detected'  ? 'var(--color-warning)'
         : state === 'historical' ? 'color-mix(in srgb, var(--color-teal) 70%, var(--color-text-secondary))'
@@ -604,8 +552,9 @@ export function Odontograma({
               isUpper={isUpper}
               state={state}
               hovered={isHov}
-              showCheckbox={showCheckbox}
-              ringed={colorMode === 'status' && selectedTeeth.includes(num)}
+              showCheckbox={showCheckbox && !clinico}
+              ringed={colorMode === 'status' && !clinico && selectedTeeth.includes(num)}
+              resumo={resumo}
             />
 
             {!isUpper && (
@@ -632,6 +581,48 @@ export function Odontograma({
   }
 
   const hoveredState = hoveredTooth ? getState(hoveredTooth) : null;
+  const hoveredResumo = clinico && hoveredTooth ? resumos.get(hoveredTooth) ?? null : null;
+
+  const legendItems = clinico
+    ? [
+        {
+          fill: 'color-mix(in srgb, var(--color-coral) 30%, var(--color-surface-alt))',
+          stroke: 'var(--color-coral)', strokeW: 1.2, filter: 'none',
+          label: 'A fazer', desc: 'Indicado/planejado — pendente',
+        },
+        {
+          fill: 'color-mix(in srgb, var(--color-teal) 30%, var(--color-surface-alt))',
+          stroke: 'var(--color-teal)', strokeW: 1.2, filter: 'none',
+          label: 'Feito aqui', desc: 'Realizado nesta clínica',
+        },
+        {
+          fill: 'color-mix(in srgb, var(--color-slate) 45%, var(--color-surface-alt))',
+          stroke: 'var(--color-slate)', strokeW: 1.2, filter: 'none',
+          label: 'Pré-existente', desc: 'O paciente já chegou assim',
+        },
+        {
+          fill: 'transparent', stroke: 'var(--color-text-muted)', strokeW: 1.2, filter: 'none',
+          label: 'Ausente', desc: 'Extraído/esfoliado — só o contorno',
+        },
+      ]
+    : [
+        {
+          fill: 'var(--color-surface-alt)',
+          stroke: 'var(--color-border)', strokeW: 1, filter: 'none',
+          label: 'Sem registro', desc: 'Nenhum registro neste dente',
+        },
+        {
+          fill: 'color-mix(in srgb, var(--color-teal) 20%, var(--color-surface-alt))',
+          stroke: 'color-mix(in srgb, var(--color-teal) 55%, var(--color-border))', strokeW: 1, filter: 'none',
+          label: 'Histórico', desc: 'Dente com registros anteriores',
+        },
+        {
+          fill: 'var(--color-teal)',
+          stroke: 'var(--color-teal)', strokeW: 2,
+          filter: 'drop-shadow(0 0 3px color-mix(in srgb, var(--color-teal) 45%, transparent))',
+          label: 'Selecionado', desc: 'Dente selecionado para esta consulta',
+        },
+      ];
 
   return (
     <div
@@ -697,36 +688,11 @@ export function Odontograma({
             className="absolute right-0 top-full z-20 mt-1 w-56 rounded-xl border p-3 flex flex-col gap-3 shadow-lg"
             style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
           >
-            {[
-              {
-                fill: 'var(--color-surface-alt)',
-                stroke: 'var(--color-border)',
-                strokeW: 1,
-                filter: 'none',
-                label: 'Sem registro',
-                desc: 'Nenhum registro neste dente',
-              },
-              {
-                fill: 'color-mix(in srgb, var(--color-teal) 20%, var(--color-surface-alt))',
-                stroke: 'color-mix(in srgb, var(--color-teal) 55%, var(--color-border))',
-                strokeW: 1,
-                filter: 'none',
-                label: 'Histórico',
-                desc: 'Dente com registros anteriores',
-              },
-              {
-                fill: 'var(--color-teal)',
-                stroke: 'var(--color-teal)',
-                strokeW: 2,
-                filter: 'drop-shadow(0 0 3px color-mix(in srgb, var(--color-teal) 45%, transparent))',
-                label: 'Selecionado',
-                desc: 'Dente selecionado para esta consulta',
-              },
-            ].map(({ fill, stroke, strokeW: sw, filter, label, desc }) => (
+            {legendItems.map(({ fill, stroke, strokeW: sw, filter, label, desc }) => (
               <div key={label} className="flex items-start gap-2.5">
                 <svg width={12} height={12} viewBox="0 0 12 12" className="mt-0.5 shrink-0" style={{ overflow: 'visible' }}>
                   <rect x={0.75} y={0.75} width={10.5} height={10.5} rx={2.5}
-                    style={{ fill, stroke, strokeWidth: sw, filter }}
+                    style={{ fill, stroke, strokeWidth: sw, filter, strokeDasharray: label === 'Ausente' ? '2 2' : undefined }}
                   />
                 </svg>
                 <div className="flex flex-col gap-0.5">
@@ -763,14 +729,14 @@ export function Odontograma({
             </div>
           )}
 
-          {/* Upper arch */}
+          {/* Upper arch — raízes pra cima, coroas pro plano oclusal */}
           {viewFilter !== 'lower' && (
             <div className="flex items-end gap-[3px]">
               {renderArch(upperTeeth, true)}
             </div>
           )}
 
-          {/* Midline separator */}
+          {/* Midline separator — o plano oclusal */}
           {viewFilter === 'all' && (
             <div
               className="w-full my-[8px]"
@@ -781,7 +747,7 @@ export function Odontograma({
             />
           )}
 
-          {/* Lower arch */}
+          {/* Lower arch — coroas pra cima, raízes pra baixo */}
           {viewFilter !== 'upper' && (
             <div className="flex items-start gap-[3px]">
               {renderArch(lowerTeeth, false)}
@@ -819,12 +785,27 @@ export function Odontograma({
             <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
               {getQuadrantLabel(hoveredTooth)}
             </span>
-            {hoveredState === 'historical' && (
+            {hoveredResumo?.cor === 'coral' && (
+              <span className="text-[10px] font-semibold ml-0.5" style={{ color: 'var(--color-coral)' }}>
+                · a fazer
+              </span>
+            )}
+            {hoveredResumo?.cor === 'teal' && (
+              <span className="text-[10px] font-semibold ml-0.5" style={{ color: 'var(--color-teal)' }}>
+                · feito aqui
+              </span>
+            )}
+            {hoveredResumo?.cor === 'slate' && (
+              <span className="text-[10px] font-semibold ml-0.5" style={{ color: 'var(--color-slate)' }}>
+                · pré-existente
+              </span>
+            )}
+            {!clinico && hoveredState === 'historical' && (
               <span className="text-[10px] font-semibold ml-0.5" style={{ color: 'var(--color-teal)' }}>
                 · histórico
               </span>
             )}
-            {(hoveredState === 'selected' || hoveredState === 'shared') && (
+            {!clinico && (hoveredState === 'selected' || hoveredState === 'shared') && (
               <span className="text-[10px] font-semibold ml-0.5" style={{ color: 'var(--color-teal)' }}>
                 · selecionado
               </span>
@@ -832,7 +813,7 @@ export function Odontograma({
           </div>
         ) : (
           <span className="text-[10px] italic leading-none" style={{ color: 'var(--color-text-muted)' }}>
-            Clique para selecionar um dente
+            {clinico ? 'Toque um dente para ver e editar o detalhe' : 'Clique para selecionar um dente'}
           </span>
         )}
       </div>
