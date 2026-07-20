@@ -19,6 +19,14 @@ const COR_TOKEN = {
   slate: 'var(--color-slate)',
 } as const;
 
+// Cor-de-texto calibrada AA (a cor cheia acima reprova em light mode sobre o
+// próprio fundo tingido — achado auditoria UX 19/07). Fill/ponto seguem COR_TOKEN.
+const COR_TOKEN_INK = {
+  coral: 'var(--color-coral-ink)',
+  teal:  'var(--color-teal-ink)',
+  slate: 'var(--color-slate-ink)',
+} as const;
+
 const ROTULO_ESTADO = { coral: 'A fazer', teal: 'Feito', slate: 'Pré-exist.' } as const;
 
 export interface ToothGroupListProps {
@@ -105,7 +113,7 @@ export function ToothGroupList({ eventos, onDenteClick, className }: ToothGroupL
                     className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0"
                     style={{
                       background: `color-mix(in srgb, ${COR_TOKEN[cor]} 15%, var(--color-surface-alt))`,
-                      color: COR_TOKEN[cor],
+                      color: COR_TOKEN_INK[cor],
                     }}
                   >
                     <span className="w-1.5 h-1.5 rounded-full" style={{ background: COR_TOKEN[cor] }} aria-hidden="true" />
@@ -141,7 +149,7 @@ export function ToothGroupList({ eventos, onDenteClick, className }: ToothGroupL
                   className="text-[10px] font-bold px-2 py-0.5 rounded-full"
                   style={{
                     background: `color-mix(in srgb, ${COR_TOKEN[cor]} 15%, var(--color-surface-alt))`,
-                    color: COR_TOKEN[cor],
+                    color: COR_TOKEN_INK[cor],
                   }}
                 >
                   {ROTULO_ESTADO[cor]}

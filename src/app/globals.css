@@ -59,6 +59,16 @@
   --color-warning: #f59e0b;
   --color-warning-pale: #fef3c7;
 
+  /* Tokens "ink" — versões calibradas p/ TEXTO sobre fundo tingido da própria cor
+     (chips/cards coral-pale, teal-pale, slate-pale, warning-pale). A cor "cheia"
+     (--color-coral etc.) é ótima como fill/borda/ponto mas reprova AA como texto
+     em light mode (achado auditoria UX 19/07 — medido: 1.9–2.9:1, precisa 4.5:1).
+     Em dark mode a cor cheia já passa (paleta calibrada), então ink=cor lá. */
+  --color-coral-ink: #b3261e;
+  --color-teal-ink: var(--color-teal-dark); /* reusa o token existente — mesmo valor */
+  --color-slate-ink: #334155;
+  --color-warning-ink: #92400e;
+
   /* Aliases canônicos da identidade visual */
   --color-brand-offwhite: #f5f3ef;
   --color-brand-charcoal: #0d0d0d;
@@ -128,6 +138,14 @@
   --color-warning: #fbbf24;
   --color-warning-pale: #451a03;
 
+  /* Ink em dark: a cor cheia já passa AA contra os fundos tingidos (auditoria
+     19/07) — exceto teal, que reprova por pouco (4.14:1); usa teal-lt (mais
+     claro) só nesse caso. */
+  --color-coral-ink: var(--color-coral);
+  --color-teal-ink: var(--color-teal-lt);
+  --color-slate-ink: var(--color-slate);
+  --color-warning-ink: var(--color-warning);
+
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
@@ -176,6 +194,17 @@
   /* Slate — pré-existente no odontograma (text-slate, bg-slate-pale) */
   --color-slate: var(--color-slate);
   --color-slate-pale: var(--color-slate-pale);
+
+  /* Warning — faltava aqui (achado 19/07: text-warning/bg-warning-pale nunca
+     geravam CSS de verdade sem entrar em @theme, apesar de já usados em JSX). */
+  --color-warning: var(--color-warning);
+  --color-warning-pale: var(--color-warning-pale);
+
+  /* Ink — texto legível AA sobre os fundos tingidos acima (auditoria UX 19/07) */
+  --color-coral-ink: var(--color-coral-ink);
+  --color-teal-ink: var(--color-teal-ink);
+  --color-slate-ink: var(--color-slate-ink);
+  --color-warning-ink: var(--color-warning-ink);
 
   /* Brand aliases disponíveis via text-brand-*, bg-brand-* */
   --color-brand-offwhite: var(--color-brand-offwhite);

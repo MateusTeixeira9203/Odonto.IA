@@ -1,0 +1,1181 @@
+{
+  "tag": "minimal",
+  "base": "http://localhost:3000",
+  "quando": "2026-07-20T01:53:01.794Z",
+  "casos": [
+    {
+      "id": "canal-26-caries-14-15",
+      "provenance": "real-observado",
+      "estavel": true,
+      "totalFalhas": 0,
+      "orphansTotais": 0,
+      "rodadas": [
+        {
+          "dentes_afetados": [
+            14,
+            15,
+            26
+          ],
+          "chaves_obs": [
+            14,
+            15,
+            26
+          ],
+          "procedimentos": [
+            "Tratamento endodôntico",
+            "Curativo de demora (medicação intracanal)",
+            "Restauração provisória",
+            "Restauração com resina composta"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 14769
+        },
+        {
+          "dentes_afetados": [
+            14,
+            15,
+            26
+          ],
+          "chaves_obs": [
+            14,
+            15,
+            26
+          ],
+          "procedimentos": [
+            "Tratamento endodôntico",
+            "Curativo de demora (medicação intracanal)",
+            "Restauração com resina composta"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 3190
+        },
+        {
+          "dentes_afetados": [
+            14,
+            15,
+            26
+          ],
+          "chaves_obs": [
+            14,
+            15,
+            26
+          ],
+          "procedimentos": [
+            "Tratamento endodôntico",
+            "Curativo de demora (medicação intracanal)",
+            "Restauração provisória",
+            "Restauração com resina composta"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 2857
+        }
+      ]
+    },
+    {
+      "id": "ppr-inferior-mais-exodontia-36",
+      "provenance": "construido",
+      "estavel": true,
+      "totalFalhas": 0,
+      "orphansTotais": 0,
+      "rodadas": [
+        {
+          "dentes_afetados": [
+            36,
+            98
+          ],
+          "chaves_obs": [
+            36,
+            98
+          ],
+          "procedimentos": [
+            "Exodontia simples",
+            "Moldagem para confecção de prótese"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 2261
+        },
+        {
+          "dentes_afetados": [
+            36,
+            98
+          ],
+          "chaves_obs": [
+            36,
+            98
+          ],
+          "procedimentos": [
+            "Moldagem para confecção de prótese/dispositivo",
+            "Exodontia simples"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 2324
+        },
+        {
+          "dentes_afetados": [
+            36,
+            98
+          ],
+          "chaves_obs": [
+            36,
+            98
+          ],
+          "procedimentos": [
+            "Moldagem para prótese parcial removível",
+            "Exodontia simples",
+            "Sutura"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 1879
+        }
+      ]
+    },
+    {
+      "id": "pulpite-46-diagnostico-preservado",
+      "provenance": "construido",
+      "estavel": true,
+      "totalFalhas": 0,
+      "orphansTotais": 0,
+      "rodadas": [
+        {
+          "dentes_afetados": [
+            46
+          ],
+          "chaves_obs": [
+            46
+          ],
+          "procedimentos": [
+            "Tratamento endodôntico"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 2581
+        },
+        {
+          "dentes_afetados": [
+            46
+          ],
+          "chaves_obs": [
+            46
+          ],
+          "procedimentos": [
+            "Tratamento endodôntico"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 2113
+        },
+        {
+          "dentes_afetados": [
+            46
+          ],
+          "chaves_obs": [
+            46
+          ],
+          "procedimentos": [
+            "Tratamento endodôntico"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 2055
+        }
+      ]
+    },
+    {
+      "id": "profilaxia-boca-toda-99",
+      "provenance": "construido",
+      "estavel": false,
+      "totalFalhas": 0,
+      "orphansTotais": 0,
+      "rodadas": [
+        {
+          "dentes_afetados": [
+            99
+          ],
+          "chaves_obs": [
+            99
+          ],
+          "procedimentos": [
+            "Profilaxia dental",
+            "Aplicação tópica de flúor"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 1656
+        },
+        {
+          "dentes_afetados": [
+            98,
+            99
+          ],
+          "chaves_obs": [
+            98,
+            99
+          ],
+          "procedimentos": [
+            "Profilaxia dental",
+            "Raspagem supragengival",
+            "Aplicação tópica de flúor"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 2222
+        },
+        {
+          "dentes_afetados": [
+            98,
+            99
+          ],
+          "chaves_obs": [
+            98,
+            99
+          ],
+          "procedimentos": [
+            "Profilaxia dental",
+            "Raspagem supragengival",
+            "Aplicação tópica de flúor"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 2097
+        }
+      ]
+    },
+    {
+      "id": "ruido-small-talk-restauracao-11",
+      "provenance": "construido",
+      "estavel": true,
+      "totalFalhas": 0,
+      "orphansTotais": 0,
+      "rodadas": [
+        {
+          "dentes_afetados": [
+            11
+          ],
+          "chaves_obs": [
+            11
+          ],
+          "procedimentos": [
+            "Restauração com resina composta"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 2102
+        },
+        {
+          "dentes_afetados": [
+            11
+          ],
+          "chaves_obs": [
+            11
+          ],
+          "procedimentos": [
+            "Restauração com resina composta"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 1787
+        },
+        {
+          "dentes_afetados": [
+            11
+          ],
+          "chaves_obs": [
+            11
+          ],
+          "procedimentos": [
+            "Restauração com resina composta"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 1927
+        }
+      ]
+    },
+    {
+      "id": "reab-boca-inteira-17-dentes",
+      "provenance": "construido-pesado",
+      "estavel": true,
+      "totalFalhas": 0,
+      "orphansTotais": 0,
+      "rodadas": [
+        {
+          "dentes_afetados": [
+            11,
+            12,
+            14,
+            15,
+            16,
+            18,
+            21,
+            22,
+            25,
+            28,
+            34,
+            36,
+            37,
+            46,
+            48,
+            97,
+            99
+          ],
+          "chaves_obs": [
+            11,
+            12,
+            14,
+            15,
+            16,
+            18,
+            21,
+            22,
+            25,
+            28,
+            34,
+            36,
+            37,
+            46,
+            48,
+            97,
+            99
+          ],
+          "procedimentos": [
+            "Raspagem e alisamento radicular",
+            "Tratamento endodôntico",
+            "Exodontia de terceiro molar",
+            "Exodontia",
+            "Moldagem para confecção de prótese/dispositivo",
+            "Coroa/faceta em cerâmica (e.max)",
+            "Restauração com resina composta",
+            "Implante osseointegrado"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 7935
+        },
+        {
+          "dentes_afetados": [
+            11,
+            12,
+            14,
+            15,
+            16,
+            18,
+            21,
+            22,
+            25,
+            28,
+            34,
+            36,
+            37,
+            46,
+            48,
+            97,
+            99
+          ],
+          "chaves_obs": [
+            11,
+            12,
+            14,
+            15,
+            16,
+            18,
+            21,
+            22,
+            25,
+            28,
+            34,
+            36,
+            37,
+            46,
+            48,
+            97,
+            99
+          ],
+          "procedimentos": [
+            "Raspagem e alisamento radicular",
+            "Tratamento endodôntico",
+            "Curativo de demora (medicação intracanal)",
+            "Exodontia de terceiro molar",
+            "Exodontia",
+            "Moldagem para confecção de prótese/dispositivo",
+            "Faceta de porcelana/resina",
+            "Restauração com resina composta"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 7119
+        },
+        {
+          "dentes_afetados": [
+            11,
+            12,
+            14,
+            15,
+            16,
+            18,
+            21,
+            22,
+            25,
+            28,
+            34,
+            36,
+            37,
+            46,
+            48,
+            97,
+            99
+          ],
+          "chaves_obs": [
+            11,
+            12,
+            14,
+            15,
+            16,
+            18,
+            21,
+            22,
+            25,
+            28,
+            34,
+            36,
+            37,
+            46,
+            48,
+            97,
+            99
+          ],
+          "procedimentos": [
+            "Raspagem e alisamento radicular",
+            "Raspagem supragengival",
+            "Raspagem infragengival",
+            "Tratamento endodôntico",
+            "Curativo de demora (medicação intracanal)",
+            "Exodontia de terceiro molar",
+            "Exodontia",
+            "Moldagem para confecção de prótese/dispositivo",
+            "Coroa/faceta em cerâmica (e.max)",
+            "Restauração com resina composta",
+            "Prescrição de amoxicilina"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 7976
+        }
+      ]
+    },
+    {
+      "id": "odontopediatria-deciduos-selantes",
+      "provenance": "construido-pesado",
+      "estavel": true,
+      "totalFalhas": 0,
+      "orphansTotais": 0,
+      "rodadas": [
+        {
+          "dentes_afetados": [
+            16,
+            26,
+            36,
+            46,
+            74,
+            84,
+            99
+          ],
+          "chaves_obs": [
+            16,
+            26,
+            36,
+            46,
+            74,
+            84,
+            99
+          ],
+          "procedimentos": [
+            "Restauração com ionômero de vidro",
+            "Pulpotomia",
+            "Selante de fossas e fissuras",
+            "Aplicação tópica de flúor"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 4799
+        },
+        {
+          "dentes_afetados": [
+            16,
+            26,
+            36,
+            46,
+            74,
+            84,
+            99
+          ],
+          "chaves_obs": [
+            16,
+            26,
+            36,
+            46,
+            74,
+            84,
+            99
+          ],
+          "procedimentos": [
+            "Restauração direta",
+            "Pulpotomia",
+            "Selante de fossas e fissuras",
+            "Aplicação tópica de flúor"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 5396
+        },
+        {
+          "dentes_afetados": [
+            16,
+            26,
+            36,
+            46,
+            74,
+            84,
+            99
+          ],
+          "chaves_obs": [
+            16,
+            26,
+            36,
+            46,
+            74,
+            84,
+            99
+          ],
+          "procedimentos": [
+            "Restauração com ionômero de vidro",
+            "Pulpotomia",
+            "Selante de fossas e fissuras",
+            "Aplicação tópica de flúor (verniz)"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 4569
+        }
+      ]
+    },
+    {
+      "id": "rajadas-acumuladas-orto-dtm-urgencia",
+      "provenance": "construido-pesado",
+      "estavel": false,
+      "totalFalhas": 4,
+      "orphansTotais": 0,
+      "rodadas": [
+        {
+          "dentes_afetados": [
+            45,
+            47,
+            99
+          ],
+          "chaves_obs": [
+            45,
+            47,
+            98,
+            99
+          ],
+          "procedimentos": [
+            "Manutenção ortodôntica",
+            "Moldagem para confecção de prótese/dispositivo",
+            "Drenagem de abscesso",
+            "Restauração direta",
+            "Clareamento dental"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [
+            "dentes_afetados não contém 98"
+          ],
+          "latMs": 3412
+        },
+        {
+          "dentes_afetados": [
+            45,
+            47,
+            97,
+            98
+          ],
+          "chaves_obs": [
+            45,
+            47,
+            97,
+            98
+          ],
+          "procedimentos": [
+            "Manutenção ortodôntica",
+            "Moldagem para placa miorrelaxante",
+            "Drenagem de abscesso",
+            "Restauração direta",
+            "Clareamento dental"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [
+            97
+          ],
+          "falhas": [
+            "ALUCINAÇÃO: dente(s) 97 não estão no relato",
+            "dentes_afetados não contém 99",
+            "dentes_observacoes sem chave \"99\""
+          ],
+          "latMs": 3519
+        },
+        {
+          "dentes_afetados": [
+            45,
+            47,
+            98,
+            99
+          ],
+          "chaves_obs": [
+            45,
+            47,
+            98,
+            99
+          ],
+          "procedimentos": [
+            "Manutenção ortodôntica",
+            "Moldagem para confecção de prótese/dispositivo",
+            "Drenagem de abscesso",
+            "Restauração direta",
+            "Clareamento dental"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 3629
+        }
+      ]
+    },
+    {
+      "id": "nota-planejamento-nao-orcavel",
+      "provenance": "real-observado",
+      "estavel": true,
+      "totalFalhas": 0,
+      "orphansTotais": 0,
+      "rodadas": [
+        {
+          "dentes_afetados": [
+            36,
+            46,
+            47
+          ],
+          "chaves_obs": [
+            36,
+            46,
+            47
+          ],
+          "procedimentos": [
+            "Restauração direta"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 4068
+        },
+        {
+          "dentes_afetados": [
+            36,
+            46,
+            47
+          ],
+          "chaves_obs": [
+            36,
+            46,
+            47
+          ],
+          "procedimentos": [
+            "Restauração com resina composta"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 2745
+        },
+        {
+          "dentes_afetados": [
+            36,
+            46,
+            47
+          ],
+          "chaves_obs": [
+            36,
+            46,
+            47
+          ],
+          "procedimentos": [
+            "Restauração direta"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 2857
+        }
+      ]
+    },
+    {
+      "id": "mod-multiface-36",
+      "provenance": "construido",
+      "estavel": true,
+      "totalFalhas": 0,
+      "orphansTotais": 0,
+      "rodadas": [
+        {
+          "dentes_afetados": [
+            36
+          ],
+          "chaves_obs": [
+            36
+          ],
+          "procedimentos": [
+            "Restauração direta"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 1737
+        },
+        {
+          "dentes_afetados": [
+            36
+          ],
+          "chaves_obs": [
+            36
+          ],
+          "procedimentos": [
+            "Restauração direta"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 1597
+        },
+        {
+          "dentes_afetados": [
+            36
+          ],
+          "chaves_obs": [
+            36
+          ],
+          "procedimentos": [
+            "Restauração direta"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 1632
+        }
+      ]
+    },
+    {
+      "id": "exame-inicial-preexistentes",
+      "provenance": "construido",
+      "estavel": true,
+      "totalFalhas": 0,
+      "orphansTotais": 0,
+      "rodadas": [
+        {
+          "dentes_afetados": [
+            14,
+            26,
+            46
+          ],
+          "chaves_obs": [
+            14,
+            26,
+            46
+          ],
+          "procedimentos": [],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 2793
+        },
+        {
+          "dentes_afetados": [
+            14,
+            26,
+            46
+          ],
+          "chaves_obs": [
+            14,
+            26,
+            46
+          ],
+          "procedimentos": [],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 2597
+        },
+        {
+          "dentes_afetados": [
+            14,
+            26,
+            46
+          ],
+          "chaves_obs": [
+            14,
+            26,
+            46
+          ],
+          "procedimentos": [
+            "Avaliação inicial"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 2037
+        }
+      ]
+    },
+    {
+      "id": "orto-manutencao-arcada",
+      "provenance": "construido",
+      "estavel": true,
+      "totalFalhas": 0,
+      "orphansTotais": 0,
+      "rodadas": [
+        {
+          "dentes_afetados": [
+            97
+          ],
+          "chaves_obs": [
+            97
+          ],
+          "procedimentos": [
+            "Manutenção ortodôntica"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 1712
+        },
+        {
+          "dentes_afetados": [
+            97
+          ],
+          "chaves_obs": [
+            97
+          ],
+          "procedimentos": [
+            "Manutenção ortodôntica"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 1652
+        },
+        {
+          "dentes_afetados": [
+            97
+          ],
+          "chaves_obs": [
+            97
+          ],
+          "procedimentos": [
+            "Manutenção ortodôntica"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 1655
+        }
+      ]
+    },
+    {
+      "id": "deciduo-restauracao-74",
+      "provenance": "construido",
+      "estavel": true,
+      "totalFalhas": 0,
+      "orphansTotais": 0,
+      "rodadas": [
+        {
+          "dentes_afetados": [
+            74
+          ],
+          "chaves_obs": [
+            74
+          ],
+          "procedimentos": [
+            "Restauração direta"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 1667
+        },
+        {
+          "dentes_afetados": [
+            74
+          ],
+          "chaves_obs": [
+            74
+          ],
+          "procedimentos": [
+            "Restauração direta"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 1630
+        },
+        {
+          "dentes_afetados": [
+            74
+          ],
+          "chaves_obs": [
+            74
+          ],
+          "procedimentos": [
+            "Restauração direta"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 1571
+        }
+      ]
+    },
+    {
+      "id": "negacao-canal-so-curativo",
+      "provenance": "construido",
+      "estavel": true,
+      "totalFalhas": 0,
+      "orphansTotais": 0,
+      "rodadas": [
+        {
+          "dentes_afetados": [
+            46
+          ],
+          "chaves_obs": [
+            46
+          ],
+          "procedimentos": [
+            "Abertura",
+            "Curativo de demora (medicação intracanal)",
+            "Tratamento endodôntico"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 1962
+        },
+        {
+          "dentes_afetados": [
+            46
+          ],
+          "chaves_obs": [
+            46
+          ],
+          "procedimentos": [
+            "Curativo de demora (medicação intracanal)"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 1713
+        },
+        {
+          "dentes_afetados": [
+            46
+          ],
+          "chaves_obs": [
+            46
+          ],
+          "procedimentos": [
+            "Abertura",
+            "Curativo de demora (medicação intracanal)",
+            "Tratamento endodôntico"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 1979
+        }
+      ]
+    },
+    {
+      "id": "fratura-trauma-11",
+      "provenance": "construido",
+      "estavel": true,
+      "totalFalhas": 0,
+      "orphansTotais": 0,
+      "rodadas": [
+        {
+          "dentes_afetados": [
+            11
+          ],
+          "chaves_obs": [
+            11
+          ],
+          "procedimentos": [],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 1649
+        },
+        {
+          "dentes_afetados": [
+            11
+          ],
+          "chaves_obs": [
+            11
+          ],
+          "procedimentos": [],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 1635
+        },
+        {
+          "dentes_afetados": [
+            11
+          ],
+          "chaves_obs": [
+            11
+          ],
+          "procedimentos": [],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 1591
+        }
+      ]
+    },
+    {
+      "id": "pino-nucleo-13",
+      "provenance": "construido",
+      "estavel": true,
+      "totalFalhas": 0,
+      "orphansTotais": 0,
+      "rodadas": [
+        {
+          "dentes_afetados": [
+            13
+          ],
+          "chaves_obs": [
+            13
+          ],
+          "procedimentos": [
+            "Núcleo de preenchimento / retentor intracanal",
+            "Coroa total protética"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 1977
+        },
+        {
+          "dentes_afetados": [
+            13
+          ],
+          "chaves_obs": [
+            13
+          ],
+          "procedimentos": [
+            "Cimentação de pino",
+            "Núcleo de preenchimento"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 2518
+        },
+        {
+          "dentes_afetados": [
+            13
+          ],
+          "chaves_obs": [
+            13
+          ],
+          "procedimentos": [
+            "Cimentação de pino",
+            "Núcleo de preenchimento"
+          ],
+          "retorno": null,
+          "orphans": [],
+          "alucinacoes": [],
+          "falhas": [],
+          "latMs": 2668
+        }
+      ]
+    }
+  ]
+}

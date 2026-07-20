@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useDexGuide } from '@/hooks/useDexGuide';
 import { DexAvatar } from '@/components/ui/dex-avatar';
-import { salvarFichaConsulta, iniciarAtendimentoConsulta } from '../actions';
+import { salvarFichaConsulta, iniciarAtendimentoConsulta, regravarEventosOdontograma } from '../actions';
 import { ConsultaAssinaturaModal } from './consulta-assinatura-modal';
 import { EmitirDocumentoModal } from '@/components/pacientes/EmitirDocumentoModal';
 import { ApresentarPaciente } from '@/components/pacientes/ApresentarPaciente';
@@ -162,6 +162,10 @@ export function ConsultaClient({
   const [dataProcedimento, setDataProcedimento] = useState(() => new Date().toLocaleDateString('en-CA'));
   const [isSaving, setIsSaving] = useState(false);
   const [savedFichaId, setSavedFichaId] = useState<string | null>(null);
+  // Fail-soft do event-log: a ficha salvou, o desenho não. Guarda os eventos pra retry
+  // em vez de deixar o dentista achar que gravou (dívida 0.3 do Bloco 0).
+  const [eventosPendentes, setEventosPendentes] = useState<OdontogramaEventoDraft[] | null>(null);
+  const [isRegravando, setIsRegravando] = useState(false);
   const isFormatando = fase === 'organizando';
   const [showSignature, setShowSignature] = useState(false);
   const [showEmitir, setShowEmitir] = useState(false);
@@ -445,7 +449,33 @@ export function ConsultaClient({
     });
     if (result.error) { toast.error(result.error); setIsSaving(false); return; }
     if (result.fichaId) setSavedFichaId(result.fichaId);
+    // A ficha salvou; o desenho pode não ter. Não engolir — guardar pro retry.
+    if (result.eventosFalharam) setEventosPendentes(eventosDraft);
     setFase('salvo');
+  };
+
+  const handleRegravarEventos = async () => {
+    if (!savedFichaId || !eventosPendentes) return;
+    setIsRegravando(true);
+    // Rede/exceção não pode travar o botão em "Gravando..." pra sempre — é
+    // exatamente o silêncio que o item 0.3 existe pra eliminar.
+    let res: { ok: boolean; error?: string };
+    try {
+      res = await regravarEventosOdontograma({
+        fichaId:    savedFichaId,
+        pacienteId: paciente.id,
+        eventos:    eventosPendentes,
+      });
+    } catch {
+      res = { ok: false, error: 'Falha de conexão. Tente novamente.' };
+    }
+    setIsRegravando(false);
+    if (res.ok) {
+      setEventosPendentes(null);
+      toast.success('Odontograma gravado.');
+    } else {
+      toast.error(res.error ?? 'Não foi possível regravar o odontograma.');
+    }
   };
 
   // Recompensa pós-ficha por persona (Workstream B1). Heurística: ~180 caracteres
@@ -828,6 +858,33 @@ export function ConsultaClient({
                     <p className="text-sm text-text-secondary">Coletando assinatura...</p>
                   )}
                 </div>
+
+                {/* Fail-soft do event-log (dívida 0.3): a ficha salvou mas o desenho não.
+                    Aviso NÃO-bloqueante — o texto clínico está seguro, só o odontograma
+                    ficou pra trás, e o dentista tem como tentar de novo. */}
+                {eventosPendentes && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    role="status"
+                    className="flex items-start gap-3 max-w-md px-4 py-3 rounded-xl bg-warning-pale border border-warning/40"
+                  >
+                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-warning-ink" aria-hidden />
+                    <div className="text-left">
+                      <p className="text-sm text-text-primary">
+                        A ficha foi salva, mas o desenho do odontograma não gravou.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => void handleRegravarEventos()}
+                        disabled={isRegravando}
+                        className="mt-1 text-sm font-semibold text-warning-ink underline underline-offset-2 disabled:opacity-60"
+                      >
+                        {isRegravando ? 'Gravando...' : 'Tentar de novo'}
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
                 {/* CTA primário: gerar o plano enquanto o paciente ainda está na cadeira (spec 2.3) */}
                 {!showSignature && savedFichaId && (
                   <motion.div
@@ -1037,7 +1094,7 @@ export function ConsultaClient({
                           borderColor: 'color-mix(in srgb, var(--color-warning) 35%, var(--color-border))',
                         }}
                       >
-                        <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: 'var(--color-warning)' }} />
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: 'var(--color-warning-ink)' }} />
                         <div className="min-w-0">
                           <p className="text-[11px] font-semibold text-text-primary mb-1">
                             Citados no relato, sem registro no desenho:
@@ -1052,7 +1109,7 @@ export function ConsultaClient({
                                 style={{
                                   background: 'var(--color-surface-alt)',
                                   borderColor: 'color-mix(in srgb, var(--color-warning) 45%, var(--color-border))',
-                                  color: 'var(--color-warning)',
+                                  color: 'var(--color-warning-ink)',
                                 }}
                               >
                                 dente {d}

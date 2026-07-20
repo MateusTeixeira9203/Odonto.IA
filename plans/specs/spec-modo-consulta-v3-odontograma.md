@@ -1338,11 +1338,15 @@ rotas perio (§3.3), sem LLM. Componente `EndoOdontometria` (painel por-dente, a
 **Invariantes herdadas:** #5 (RLS núcleo clínico), #6 (dark/tokens), #7 (TS estrito),
 #13 (dado clínico não nasce de IA — a odontometria é digitada/medida, zero Gemini).
 
-**⚠️ PENDENTE — validação de campo (18/07):** o design das tabelas (Endo + Perio) e o
-catálogo anatômico foram para os **dentistas do piloto** avaliarem (preview em artifact,
-2026-07-18). As colunas exatas da odontometria, o fluxo e o layout **congelam depois das
-observações deles** — endodontistas variam na ficha. Não executar a Fatia D (nem finalizar
-a UI da A) antes desse retorno. **Dependências:** Fatia A (evento + `ToothDetailPanel`).
+**✅ RESOLVIDO — validação de campo (retorno em 19/07):** o design das tabelas (Endo + Perio)
+e o catálogo anatômico foram para os **dentistas do piloto** (preview em artifact, 2026-07-18)
+e o retorno foi **positivo — "tava tudo correto"**. Efeito: as colunas da odontometria
+(`comprimento_raiz_mm`, `ct_mm`, `lima_final`) **congelam como especificado**, a **Fatia D está
+destravada** e a **UI da Fatia A é final**.
+**⚠️ Ressalva:** foi validação de **preview estático**, não de uso sob pressão de tempo — ela
+congela o **modelo de dados** (o caro de reverter depois que há dado gravado), mas **não** valida
+o fluxo. O fluxo continua pendente de dogfood real, e endodontistas variam na ficha.
+**Dependências:** Fatia A (evento + `ToothDetailPanel`).
 
 ---
 

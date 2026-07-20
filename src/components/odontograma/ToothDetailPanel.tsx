@@ -30,6 +30,20 @@ const COR_TOKEN = {
   slate: 'var(--color-slate)',
 } as const;
 
+// Versão calibrada pra TEXTO (a cor cheia acima reprova AA em light mode sobre o
+// próprio fundo tingido — achado auditoria UX 19/07). Fill/borda/ponto continuam
+// usando COR_TOKEN normalmente; só cor-de-texto usa este mapa.
+const COR_TOKEN_INK = {
+  coral: 'var(--color-coral-ink)',
+  teal:  'var(--color-teal-ink)',
+  slate: 'var(--color-slate-ink)',
+} as const;
+
+/** Rótulo falado do estado de uma face, pro aria-label — cor sozinha não é
+ * acessível (achado auditoria UX 19/07, CRITICAL #3: faces eram inoperáveis
+ * por teclado/leitor de tela). */
+const ROTULO_ESTADO_FACE = { coral: 'a fazer', teal: 'feito', slate: 'pré-existente' } as const;
+
 /** Chips de ação a nível de dente inteiro — cada um cicla os `modos` e depois remove. */
 const CHIPS: { tipo: TipoRegistroOdontograma; modos: StatusRegistro[] }[] = [
   { tipo: 'endodontia',       modos: ['indicado', 'realizado'] },
@@ -166,7 +180,7 @@ export function ToothDetailPanel({
     <div
       className={cn('rounded-xl border p-4 flex flex-col gap-3', className)}
       style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
-      role="dialog"
+      role="region"
       aria-label={`Detalhe do dente ${dente}`}
     >
       {/* ── Header ── */}
@@ -179,7 +193,7 @@ export function ToothDetailPanel({
         {temPreexistente && (
           <span
             className="text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded"
-            style={{ background: 'var(--color-slate-pale)', color: 'var(--color-slate)' }}
+            style={{ background: 'var(--color-slate-pale)', color: 'var(--color-slate-ink)' }}
           >
             Pré-existente
           </span>
@@ -243,11 +257,19 @@ export function ToothDetailPanel({
             <g clipPath={`url(#occl-clip-${dente})`}>
               {FACES.map((face) => {
                 const cor = corFace(face);
+                const rotulo = `Face ${faceLabel(face, dente)} — ${cor ? ROTULO_ESTADO_FACE[cor] : 'sem registro'}`;
                 return (
                   <polygon
                     key={face}
                     points={occlusalZonePoints(face, dente)}
                     onClick={() => cycleFace(face)}
+                    role={readOnly ? undefined : 'button'}
+                    tabIndex={readOnly ? undefined : 0}
+                    aria-label={readOnly ? undefined : rotulo}
+                    onKeyDown={readOnly ? undefined : (e) => {
+                      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cycleFace(face); }
+                    }}
+                    className={readOnly ? undefined : 'outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-teal'}
                     style={{
                       fill: cor
                         ? `color-mix(in srgb, ${COR_TOKEN[cor]} ${cor === 'slate' ? 60 : 75}%, var(--color-surface-alt))`
@@ -331,7 +353,7 @@ export function ToothDetailPanel({
                   background: cor
                     ? `color-mix(in srgb, ${COR_TOKEN[cor]} 16%, var(--color-surface-alt))`
                     : 'var(--color-surface-alt)',
-                  color: cor ? COR_TOKEN[cor] : 'var(--color-text-secondary)',
+                  color: cor ? COR_TOKEN_INK[cor] : 'var(--color-text-secondary)',
                   border: `1px solid ${cor ? `color-mix(in srgb, ${COR_TOKEN[cor]} 45%, var(--color-border))` : 'var(--color-border)'}`,
                 }}
               >
@@ -372,7 +394,7 @@ export function ToothDetailPanel({
                   className="text-[9.5px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0"
                   style={{
                     background: `color-mix(in srgb, ${COR_TOKEN[cor]} 15%, var(--color-surface-alt))`,
-                    color: COR_TOKEN[cor],
+                    color: COR_TOKEN_INK[cor],
                   }}
                 >
                   {ev.status === 'indicado' ? 'A fazer' : ev.origem === 'preexistente' ? 'Pré-exist.' : 'Feito'}

@@ -62,6 +62,22 @@ const COR_TOKEN: Record<CorClinica, string> = {
   slate: 'var(--color-slate)',
 };
 
+// Cor-de-texto calibrada AA (a cor cheia acima reprova mesmo sobre fundo neutro
+// em light mode — teal 3.38:1, coral 2.99:1; achado auditoria UX 19/07).
+const COR_TOKEN_INK: Record<CorClinica, string> = {
+  coral: 'var(--color-coral-ink)',
+  teal:  'var(--color-teal-ink)',
+  slate: 'var(--color-slate-ink)',
+};
+
+/** Status falado — cor sozinha não comunica estado clínico (achado auditoria
+ * UX 19/07, HIGH #5: aria-label/aria-pressed nunca refletiam a cor da boca). */
+const STATUS_CLINICO_LABEL: Record<CorClinica, string> = {
+  coral: 'a fazer',
+  teal:  'feito aqui',
+  slate: 'pré-existente',
+};
+
 export interface ResumoDente {
   cor: CorClinica | null;       // dominante: coral (a fazer) > teal (feito aqui) > slate (pré-existente)
   ausente: boolean;             // exodontia realizada / esfoliação
@@ -516,6 +532,8 @@ export function Odontograma({
             onClick={() => onToothToggle(num)}
             onMouseEnter={() => setHoveredTooth(num)}
             onMouseLeave={() => setHoveredTooth(null)}
+            onFocus={() => setHoveredTooth(num)}
+            onBlur={() => setHoveredTooth(null)}
             className={cn(
               'relative flex flex-col items-center outline-none focus-visible:ring-1 focus-visible:ring-teal rounded-sm',
               isUpper ? 'justify-end' : 'justify-start',
@@ -526,8 +544,8 @@ export function Odontograma({
               transition: 'transform 0.13s ease',
               gap: 5,
             }}
-            aria-label={`Dente ${num} — ${TOOTH_NAMES[num] ?? ''}`}
-            aria-pressed={isActive}
+            aria-label={`Dente ${num} — ${TOOTH_NAMES[num] ?? ''}${resumo?.cor ? `, ${STATUS_CLINICO_LABEL[resumo.cor]}` : ''}`}
+            aria-pressed={clinico ? undefined : isActive}
           >
             {isUpper && (
               <span
@@ -627,7 +645,11 @@ export function Odontograma({
   return (
     <div
       className={cn('flex flex-col gap-3 select-none', className)}
-      style={compact ? { zoom: 0.82 } : undefined}
+      // 0.82 deixava o incisivo lateral com ~23.8px de alvo de toque, abaixo do
+      // piso de 24px (achado auditoria UX 19/07, MEDIUM #6) — usado no Modo
+      // Consulta chairside, onde errar o dente vizinho é um risco real. 0.85
+      // garante >=24.6px no menor dente sem descaracterizar o modo compacto.
+      style={compact ? { zoom: 0.85 } : undefined}
     >
 
       {/* ── Tab bar + Legenda ── */}
@@ -786,27 +808,27 @@ export function Odontograma({
               {getQuadrantLabel(hoveredTooth)}
             </span>
             {hoveredResumo?.cor === 'coral' && (
-              <span className="text-[10px] font-semibold ml-0.5" style={{ color: 'var(--color-coral)' }}>
+              <span className="text-[10px] font-semibold ml-0.5" style={{ color: COR_TOKEN_INK.coral }}>
                 · a fazer
               </span>
             )}
             {hoveredResumo?.cor === 'teal' && (
-              <span className="text-[10px] font-semibold ml-0.5" style={{ color: 'var(--color-teal)' }}>
+              <span className="text-[10px] font-semibold ml-0.5" style={{ color: COR_TOKEN_INK.teal }}>
                 · feito aqui
               </span>
             )}
             {hoveredResumo?.cor === 'slate' && (
-              <span className="text-[10px] font-semibold ml-0.5" style={{ color: 'var(--color-slate)' }}>
+              <span className="text-[10px] font-semibold ml-0.5" style={{ color: COR_TOKEN_INK.slate }}>
                 · pré-existente
               </span>
             )}
             {!clinico && hoveredState === 'historical' && (
-              <span className="text-[10px] font-semibold ml-0.5" style={{ color: 'var(--color-teal)' }}>
+              <span className="text-[10px] font-semibold ml-0.5" style={{ color: COR_TOKEN_INK.teal }}>
                 · histórico
               </span>
             )}
             {!clinico && (hoveredState === 'selected' || hoveredState === 'shared') && (
-              <span className="text-[10px] font-semibold ml-0.5" style={{ color: 'var(--color-teal)' }}>
+              <span className="text-[10px] font-semibold ml-0.5" style={{ color: COR_TOKEN_INK.teal }}>
                 · selecionado
               </span>
             )}

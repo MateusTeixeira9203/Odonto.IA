@@ -7,6 +7,41 @@ import { revalidatePath } from 'next/cache';
 import { inserirNotificacao } from '@/lib/notificacoes';
 import type { OdontogramaEventoDraft } from '@/types/odontograma';
 
+/**
+ * Monta as linhas de `odontograma_eventos` a partir dos drafts revisados pelo dentista.
+ * Extraído pra ser reusado pelo save inicial E pelo retry (`regravarEventosOdontograma`) —
+ * a data clínica e as âncoras precisam ser idênticas nos dois caminhos.
+ */
+function montarRowsEventos(
+  eventos: OdontogramaEventoDraft[],
+  ctx: { clinicId: string; pacienteId: string; dentistaId: string; fichaId: string },
+) {
+  const hoje = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+  return eventos.map((ev) => ({
+    clinica_id:     ctx.clinicId,
+    paciente_id:    ctx.pacienteId,
+    dentista_id:    ctx.dentistaId,
+    ficha_id:       ctx.fichaId,
+    grupo_id:       ev.grupo_id,
+    tipo:           ev.tipo,
+    status:         ev.status,
+    origem:         ev.origem,
+    nivel:          ev.ancora.nivel,
+    arcada:         ev.ancora.arcada ?? null,
+    quadrante:      ev.ancora.quadrante ?? null,
+    dente:          ev.ancora.dente ?? null,
+    faces:          ev.ancora.faces ?? [],
+    papel_no_grupo: ev.papel_no_grupo,
+    observacao:     ev.observacao || null,
+    // Data clínica: obrigatória no realizado da clínica (default hoje BRT — rede de
+    // segurança; a UI já manda explícita). Indicado nunca tem data (constraint SQL).
+    realizado_em:
+      ev.status === 'realizado'
+        ? (ev.realizado_em ?? (ev.origem === 'clinica' ? hoje : null))
+        : null,
+  }));
+}
+
 export async function salvarFichaConsulta(params: {
   agendamentoId:      string;
   pacienteId:         string;
@@ -20,7 +55,11 @@ export async function salvarFichaConsulta(params: {
   alerta_novo?:       string | null;
   /** v3 — eventos de odontograma revisados pelo dentista na confirmação (Fatia A). */
   odontograma_eventos?: OdontogramaEventoDraft[];
-}): Promise<{ fichaId?: string; error?: string }> {
+  /**
+   * `eventosFalharam` sinaliza que a ficha salvou mas o event-log do odontograma NÃO —
+   * o chamador mostra aviso não-bloqueante + retry (`regravarEventosOdontograma`).
+   */
+}): Promise<{ fichaId?: string; error?: string; eventosFalharam?: boolean }> {
   const { supabase, user, clinicId, role } = await requireClinicContext();
 
   if (role === 'secretaria') return { error: 'Sem permissão.' };
@@ -61,34 +100,20 @@ export async function salvarFichaConsulta(params: {
   // a ficha v2 JÁ está salva; se a camada visual falhar, loga e segue — o dado clínico
   // textual não se perde e o odontograma degrada pra "sem registro".
   const eventos = params.odontograma_eventos ?? [];
+  let eventosFalharam = false;
   if (eventos.length > 0) {
-    const hoje = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
-    const rows = eventos.map((ev) => ({
-      clinica_id:     clinicId,
-      paciente_id:    params.pacienteId,
-      dentista_id:    dentistaPerfil.id,
-      ficha_id:       fichaId,
-      grupo_id:       ev.grupo_id,
-      tipo:           ev.tipo,
-      status:         ev.status,
-      origem:         ev.origem,
-      nivel:          ev.ancora.nivel,
-      arcada:         ev.ancora.arcada ?? null,
-      quadrante:      ev.ancora.quadrante ?? null,
-      dente:          ev.ancora.dente ?? null,
-      faces:          ev.ancora.faces ?? [],
-      papel_no_grupo: ev.papel_no_grupo,
-      observacao:     ev.observacao || null,
-      // Data clínica: obrigatória no realizado da clínica (default hoje BRT — rede de
-      // segurança; a UI já manda explícita). Indicado nunca tem data (constraint SQL).
-      realizado_em:
-        ev.status === 'realizado'
-          ? (ev.realizado_em ?? (ev.origem === 'clinica' ? hoje : null))
-          : null,
-    }));
+    const rows = montarRowsEventos(eventos, {
+      clinicId,
+      pacienteId: params.pacienteId,
+      dentistaId: dentistaPerfil.id,
+      fichaId,
+    });
     const { error: eventosError } = await supabase.from('odontograma_eventos').insert(rows);
     if (eventosError) {
       console.error('[salvarFichaConsulta] odontograma_eventos:', eventosError.message);
+      // Fail-soft CONTINUA (a ficha não é desfeita), mas deixou de ser silencioso:
+      // o chamador recebe o sinal e oferece "tentar de novo" ao dentista.
+      eventosFalharam = true;
     }
   }
 
@@ -116,7 +141,73 @@ export async function salvarFichaConsulta(params: {
     href:          '/dashboard/agendamentos',
   });
 
-  return { fichaId };
+  return { fichaId, ...(eventosFalharam && { eventosFalharam: true }) };
+}
+
+/**
+ * Retry do event-log do odontograma quando o insert do save falhou (fail-soft — ver
+ * `salvarFichaConsulta`). Idempotente por ficha: apaga os eventos já gravados daquela
+ * ficha antes de reinserir, pra um retry após sucesso parcial não duplicar o desenho.
+ */
+export async function regravarEventosOdontograma(params: {
+  fichaId:    string;
+  pacienteId: string;
+  eventos:    OdontogramaEventoDraft[];
+}): Promise<{ ok: boolean; error?: string }> {
+  const { supabase, user, clinicId, role } = await requireClinicContext();
+  if (role === 'secretaria') return { ok: false, error: 'Sem permissão.' };
+
+  const { data: dentistaPerfil } = await supabase
+    .from('dentistas')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('clinica_id', clinicId)
+    .maybeSingle();
+
+  if (!dentistaPerfil) return { ok: false, error: 'Perfil de dentista não encontrado.' };
+
+  // A ficha tem que existir, ser da clínica e ser DESTE dentista (mesma regra de autoria
+  // do núcleo clínico 3.1 — clínica lê, autor escreve).
+  const { data: ficha } = await supabase
+    .from('fichas')
+    .select('id')
+    .eq('id', params.fichaId)
+    .eq('clinica_id', clinicId)
+    .eq('paciente_id', params.pacienteId)
+    .eq('dentista_id', dentistaPerfil.id)
+    .maybeSingle();
+
+  if (!ficha) return { ok: false, error: 'Ficha não encontrada.' };
+  if (params.eventos.length === 0) return { ok: true };
+
+  const rows = montarRowsEventos(params.eventos, {
+    clinicId,
+    pacienteId: params.pacienteId,
+    dentistaId: dentistaPerfil.id,
+    fichaId:    params.fichaId,
+  });
+
+  // RPC atômica (migration 104): lock da ficha + delete + insert no mesmo
+  // statement — serializa retries concorrentes (2 abas) e reforça no servidor
+  // que ficha assinada é imutável (invariante #14), mesmo que a UI já esconda
+  // o botão nesse caso.
+  const { error } = await supabase.rpc('regravar_odontograma_eventos', {
+    p_ficha_id:    params.fichaId,
+    p_clinica_id:  clinicId,
+    p_paciente_id: params.pacienteId,
+    p_eventos:     rows,
+  });
+
+  if (error) {
+    if (error.message.includes('ficha_assinada')) {
+      return { ok: false, error: 'Esta ficha já foi assinada e não pode mais ser alterada.' };
+    }
+    console.error('[regravarEventosOdontograma]', error.message);
+    return { ok: false, error: 'Não foi possível regravar o odontograma.' };
+  }
+
+  revalidatePath(`/dashboard/pacientes/${params.pacienteId}`);
+  return { ok: true };
 }
 
 export async function salvarAssinaturaConsulta(
