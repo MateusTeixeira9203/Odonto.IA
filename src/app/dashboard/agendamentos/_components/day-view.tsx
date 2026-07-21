@@ -10,6 +10,7 @@ import {
   X as XIcon, FileText, CalendarOff, SlidersHorizontal, ThumbsUp,
 } from 'lucide-react';
 import { STATUS_CONFIG } from './status-config';
+import { calcularFaixas } from './layout-sobreposicao';
 import type { AgendamentoRow } from '../page';
 import type { AgendamentoStatus } from '@/types/database';
 
@@ -72,35 +73,19 @@ export function DayView({
       return { id: apt.id, top, bottom: top + height, height };
     });
 
+    // O algoritmo mora em `layout-sobreposicao.ts` — compartilhado com a visão de Semana,
+    // que tinha o mesmo problema e ganhou o mesmo tratamento em 21/07.
+    const faixas = calcularFaixas(boxes);
+
     const layout = new Map<string, { top: number; height: number; leftPct: number; widthPct: number }>();
-    let i = 0;
-    while (i < boxes.length) {
-      // Cluster = conjunto de caixas encadeadas por sobreposição visual.
-      let clusterEnd = boxes[i].bottom;
-      let j = i + 1;
-      while (j < boxes.length && boxes[j].top < clusterEnd) {
-        clusterEnd = Math.max(clusterEnd, boxes[j].bottom);
-        j++;
-      }
-      const cluster = boxes.slice(i, j);
-      // Alocação gulosa: cada caixa vai pra 1ª coluna cuja última caixa já terminou.
-      const colEnds: number[] = [];
-      const colOf = cluster.map(b => {
-        let col = colEnds.findIndex(end => b.top >= end - 0.5);
-        if (col === -1) { col = colEnds.length; colEnds.push(b.bottom); }
-        else { colEnds[col] = b.bottom; }
-        return col;
+    for (const b of boxes) {
+      const f = faixas.get(b.id);
+      layout.set(b.id, {
+        top: b.top,
+        height: b.height,
+        leftPct: f?.leftPct ?? 0,
+        widthPct: f?.widthPct ?? 100,
       });
-      const totalCols = colEnds.length;
-      cluster.forEach((b, k) => {
-        layout.set(b.id, {
-          top: b.top,
-          height: b.height,
-          leftPct: (colOf[k] / totalCols) * 100,
-          widthPct: (1 / totalCols) * 100,
-        });
-      });
-      i = j;
     }
     return layout;
   }, [dayApts]);

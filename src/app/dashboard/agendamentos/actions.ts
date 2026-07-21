@@ -13,6 +13,30 @@ import { inserirNotificacao } from "@/lib/notificacoes";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
+/**
+ * Janela de busca dos agendamentos candidatos a conflito, em torno de uma data clínica.
+ *
+ * ⚠️ BUG CORRIGIDO 21/07: a janela era montada em **UTC** (`${dia}T00:00:00Z` até
+ * `${dia}T23:59:59Z`). Como a clínica é UTC-3, isso na prática cobria das **21h do dia
+ * anterior às 21h do dia** — ou seja, **agendamento a partir das 21h simplesmente não
+ * era checado**. Falso negativo, o pior tipo: dois pacientes no mesmo horário, sem aviso
+ * nenhum. E o Mateus confirmou (21/07) que "muitas vezes o dentista fica até mais tarde
+ * pra concluir atendimentos" — exatamente o horário que escapava.
+ *
+ * A correção não tenta acertar o limite do dia: pega **de véspera a dia seguinte**. São
+ * poucas dezenas de linhas por dentista, e assim nenhum raciocínio de fuso pode errar de
+ * novo — inclusive o caso de uma consulta longa que começa num dia e termina no outro.
+ * Quem decide o conflito é a sobreposição real de timestamps, não esta janela.
+ */
+function janelaDeConflito(dataHoraISO: string): { de: string; ate: string } {
+  const inicio = new Date(dataHoraISO).getTime();
+  const DIA = 24 * 60 * 60 * 1000;
+  return {
+    de:  new Date(inicio - DIA).toISOString(),
+    ate: new Date(inicio + DIA).toISOString(),
+  };
+}
+
 export type StatusAgendamento =
   | 'scheduled'
   | 'confirmed'
@@ -28,7 +52,15 @@ export async function criarAgendamento(dados: {
   duracaoMinutos: number;
   observacoes: string | null;
   dentistaId?: string;
-}): Promise<{ error?: string; id?: string }> {
+  /**
+   * Marca por cima de um horário já ocupado do DENTISTA (decisão do Mateus 21/07: a
+   * recepção precisa dessa liberdade — sobreposição acontece na clínica real). Só a UI
+   * pede isso, e só depois de mostrar o conflito. Mesmo espírito do `forcarEncaixe`.
+   *
+   * ⚠️ NÃO cobre o conflito do PACIENTE — esse continua sem override (ver abaixo).
+   */
+  forcarConflitoDentista?: boolean;
+}): Promise<{ error?: string; id?: string; conflitoDentista?: boolean }> {
   const { supabase, user, clinicId, role } = await requireClinicContext();
 
   const [{ data: dentistaPerfil }, { count: pacCount }] = await Promise.all([
@@ -52,7 +84,7 @@ export async function criarAgendamento(dados: {
 
   const novoInicioMs = new Date(dados.dataHora).getTime();
   const novoFimMs = novoInicioMs + dados.duracaoMinutos * 60_000;
-  const dateOnly = dados.dataHora.split('T')[0];
+  const janela = janelaDeConflito(dados.dataHora);
 
   // Duas checagens independentes, em paralelo:
   //  1. Agenda do DENTISTA-alvo — visível pra este client (é a dele, ou ele é secretária).
@@ -66,8 +98,8 @@ export async function criarAgendamento(dados: {
       .eq('dentista_id', dentistaAlvo)
       .eq('clinica_id', clinicId)
       .in('status', ['scheduled', 'confirmed', 'checked_in', 'in_progress', 'completed'])
-      .gte('data_hora', `${dateOnly}T00:00:00.000Z`)
-      .lt('data_hora', `${dateOnly}T23:59:59.999Z`),
+      .gte('data_hora', janela.de)
+      .lt('data_hora', janela.ate),
     supabase.rpc('paciente_tem_conflito_agenda', {
       p_paciente_id: dados.pacienteId,
       p_inicio: dados.dataHora,
@@ -84,15 +116,27 @@ export async function criarAgendamento(dados: {
     return { error: 'Não foi possível verificar a agenda do paciente. Tente novamente.' };
   }
 
-  for (const ag of agendamentosNoDia ?? []) {
-    const agInicioMs = new Date(ag.data_hora).getTime();
-    const agFimMs = agInicioMs + (ag.duracao_minutos ?? 30) * 60_000;
-    if (agInicioMs < novoFimMs && agFimMs > novoInicioMs) {
-      return { error: 'Este horário conflita com outro agendamento existente. Escolha outro horário.' };
+  // Conflito na agenda do DENTISTA: sinaliza e deixa a UI decidir. Não é erro terminal —
+  // a recepção sobrepõe horário de propósito (retorno rápido, urgência entre consultas).
+  // Devolve `conflitoDentista` pra a tela oferecer "marcar mesmo assim"; só volta a barrar
+  // se o chamador NÃO pediu o override.
+  if (!dados.forcarConflitoDentista) {
+    for (const ag of agendamentosNoDia ?? []) {
+      const agInicioMs = new Date(ag.data_hora).getTime();
+      const agFimMs = agInicioMs + (ag.duracao_minutos ?? 30) * 60_000;
+      if (agInicioMs < novoFimMs && agFimMs > novoInicioMs) {
+        return {
+          error: 'Este horário conflita com outro agendamento deste dentista.',
+          conflitoDentista: true,
+        };
+      }
     }
   }
 
-  // Sem override: dois dentistas não atendem o mesmo paciente ao mesmo tempo.
+  // ⚠️ SEM OVERRIDE, e é deliberado (mantido na liberação de 21/07): dois dentistas não
+  // atendem o mesmo paciente ao mesmo tempo. O silo esconde a agenda do outro dentista —
+  // furar aqui poria o paciente em dois consultórios sem ninguém enxergar até ele chegar.
+  // `forcarConflitoDentista` NÃO alcança esta checagem, por construção.
   if (pacienteOcupado === true) {
     return { error: 'Este paciente já tem um horário nesse intervalo.' };
   }
@@ -554,7 +598,7 @@ export async function criarEncaixe(dados: {
   const dentistaAlvo = dados.dentistaId ?? dentistaPerfil.id;
   const novoStart = new Date(dados.dataHora).getTime();
   const novoEnd = novoStart + dados.duracaoMinutos * 60_000;
-  const dateOnly = dados.dataHora.split('T')[0];
+  const janelaEncaixe = janelaDeConflito(dados.dataHora);
 
   const [{ data: existing }, { data: pacienteOcupado, error: conflitoErr }] = await Promise.all([
     supabase
@@ -563,8 +607,8 @@ export async function criarEncaixe(dados: {
       .eq('dentista_id', dentistaAlvo)
       .eq('clinica_id', clinicId)
       .in('status', ['scheduled', 'confirmed', 'checked_in', 'in_progress'])
-      .gte('data_hora', `${dateOnly}T00:00:00.000Z`)
-      .lt('data_hora', `${dateOnly}T23:59:59.999Z`),
+      .gte('data_hora', janelaEncaixe.de)
+      .lt('data_hora', janelaEncaixe.ate),
     supabase.rpc('paciente_tem_conflito_agenda', {
       p_paciente_id: dados.pacienteId,
       p_inicio: dados.dataHora,

@@ -265,6 +265,8 @@ export function AgendamentosClient({
   const [pacienteSugestoes, setPacienteSugestoes] = useState<{ id: string; nome: string }[]>([]);
   const [showSugestoes, setShowSugestoes] = useState(false);
   const [criandoPacienteNovo, setCriandoPacienteNovo] = useState(false);
+  /** O servidor recusou por conflito do DENTISTA — libera o "marcar mesmo assim". */
+  const [conflitoServidor, setConflitoServidor] = useState(false);
 
   type ViewMode = 'day' | 'week' | 'month';
   const [viewMode, setViewMode] = useState<ViewMode>('week');
@@ -357,6 +359,39 @@ export function AgendamentosClient({
     });
   }, [agendamentos, editForm.data, editForm.hora, editForm.duracao, selectedApt]);
 
+  /**
+   * Dentista que o formulário assume por padrão.
+   *
+   * BUG CORRIGIDO 21/07: era sempre `dentistas[0]`, sem olhar o filtro da grade. A
+   * secretária filtrava pra ver o Dr. X, via um horário livre, abria "Novo Agendamento"
+   * — e o drawer vinha apontando pro PRIMEIRO dentista da lista. O servidor então
+   * checava a agenda de OUTRA pessoa e recusava por conflito que ela não conseguia ver
+   * na tela ("conflita com outro agendamento" num horário visivelmente vazio).
+   *
+   * Regra: se há um dentista filtrado, é ele. A tela e o formulário passam a falar
+   * do mesmo profissional.
+   *
+   * `useCallback` e não função solta: o atalho de teclado "N" fecha sobre esta função
+   * dentro de um useEffect. Sem memo estável + deps corretas, o atalho capturaria o
+   * filtro de quando o listener foi montado — o mesmo bug pela porta dos fundos.
+   */
+  const dentistaPadraoForm = useCallback(
+    () => (isSecretaria && filtroDentistaId !== 'todos' ? filtroDentistaId : dentistas[0]?.id) ?? '',
+    [isSecretaria, filtroDentistaId, dentistas],
+  );
+
+  /**
+   * Abre o "Novo Agendamento" já apontado pro dentista que está na tela.
+   * Precisa existir separado do `resetForm` porque o reset roda ao FECHAR: sem isto,
+   * trocar o filtro e reabrir o drawer traria o dentista da vez anterior.
+   */
+  const abrirNovoAgendamento = useCallback(() => {
+    setSaveError(null);
+    setConflitoServidor(false);
+    setNovoForm((f) => ({ ...f, dentistaId: dentistaPadraoForm() }));
+    setIsNewModalOpen(true);
+  }, [dentistaPadraoForm]);
+
   // Keyboard shortcuts — apenas quando nenhum input/drawer está focado
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -369,11 +404,15 @@ export function AgendamentosClient({
       switch (e.key) {
         case 'n':
         case 'N':
-          if (!modalOpen && canEdit) { e.preventDefault(); setIsNewModalOpen(true); }
+          if (!modalOpen && canEdit) { e.preventDefault(); abrirNovoAgendamento(); }
           break;
         case 'e':
         case 'E':
-          if (!modalOpen && canEdit && isSecretaria) { e.preventDefault(); setIsEncaixeOpen(true); }
+          if (!modalOpen && canEdit && isSecretaria) {
+            e.preventDefault();
+            setEncaixeForm((f) => ({ ...f, dentistaId: dentistaPadraoForm() }));
+            setIsEncaixeOpen(true);
+          }
           break;
         case 't':
         case 'T':
@@ -395,7 +434,7 @@ export function AgendamentosClient({
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [isNewModalOpen, isDetailModalOpen, isEncaixeOpen, cancelDialog, assinaturaModal, canEdit, viewMode, isSecretaria]);
+  }, [isNewModalOpen, isDetailModalOpen, isEncaixeOpen, cancelDialog, assinaturaModal, canEdit, viewMode, isSecretaria, abrirNovoAgendamento, dentistaPadraoForm]);
 
   // Busca pacientes por nome (autocomplete) — debounced 300ms + AbortController
   const buscarPacientes = useCallback((nome: string) => {
@@ -457,10 +496,12 @@ export function AgendamentosClient({
       hora: '09:00',
       duracao: '30',
       observacoes: '',
-      dentistaId: dentistas[0]?.id ?? '',
+      dentistaId: dentistaPadraoForm(),
     });
     setPacienteSugestoes([]);
     setShowSugestoes(false);
+    setSaveError(null);
+    setConflitoServidor(false); // senão o banner âmbar reaparece no próximo agendamento
   };
 
   // ── Importação do Google Calendar ──────────────────────────────────────────
@@ -534,8 +575,9 @@ export function AgendamentosClient({
     }
   };
 
-  // Cria novo agendamento via server action
-  const handleCriarAgendamento = async () => {
+  // Cria novo agendamento via server action.
+  // `forcar` = o usuário já viu o conflito do dentista e escolheu marcar mesmo assim.
+  const handleCriarAgendamento = async (forcar = false) => {
     if (!novoForm.pacienteId) {
       setSaveError('Selecione um paciente.');
       return;
@@ -545,6 +587,7 @@ export function AgendamentosClient({
       return;
     }
     setSaveError(null);
+    if (!forcar) setConflitoServidor(false);
     setIsSaving(true);
 
     // Timestamp explicitamente em BRT (UTC-3) — independente do timezone do browser
@@ -558,11 +601,16 @@ export function AgendamentosClient({
       duracaoMinutos: parseInt(novoForm.duracao, 10) || 30,
       observacoes: observacoesCombinadas,
       ...(isSecretaria && novoForm.dentistaId ? { dentistaId: novoForm.dentistaId } : {}),
+      ...(forcar ? { forcarConflitoDentista: true } : {}),
     });
 
     if (result.error) {
       setSaveError(result.error);
+      // Conflito do dentista é recuperável: a tela oferece "marcar mesmo assim".
+      // Qualquer outro erro (inclusive conflito do PACIENTE) não ganha esse botão.
+      setConflitoServidor(result.conflitoDentista === true);
     } else {
+      setConflitoServidor(false);
       const dentistaDoAgt = isSecretaria
         ? dentistas.find((d) => d.id === novoForm.dentistaId) ?? null
         : null;
@@ -769,7 +817,7 @@ export function AgendamentosClient({
     setAgendamentos(prev => [...prev, novoAgt]);
     setIsEncaixeOpen(false);
     setEncaixeConflito(false);
-    setEncaixeForm({ pacienteSearch: '', pacienteId: '', pacienteNome: '', hora: '09:00', duracao: '30', dentistaId: dentistas[0]?.id ?? '' });
+    setEncaixeForm({ pacienteSearch: '', pacienteId: '', pacienteNome: '', hora: '09:00', duracao: '30', dentistaId: dentistaPadraoForm() });
     toast.success('Encaixe criado!');
     setEncaixeSaving(false);
   };
@@ -884,7 +932,10 @@ export function AgendamentosClient({
           {/* Encaixe — secretária */}
           {canEdit && isSecretaria && (
             <button
-              onClick={() => setIsEncaixeOpen(true)}
+              onClick={() => {
+                setEncaixeForm((f) => ({ ...f, dentistaId: dentistaPadraoForm() }));
+                setIsEncaixeOpen(true);
+              }}
               className="border border-border text-text-secondary hover:bg-surface-alt hover:text-text-primary active:scale-[0.98] px-4 py-2.5 rounded-xl font-semibold text-sm flex items-center gap-2 transition-all group"
             >
               <Stethoscope className="w-4 h-4" />
@@ -896,7 +947,7 @@ export function AgendamentosClient({
           {/* Novo Agendamento — plano SOLO ou secretária */}
           {canEdit && (
             <button
-              onClick={() => { setSaveError(null); setIsNewModalOpen(true); }}
+              onClick={abrirNovoAgendamento}
               className="bg-gradient-to-r from-teal to-teal-lt text-white px-5 py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all shadow-[0_8px_32px_rgba(47,156,133,0.38)] hover:-translate-y-0.5 active:scale-[0.98] w-full sm:w-auto group"
             >
               <Plus className="w-4 h-4" />
@@ -1017,7 +1068,7 @@ export function AgendamentosClient({
             setCancelDialog({ aptId: apt.id, aptNome: apt.paciente?.nome ?? '' });
             setCancelMotivo('');
           }}
-          onNewAppointment={() => setIsNewModalOpen(true)}
+          onNewAppointment={abrirNovoAgendamento}
           onVerFicha={(pacienteId) => router.push(`/dashboard/pacientes/${pacienteId}`)}
           onStartConsulta={(aptId) => router.push(`/consulta/${aptId}`)}
           onRequestAssinatura={(pacienteId, nome, aptId) =>
@@ -1248,6 +1299,28 @@ export function AgendamentosClient({
               ))}
             </div>
 
+            {/* Duração livre — os chips acima são atalho, não limite (pedido 21/07).
+                Aceita qualquer valor em minutos; o campo e os chips leem o mesmo estado,
+                então digitar 45 acende o chip de 45 e vice-versa. */}
+            <div className="flex items-center gap-2.5">
+              <Label htmlFor="apt-duracao-livre" className="text-xs text-text-secondary shrink-0">
+                Ou digite:
+              </Label>
+              <Input
+                id="apt-duracao-livre"
+                type="number"
+                min={5}
+                max={600}
+                step={5}
+                inputMode="numeric"
+                value={novoForm.duracao}
+                onChange={(e) => setNovoForm((f) => ({ ...f, duracao: e.target.value }))}
+                className="w-24 rounded-xl bg-surface-alt border-border text-text-primary text-sm"
+                aria-label="Duração personalizada em minutos"
+              />
+              <span className="text-xs text-text-secondary">minutos</span>
+            </div>
+
             {/* ── Notas ───────────────────────────────── */}
             <div className="flex items-center gap-3">
               <div className="flex-1 h-px bg-border/50" />
@@ -1304,9 +1377,32 @@ export function AgendamentosClient({
 
           {/* Sticky footer */}
           <div className="shrink-0 px-6 py-5 border-t border-border space-y-3 bg-surface">
-            {saveError && (
+            {saveError && !conflitoServidor && (
               <p className="text-xs text-red-500 bg-red-500/10 rounded-lg p-2">{saveError}</p>
             )}
+
+            {/* Conflito do DENTISTA — recuperável. Âmbar (aviso), não vermelho (erro):
+                a recepção decide. O conflito do PACIENTE nunca chega aqui, cai no bloco
+                vermelho acima e continua sem saída. */}
+            {conflitoServidor && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+                <div className="flex items-start gap-2 mb-2.5">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                  <p className="text-xs text-amber-700 dark:text-amber-400">
+                    {saveError} Marcar mesmo assim vai <b>sobrepor</b> os dois na agenda.
+                  </p>
+                </div>
+                <Button
+                  onClick={() => void handleCriarAgendamento(true)}
+                  disabled={isSaving}
+                  size="sm"
+                  className="w-full rounded-lg text-xs bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50"
+                >
+                  {isSaving ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-2" /> Salvando...</> : 'Marcar mesmo assim'}
+                </Button>
+              </div>
+            )}
+
             <Button
               onClick={() => void handleCriarAgendamento()}
               disabled={isSaving}

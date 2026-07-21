@@ -15,6 +15,7 @@ import {
 import { ptBR } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { STATUS_CONFIG } from './status-config';
+import { calcularFaixas } from './layout-sobreposicao';
 import type { AgendamentoRow } from '../page';
 import type { AgendamentoStatus } from '@/types/database';
 
@@ -69,6 +70,29 @@ export function WeekView({
     const { bg, border, text } = (STATUS_CONFIG[apt.status as AgendamentoStatus] ?? STATUS_CONFIG.scheduled).timeline;
     return { top, height, bg, border, text };
   }
+
+  /**
+   * Layout de sobreposição — BUG CORRIGIDO 21/07: todo card usava a largura inteira da
+   * coluna, então dois horários sobrepostos eram desenhados no MESMO retângulo (texto por
+   * cima de texto, o de baixo inclicável). Com o "marcar mesmo assim" e com consultas
+   * longas (240min), sobreposição deixou de ser exceção.
+   *
+   * O algoritmo mora em `layout-sobreposicao.ts`, compartilhado com a visão de Dia.
+   */
+  const faixasPorDia = useMemo(() => {
+    const porDia = new Map<string, ReturnType<typeof calcularFaixas>>();
+    for (const day of days) {
+      const key = format(day, 'yyyy-MM-dd');
+      const caixas = (aptsByDay[key] ?? [])
+        .map((apt) => {
+          const { top, height } = getAptStyle(apt);
+          return { id: apt.id, top, height };
+        })
+        .sort((a, b) => a.top - b.top); // `calcularFaixas` espera ordenado por topo
+      porDia.set(key, calcularFaixas(caixas));
+    }
+    return porDia;
+  }, [aptsByDay, days]);
 
   return (
     <div className="flex flex-col">
@@ -163,13 +187,29 @@ export function WeekView({
                 ))}
                 {dayApts.map(apt => {
                   const { top, height, bg, border, text } = getAptStyle(apt);
+                  // Sobrepostos dividem a coluna lado a lado; sozinho ocupa tudo.
+                  const fx = faixasPorDia.get(key)?.get(apt.id);
+                  const leftPct = fx?.leftPct ?? 0;
+                  const larguraPct = fx?.widthPct ?? 100;
+                  const faixa = fx?.faixa ?? 0;
+                  const faixas = fx?.faixas ?? 1;
                   return (
                     <div
                       key={apt.id}
                       onClick={() => onAppointmentClick(apt)}
                       title={`${format(parseISO(apt.data_hora), 'HH:mm')} — ${apt.paciente?.nome ?? '—'}`}
-                      className="absolute left-0.5 right-0.5 rounded-md px-1.5 py-1 cursor-pointer hover:brightness-95 active:brightness-90 transition-all overflow-hidden select-none"
-                      style={{ top: `${top}px`, height: `${height}px`, background: bg, border: `1px solid ${border}` }}
+                      className="absolute rounded-md px-1.5 py-1 cursor-pointer hover:brightness-95 active:brightness-90 transition-all overflow-hidden select-none"
+                      style={{
+                        top: `${top}px`,
+                        height: `${height}px`,
+                        left: `calc(${leftPct}% + 2px)`,
+                        width: `calc(${larguraPct}% - 4px)`,
+                        // Sobreposto sobe no empilhamento ao passar o mouse — sem isso o
+                        // card da direita cobriria a borda do vizinho e pareceria cortado.
+                        zIndex: faixas > 1 ? faixa + 1 : undefined,
+                        background: bg,
+                        border: `1px solid ${border}`,
+                      }}
                     >
                       <p className="text-[10px] font-semibold leading-tight truncate" style={{ color: text }}>
                         {format(parseISO(apt.data_hora), 'HH:mm')} · {apt.paciente?.nome?.split(' ')[0] ?? '—'}
