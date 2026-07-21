@@ -267,7 +267,7 @@ export function AgendamentosClient({
   const [criandoPacienteNovo, setCriandoPacienteNovo] = useState(false);
 
   type ViewMode = 'day' | 'week' | 'month';
-  const [viewMode, setViewMode] = useState<ViewMode>('day');
+  const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [selectedWeek, setSelectedWeek] = useState(() => new Date());
 
   // Cancel dialog
@@ -973,7 +973,7 @@ export function AgendamentosClient({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -6 }}
           transition={{ duration: 0.18 }}
-          className="bg-surface rounded-3xl border border-border shadow-sm overflow-hidden h-[440px] sm:h-[560px] lg:h-[680px]"
+          className="bg-surface rounded-3xl border border-border shadow-sm overflow-hidden"
         >
           <WeekView
             agendamentos={agendamentosFiltrados}

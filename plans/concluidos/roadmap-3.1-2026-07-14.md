@@ -1,3 +1,13 @@
+> # ⚠️ ARQUIVADO 21/07/2026 — NÃO USE COMO REFERÊNCIA
+> O conteúdo vivo deste arquivo foi **absorvido** pelo
+> [`roadmap-mestre-2026-07-21.md`](../roadmap/roadmap-mestre-2026-07-21.md).
+> Não foi concluído nem descartado — foi **transplantado**. A fila (#5 transcrição, #6 protético,
+> #7 painel do Dex, #8 Job B, #9 financeiro), as dívidas e o backlog continuam vivos **lá**.
+>
+> **O que aqui está desatualizado e enganaria você:** este arquivo afirma "nada commitado" e
+> "push adiado" — o push aconteceu em **21/07 (`65cf9cc`)** com o lote inteiro. Guardado só
+> como histórico das decisões de 14–20/07.
+
 # Roadmap 3.1 — Núcleo clínico compartilhado
 
 **Criado** 14/07 · **Atualizado** 20/07 (Bloco 0 fechado + migration 104 aplicada · **Job A — Fatia A+B codadas** [data_atendimento + campo mágico] · design review parcial · push segue adiado) · Supersede `roadmap-3-fases-2026-07.md`

@@ -1,3 +1,7 @@
+> # ⚠️ ARQUIVADO 21/07/2026 — histórico
+> Já estava superseded pelo roadmap 3.1 desde 14/07; ficou 7 dias na pasta ativa por engano.
+> O mapa vivo é [`roadmap-mestre-2026-07-21.md`](../roadmap/roadmap-mestre-2026-07-21.md).
+
 # Roadmap — 3 fases (julho/2026)
 
 > **Criado:** 2026-07-12. Consolida TUDO que está pendente em `roadmap-polimento.md`, `plano-fase1-retencao.md`, `auditoria-2026-07-09.md` e `diagnostico-2026-07-12-tres-papeis.md` num plano único de 3 semanas.

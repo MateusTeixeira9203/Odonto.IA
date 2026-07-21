@@ -71,7 +71,7 @@ export function WeekView({
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       {/* Week navigation header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-surface-alt/40 shrink-0">
         <div className="flex items-center gap-2">
@@ -129,8 +129,9 @@ export function WeekView({
         })}
       </div>
 
-      {/* Scrollable time grid */}
-      <div className="flex-1 overflow-y-auto">
+      {/* Grade de horários — renderiza sempre por inteiro (sem scroll interno); se
+          não couber na viewport, quem rola é a página, não uma caixa dentro da caixa. */}
+      <div>
         <div className="flex" style={{ height: `${totalHeight}px` }}>
           {/* Time gutter */}
           <div className="w-14 shrink-0 relative">

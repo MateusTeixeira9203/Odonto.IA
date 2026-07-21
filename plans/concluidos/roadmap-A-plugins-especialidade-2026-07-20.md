@@ -1,3 +1,13 @@
+> # ⚠️ ARQUIVADO 21/07/2026 — NÃO USE COMO REFERÊNCIA
+> O conteúdo vivo foi **absorvido** pelo
+> [`roadmap-mestre-2026-07-21.md`](../roadmap/roadmap-mestre-2026-07-21.md).
+> A0 fechou e foi pro ar; A1 saiu **pela metade** (tabela de endo e campos de implante existem,
+> o extractor de voz não); A2 (perio) e A3 (catálogo) continuam vivos **lá**.
+>
+> **O que aqui está desatualizado:** "push no fim do roadmap" — o push aconteceu em
+> **21/07 (`65cf9cc`)**. Guardado como histórico do contrato de plugins (a spec A0 segue
+> válida e ativa em `plans/specs/`).
+
 # Roadmap A — Ficha por plugins de especialidade
 
 > **Status:** ✅ **APROVADO 20/07 (Mateus)** — com as decisões: D1–D3 da spec A0 ratificadas · **push só no FIM do Roadmap A** (gate completo, lote único) · design ancorado no artefato-base (aprovado pelos dentistas) · **Criado** 2026-07-20
