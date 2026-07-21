@@ -22,6 +22,63 @@ O detalhe técnico mora nas specs em `plans/specs/`; quando há spec, aqui é s�
 
 ---
 
+# 0. A SEMANA — o que fazer, em ordem
+
+> **Prioridade definida pelo Mateus em 21/07:** primeiro **tudo que é funcionalidade do
+> dentista** (ficha, odontograma, cockpit), depois **financeiro**, depois o resto.
+> Meta declarada: _"matar tudo relacionado ao dentista esta semana"_.
+
+### Bloco 1 — Hoje, enquanto os 5 testam
+
+| | O quê | Custo | Por quê agora |
+|---|---|---|---|
+| **1** | **Verificar compartilhamento com 2 contas logadas** | 10 min | É o único que falha **em público**. A RLS está no ar desde 18/07 e nunca foi testada por login. Numa clínica de 5 que divide paciente, um furo aqui todos descobrem juntos |
+| **2** | **Aviso de perda de dado** (§3.1) | baixo | Cada consulta ditada hoje que perde odontometria é um prontuário que **nunca mais** vai ter aquilo. Perda silenciosa é o pior modo de falha em registro clínico |
+
+### Bloco 2 — Os consertos da ficha (o que já existe e está errado)
+
+| | O quê | Custo | Nota |
+|---|---|---|---|
+| **3** | **`queixa_principal`** (§3.2) | baixo | Campo com peso legal (CFO); hoje o prompt pede a coisa errada |
+| **4** | **Schema de endo** (§3.3) | baixo | ⚠️ **Antes** do extractor — senão ele nasce mirando um schema errado |
+| **5** | **Vocabulário do prompt** (§3.8) | baixo | Destrava os 5 tipos que a 106 liberou e que hoje são inalcançáveis |
+| **6** | **Ponte + esfoliação** (§3.10) | baixo-médio | Destrava 2 das 8 especialidades (prótese e odontopediatria) |
+
+### Bloco 3 — Encher as tabelas pela voz
+
+| | O quê | Custo | Nota |
+|---|---|---|---|
+| **7** | **Extractor de endo** (§3.4) | médio | A tabela existe desde ontem; falta a fala chegar nela. É a peça que o teste da anamnese provou faltar |
+| **8** | **Extractor de implante** (§3.5) | médio | Mesmo padrão, menor |
+| **9** | **`grupo_id` no prompt** (§3.9) | médio | ⚠️ Gate = rodar o eval, que exige **build de prod + Playwright**. Fazer em passada focada, sem dev server |
+
+### Bloco 4 — A ficha que falta construir
+
+| | O quê | Custo | Nota |
+|---|---|---|---|
+| **10** | **Densidade da tela de confirmação** (§3.6) | médio | Hoje os mesmos procedimentos aparecem em **5 formas** na mesma tela |
+| **11** | **Encaminhar a outro dentista** (§4) | médio | Coluna já existe (106). ⚠️ Exige teste de RLS com 2 contas — um furo vaza prontuário |
+| **12** | **Perfil da região** (§4) | médio | Depende do item 5 (vocabulário); sem ele não há onde salvar |
+
+---
+
+> ## ⚠️ O que NÃO cabe nesta semana — e por quê
+>
+> Isto não é pessimismo, é aritmética. Se a meta for literalmente "tudo do dentista",
+> a semana estoura e o que sai fica pela metade. **Estes três são frentes próprias:**
+>
+> | Frente | Por que não cabe |
+> |---|---|
+> | **Periograma** (§5) | 192 células + motor de voz determinístico + **tabelas satélite novas**. É a maior peça do projeto inteiro e a única com premissa nunca validada em campo |
+> | **Cockpit / Job B** (§6) | A própria spec manda **reabrir → congelar a §8 → rodar design-brief** antes de escrever código. E ele **consome** os plugins — faz sentido vir depois dos extractors (blocos 3) |
+> | **Próxima fase da ficha** (§4: odontograma do paciente + revisão por exceção + split) | A revisão por exceção depende do odontograma do paciente, e **não pode subir sem teste contra boca real** — falso positivo repetido queima a confiança dos 5 em uma semana |
+>
+> **Minha recomendação:** blocos 1–3 são a semana realista. O bloco 4 entra se sobrar tempo.
+> Periograma e cockpit começam **depois** do primeiro ciclo de feedback dos 5 — que é
+> justamente quando você vai saber se o que construímos acerta o alvo.
+
+---
+
 # 1. Onde estamos — 21/07
 
 **Tudo foi para produção hoje.** O lote que ficou represado desde 20/07 subiu num commit só
@@ -79,17 +136,24 @@ até uma auditoria.
 | **Orto** — Classe II Angle, apinhamento, diastema, arco NiTi 014, bypass no 36 | 1 rótulo, **duplicado** em sup + inf | plugin cobre só manutenção mensal; instalação/diagnóstico é fora de escopo |
 | **Queixa principal** — "quer aparelho para alinhar os dentes" | virou lista de procedimentos | o prompt pede "título do procedimento principal" (linha 257) — o modelo obedeceu |
 
-### Ordem de correção — do mais barato ao mais caro
+### Os itens de correção — referência
 
-| # | O quê | Custo | Por quê primeiro |
-|---|---|---|---|
-| **3.1** | **Aviso de perda** — se o relato tem odontometria/sondagem e nada foi capturado, dizer na tela | baixo | Para de perder em silêncio. É o que mais protege por menos esforço |
-| **3.2** | **Queixa principal** — ajustar o prompt pra pedir a queixa **do paciente**, não o procedimento | baixo | Campo tem peso legal (CFO); hoje está semanticamente errado |
-| **3.3** | ⚠️ **Corrigir o schema de endo** — ver caixa abaixo | baixo | A tabela entregue hoje **perde dado mesmo preenchida à mão** |
-| **3.4** | **Extractor de endo por voz** (era a "A1") | médio | A tabela já existe; falta encher pela fala |
-| **3.5** | **Extractor de implante** | médio | Menor que endo, mesmo padrão |
-| **3.6** | **Densidade da tela de confirmação** do Modo Consulta | médio | Os mesmos procedimentos aparecem em **5 formas** na mesma tela |
-| **3.7** | **Periograma** | **alto** | A maior peça de todas — ver §5 |
+_A **ordem de execução** está na §0. Aqui é só o catálogo do que cada item é.
+Os itens 3.1–3.7 vieram do teste da anamnese; 3.8–3.10 são achados da varredura de código
+do mesmo dia — **não são continuação da fila**, são defeitos independentes._
+
+| # | O quê | Custo |
+|---|---|---|
+| **3.1** | **Aviso de perda** — se o relato tem odontometria/sondagem e nada foi capturado, dizer na tela | baixo |
+| **3.2** | **Queixa principal** — o prompt pede a queixa **do paciente**, não o procedimento | baixo |
+| **3.3** | ⚠️ **Schema de endo** — ver caixa abaixo | baixo |
+| **3.4** | **Extractor de endo por voz** (era a "A1" do roadmap antigo) | médio |
+| **3.5** | **Extractor de implante** | médio |
+| **3.6** | **Densidade da tela de confirmação** do Modo Consulta | médio |
+| **3.7** | **Periograma** | **alto** — frente própria, ver §5 |
+| **3.8** | **Vocabulário do prompt** desatualizado vs. banco | baixo |
+| **3.9** | **`grupo_id`** nunca instruído — agrupamento morto | médio |
+| **3.10** | **Ponte e esfoliação** proibidas por instrução | baixo-médio |
 
 ### ⚠️ 3.8 · O vocabulário do banco e o do Dex divergiram hoje
 
@@ -191,12 +255,16 @@ O que existe é checagem de **conflito**, não de **expediente**.
 
 ---
 
-# 7. A fila — depois da ficha
+# 7. A fila — depois de tudo do dentista
 
 _Revisada 21/07 lendo as 5 specs na íntegra. O que segue **é o que a spec diz**, não o que o
 roadmap antigo supunha._
 
-### 7.1 · Financeiro / Orçamentos ⚠️ o mais caro em dinheiro
+> **Ordem definida em 21/07:** ① tudo do dentista (§0, §3, §4, §5, §6) → ② **financeiro (7.1)**
+> → ③ o resto (7.2, 7.4, 7.5). O cockpit/Job B saiu desta fila e virou item de dentista — está
+> em **7.3**, mas pertence ao bloco 4 da §0.
+
+### 7.1 · Financeiro / Orçamentos — o primeiro depois do dentista
 
 [spec](../specs/2026-07-17-financeiro-correcao-completa-spec.md) · status `draft`
 
