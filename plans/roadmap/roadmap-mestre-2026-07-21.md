@@ -52,6 +52,15 @@ começa a usar hoje. O foco desta semana deixa de ser "construir" e passa a ser
 > ao editar?** Numa clínica de 5 que divide paciente, se isso tiver furo os 5 descobrem juntos.
 > Nunca foi testado por login — só por script.
 
+> ### ⚠️ Não confie na tabela de controle de migrations
+> `supabase_migrations.schema_migrations` em prod **tem buracos**: ela registra 087, 089–096 e
+> 104–106, mas **não** as 097, 098, 099, 100, 101 e 103 — que **estão aplicadas** (verificado
+> objeto por objeto em 21/07: coluna de parcelas, helper `belongs_to_active_clinic`,
+> `fichas.data_atendimento`, tabela `odontograma_eventos`, policy `notificacoes_select`).
+>
+> Causa provável: só as aplicadas via MCP entram no registro; as feitas pelo editor SQL do
+> dashboard não. **Para saber se algo está no ar, cheque o objeto no schema — nunca essa tabela.**
+
 ---
 
 # 3. ⚠️ Achados do teste real (21/07) — a lista de correção
@@ -81,6 +90,40 @@ até uma auditoria.
 | **3.5** | **Extractor de implante** | médio | Menor que endo, mesmo padrão |
 | **3.6** | **Densidade da tela de confirmação** do Modo Consulta | médio | Os mesmos procedimentos aparecem em **5 formas** na mesma tela |
 | **3.7** | **Periograma** | **alto** | A maior peça de todas — ver §5 |
+
+### ⚠️ 3.8 · O vocabulário do banco e o do Dex divergiram hoje
+
+Achado ao reler o prompt depois de aplicar a 106. **A migration ampliou o banco; o prompt do
+Dex ficou onde estava** — e nada mais foi ajustado:
+
+| O que a 106 liberou no banco | O Dex emite? | Existe caminho manual? |
+|---|---|---|
+| `exame_periodontal`, `profilaxia`, `raspagem`, `clareamento`, `fluor` | ❌ não estão no enum do prompt | ❌ não existe UI de região |
+| `nivel = 'boca'` | ❌ o enum do prompt tem só arcada/quadrante/dente/face | ❌ |
+
+**Resultado: os cinco tipos novos são inalcançáveis.** Ampliei o banco e nada consegue
+escrever lá. É o que explica "raspagem e alisamento radicular" ter virado texto solto no teste
+de ontem — agora há tipo, mas continua sem caminho.
+
+**Conserto:** ampliar o enum do prompt ([route.ts:78](../../src/app/api/dex/formatar-evolucao/route.ts))
+**e** o validador `TIPOS_FATIA_A` (linha 140) — os dois, senão o evento é gerado e descartado
+silenciosamente na validação.
+
+### ⚠️ 3.9 · Agrupamento multi-dente está morto
+
+A infraestrutura está pronta: o schema aceita `grupo_id` e a rota resolve tag curta (`"g1"`)
+pra UUID real. **Mas não há uma linha no prompt ensinando o modelo a emitir a tag.**
+
+Consequência: *"extraí do 31 ao 41"* vira **11 cards separados**, não um card agrupado.
+Era a "Fase 2a" do roadmap A — ficou pendente porque o gate exige rodar o eval
+`run-formatar-evolucao.mjs`, que precisa de build de prod + Playwright autenticado.
+
+### ⚠️ 3.10 · Ponte e esfoliação estão proibidas por instrução explícita
+
+[route.ts:298](../../src/app/api/dex/formatar-evolucao/route.ts) diz ao modelo, literalmente:
+*"NÃO emita tipo 'ponte' nem 'esfoliacao'"*. Foi decisão consciente da Fatia A, mas o efeito
+hoje é que **prótese com ponte e odontopediatria não podem ser ditadas** — duas das 8
+especialidades do projeto.
 
 > ### ⚠️ 3.3 — a tabela de endo que subiu hoje já nasce incompleta
 > Achado ao comparar com um ditado real, não por typecheck:
@@ -150,16 +193,124 @@ O que existe é checagem de **conflito**, não de **expediente**.
 
 # 7. A fila — depois da ficha
 
-| # | O quê | Estado | Spec |
-|---|---|---|---|
-| **1** | **Financeiro / Orçamentos** — 5 lugares quebrados por embed ambíguo · status por trigger | ⚠️ **tela Orçamentos prod-down há ~2 meses** · spec escrita, **não executada** | [spec](../specs/2026-07-17-financeiro-correcao-completa-spec.md) |
-| **2** | **Painel do Dex** — notificações que não chegam (dentista: 48 enviadas, **0 lidas**) | spec aprovada 16/07 | [spec](../specs/2026-07-16-painel-dex-notificacoes-spec.md) |
-| **3** | **Job B — cockpit do tratamento** (o novo Modo Consulta) | spec aprovada · **consome os plugins**, monta peças prontas | [spec](../specs/2026-07-16-job-b-cockpit-tratamento-spec.md) |
-| **4** | **Transcrição tratada** — hoje some 100% (0 de 13 fichas guardaram) | spec aprovada 16/07 | [spec](../specs/2026-07-16-transcricao-tratada-spec.md) |
-| **5** | **Protético** — papel, ordem de trabalho, notificação | depende do painel (#2) | [spec](../specs/2026-07-16-protetico-marcar-retorno-spec.md) §5 |
+_Revisada 21/07 lendo as 5 specs na íntegra. O que segue **é o que a spec diz**, não o que o
+roadmap antigo supunha._
 
-> **A #1 é a mais antiga e a mais cara em dinheiro:** a tela de Orçamentos está vazia em produção
-> há cerca de 2 meses. Não depende de nada da ficha — pode subir a qualquer momento.
+### 7.1 · Financeiro / Orçamentos ⚠️ o mais caro em dinheiro
+
+[spec](../specs/2026-07-17-financeiro-correcao-completa-spec.md) · status `draft`
+
+A tela de Orçamentos devolve **"Nenhum orçamento encontrado" para todos os papéis** desde
+28/05 — a migration 067 criou uma 2ª FK pra `dentistas`, o embed do PostgREST virou ambíguo
+(HTTP 300), e **o código não checa `error`** → `data` vira `null` e a tela mostra vazio.
+Mesma causa derruba: PDF de orçamento (404 sempre), eventos de orçamento e de agendamento
+na timeline, e a aba Agenda do perfil do paciente.
+
+**6 frentes, nesta ordem** (a spec justifica): **1 → 4 → 2 → 3 → 5 → 6**
+
+| Frente | O quê |
+|---|---|
+| 1 | Embeds ambíguos + erros de query engolidos — *destrava as telas, maior impacto, menor risco* |
+| 4 | `registrarRecebimento`: dupla gravação + `dentista_id` NULL (isolada, latente) |
+| 2 | Recebível fantasma (pendente criada na aprovação, nunca abatida) |
+| 3 | Receita contando pagamento de orçamento recusado |
+| 5 | Pacientes duplicados: mesclar + trava anti-duplicata |
+| 6 | Higiene: dado de teste em prod + fuso na janela do mês — *explicitamente por último* |
+
+⚠️ **Antes de executar:** a spec foi escrita contra o deploy `ca1b4a4`, quando a **099 ainda
+não existia**. Hoje há 099 + 7 migrations depois dela. **Reconferir as assunções da spec**
+antes de tocar a Frente 1.
+
+⚠️ **Três escritas em prod, cada uma com gate próprio:** a migration nova (`pago_total` +
+`situacao_pagamento` + trigger) com backfill · a limpeza das pendentes fantasma · o merge de
+pacientes duplicados. A spec é explícita: *"nada de escrita em prod sem ok explícito, mesmo
+com esta spec aprovada"*.
+
+⚠️ **O DELETE das pendentes fantasma tem predicado perigoso** — só pode mirar pendentes **sem
+`data_vencimento` e sem `parcela_numero`**. Parcelas reais têm os dois; errar o predicado
+destrói o parcelamento de verdade.
+
+**Decisão pendente sua:** a spec está `draft` e pede sua revisão do modelo da Frente 2
+(recebível calculado por trigger, nunca materializado). E o paciente duplicado **"Mateus"** só
+é apagado depois que você confirmar que é dado de teste.
+
+---
+
+### 7.2 · Painel do Dex
+
+[spec](../specs/2026-07-16-painel-dex-notificacoes-spec.md) · **aprovada 16/07** · nenhuma decisão sua pendente
+
+Dentista: **48 notificações enviadas, 0 lidas**. Secretária: 58/17. Não é "ele ignora" — é
+sinal de que não chega.
+
+✅ **A Fatia 0 já está feita** — a migration 103 (RLS destinatário-pessoa) **está aplicada em
+prod**, verificada hoje. O roadmap antigo a listava como trabalho futuro. Restam as Fatias 1
+(entrega: rota de alerts, sino no mobile, leitura por item, realtime) e 2 (fontes e render).
+
+⚠️ **Consertar a entrega inunda o dentista com 48 notificações de backlog** de uma vez.
+Mitigação prevista: marcar como lidas as > 30 dias.
+
+⚠️ Realtime pode entregar payload **antes** da RLS filtrar → gate exige teste com 2 sessões reais.
+
+**Ordem:** painel **antes** do protético — as duas specs concordam nisso.
+
+---
+
+### 7.3 · Job B — cockpit do tratamento 🔓 destravou hoje
+
+[spec](../specs/2026-07-16-job-b-cockpit-tratamento-spec.md) · aprovada estruturalmente ("spec 100%")
+
+> ### A regra de retomada desta spec **disparou com o push de hoje**
+> A spec dizia: os contratos técnicos da §8 *"congelam só depois que as Fatias A/B do v3
+> rodarem em prod"*. **O v3 está em prod desde hoje.** Então o próximo passo dela mudou de
+> "esperar" para: **reabrir a spec → congelar a §8 → rodar design-brief → status vira
+> `agreed-final` → só então executar.**
+
+5 contratos estavam ⏳ esperando exatamente isso: endpoint agregador, layout do workspace,
+shape do delta, migration (drops), gates finais.
+
+⚠️ **Risco nomeado pela própria spec:** o workspace virar dashboard genérico — *"a doença que
+o CLAUDE.md proíbe"*. Qualquer card além das 4 perguntas da §1 volta pro planejamento.
+
+⚠️ O re-layout **não pode encostar no motor de captura** (auto-stop por silêncio, acúmulo de
+trechos). *"Encolheu o pixel, não o comportamento."*
+
+---
+
+### 7.4 · Transcrição tratada — a menor das cinco
+
+[spec](../specs/2026-07-16-transcricao-tratada-spec.md) · `agreed` · **zero migration**
+
+A coluna `fichas.transcricao` existe desde sempre e **nunca foi preenchida uma vez** — 0 de 13
+fichas do modo consulta guardaram o relato. Superfície pequena: 1 lib nova, 1 param opcional
+no save, 1 seção na ficha, 1 no PDF.
+
+⚠️ **Não simultânea com o Job A** — mesmos arquivos. A ordem entre as duas é livre.
+⚠️ **Dobra o custo de Gemini por consulta** (2ª chamada com o mesmo input) — aceito na spec.
+⚠️ Relato **bruto nunca persiste**; se o tratamento falhar, a ficha salva com `transcricao = null`.
+
+---
+
+### 7.5 · Protético
+
+[spec](../specs/2026-07-16-protetico-marcar-retorno-spec.md) · ⚠️ **`draft` — a única das 5 que você ainda não aprovou**
+
+✅ **A Fatia A já foi feita e deployada em 18/07** (modal "Marcar retorno", botão morto extinto,
+`retorno_sugerido` fora do código — verificado hoje). A spec não foi atualizada e ainda diz
+"nada implementado".
+
+Falta a **Fatia B**: papel `protetico`, tabelas `proteticos` + `ordens_protetico`, tela
+`/protetico`, notificação.
+
+⚠️ **O número de migration da spec está queimado** — ela pede "migration 100", mas 100 é
+`ficha_data_atendimento` e o repo já vai até 106. Renumerar pra **107+**.
+
+⚠️ **Adicionar `'protetico'` ao CHECK de papéis quebra código que assume 3 papéis** — a spec
+manda fazer `grep -rn "'secretaria'\|'dentista'\|'admin'" src/` antes.
+
+⚠️ **Invariante dura:** o protético vê `{descricao, prazo, status}` e **nada mais** — é
+*proibido* evoluir a função pra devolver mais campos (abrir `agendamentos` pra ele exporia
+`observacoes` do paciente). E o prazo vem de JOIN, **nunca copiado** — copiado, envelhece em silêncio.
 
 ---
 
@@ -169,6 +320,21 @@ O que existe é checagem de **conflito**, não de **expediente**.
 - [ ] Schema de endo incompleto (aparente vs. real, técnica da lima) — §3.3
 - [ ] Perda silenciosa de dado ditado — §3.1
 - [ ] `queixa_principal` semanticamente errada — §3.2
+- [ ] Vocabulário do prompt desatualizado vs. banco (5 tipos + `nivel='boca'`) — §3.8
+- [ ] `grupo_id` nunca instruído no prompt — agrupamento morto — §3.9
+
+**Herdadas da spec de hierarquia (arquivada 21/07 — só estes 2 itens sobreviveram)**
+- [ ] **Plano `BASICO` nunca foi removido** — o CHECK de `clinicas.plano` e as RPCs de
+      onboarding ainda o aceitam; o código contorna com backward-compat em ~5 pontos
+      (`lib/planos.ts`, `access-control.ts`). Limpar = 1 migration + apagar os contornos
+- [ ] **Fase B nunca iniciada** — varrer `permissions.ts` e as telas que ainda assumem
+      "admin vê tudo". ⚠️ Precisa ser reescrita contra o modelo da **hierarquia 3.1**
+      (clínica lê, autor escreve), não contra o silo antigo que ela pressupunha
+
+**Higiene de documentação**
+- [ ] ⚠️ **O campo `Status:` de várias specs mente** — a triagem de 21/07 achou 5 specs
+      dizendo "PRONTA para execução" ou "draft" para coisas **em produção há semanas**.
+      Ao ler qualquer spec, confie no código e no banco, não no cabeçalho dela
 
 **Verificação que nunca aconteceu**
 - [ ] ⚠️ Compartilhamento de ficha com 2 contas logadas
@@ -222,6 +388,11 @@ plans/
 | [`ficha-dois-modos-2026-07-21-artefato.html`](../specs/ficha-dois-modos-2026-07-21-artefato.html) | Design da **próxima fase** (nada codado) |
 | [`DESIGN-ficha-a0.md`](../specs/DESIGN-ficha-a0.md) · [`DESIGN-odontograma-v3.md`](../specs/DESIGN-odontograma-v3.md) | Como traduzir design pros tokens (`-ink`, DM Mono, zero hex) |
 | As 5 da fila (§7) | Financeiro, painel do Dex, Job B, transcrição, protético |
+
+**Arquivadas em 21/07** (estavam na pasta ativa dizendo-se pendentes, mas já em produção):
+multi-especialidade · secretária cria orçamento · ficha unificada #16 · arquitetura de IA
+providers · odontograma referência · precisão de extração · segurança do silo · perguntas da
+clínica-piloto · hierarquia de papéis e planos. **`plans/specs/` foi de 24 para 16 arquivos.**
 
 > ⚠️ **Dois artefatos de ficha convivem de propósito**: `ficha-definitiva` é o que está no ar,
 > `ficha-dois-modos` é o desenho da próxima fase. **Quando a próxima fase for aprovada e codada,
