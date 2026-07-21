@@ -34,6 +34,7 @@ export type OrcamentoComItens = {
 export type FichaParaOrc = {
   id: string;
   created_at: string;
+  data_atendimento: string;
   queixa_principal: string | null;
   dentes_afetados: number[];
   dentes_observacoes: Record<string, string>;

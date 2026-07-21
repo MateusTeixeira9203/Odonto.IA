@@ -3,7 +3,6 @@
 import { requireClinicContext } from "@/server/auth/clinic";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { format } from "date-fns";
 
 export async function deletarFicha(fichaId: string): Promise<void> {
   const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
@@ -135,18 +134,20 @@ export async function gerarPlanejamentoIA(
 
   const { data: fichas } = await supabase
     .from("fichas")
-    .select("queixa_principal, anotacoes, alergias, medicamentos_em_uso, created_at")
+    .select("queixa_principal, anotacoes, alergias, medicamentos_em_uso, data_atendimento")
     .eq("paciente_id", pacienteId)
     .eq("clinica_id", clinicId)
-    .order("created_at", { ascending: false })
+    .order("data_atendimento", { ascending: false })
     .limit(10);
 
   const historico =
     fichas && fichas.length > 0
       ? fichas
           .map(
+            // 'YYYY-MM-DD' formatado na mão — `new Date()` parseia como UTC meia-noite
+            // e desloca um dia pra trás em fusos negativos (BRT).
             (f) =>
-              `[${format(new Date(f.created_at), "dd/MM/yyyy")}] Queixa: ${f.queixa_principal ?? "—"} | Anotações: ${f.anotacoes ?? "—"}${f.alergias ? ` | Alergias: ${f.alergias}` : ""}${f.medicamentos_em_uso ? ` | Medicamentos: ${f.medicamentos_em_uso}` : ""}`
+              `[${f.data_atendimento.split('-').reverse().join('/')}] Queixa: ${f.queixa_principal ?? "—"} | Anotações: ${f.anotacoes ?? "—"}${f.alergias ? ` | Alergias: ${f.alergias}` : ""}${f.medicamentos_em_uso ? ` | Medicamentos: ${f.medicamentos_em_uso}` : ""}`
           )
           .join("\n")
       : "Sem fichas clínicas anteriores.";

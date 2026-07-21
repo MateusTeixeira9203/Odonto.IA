@@ -18,7 +18,7 @@ type ProcedimentoItem = {
 
 type FichaResumida = {
   id: string;
-  created_at: string;
+  data_atendimento: string;
   queixa_principal: string | null;
   dentes_afetados: number[];
   dentes_observacoes: Record<string, string>;
@@ -42,10 +42,10 @@ export function PendenciasTab({ patientId, clinicaId }: PendenciasTabProps) {
       const supabase = createClient();
       const { data, error } = await supabase
         .from('fichas')
-        .select('id, created_at, queixa_principal, dentes_afetados, dentes_observacoes, procedimentos_concluidos')
+        .select('id, data_atendimento, queixa_principal, dentes_afetados, dentes_observacoes, procedimentos_concluidos')
         .eq('paciente_id', patientId)
         .eq('clinica_id', clinicaId)
-        .order('created_at', { ascending: false });
+        .order('data_atendimento', { ascending: false });
 
       if (error) throw error;
 
@@ -63,7 +63,7 @@ export function PendenciasTab({ patientId, clinicaId }: PendenciasTabProps) {
           parts.forEach((note, i) => {
             allItems.push({
               fichaId: ficha.id,
-              fichaDate: ficha.created_at,
+              fichaDate: ficha.data_atendimento,
               queixa: ficha.queixa_principal ?? 'Evolução',
               tooth,
               noteIndex: i,
@@ -231,11 +231,10 @@ function ProcedimentoRow({
   loading: boolean;
   onToggle: () => void;
 }) {
-  const date = new Date(item.fichaDate).toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
+  // data_atendimento é 'YYYY-MM-DD' — formata na mão (não via `new Date()`, que
+  // parseia como UTC meia-noite e desloca um dia pra trás em fusos negativos).
+  const [anoF, mesF, diaF] = item.fichaDate.split('-');
+  const date = `${diaF}/${mesF}/${anoF}`;
 
   return (
     <motion.div

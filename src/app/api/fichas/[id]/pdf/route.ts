@@ -16,7 +16,7 @@ export async function GET(
   const [{ data: fichaRaw }, { data: eventosRaw }] = await Promise.all([
     supabase
       .from('fichas')
-      .select('id, created_at, queixa_principal, anotacoes, dentes_afetados, dentes_observacoes, procedimentos_concluidos, assinatura_url, assinado_em, dentista:dentistas(nome, cro), paciente:pacientes(nome, data_nascimento)')
+      .select('id, created_at, data_atendimento, queixa_principal, anotacoes, dentes_afetados, dentes_observacoes, procedimentos_concluidos, assinatura_url, assinado_em, dentista:dentistas(nome, cro), paciente:pacientes(nome, data_nascimento)')
       .eq('id', id)
       .eq('clinica_id', dentista.clinica_id)
       .maybeSingle(),

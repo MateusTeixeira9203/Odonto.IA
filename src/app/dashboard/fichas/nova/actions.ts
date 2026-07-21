@@ -31,10 +31,12 @@ export async function createFicha(
   const { data: ficha, error } = await supabase
     .from("fichas")
     .insert({
-      clinica_id:  clinicId,
-      paciente_id: pacienteId,
-      dentista_id: dentistaPerfil.id,
-      status:      "aberta",
+      clinica_id:       clinicId,
+      paciente_id:      pacienteId,
+      dentista_id:      dentistaPerfil.id,
+      // Job A §7.2 — 1 linha por consistência (rota legado, sem UI de data).
+      data_atendimento: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }),
+      status:           "aberta",
     })
     .select("id")
     .single();

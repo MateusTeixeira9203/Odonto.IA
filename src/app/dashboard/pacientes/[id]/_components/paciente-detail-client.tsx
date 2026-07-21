@@ -82,6 +82,7 @@ import type { Paciente } from '@/types/database';
 import type { TimelineEvent } from '@/server/patients/get-visible-timeline-events';
 import { format, parseISO, differenceInCalendarDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { formatarDataFicha } from '@/lib/format-data-ficha';
 import { toast } from 'sonner';
 import { STATUS_ORCAMENTO } from '@/lib/constants/orcamento-status';
 import { parseValorBR, formatValorBR } from '@/lib/valor-br';
@@ -95,13 +96,7 @@ import { EmitirDocumentoModal } from '@/components/pacientes/EmitirDocumentoModa
 import { NovoOrcamentoModal } from './modals/novo-orcamento-modal';
 import { ApresentarPaciente } from '@/components/pacientes/ApresentarPaciente';
 
-type FichaRecente = {
-  id: string;
-  created_at: string;
-  queixa_principal: string | null;
-  anotacoes: string | null;
-  dentista: { nome: string } | null;
-};
+import type { FichaRecente } from '@/server/patients/get-patient-workspace-data';
 
 type FichaParaPendencia = {
   id: string;
@@ -547,10 +542,10 @@ export function PacienteDetailClient({
     if (fichasRecentesSSR === undefined) {
       void supabase
         .from('fichas')
-        .select('id, created_at, queixa_principal, anotacoes, dentista:dentistas(nome)')
+        .select('id, created_at, data_atendimento, queixa_principal, anotacoes, dentista:dentistas(nome)')
         .eq('paciente_id', paciente.id)
         .eq('clinica_id', clinicaId)
-        .order('created_at', { ascending: false })
+        .order('data_atendimento', { ascending: false })
         .limit(5)
         .then(({ data }) => setFichasRecentes((data as unknown as FichaRecente[]) ?? []));
     }
@@ -560,7 +555,7 @@ export function PacienteDetailClient({
       .select('id, dentes_afetados, dentes_observacoes, procedimentos_concluidos')
       .eq('paciente_id', paciente.id)
       .eq('clinica_id', clinicaId)
-      .order('created_at', { ascending: false })
+      .order('data_atendimento', { ascending: false })
       .then(({ data }) => {
         const fichas = (data as unknown as FichaParaPendencia[]) ?? [];
         const items: PendenciaItem[] = [];
@@ -858,10 +853,10 @@ export function PacienteDetailClient({
       const supabase = createClient();
       const { data } = await supabase
         .from('fichas')
-        .select('id, created_at, queixa_principal, dentes_afetados, dentes_observacoes')
+        .select('id, created_at, data_atendimento, queixa_principal, dentes_afetados, dentes_observacoes')
         .eq('paciente_id', paciente.id)
         .eq('clinica_id', clinicaId)
-        .order('created_at', { ascending: false })
+        .order('data_atendimento', { ascending: false })
         .limit(10);
 
       const fichas = (data as unknown as FichaParaOrc[]) ?? [];
@@ -909,7 +904,7 @@ export function PacienteDetailClient({
       const supabase = createClient();
       const { data } = await supabase
         .from('fichas')
-        .select('id, created_at, queixa_principal, dentes_afetados, dentes_observacoes')
+        .select('id, created_at, data_atendimento, queixa_principal, dentes_afetados, dentes_observacoes')
         .eq('id', fichaId)
         .eq('clinica_id', clinicaId)
         .single();
@@ -1313,7 +1308,7 @@ export function PacienteDetailClient({
                                 )}
                                 <div className="flex items-center gap-3 mt-1">
                                   <span className="text-xs text-text-secondary">
-                                    {format(parseISO(ficha.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                                    {formatarDataFicha(ficha.data_atendimento, ficha.created_at)}
                                   </span>
                                   {ficha.dentista && (
                                     <span className="text-xs text-teal font-medium">

@@ -205,7 +205,7 @@ export async function vincularFichasAoTratamento(
 
 export type FichaSemTratamento = {
   id: string;
-  created_at: string;
+  data_atendimento: string;
   queixa_principal: string | null;
   dentes_afetados: number[];
 };
@@ -218,11 +218,11 @@ export async function buscarFichasSemTratamento(
 
   const { data, error } = await supabase
     .from("fichas")
-    .select("id, created_at, queixa_principal, dentes_afetados, dentes_observacoes")
+    .select("id, data_atendimento, queixa_principal, dentes_afetados, dentes_observacoes")
     .eq("clinica_id", clinicId)
     .eq("paciente_id", pacienteId)
     .is("tratamento_id", null)
-    .order("created_at", { ascending: false });
+    .order("data_atendimento", { ascending: false });
 
   if (error) return { fichas: [], error: error.message };
 

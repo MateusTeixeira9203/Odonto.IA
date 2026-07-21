@@ -129,7 +129,7 @@ export async function DentistaDashboard({ dentista }: { dentista: DentistaCache 
         .from('fichas')
         .select('queixa_principal')
         .eq('paciente_id', nextApt.paciente.id)
-        .order('created_at', { ascending: false })
+        .order('data_atendimento', { ascending: false })
         .limit(1)
         .maybeSingle(),
       supabase

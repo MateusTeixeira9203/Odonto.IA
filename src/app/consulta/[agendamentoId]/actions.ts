@@ -33,6 +33,9 @@ function montarRowsEventos(
     faces:          ev.ancora.faces ?? [],
     papel_no_grupo: ev.papel_no_grupo,
     observacao:     ev.observacao || null,
+    // Dado clínico da especialidade (migration 106) — tabela de endo, campos de implante.
+    // undefined (a maioria dos tipos) vira null explícito; o insert nunca omite a coluna.
+    detalhe:        ev.detalhe ?? null,
     // Data clínica: obrigatória no realizado da clínica (default hoje BRT — rede de
     // segurança; a UI já manda explícita). Indicado nunca tem data (constraint SQL).
     realizado_em:
@@ -77,6 +80,9 @@ export async function salvarFichaConsulta(params: {
     clinica_id:          clinicId,
     paciente_id:         params.pacienteId,
     dentista_id:         dentistaPerfil.id,
+    // Job A §7.2 — data clínica explícita (hoje no fuso da clínica); o default
+    // do banco é rede de segurança, não a fonte de verdade da aplicação.
+    data_atendimento:    new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }),
     queixa_principal:    params.queixa_principal,
     anotacoes:           params.anotacoes,
     dentes_afetados:     params.dentes_afetados,
@@ -283,3 +289,72 @@ export async function iniciarAtendimentoConsulta(agendamentoId: string): Promise
 }
 
 // finalizarConsulta foi removida — fluxo de finalização usa salvarFichaConsulta diretamente.
+
+/**
+ * Alterna planejado ⇄ realizado de UM registro (grupo de eventos) na ficha salva.
+ * Bug 21/07: a ficha salva não tinha caminho pra marcar o que foi feito — tudo
+ * ficava "Planejado". Regras herdadas do núcleo clínico: só o AUTOR escreve, e
+ * ficha assinada é imutável (invariante #14). `realizado_em` segue a regra §1.10:
+ * ganha a data clínica ao virar realizado, volta a null ao virar planejado.
+ */
+export async function alternarStatusRegistro(params: {
+  eventoIds: string[];
+  novoStatus: 'indicado' | 'realizado';
+  dataClinica: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const { supabase, user, clinicId, role } = await requireClinicContext();
+  if (role === 'secretaria') return { ok: false, error: 'Sem permissão.' };
+  if (params.eventoIds.length === 0) return { ok: true };
+
+  const { data: dentistaPerfil } = await supabase
+    .from('dentistas')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('clinica_id', clinicId)
+    .maybeSingle();
+
+  if (!dentistaPerfil) return { ok: false, error: 'Perfil de dentista não encontrado.' };
+
+  // A ficha dona precisa ser DESTE dentista e não estar assinada.
+  const { data: eventos } = await supabase
+    .from('odontograma_eventos')
+    .select('id, ficha_id, origem')
+    .in('id', params.eventoIds)
+    .eq('clinica_id', clinicId)
+    .eq('dentista_id', dentistaPerfil.id);
+
+  if (!eventos || eventos.length !== params.eventoIds.length) {
+    return { ok: false, error: 'Registro não encontrado ou de outro dentista.' };
+  }
+
+  const fichaIds = [...new Set(eventos.map((e) => e.ficha_id).filter((f): f is string => f != null))];
+  const { data: fichas } = await supabase
+    .from('fichas')
+    .select('id, assinado_em')
+    .in('id', fichaIds)
+    .eq('clinica_id', clinicId);
+
+  if (fichas?.some((f) => f.assinado_em != null)) {
+    return { ok: false, error: 'Esta ficha já foi assinada e não pode mais ser alterada.' };
+  }
+
+  const realizado = params.novoStatus === 'realizado';
+  const { error } = await supabase
+    .from('odontograma_eventos')
+    .update({
+      status: params.novoStatus,
+      // Pré-existente nunca ganha data da clínica (§1.10); indicado nunca tem data.
+      realizado_em: realizado
+        ? (eventos[0].origem === 'clinica' ? params.dataClinica : null)
+        : null,
+    })
+    .in('id', params.eventoIds)
+    .eq('clinica_id', clinicId)
+    .eq('dentista_id', dentistaPerfil.id);
+
+  if (error) {
+    console.error('[alternarStatusRegistro]', error.message);
+    return { ok: false, error: 'Não foi possível atualizar o registro.' };
+  }
+  return { ok: true };
+}

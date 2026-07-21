@@ -1,15 +1,48 @@
 # Roadmap 3.1 — Núcleo clínico compartilhado
 
-**Criado** 14/07 · **Atualizado** 19/07 (v3 Fatia A codada+dogfood · Job A perde Fatia C · Ficha v2 nova frente #4b · push adiado · **gate de campo do piloto RESOLVIDO + ordem de execução da #3 fixada**) · Supersede `roadmap-3-fases-2026-07.md`
+**Criado** 14/07 · **Atualizado** 20/07 (Bloco 0 fechado + migration 104 aplicada · **Job A — Fatia A+B codadas** [data_atendimento + campo mágico] · design review parcial · push segue adiado) · Supersede `roadmap-3-fases-2026-07.md`
 
 > **Este arquivo é o MAPA.** Ele diz o que vem, em que ordem, e onde está o detalhe.
 > O detalhe mora nas specs em `plans/specs/` — se está lá, aqui é só um ponteiro.
+> **⏸️ INTERROMPIDO 20/07 por [Roadmap A — plugins de especialidade](roadmap-A-plugins-especialidade-2026-07-20.md):** a ficha vira 8 especialidades como plugins (A0 fundação → A1 endo → A2 perio → A3 catálogo). #3/#4b retomam depois do A — detalhe lá, aqui só o ponteiro.
 
 ---
 
 # ▶ AGORA
 
-### Onde estamos — **Odontograma v3 Fatia A no código (19/07), segurando o push até a ficha montar**
+### Onde estamos (20/07) — **Bloco 0 fechado + Job A (Fatia A+B) codado, nada commitado**
+
+**Sessão 20/07 (madrugada):** Bloco 0 fechou de ponta a ponta (auditoria TS+UX aplicada,
+migration 104 **aplicada em prod** e verificada). Depois, executei o **Job A completo**
+(fila #4) — achei em campo que a "Fatia A (feita)" do registro anterior estava **errada**:
+só a migration 100 tinha rodado, nada do código (`data_atendimento` não existia em nenhum
+lugar de `src/`). Corrigido: Fatia A (12 pontos de leitura + form) e Fatia B (campo mágico)
+saíram as duas nesta sessão. Detalhe completo no handoff de 20/07.
+
+- **Fatia A (data do atendimento):** campo de data no form + `procedimentos`/`conduta`
+  passam a salvar no form manual · 12 pontos de leitura trocados pra `data_atendimento` ·
+  2 pontos de escrita explícitos · **bug de fuso achado e corrigido no caminho**:
+  `new Date('YYYY-MM-DD')` parseia como UTC meia-noite e desloca um dia em BRT — corrigido
+  em todo lugar que exibia a data, extraído pra `lib/format-data-ficha.ts`.
+  **Verificado no banco:** `0 nulos, 40/40 fichas coerentes` com o backfill da migration 100.
+- **Fatia B (campo mágico):** `useCapturaLivre` extraído do `consulta-client` (behavior-
+  preserving — 102 linhas saíram, 16 entraram, resto do arquivo intocado) · `VoiceUX`
+  movido pra `components/fichas/` · `CapturaLivreCard` novo (relato + voz + anexo + chips +
+  "Organizar com Dex") · rota nova `/api/extrair-texto` + `lib/extract-text.ts` (parsers
+  extraídos do `processar-documento`, refactor extrativo) · mapeamento IA→form no
+  `FichasTab` com `origem='ficha_rapida'` só quando veio do Dex.
+- **Design review parcial:** screenshot do browser pane **travou** (mesmo bug já registrado
+  na memória — "congela, async nunca comita"). Fiz auditoria por estilos computados (JS) em
+  vez de pixel: achei e corrigi `text-teal` (cor cheia) usado como texto em 4 lugares do
+  `CapturaLivreCard` — **o mesmo bug de contraste que eu tinha acabado de corrigir no Bloco
+  0**, reintroduzido no componente novo. Corrigido pra `text-teal-ink`, rebuildado,
+  confirmado via estilo computado (`rgb(30,112,96)` = token certo). **Não verificado**:
+  hierarquia visual, "sensação" premium, AI-slop — isso só um screenshot real resolve.
+- **Paciente de teste criado** na conta QA (`Teste Design Review (apagar)`,
+  `id=0875d28a-223d-4821-be33-8c37b79b234e`) só pra abrir o painel — **não apagado ainda**.
+- **Nada commitado.** Todo o Job A (Fatia A+B) está no working tree.
+
+### Onde estávamos (19/07) — contexto herdado, ainda válido
 
 Base 3.1 no ar desde 18/07 (migration 099 + Spec 1 núcleo clínico + Fatia A marcar-retorno — deployadas, gate comportamental PASS `b80edf6`/`f7f4b4e`). Sobre ela, o **carro-chefe começou**:
 
@@ -18,13 +51,14 @@ Base 3.1 no ar desde 18/07 (migration 099 + Spec 1 núcleo clínico + Fatia A ma
 | **Migrations 100 + 101 + 103** | ✅ **aplicadas em prod** (dry-run 74/74). 100 = `data_atendimento` · 101 = `odontograma_eventos` (event-log RLS núcleo clínico) · 103 = notificações destinatário-pessoa (fecha vazamento B↔A). Commit `b8740b0`. |
 | **Odontograma v3 — Fatia A** | ✅ **codada + commitada** (5 commits `b8740b0..742b1ee`) · **design aprovado** (dente anatômico, orientação de boca, canal-silhueta, endo 1-medida — artifact `d5f66b1a`) · **dogfood E2E PASS 19/07** (Modo Consulta: dita → boca pintada nas 3 cores → painel do dente cicla estado → salva → eventos no banco com autoria/data → assinatura lista realizados+datas → PDF com CRO). Eval Motor A **14/16** (2 falhas menores — Dívidas). |
 
-> ### ⏸️ Push/deploy ADIADO de propósito — decisão 19/07
+> ### ⏸️ Push/deploy ADIADO de propósito — decisão 19/07, **revisada 20/07**
 > A Fatia A está **só no código, não no ar**. `git push` = deploy Vercel, e subir agora deixaria o
-> sistema **meio-migrado**: Modo Consulta com odontograma novo, ficha ainda no antigo. Decisão do
-> Mateus: **segurar o push até a FICHA estar toda montada** (Job A + Ficha v2) e aí rodar o gate
-> completo (eval → dogfood → auditoria → push) sobre o sistema **consistente**. Os reviews de
-> auditoria (TS + UX) da Fatia A rodaram nesta sessão — findings entram no esforço da ficha, não
-> num push imediato.
+> sistema **meio-migrado**: Modo Consulta com odontograma novo, ficha ainda no antigo.
+> **Decisão do Mateus 20/07: o push acontece no FIM do Roadmap A** (não mais em "Job A + Ficha
+> v2" — a Ficha v2 foi absorvida pelo A). Gate completo (eval → dogfood → auditoria → push) sobre
+> o sistema consistente, com o Roadmap A inteiro no lote. Ressalva registrada (assistente): lote
+> grande = mais risco de uma vez; alternativa de push intermediário pós-Job-A foi oferecida e
+> recusada.
 
 > ### 💡 O Job A já traz o odontograma novo pra ficha (de graça)
 > `formatar-evolucao` (Motor A) agora emite `odontograma_eventos`. O campo mágico do Job A chama
@@ -47,23 +81,24 @@ Base 3.1 no ar desde 18/07 (migration 099 + Spec 1 núcleo clínico + Fatia A ma
 | 0.1 | ✅ **FEITO 19/07** — `negacao-canal-so-curativo` corrigido. Bug era na CAMADA VISUAL (`odontograma_eventos` emitia `{endodontia,realizado}`), o texto nunca quebrou. Fix = **bloco forte inline na seção ODONTOGRAMA do prompt** (com exemplo+formato `{}`); ref. cruzada não resolve, enxugar regride. **Confirmado 0/3 em 3 rodadas.** ⚠️ `rajadas-acumuladas` (caso pesado sintético) = RUÍDO do eval, não regressão — falha ~2/3 com qualquer prompt; dívida, não perseguir |
 | 0.2 | ~~Latência p95~~ — **INVESTIGADO 19/07: NÃO é maxOutputTokens** (saída curta; cap não é gargalo). Causa = decode com responseSchema grande + prompt longo. p95 local oscila 6.6–10.1s (ruidoso, cold start); méd ~3s. **Decisão Mateus: aceitar como dívida**, medir em prod real depois — não bloqueia push. Baixar tokens seria placebo |
 | 0.3 | ✅ **FEITO** — fail-soft endurecido: `salvarFichaConsulta` devolve `eventosFalharam`; nova action `regravarEventosOdontograma` (idempotente por ficha) faz retry; `consulta-client` mostra card `bg-warning-pale` não-bloqueante "tentar de novo". Typecheck+build ok; UI não dogfoodada (login-gated) |
-| 0.4 | ✅ **FEITO 19/07 — BLOCK nas duas auditorias, findings aplicados na mesma sessão.** TS (2 HIGH, código meu desta sessão): `regravarEventosOdontograma` não respeitava a invariante #14 (ficha assinada imutável) + delete+insert sem lock duplicava eventos sob concorrência → **migration 104** (RLS reforçada + RPC atômica `regravar_odontograma_eventos`, **escrita mas NÃO aplicada em prod** — decisão sua) + try/catch no client. UX (3 CRITICAL + 2 HIGH): `text-warning`/`bg-warning-pale` nunca compilavam CSS (faltava no `@theme` — meu card do 0.3 tinha zero cor) · coral/teal/slate como texto reprovavam AA em 4 componentes → tokens `-ink` novos · as 5 faces do dente eram inoperáveis por teclado (WCAG 2.1.1) → `role=button`+teclado · `role="dialog"` sem comportamento → `role="region"` · `aria-pressed` mentindo → omitido em modo clínico. Dívidas registradas (não fixadas): `get_my_dentista_id()` sem escopo de clínica (pré-existente 089) · competição visual dos cards na tela "salvo" |
+| 0.4 | ✅ **FEITO 19/07 — BLOCK nas duas auditorias, findings aplicados na mesma sessão.** TS (2 HIGH, código meu desta sessão): `regravarEventosOdontograma` não respeitava a invariante #14 (ficha assinada imutável) + delete+insert sem lock duplicava eventos sob concorrência → **migration 104** (RLS reforçada + RPC atômica `regravar_odontograma_eventos`) — **escrita, aplicada em prod e verificada 20/07** (policy com o guard real de `assinado_em`, RPC criada, advisors sem novidade) + try/catch no client. UX (3 CRITICAL + 2 HIGH): `text-warning`/`bg-warning-pale` nunca compilavam CSS (faltava no `@theme` — meu card do 0.3 tinha zero cor) · coral/teal/slate como texto reprovavam AA em 4 componentes → tokens `-ink` novos · as 5 faces do dente eram inoperáveis por teclado (WCAG 2.1.1) → `role=button`+teclado · `role="dialog"` sem comportamento → `role="region"` · `aria-pressed` mentindo → omitido em modo clínico. Dívidas registradas (não fixadas): `get_my_dentista_id()` sem escopo de clínica (pré-existente 089) · competição visual dos cards na tela "salvo" |
 | — | ~~`profilaxia-boca-toda-99` instável 98↔99~~ — RESOLVIDO de fato: estável [99,99,99] em 4 rodadas pós-fix |
 
 **Bloco 1 — a ficha** (é aqui que o push acontece)
 | | Passo |
 |---|---|
-| 1.1 | **Job A — ficha rápida** (#4), agora **sem a Fatia C** (foi pra #4b) |
-| 1.2 | **Escrever a spec da Ficha v2** (#4b) — vale design-brief próprio |
-| 1.3 | **Executar a Ficha v2** — absorve a Fatia C do Job A |
-| 1.4 | **Gate completo + `git push`** do odontograma+ficha juntos ⚠️ **o push é AQUI**, não no fim da #3 |
+| 1.1 | ✅ **CODADO 20/07** — Job A (#4), Fatia A+B, **sem a Fatia C** (foi pra #4b). Typecheck/lint/build limpos. **Faltam antes de fechar**: (a) dogfood ao vivo (gates §10 da spec — login-gated, ninguém testou o fluxo rodando ainda) · (b) `design-review` completo (só parcial — ver ▶ AGORA) · (c) apagar o paciente de teste · (d) commit (nada commitado) |
+| 1.2 | ~~Escrever a spec da Ficha v2 (#4b)~~ — **ABSORVIDA pelo Roadmap A (20/07)**: estrutura = spec A0; polimento = gate do próprio A (design-brief → design-review sobre o artefato-base) |
+| 1.3 | ~~Executar a Ficha v2~~ — **idem, vive no Roadmap A** (a Fatia C do Job A/estado denso entra lá) |
+| 1.4 | **Gate completo + `git push`** ⚠️ **decisão 20/07: o push é no FIM do Roadmap A** — odontograma + ficha + plugins sobem num lote só |
 
-**Bloco 2 — fatias restantes do odontograma** (ordem revisada 19/07 — ver #3 na fila)
-| | Passo |
-|---|---|
-| 2.1 | **Fatia B** — acumulado, ponte, esfoliação, vínculo com orçamento |
-| 2.2 | **Fatia D** — endo/odontometria (destravada 19/07; a menor; ensaia o schema que a C repete) |
-| 2.3 | **Fatia C** — periodontograma (a maior e a única com premissa não validada: voz com ruído) |
+**Bloco 2 — fatias restantes do odontograma** — **REORGANIZADO 20/07: quase tudo migrou pro [Roadmap A](roadmap-A-plugins-especialidade-2026-07-20.md)**
+| | Passo | Destino |
+|---|---|---|
+| 2.1 | Fatia D (endo/odontometria) | → **A1** do Roadmap A |
+| 2.2 | Fatia C (periodontograma) | → **A2** do Roadmap A |
+| 2.3 | Ponte + esfoliação (eram da Fatia B) | → **A3** do Roadmap A |
+| 2.4 | **Fatia B restante** — acumulado (§3.4) + vínculo com orçamento | **fica AQUI** — retoma pós-A, alimenta o Job B (#8) |
 
 ---
 
@@ -74,12 +109,12 @@ Base 3.1 no ar desde 18/07 (migration 099 + Spec 1 núcleo clínico + Fatia A ma
 | **1** | **Spec 1 — Núcleo clínico compartilhado** | ✅ **aplicada + deployada 18/07** (`b80edf6`) · **gate comportamental PASS** (S2/S4/S5/S7 ao vivo) · bug do "Assinar" achado e corrigido (`f7f4b4e`) | [`2026-07-16-hierarquia-3.1-nucleo-clinico-spec.md`](../specs/2026-07-16-hierarquia-3.1-nucleo-clinico-spec.md) |
 | **2** | **Spec 3 · Fatia A — Marcar retorno** — renomeia o modal, mata o botão morto da ficha, tira a sugestão da IA e mitiga o agendamento que some | ✅ **deployada 18/07** junto com a 099 · **aparência confirmada** (light+dark) no passo 4 | [`2026-07-16-protetico-marcar-retorno-spec.md`](../specs/2026-07-16-protetico-marcar-retorno-spec.md) §4 |
 | **3** | **Odontograma v3** — event-log + boca pintada + fiscalização + perio + **Endo (Fatia D)**. Fatias A→B→C→**D**, **"trabalho só com isso"** | 🟢 **Fatia A CODADA+COMMITADA+DOGFOOD (19/07)** — Modo Consulta unificado no odontograma novo (5 commits `b8740b0..742b1ee`; migrations 100/101/103 em prod; Motor A emite eventos; ToothDetailPanel + lista agrupada; fiscalização §1.10). Design aprovado (artifact `d5f66b1a`) · **gate de campo do piloto RESOLVIDO 19/07** (positivo → Fatia D destravada, UI da A final; ressalva: preview estático, fluxo não validado). **NÃO pushado** — deploy adiado até a ficha montar (▶ AGORA). **Ordem revisada 19/07: B → D → C** (a spec dizia A→B→C→D; ela mesma chama a D de "paralela ao Perio", então a ordem entre C e D é livre — D é a menor, já destravada, e ensaia o schema espelhado que a C repete em escala). Antes de qualquer fatia: **Bloco 0 de dívidas da A** (▶ AGORA) | [`spec-modo-consulta-v3-odontograma.md`](../specs/spec-modo-consulta-v3-odontograma.md) · [`DESIGN-odontograma-v3.md`](../specs/DESIGN-odontograma-v3.md) |
-| **4** | **Job A — ficha rápida no perfil** — campo mágico no form + voz completa + anexo (áudio/pdf/docx) + `data_atendimento` (migration 100 ✅). ⚠️ **Fatia C (estado denso) SAIU 19/07 → Ficha v2 (#4b)** | 🟡 spec APROVADA 16/07 · **agora só Fatias A (feita) + B** · o campo mágico chama `formatar-evolucao`, que já emite `odontograma_eventos` → **a ficha criada por IA já ganha a boca pintada de graça** | [`2026-07-16-job-a-ficha-rapida-spec.md`](../specs/2026-07-16-job-a-ficha-rapida-spec.md) |
+| **4** | **Job A — ficha rápida no perfil** — campo mágico no form + voz completa + anexo (áudio/pdf/docx) + `data_atendimento` (migration 100 ✅). ⚠️ **Fatia C (estado denso) SAIU 19/07 → Ficha v2 (#4b)** | 🟢 **CODADO 20/07** — Fatia A (data_atendimento: 12 pontos de leitura + form) **e** Fatia B (`useCapturaLivre`, `CapturaLivreCard`, `/api/extrair-texto`, `VoiceUX` movido) escritas nesta sessão. Typecheck/lint/build limpos; **NÃO dogfoodado ao vivo, NÃO commitado.** design-review só parcial (1 achado de contraste corrigido; hierarquia/AI-slop pendente — screenshot travou). O campo mágico chama `formatar-evolucao`, que já emite `odontograma_eventos` → **a ficha criada por IA já ganha a boca pintada de graça** | [`2026-07-16-job-a-ficha-rapida-spec.md`](../specs/2026-07-16-job-a-ficha-rapida-spec.md) |
 | **4b** | **Ficha v2 — reformulação completa da ficha** (logo após #4) — **não é só o odontograma:** (a) ficha 100% manual (sem IA) gera eventos pelo painel do dente · (b) visualização da ficha SALVA troca o `colorMode="status"` pelo odontograma clínico novo · (c) **redesenho de layout/organização** da ficha · (d) **absorve a Fatia C do Job A** (estado denso) — redesenha a ficha UMA vez, com o quadro completo. **O push/deploy do odontograma+ficha acontece no fim desta frente** | 🟡 **frente nova, decidida 19/07** (Mateus) · spec a escrever pós-Job-A · ⚠️ **AO ESCREVER A SPEC:** a visualização da ficha salva (b) precisa do MESMO dado histórico que a rota `GET /api/pacientes/[id]/odontograma-acumulado` (§3.4 da spec v3, Fatia B). Como a Ficha v2 vem ANTES da Fatia B na ordem, ou se puxa a B pra frente ou **a spec da Ficha v2 consome a §3.4 desde o desenho** — senão essa consulta de histórico é construída duas vezes | spec a escrever |
 | **5** | **Transcrição tratada** — relato da consulta tratado por IA → `fichas.transcricao` (coluna virgem, zero migration) · aberta pra clínica · fail-soft no save | 🟡 **spec APROVADA 16/07** · pós-v3, **não simultânea com Job A** (mesmos arquivos) | [`2026-07-16-transcricao-tratada-spec.md`](../specs/2026-07-16-transcricao-tratada-spec.md) |
 | **6** | **Spec 3 · Fatia B — Protético** — papel, ordem de trabalho, tela, notificação | 🔴 spec final **pós-099 em prod** (mantida) · decisões novas 16/07: vê **primeiro nome + trabalho + prazo** · **depende do painel (#7)** pro keystone | mesma spec, §5 + painel §6 |
 | **7** | **Painel do Dex** — o canal consertado: destinatário-pessoa · sino no mobile · lida por item · RLS 103 | 🟢 **spec APROVADA 16/07** · causa dos 0/48 **diagnosticada e provada** (3 camadas) · painel do Dex (temporal · 3 famílias · mobile) · fonte "sem retorno 30/60" (híbrida, dono 2 linhas) · **Fatia 0 = migration 103 no SÁBADO** · Fatias 1–2 em qualquer janela pós-gate (arquivos disjuntos) | [`2026-07-16-painel-dex-notificacoes-spec.md`](../specs/2026-07-16-painel-dex-notificacoes-spec.md) |
-| **8** | **Job B — cockpit do tratamento = O NOVO MODO CONSULTA** (reframe do Mateus 16/07) — mapa de tratamento central + radiografia/docs lado a lado + captura compacta + delta · derivado sem container · substitui PendenciasTab · fonte híbrida · perfil ganha o mesmo cockpit (Fatia 2) | 🟢 **spec estrutural APROVADA 16/07 ("spec 100%")** · **contratos §8 congelam pós-v3 A/B** (regra de retomada escrita) · executa depois de v3 → Job A → transcrição | [`2026-07-16-job-b-cockpit-tratamento-spec.md`](../specs/2026-07-16-job-b-cockpit-tratamento-spec.md) |
+| **8** | **Job B — cockpit do tratamento = O NOVO MODO CONSULTA** (reframe do Mateus 16/07) — mapa de tratamento central + radiografia/docs lado a lado + captura compacta + delta · derivado sem container · substitui PendenciasTab · fonte híbrida · perfil ganha o mesmo cockpit (Fatia 2) | 🟢 **spec estrutural APROVADA 16/07 ("spec 100%")** · **contratos §8 congelam pós-v3 A/B** (regra de retomada escrita) · **nota 20/07: o cockpit CONSOME os plugins do Roadmap A** (cards/tabelas de especialidade prontos — monta peças, não cria) · sequência pós-A0/A1; se entra antes ou depois da A2, decide-se ao fechar a A1 (recomendação registrada: antes) | [`2026-07-16-job-b-cockpit-tratamento-spec.md`](../specs/2026-07-16-job-b-cockpit-tratamento-spec.md) |
 | **9** | **Correção completa Financeiro / Orçamentos** — 5 lugares quebrados pelo embed ambíguo de `dentistas` (⚠️ **tela Orçamentos vazia em PROD ~2 meses**, PDF 404, timeline sem eventos) · recebível fantasma → **status de pagamento por trigger + Situação única** (fecha o "redesenho de status" do backlog) · receita ignora recusado · `registrarRecebimento` blindado · dedup de pacientes + trava | 🟢 **spec escrita 17/07** (QA ao vivo em prod) · ⚠️ **Frente 1 é prod-down e NÃO depende da 099 — pode subir já** · migrações de dados sob confirmação | [`2026-07-17-financeiro-correcao-completa-spec.md`](../specs/2026-07-17-financeiro-correcao-completa-spec.md) |
 | ❌ | ~~Spec 2 — Ficha compartilhada / co-autoria~~ | **MORTA** — event-log entrega co-autoria de graça; não havia feature | §Notas |
 
@@ -156,6 +191,7 @@ procedimentos. *"Ele não mexe no meu, eu não mexo no dele. Eu só vejo."*
 
 | Quando | O quê |
 |---|---|
+| **20/07** | **Bloco 0 fechado** (auditoria TS+UX aplicada, migration 104 aplicada+verificada em prod) · **Job A (fila #4) codado** — achado em campo que a "Fatia A (feita)" do registro de 19/07 estava errada (só a migration tinha rodado); Fatia A (12 pontos de leitura + form) e Fatia B (`useCapturaLivre`+`CapturaLivreCard`+`/api/extrair-texto`) saíram as duas. Typecheck/lint/build limpos. **Nada commitado, nada dogfoodado ao vivo.** |
 | **18/07** | **Spec 1 (núcleo clínico) + Fatia A — APLICADAS, DEPLOYADAS e VERIFICADAS.** Migration 099 em prod (dry-run 66/66 → aplicada → verificada: funções/colunas/backfill/policies/inv#10/advisor). Commit `b80edf6` + push + Vercel `READY`. Fix do `tornarPrincipal` (nunca 2 principais) entrou antes do deploy. **Gate comportamental (passo 4) rodado ao vivo:** S2/S4/S5/S7 PASS (silo de leitura/escrita simétrico + indicador fora-da-janela light/dark). QA achou 1 bug — botão "Assinar" visível pro não-autor com falso sucesso + PNG órfão — **corrigido e deployado** (`f7f4b4e`). |
 | **16/07** | **Spec 3 · Fatia A executada** (A1–A4) — modal `marcar-retorno-modal.tsx`, toast com data + link pro mês, botão morto e `retorno_sugerido` extintos. Typecheck/lint/build limpos, greps do §7 zerados. **Não aplicado, não commitado, não testado em sessão real** |
 | **16/07** | Spec 1 **aprovada** + Spec 3 **escrita**. Migration 099, harness e código prontos — **nada aplicado** |
@@ -306,6 +342,24 @@ suficiente** — a RLS é a fronteira real.
 - [ ] 🔍 **Varrer features escondidas atrás de campo que a IA raramente preenche** — `retorno_sugerido`
       tinha 2/35 e escondia um botão; ✅ extinto pela Fatia A (a coluna fica no banco, o código não a
       usa). **`fichas.conduta` tem exatamente os mesmos 2/35** e continua de pé. Suspeito.
+
+**De 20/07 (Job A Fatia A+B)**
+- [ ] **Touch targets do `CapturaLivreCard` (~28px, botões "Gravar voz"/"Anexar")** abaixo do
+      alvo recomendado de 44px — **herdado**, copiei fielmente o padrão que o botão "Gravar
+      Voz (IA)" já tinha no `FichasTab` antes de eu tocar. Decisão de design-system, não bug
+      pontual — se mudar, mudar em todo o arquivo pra não ficar inconsistente.
+- [ ] **Paciente de teste não apagado** — `Teste Design Review (apagar)`
+      (`id=0875d28a-223d-4821-be33-8c37b79b234e`) na clínica QA, criado só pra abrir o painel
+      "Nova Evolução" e revisar o `CapturaLivreCard`. Apagar quando não precisar mais dele
+      pra dogfood.
+- [ ] **`design-review` incompleto** — só a parte de contraste/tipografia (via estilos
+      computados) rodou; hierarquia visual, "sensação premium" e detecção de AI-slop
+      pedem pixel real. Screenshot do browser pane trava (mesmo bug de sempre) — refazer
+      quando o Mateus testar ao vivo, ou achar outro caminho de captura.
+- [ ] **Gates de aceite §10 da spec Job A não verificados ao vivo** — tudo verificado por
+      leitura de código + typecheck/build, nenhum clique real (voz gravando, anexo de PDF
+      escaneado mostrando o erro certo, "Organizar" perguntando antes de sobrescrever).
+      Login-gated — precisa do Mateus.
 
 **Herdadas**
 - [ ] Tipos `Pagamento`/`OrcamentoComItens` duplicados client↔server.

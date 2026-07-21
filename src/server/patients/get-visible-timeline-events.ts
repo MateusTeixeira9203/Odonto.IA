@@ -92,10 +92,10 @@ export async function getVisibleTimelineEvents({
       isClinical
         ? supabase
             .from('fichas')
-            .select('id, created_at, queixa_principal, dentista:dentistas(nome)')
+            .select('id, data_atendimento, queixa_principal, dentista:dentistas(nome)')
             .eq('paciente_id', patientId)
             .eq('clinica_id', clinicId)
-            .order('created_at', { ascending: false })
+            .order('data_atendimento', { ascending: false })
             .limit(limit)
         : Promise.resolve({ data: null, error: null }),
     ]);
@@ -186,7 +186,7 @@ export async function getVisibleTimelineEvents({
     for (const f of fichasResult.data ?? []) {
       const ficha = f as unknown as {
         id: string;
-        created_at: string;
+        data_atendimento: string;
         queixa_principal: string | null;
         dentista: { nome: string } | null;
       };
@@ -194,7 +194,7 @@ export async function getVisibleTimelineEvents({
       events.push({
         id: `fic_${ficha.id}`,
         type: 'consultation_created',
-        timestamp: ficha.created_at,
+        timestamp: ficha.data_atendimento,
         title: 'Consulta realizada',
         description: ficha.queixa_principal,
         actor: (ficha.dentista as { nome: string } | null)?.nome ?? null,

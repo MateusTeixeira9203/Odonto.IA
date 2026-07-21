@@ -6,8 +6,8 @@
 // aqui — o painel só edita o rascunho de eventos; salvar é do "Confirmar e salvar"
 // da tela-mãe (invariante #1).
 
-import { useMemo } from 'react';
-import { X } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ChevronRight, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   faceLabel,
@@ -19,8 +19,15 @@ import {
   type StatusRegistro,
   type AncoraClinica,
 } from '@/types/odontograma';
-import { TOOTH_CLASS, DIMS, occlusalContourPath, occlusalZonePoints } from './tooth-geometry';
+import { TOOTH_CLASS, DIMS, occlusalContourPath, occlusalZonePoints, occlusalLabelPos } from './tooth-geometry';
 import { ToothSVG, buildResumos, TOOTH_NAMES, getQuadrantLabel } from './Odontograma';
+// Detalhe de especialidade (migration 106) — resolvido por tipo CONCRETO, não pelo
+// registry apagado (o registry só lê metadados; Form/Card são invocados com o tipo
+// real, mesma convenção do orto em FichasTab).
+import { endoDetalheSchema } from '@/lib/especialidades/endo';
+import { EndoForm } from '@/components/fichas/endo-form';
+import { implanteDetalheSchema } from '@/lib/especialidades/implante';
+import { ImplanteForm } from '@/components/fichas/implante-form';
 
 const FACES: FaceDental[] = ['V', 'M', 'O', 'D', 'L'];
 
@@ -91,6 +98,14 @@ export function ToothDetailPanel({
   const scale = 1.7;
   const temPreexistente = doDente.some((e) => e.origem === 'preexistente');
 
+  // Detalhe de especialidade (migration 106) — só endo/implante têm Form hoje. Um aberto
+  // por vez (regra do artefato de dois-modos §02): abrir outro fecha o anterior.
+  const [detalheAbertoIdx, setDetalheAbertoIdx] = useState<number | null>(null);
+
+  function atualizarDetalhe(evento: OdontogramaEventoDraft, detalhe: unknown) {
+    onChange(eventos.map((e) => (e === evento ? { ...e, detalhe } : e)));
+  }
+
   const novo = (
     tipo: TipoRegistroOdontograma,
     status: StatusRegistro,
@@ -140,6 +155,11 @@ export function ToothDetailPanel({
       const ancora: AncoraClinica =
         tipo === 'selante' ? { nivel: 'face', dente, faces: ['O'] } : { nivel: 'dente', dente };
       all.push(novo(tipo, modos[0], ancora));
+      // Endo/implante acabaram de ganhar tabela (migration 106) — abre sozinha na criação,
+      // senão o dentista nunca descobre que ela existe (é o "preciso que apareça" de 21/07).
+      if (tipo === 'endodontia' || tipo === 'implante') {
+        setDetalheAbertoIdx(all.filter((e) => e.ancora.dente === dente).length - 1);
+      }
     } else {
       const e = all[i];
       const pos = modos.indexOf(e.status);
@@ -294,20 +314,10 @@ export function ToothDetailPanel({
                 ) : null,
               )}
               {/* letras das faces */}
-              {(
-                [
-                  ['V', 50, superior ? 20 : 88],
-                  ['L', 50, superior ? 88 : 20],
-                  ['M', 17, 53],
-                  ['D', 83, 53],
-                  ['O', 50, 53],
-                ] as const
-              ).map(([f, x, y]) => {
-                // M/D respeitam o espelhamento por quadrante
+              {(['V', 'L', 'M', 'D', 'O'] as const).map((f) => {
+                // Posição vem da geometria (respeita oval vs. molar) — bug de corte 21/07.
                 const face = f as FaceDental;
-                const pts = occlusalZonePoints(face, dente);
-                const esquerda = pts.startsWith('0,0 33');
-                const fx = face === 'M' || face === 'D' ? (esquerda ? 17 : 83) : x;
+                const { x: fx, y } = occlusalLabelPos(face, dente);
                 return (
                   <text
                     key={f}
@@ -369,61 +379,92 @@ export function ToothDetailPanel({
         <div className="flex flex-col pt-2 border-t" style={{ borderColor: 'var(--color-border)' }}>
           {doDente.map((ev, i) => {
             const cor = corDoRegistro(ev.status, ev.origem);
+            // Só endo/implante têm tabela de especialidade hoje (migration 106).
+            const temDetalhe = ev.tipo === 'endodontia' || ev.tipo === 'implante';
+            const aberto = detalheAbertoIdx === i;
             return (
-              <div
-                key={i}
-                className="flex items-center gap-2 py-1.5 text-[12px]"
-                style={i > 0 ? { borderTop: '1px solid var(--color-border)' } : undefined}
-              >
-                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: COR_TOKEN[cor] }} aria-hidden="true" />
-                <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-                  {TIPO_LABEL[ev.tipo]}
-                </span>
-                {(ev.ancora.faces ?? []).length > 0 && (
-                  <span className="font-mono text-[10.5px]" style={{ color: 'var(--color-text-muted)' }}>
-                    {(ev.ancora.faces ?? []).join(' ')}
+              <div key={i} style={i > 0 ? { borderTop: '1px solid var(--color-border)' } : undefined}>
+                <div className="flex items-center gap-2 py-1.5 text-[12px]">
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: COR_TOKEN[cor] }} aria-hidden="true" />
+                  <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                    {TIPO_LABEL[ev.tipo]}
                   </span>
-                )}
-                {ev.observacao && (
-                  <span className="text-[11px] truncate" style={{ color: 'var(--color-text-secondary)' }}>
-                    {ev.observacao}
-                  </span>
-                )}
-                <div className="flex-1" />
-                <span
-                  className="text-[9.5px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0"
-                  style={{
-                    background: `color-mix(in srgb, ${COR_TOKEN[cor]} 15%, var(--color-surface-alt))`,
-                    color: COR_TOKEN_INK[cor],
-                  }}
-                >
-                  {ev.status === 'indicado' ? 'A fazer' : ev.origem === 'preexistente' ? 'Pré-exist.' : 'Feito'}
-                </span>
-                {ev.status === 'realizado' && ev.origem === 'clinica' && !readOnly && (
-                  <input
-                    type="date"
-                    value={ev.realizado_em ?? ''}
-                    max={dataPadrao}
-                    onChange={(e) => setData(ev, e.target.value)}
-                    className="text-[10.5px] font-mono rounded-md px-1.5 py-0.5 outline-none focus-visible:ring-1 focus-visible:ring-teal"
+                  {(ev.ancora.faces ?? []).length > 0 && (
+                    <span className="font-mono text-[10.5px]" style={{ color: 'var(--color-text-muted)' }}>
+                      {(ev.ancora.faces ?? []).join(' ')}
+                    </span>
+                  )}
+                  {ev.observacao && (
+                    <span className="text-[11px] truncate" style={{ color: 'var(--color-text-secondary)' }}>
+                      {ev.observacao}
+                    </span>
+                  )}
+                  <div className="flex-1" />
+                  <span
+                    className="text-[9.5px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0"
                     style={{
-                      background: 'var(--color-surface-alt)',
-                      border: '1px solid var(--color-border)',
-                      color: 'var(--color-text-secondary)',
+                      background: `color-mix(in srgb, ${COR_TOKEN[cor]} 15%, var(--color-surface-alt))`,
+                      color: COR_TOKEN_INK[cor],
                     }}
-                    aria-label={`Data do procedimento — ${TIPO_LABEL[ev.tipo]}`}
-                  />
-                )}
-                {!readOnly && (
-                  <button
-                    type="button"
-                    onClick={() => remover(ev)}
-                    className="p-0.5 rounded outline-none focus-visible:ring-1 focus-visible:ring-teal shrink-0"
-                    style={{ color: 'var(--color-text-muted)' }}
-                    aria-label={`Remover ${TIPO_LABEL[ev.tipo]}`}
                   >
-                    <X size={12} strokeWidth={2.4} />
-                  </button>
+                    {ev.status === 'indicado' ? 'A fazer' : ev.origem === 'preexistente' ? 'Pré-exist.' : 'Feito'}
+                  </span>
+                  {ev.status === 'realizado' && ev.origem === 'clinica' && !readOnly && (
+                    <input
+                      type="date"
+                      value={ev.realizado_em ?? ''}
+                      max={dataPadrao}
+                      onChange={(e) => setData(ev, e.target.value)}
+                      className="text-[10.5px] font-mono rounded-md px-1.5 py-0.5 outline-none focus-visible:ring-1 focus-visible:ring-teal"
+                      style={{
+                        background: 'var(--color-surface-alt)',
+                        border: '1px solid var(--color-border)',
+                        color: 'var(--color-text-secondary)',
+                      }}
+                      aria-label={`Data do procedimento — ${TIPO_LABEL[ev.tipo]}`}
+                    />
+                  )}
+                  {temDetalhe && (
+                    <button
+                      type="button"
+                      onClick={() => setDetalheAbertoIdx(aberto ? null : i)}
+                      className="flex items-center gap-0.5 text-[10.5px] font-bold shrink-0 outline-none focus-visible:ring-1 focus-visible:ring-teal rounded px-1"
+                      style={{ color: 'var(--color-teal-ink)' }}
+                    >
+                      {readOnly ? 'Ver tabela' : 'Detalhes'}
+                      <ChevronRight size={11} strokeWidth={2.6} style={{ transform: aberto ? 'rotate(90deg)' : undefined, transition: 'transform .15s' }} />
+                    </button>
+                  )}
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      onClick={() => remover(ev)}
+                      className="p-0.5 rounded outline-none focus-visible:ring-1 focus-visible:ring-teal shrink-0"
+                      style={{ color: 'var(--color-text-muted)' }}
+                      aria-label={`Remover ${TIPO_LABEL[ev.tipo]}`}
+                    >
+                      <X size={12} strokeWidth={2.4} />
+                    </button>
+                  )}
+                </div>
+
+                {temDetalhe && aberto && (
+                  <div className="pb-3 pl-4">
+                    {ev.tipo === 'endodontia' && (
+                      <EndoForm
+                        valor={endoDetalheSchema.safeParse(ev.detalhe).success ? (endoDetalheSchema.parse(ev.detalhe)) : null}
+                        onChange={(v) => atualizarDetalhe(ev, v)}
+                        readOnly={readOnly}
+                      />
+                    )}
+                    {ev.tipo === 'implante' && (
+                      <ImplanteForm
+                        valor={implanteDetalheSchema.safeParse(ev.detalhe).success ? (implanteDetalheSchema.parse(ev.detalhe)) : null}
+                        onChange={(v) => atualizarDetalhe(ev, v)}
+                        readOnly={readOnly}
+                      />
+                    )}
+                  </div>
                 )}
               </div>
             );

@@ -1,0 +1,540 @@
+<!doctype html><html><head><!-- frame-runtime --><script>window.__FRAME_PREAMBLE={"capabilities":{"downloads":"downloads.BABDwU1K.js","mcp":"mcp.hoz5jxDa.js","permissions":"permissions.ByA9Fd8x.js","self":"self.D3u1zjZe.js","user":"user.Cp1-RnjB.js"},"transforms":"_transforms.DYk1Ltlh.js","comments":"_comments.Dp6RDy7J.js","translate":"_translate.C9eLA9Mu.js"}</script><script>(function(){"use strict";const Ee="modulepreload",we=function(e){return"/"+e},Se={},ee=function(t,n,c){let i=Promise.resolve();function s(u){const a=new Event("vite:preloadError",{cancelable:!0});if(a.payload=u,window.dispatchEvent(a),!a.defaultPrevented)throw u}return i.then(u=>{for(const a of u||[])a.status==="rejected"&&s(a.reason);return t().catch(s)})},te=["light","dark","system"];function ne(e){if(e===null||typeof e!="object")return!1;const t=e.__frame_init;return t!==null&&typeof t=="object"}function H(e){return e!==null&&typeof e=="object"&&e.__frame_size_poke===!0}function re(e){if(e===null||typeof e!="object")return!1;const t=e.__frame_theme;if(t===null||typeof t!="object")return!1;const n=t.theme;return typeof n=="string"&&te.includes(n)}function se(e){try{typeof reportError=="function"?reportError(e):setTimeout(()=>{throw e},0)}catch{}}const oe=Object.freeze(Object.assign(Object.create(null),{user:Object.freeze(Object.assign(Object.create(null),{id:null,isOwner:!1,canEdit:!1,name:null,avatarUrl:null,email:null}))}));function W(e){if(window===top||e.type==="auxclick"&&e.button!==1)return;const t=e.composedPath?e.composedPath():[e.target];let n=null;for(let u=0;u<t.length;u++){const a=t[u];if(a&&a.matches&&a.matches("a[href],area[href]")){n=a;break}}if(!n&&e.target&&e.target.closest&&(n=e.target.closest("a[href],area[href]")),!n)return;const c=n.getAttribute("href");if(!c)return;let i,s;try{i=new URL(c,document.baseURI),s=new URL(document.baseURI).origin}catch{return}(i.protocol==="http:"||i.protocol==="https:")&&i.origin!==s&&(e.preventDefault(),parent.postMessage({__frame_nav:!0,url:i.href},"*"))}const Y={};function C(e){if(window===top)return;const t=Date.now();t-(Y[e]||0)<500||(Y[e]=t,parent.postMessage({__frame_engaged:!0,kind:e},"*"))}const ie=2e3,K=["wheel","touchstart","touchmove","keydown","pointerdown"];let x=0;function ae(e){e.isTrusted&&(x=Date.now())}function ce(){addEventListener("click",W,!0),addEventListener("auxclick",W,!0)}function le(){for(let e=0;e<K.length;e++)addEventListener(K[e],ae,{capture:!0,passive:!0});addEventListener("scroll",e=>{e.isTrusted&&Date.now()-x<ie&&C("scroll")},{capture:!0,passive:!0}),addEventListener("pointermove",e=>{e.isTrusted&&C("pointer")},{capture:!0,passive:!0}),addEventListener("click",e=>{e.isTrusted&&C("click")},{capture:!0,passive:!0})}const D="__frame_scroll",ue=150,fe=310,de=160,me=3e4;function pe(){let e=0,t=!1,n=!1,c=!1,i=0;const s=d=>{try{sessionStorage.setItem(D,JSON.stringify({y:d}))}catch{}},u=()=>{if(t){t=!1;return}n=!0,clearTimeout(e),e=setTimeout(()=>s(scrollY),ue)};try{addEventListener("scroll",u,{passive:!0}),addEventListener("pagehide",()=>{clearTimeout(e),s(scrollY)})}catch{}const a=()=>{let d;try{d=sessionStorage.getItem(D)}catch{return null}if(d===null)return null;let h;try{h=JSON.parse(d)}catch{h=null}const g=h?.y;if(!(typeof g=="number"&&Number.isFinite(g)&&g>=0)){try{sessionStorage.removeItem(D)}catch{}return null}return g};let y=!1;const _=d=>{try{const h=scrollY;scrollTo({top:d,left:0,behavior:"instant"}),i=d,c=!0,s(d);const g=scrollY;g!==h&&(t=!0),g!==d&&!y&&(y=!0,addEventListener("load",()=>{try{if(scrollY===g){const b=a();_(b!==null?b:i)}}catch{}},{once:!0}))}catch{}},o=()=>{try{return!!location.hash}catch{return!0}};let l=!1;const p=()=>{try{if(l||innerWidth>fe||innerHeight>de)return;l=!0;const d=Date.now(),h=()=>{try{removeEventListener("resize",h)}catch{}if(Date.now()-d>me||n||o())return;const g=a();_(g!==null?g:i)};addEventListener("resize",h)}catch{}};let m=!1,f=!1;return{restore(){if(m||(m=!0,o()))return;const d=a();d!==null&&(_(d),p())},promoted(){if(f||(f=!0,o()))return;const d=a();d!==null?(_(d),p()):c&&_(i)}}}function he(e,t,n){const c=[...t.values()].filter(i=>i.targets.some(s=>s.startsWith(e+".")));return{wrap(i,s){const u=`${e}.${i}`,a=c.filter(y=>y.targets.includes(u));return a.length===0?(...y)=>{try{return s(...y)}catch(_){return Promise.reject(_)}}:(...y)=>{let _=y;for(const l of a){const p=l.module.parameters;if(p)try{_=p(_)}catch{return Promise.reject({code:"transform_error",id:l.id,scope:e,message:"parameters transform failed"})}}let o;try{o=s(..._)}catch(l){o=Promise.reject(l)}return o.then(l=>{for(let p=a.length-1;p>=0;p--){const m=a[p],f=m.module.returns;if(f)try{l=f(l)}catch{return n({id:m.id,scope:e,leg:"returns"}),l}}return l},l=>{for(let p=a.length-1;p>=0;p--){const m=a[p],f=m.module.throws;if(f)try{l=f(l)}catch{return n({id:m.id,scope:e,leg:"throws"}),Promise.reject(l)}}return Promise.reject(l)})}}}}function ge(e,t,n,c=()=>{}){const i=new Set(e.changes??[]),s=new Map;for(const u of i){const a=t[u];a&&s.set(u,a)}return{contract:e.contract,changes:i,flags:new Set(e.flags??[]),capabilities:e.capabilities??{},capBudgets:e.capBudgets??{},transforms:s,shellOrigin:n.shellOrigin,mount:n.mount,pipe:u=>he(u,s,c)}}(function(){const e=Object.defineProperty,t=globalThis,n=["RTCPeerConnection","webkitRTCPeerConnection","RTCDataChannel","RTCIceCandidate","RTCSessionDescription","RTCRtpSender","RTCRtpReceiver"];let c=0;for(let i=0;i<n.length;i++){const s=n[i];try{e(t,s,{value:void 0,writable:!1,configurable:!1})}catch{try{delete t[s]}catch{}try{e(t,s,{value:void 0,writable:!1,configurable:!0})}catch{}}typeof t[s]=="function"&&c++}if(c&&window!==top)try{parent.postMessage({__frame_rtc_lockdown_failed:c},"*")}catch{}})();const _e=1e4,ye=Object.freeze([...window.__FRAME_PREAMBLE?.origins??["https://claude.ai","https://preview.claude.ai"]]);function J(e){for(const t of ye)if(t.endsWith(":*"))try{const n=new URL(e);if(`${n.protocol}//${n.hostname}:*`===t)return!0}catch{}else if(e===t)return!0;return!1}const R=Object.freeze({...window.__FRAME_PREAMBLE?.capabilities}),I=window.__FRAME_PREAMBLE?.transforms,U=window.__FRAME_PREAMBLE?.comments,z=window.__FRAME_PREAMBLE?.translate,T=/^[\w.-]+\.js$/,be=/^[a-z][a-z0-9_-]{0,63}$/;let G=null,j=null;function $(e,t,n){try{Object.defineProperty(e,t,{value:n,writable:!1,configurable:!1,enumerable:!0})}catch{try{Object.defineProperty(e,t,{value:n,writable:!1,configurable:!0,enumerable:!0})}catch{}}}let q=!1;function V(e){const t=document.documentElement;e==="light"||e==="dark"?(t.dataset.theme=e,t.style.colorScheme=e,q=!0):q&&(delete t.dataset.theme,t.style.colorScheme="",q=!1)}const A=Object.assign(Object.create(null),{mcp:Object.assign(Object.create(null),{watchTool:{handlerArg:3}})}),M=new Map;function X(e,t){const n=M.get(e);if(!n)return;const c=Object.assign(Object.create(null),t);Object.assign(n.impl,c),n.impl.__settled=()=>Promise.reject({code:"capability_removed",message:`${e}: method not in this runtime`});const i=n.queue;n.queue=[];for(const s of i){const u=c[s.method];if(u)if(A[e]?.[s.method])try{s.resolve(u(...s.args))}catch{k(s,A[e][s.method].handlerArg,{code:"transform_error",message:`${e}.${s.method} rejected its arguments`})}else u(...s.args).then(s.resolve,s.reject);else{const a={code:"capability_removed",message:`${e}.${s.method} is not in this runtime`},y=A[e]?.[s.method];if(y){k(s,y.handlerArg,a);continue}s.reject(a)}}}function ve(e,t){const n=M.get(e);if(!n)return;n.impl.__settled=()=>Promise.reject(t);const c=n.queue;n.queue=[];for(const i of c){const s=A[e]?.[i.method];if(s){k(i,s.handlerArg,t);continue}i.reject(t)}}function N(e,t){const n=oe[e];if(!n){ve(e,t);return}X(e,Object.fromEntries(Object.entries(n).map(([c,i])=>[c,()=>Promise.resolve(i)])))}function k(e,t,n){if(e.syncState?.dead)return;const c=e.args[t];typeof c=="function"&&queueMicrotask(()=>{if(!e.syncState?.dead)try{c({type:"error",error:n})}catch(i){se(i)}})}const B=Object.getOwnPropertyDescriptor(window,"claude");if(window!==top&&!(B&&B.writable===!1)){ce(),le();let e=null;try{e=pe()}catch{}const t=B?.value??{};$(window,"claude",t);const n=o=>{const l={impl:Object.create(null),queue:[]};M.set(o,l);const p=new Proxy(l.impl,{get:(m,f)=>{if(typeof f!="string"||f==="then"||f==="toJSON"||f==="valueOf")return;if(f==="toString")return Object.prototype.toString;const d=A[o]?.[f];return d?(...h)=>{if(typeof h[d.handlerArg]!="function")throw new TypeError(`${o}.${f} requires a handler function`);const g=m[f];if(g)return g(...h);if(m.__settled){const w={dead:!1},S={args:[...h],syncState:w};return m.__settled().catch(P=>k(S,d.handlerArg,P)),()=>{w.dead=!0}}let b=null;const v={dead:!1};return l.queue.push({method:f,args:h,resolve:w=>{b=typeof w=="function"?w:null,v.dead&&b?.()},reject:()=>{},syncState:v}),()=>{v.dead=!0,b?.()}}:(...h)=>{const g=m[f]??m.__settled;return g?g(...h):new Promise((b,v)=>{l.queue.push({method:f,args:h,resolve:b,reject:v})})}},set:()=>!1});$(t,o,p)};for(const o of Object.keys(R)){if(t[o]!==void 0){$(t,o,t[o]);continue}n(o)}let c=null,i=null,s=0;const u=o=>{o.source!==parent||!J(o.origin)||ne(o.data)&&(c=o.data.__frame_init,j=o.origin,removeEventListener("message",u),clearTimeout(s),i?.())};addEventListener("message",u),parent.postMessage({__frame_connect:!0},"*");const a=new Promise(o=>{i=o,s=setTimeout(()=>{removeEventListener("message",u),o()},_e)}),y=document.readyState==="loading"?new Promise(o=>document.addEventListener("DOMContentLoaded",()=>o(),{once:!0})):Promise.resolve();y.then(()=>{try{e?.restore()}catch{}});const _=o=>{if(!(o.source!==parent||!J(o.origin))&&H(o.data)){removeEventListener("message",_);try{e?.promoted()}catch{}}};addEventListener("message",_),a.then(async()=>{if(!c||!j){for(const r of M.keys())N(r,{code:"not_granted",message:"frame initialization did not arrive - capability unavailable"});return}V(c.theme);const o=j;let l=!1,p=!1;addEventListener("message",r=>{if(r.source!==parent||r.origin!==o)return;re(r.data)&&V(r.data.__frame_theme.theme);const E=r.data?.__fc_mode;E&&typeof E=="object"&&!l&&U&&T.test(U)&&(l=!0,m(U).then(F=>F.install?.(o,E.on===!0)).catch(()=>{}));const O=r.data?.__ft_cmd;O&&typeof O=="object"&&!p&&z&&T.test(z)&&(p=!0,m(z).then(F=>F.install?.(o,O)).catch(()=>{}))});const m=r=>ee(()=>import("/_runtime/"+r),void 0),f=Object.keys(c.capabilities??{});for(const r of f)Object.hasOwn(R,r)||be.test(r)&&t[r]===void 0&&(n(r),N(r,{code:"capability_disabled",message:"capability not in this runtime generation"}));const d=f.filter(r=>Object.hasOwn(R,r)).map(r=>[r,R[r]]).filter(r=>typeof r[1]=="string"&&T.test(r[1])),[h,...g]=await Promise.allSettled([I&&T.test(I)?m(I):Promise.resolve({}),...d.map(([,r])=>m(r))]),b=j;G=ge(c,h.status==="fulfilled"&&h.value?.TRANSFORMS||{},{shellOrigin:b,mount:X},r=>parent.postMessage({__frame_cap_telemetry:r},b));const v=r=>parent.postMessage({__frame_cap_telemetry:{kind:"cap-load-error",cap:r}},b),w=G;g.forEach((r,E)=>{const O=d[E][0];if(r.status!=="fulfilled"){v(O);return}try{r.value?.install?.(w)}catch{v(O)}});for(const[r,E]of M)if(!(E.queue.length===0&&Object.keys(E.impl).length>0)){if(f.includes(r)){N(r,{code:"capability_disabled",message:"capability not available in this session"});continue}N(r,{code:"not_granted",message:"capability not available in this session"})}await y,parent.postMessage({__frame_ready:!0},j);let S=-1,P=0;const Q=()=>{P=0;const r=Math.max(document.documentElement.scrollHeight,document.body?document.body.scrollHeight:0);r!==S&&(S=r,parent.postMessage({__frame_size:!0,h:r},b))},L=()=>{P||(P=setTimeout(Q,200))},Z=new ResizeObserver(L);Z.observe(document.documentElement),document.body&&Z.observe(document.body),document.addEventListener("load",L,!0),document.fonts?.ready.then(L,()=>{}),addEventListener("beforeprint",()=>{S=-1,Q()}),L(),addEventListener("message",r=>{if(!(r.source!==parent||r.origin!==b)&&H(r.data)){try{e?.promoted()}catch{}S=-1,L()}})})}})();</script><!-- /frame-runtime --><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}</style></head><body>
+<title>Odontograma v3 — Preview para os dentistas</title>
+<style>
+  :root{
+    --teal:#2f9c85; --teal-pale:#e4f4f1; --coral:#e57373; --coral-pale:#fce8e8;
+    --slate:#64748b; --slate-pale:#e2e8f0; --warning:#f59e0b; --warning-pale:#fef3c7;
+    --bg:#f6f7f6; --surface:#ffffff; --surface-alt:#eef0ef; --border:#dfe2df;
+    --text:#1b1c1b; --text-2:#5f6b66; --text-3:#9aa39e;
+    --shadow:0 1px 2px rgba(20,30,25,.04),0 8px 24px rgba(20,30,25,.06);
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --teal:#3ba992; --teal-pale:#123a33; --coral:#ef9a9a; --coral-pale:#3d1f1f;
+    --slate:#94a3b8; --slate-pale:#2b3444; --warning:#fbbf24; --warning-pale:#41260a;
+    --bg:#0c0d0c; --surface:#141514; --surface-alt:#1e201e; --border:#2c2f2c;
+    --text:#f3f4f3; --text-2:#a6ada9; --text-3:#5a615c;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.4);}}
+  :root[data-theme="dark"]{
+    --teal:#3ba992; --teal-pale:#123a33; --coral:#ef9a9a; --coral-pale:#3d1f1f;
+    --slate:#94a3b8; --slate-pale:#2b3444; --warning:#fbbf24; --warning-pale:#41260a;
+    --bg:#0c0d0c; --surface:#141514; --surface-alt:#1e201e; --border:#2c2f2c;
+    --text:#f3f4f3; --text-2:#a6ada9; --text-3:#5a615c;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.4);}
+  :root[data-theme="light"]{
+    --teal:#2f9c85; --teal-pale:#e4f4f1; --coral:#e57373; --coral-pale:#fce8e8;
+    --slate:#64748b; --slate-pale:#e2e8f0; --warning:#f59e0b; --warning-pale:#fef3c7;
+    --bg:#f6f7f6; --surface:#ffffff; --surface-alt:#eef0ef; --border:#dfe2df;
+    --text:#1b1c1b; --text-2:#5f6b66; --text-3:#9aa39e;
+    --shadow:0 1px 2px rgba(20,30,25,.04),0 8px 24px rgba(20,30,25,.06);}
+  *{box-sizing:border-box} body{margin:0}
+  .wrap{background:var(--bg);color:var(--text);font-family:var(--sans);padding:40px 24px 72px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .inner{max-width:1120px;margin:0 auto}
+  .eyebrow{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--teal);font-weight:700;margin:0 0 8px}
+  h1{font-size:27px;font-weight:700;letter-spacing:-.02em;margin:0 0 6px;text-wrap:balance}
+  .sub{color:var(--text-2);font-size:14px;max-width:68ch;margin:0}
+  h2{font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-2);font-weight:700;margin:52px 0 4px;display:flex;align-items:center;gap:10px}
+  h2 .tag{font-size:9px;background:var(--teal-pale);color:var(--teal);padding:2px 7px;border-radius:5px;letter-spacing:.06em;flex:none}
+  h2 .tag.warn{background:var(--warning-pale);color:var(--warning)}
+  h2::after{content:"";flex:1;height:1px;background:var(--border)}
+  .note{color:var(--text-2);font-size:13px;margin:4px 0 18px;max-width:76ch}
+  .note b{color:var(--text)}
+  .legend{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 0}
+  .chip{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:999px;background:var(--surface);border:1px solid var(--border);font-size:12px;font-weight:600;color:var(--text-2)}
+  .sw{width:12px;height:12px;border-radius:3px;flex:none}
+  .cat{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:12px;margin-top:14px}
+  .ccard{background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:14px 10px 12px;display:flex;flex-direction:column;align-items:center;text-align:center}
+  .ct{width:54px;height:auto;display:block;overflow:visible;margin-bottom:8px}
+  .cl{font-size:12.5px;font-weight:700;color:var(--text)}
+  .cl .n{font-family:var(--mono);color:var(--text-3);font-weight:600;margin-right:3px}
+  .cc{font-size:11px;color:var(--text-2);margin-top:2px;line-height:1.45}
+  .cc i{color:var(--text-3)}
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:18px 20px;max-width:720px;margin-top:14px}
+  .panel h3{font-size:13px;font-weight:700;margin:0 0 4px}
+  .panel .ph{font-size:12px;color:var(--text-2);margin:0 0 10px}
+  .tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+  .tbl th{text-align:left;font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3);font-weight:700;padding:6px 9px;border-bottom:1px solid var(--border)}
+  .tbl td{padding:8px 9px;border-bottom:1px solid var(--border)}
+  .tbl .num{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+  .tbl .ctc{color:var(--teal);font-weight:700}
+  .tbl .canal{font-weight:600} .tbl .canal small{color:var(--text-3);font-family:var(--mono);font-weight:500}
+  .efoot{margin-top:12px;font-size:12px;color:var(--text-2);display:flex;gap:20px;flex-wrap:wrap}
+  .efoot b{color:var(--text);font-weight:600}
+  .kbd{font-family:var(--mono);font-size:10.5px;background:var(--surface-alt);border:1px solid var(--border);border-radius:4px;padding:1px 6px;color:var(--text-2)}
+  .mouth{background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:20px;overflow-x:auto;margin-top:14px}
+  .arch{display:flex;gap:3px;align-items:flex-end;justify-content:center;min-width:max-content}
+  .arch.lower{align-items:flex-start}
+  .tw{display:flex;flex-direction:column;align-items:center;gap:3px}
+  .tw .num{font-family:var(--mono);font-size:9.5px;font-weight:700;color:var(--text-3)}
+  .mt{width:27px;height:auto;display:block;overflow:visible}
+  .midline{display:flex;align-items:center;gap:12px;margin:10px 0}
+  .midline .ln{flex:1;border-top:2px dashed var(--border)}
+  .midline .lb{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-3);font-weight:700;white-space:nowrap}
+  .perio{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:var(--shadow);overflow-x:auto;margin-top:14px}
+  .prow{display:flex;gap:12px;align-items:flex-start;min-width:max-content}
+  .pt{display:flex;flex-direction:column;align-items:center;gap:4px}
+  .pt-num{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--text-2)}
+  .cells{display:flex;flex-direction:column;gap:3px}
+  .crow{display:flex;gap:3px}
+  .cell{width:34px;height:34px;border-radius:6px;background:var(--surface-alt);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;position:relative}
+  .cell.cur{border-color:var(--teal);box-shadow:0 0 0 2px var(--teal-pale)}
+  .cell.deep .mm{color:var(--coral)}
+  .mm{font-family:var(--mono);font-size:14px;font-weight:700;line-height:1}
+  .ind{display:flex;gap:2px;position:absolute;bottom:3px}
+  .ind i{width:4px;height:4px;border-radius:999px;display:block}
+  .i-bop{background:#e11d48} .i-sup{background:var(--warning)} .i-plq{background:#eab308}
+  .absent{width:34px;height:71px;border-radius:6px;background:repeating-linear-gradient(45deg,var(--surface-alt),var(--surface-alt) 5px,var(--border) 5px,var(--border) 6px);display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--text-3);font-weight:600;writing-mode:vertical-rl}
+  .mf{display:flex;gap:5px;margin-top:2px}
+  .mf span{font-size:9px;font-family:var(--mono);font-weight:700;background:var(--surface-alt);border:1px solid var(--border);border-radius:4px;padding:1px 5px;color:var(--text-2)}
+  .ptbl{border-collapse:collapse;font-size:12.5px;margin-top:6px}
+  .ptbl th,.ptbl td{border:1px solid var(--border);padding:6px 10px;text-align:center;font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .ptbl th{font-family:var(--sans);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3)}
+  .ptbl .rowlab{font-family:var(--sans);font-weight:700;font-size:11px;text-align:left;color:var(--text-2)}
+  .ptbl .nic{background:var(--teal-pale);color:var(--teal);font-weight:700}
+  .ptbl .nic.bad{color:var(--coral)}
+  .ptbl .deep{color:var(--coral);font-weight:700}
+  .ochips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .ochip{display:inline-flex;align-items:center;gap:7px;background:var(--surface-alt);border:1px solid var(--border);border-radius:9px;padding:7px 12px;font-size:12.5px}
+  .ochip b{font-weight:700} .ochip small{color:var(--text-3);font-size:10px;text-transform:uppercase;letter-spacing:.05em}
+  .ghost{display:inline-flex;align-items:center;gap:6px;border:1px dashed var(--teal);color:var(--teal);border-radius:9px;padding:7px 12px;font-size:12.5px;font-weight:600}
+  .evo{border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-top:10px;display:flex;flex-direction:column;gap:6px;background:var(--surface-alt)}
+  .evo .l1{display:flex;align-items:center;gap:8px;font-size:13px;flex-wrap:wrap}
+  .evo .l1 b{font-weight:700}
+  .evo .meta{font-size:11.5px;color:var(--text-2);display:flex;gap:14px;flex-wrap:wrap}
+  .evo .meta b{color:var(--text);font-weight:600}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px}
+  .pill .pd{width:7px;height:7px;border-radius:999px}
+  .p-teal{background:var(--teal-pale);color:var(--teal)} .p-teal .pd{background:var(--teal)}
+  .modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-top:14px}
+  .mode{background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:16px 18px}
+  .mh{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+  .mh b{font-size:13.5px}
+  .mtag{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--teal);background:var(--teal-pale);border-radius:5px;padding:2px 7px;margin-left:auto}
+  .steps{margin:0;padding-left:18px;font-size:12.5px;color:var(--text-2);display:flex;flex-direction:column;gap:6px}
+  .steps b{color:var(--text)}
+  .mfoot{font-size:12px;color:var(--text-3);margin:10px 0 0}
+  .cycle{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;color:var(--text-3);margin:8px 0 8px 18px;font-weight:600}
+  .cy{padding:4px 10px;border-radius:999px;border:1px solid var(--border);background:var(--surface-alt);color:var(--text-2)}
+  .cy.c1{background:var(--coral-pale);color:var(--coral);border-color:transparent}
+  .cy.c2{background:var(--teal-pale);color:var(--teal);border-color:transparent}
+  .cy.c3{background:var(--surface-alt);color:var(--text-3);text-decoration:line-through}
+  .maptbl{width:100%;max-width:820px;border-collapse:collapse;font-size:13px;margin-top:10px}
+  .maptbl th{text-align:left;font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3);font-weight:700;padding:7px 10px;border-bottom:1px solid var(--border)}
+  .maptbl td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+  .maptbl .say{font-style:italic;color:var(--text-2)}
+  .maptbl .reg b{font-weight:600}
+  .outlist{columns:2;column-gap:32px;font-size:12.5px;color:var(--text-2);max-width:820px;margin-top:8px}
+  .outlist li{margin-bottom:6px;break-inside:avoid}
+  .outlist b{color:var(--text);font-weight:600}
+  .foot{margin-top:52px;padding-top:20px;border-top:1px solid var(--border);font-size:12.5px;color:var(--text-3);max-width:76ch}
+  code{font-family:var(--mono);font-size:.92em;background:var(--surface-alt);padding:1px 5px;border-radius:4px}
+  @media (max-width:640px){.outlist{columns:1}}
+</style>
+
+<!-- símbolos compartilhados: dente na orientação INFERIOR (coroa pra cima, raiz pra baixo).
+     Superiores usam flip vertical — como numa boca. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="t-molar" viewBox="0 0 96 152" overflow="visible">
+    <path d="M18,64 C16,86 22,118 30,144 C33,150 38,150 40,143 C42,117 42,90 45,66 L51,66 C54,90 54,117 56,143 C58,150 63,150 66,144 C74,118 80,86 78,64 Z" style="fill:var(--rf,var(--surface-alt));stroke:var(--rs,var(--border));opacity:.72"/>
+    <path d="M14,64 C10,42 8,24 18,13 C23,7 29,12 33,8 C37,4 43,10 48,10 C53,10 59,4 63,8 C67,12 73,7 78,13 C88,24 86,42 82,64 Z" style="fill:var(--tc,var(--surface-alt));stroke:var(--ts,var(--border));stroke-width:1.2"/>
+  </symbol>
+  <symbol id="t-premolar" viewBox="0 0 96 152" overflow="visible">
+    <path d="M25,60 C22,90 32,132 48,147 C64,132 74,90 71,60 Z" style="fill:var(--rf,var(--surface-alt));stroke:var(--rs,var(--border));opacity:.72"/>
+    <path d="M20,60 C16,40 15,22 25,12 C31,6 38,12 48,9 C58,12 65,6 71,12 C81,22 80,40 76,60 Z" style="fill:var(--tc,var(--surface-alt));stroke:var(--ts,var(--border));stroke-width:1.2"/>
+  </symbol>
+  <symbol id="t-canine" viewBox="0 0 96 152" overflow="visible">
+    <path d="M30,60 C27,92 37,132 48,145 C59,132 69,92 66,60 Z" style="fill:var(--rf,var(--surface-alt));stroke:var(--rs,var(--border));opacity:.72"/>
+    <path d="M22,60 C18,40 18,20 28,11 C34,5 41,11 48,8 C55,11 62,5 68,11 C78,20 78,40 74,60 Z" style="fill:var(--tc,var(--surface-alt));stroke:var(--ts,var(--border));stroke-width:1.2"/>
+  </symbol>
+  <symbol id="t-incisor" viewBox="0 0 96 152" overflow="visible">
+    <path d="M32,58 C30,88 38,124 48,138 C58,124 66,88 64,58 Z" style="fill:var(--rf,var(--surface-alt));stroke:var(--rs,var(--border));opacity:.72"/>
+    <path d="M26,58 C22,40 22,20 30,12 C36,8 60,8 66,12 C74,20 74,40 70,58 Z" style="fill:var(--tc,var(--surface-alt));stroke:var(--ts,var(--border));stroke-width:1.2"/>
+  </symbol>
+  <clipPath id="clipMolar" clipPathUnits="userSpaceOnUse"><path d="M50,5 C67,5 78,3 87,13 C97,22 95,33 95,50 C95,67 97,78 87,87 C78,97 67,95 50,95 C33,95 22,97 13,87 C3,78 5,67 5,50 C5,33 3,22 13,13 C22,3 33,5 50,5 Z"/></clipPath>
+  <pattern id="dots" width="5" height="5" patternUnits="userSpaceOnUse"><circle cx="1.2" cy="1.2" r=".95" fill="var(--surface)"/></pattern>
+  <pattern id="hatch" width="6" height="6" patternTransform="rotate(45)" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="var(--teal-pale)"/><line x1="0" y1="0" x2="0" y2="6" stroke="var(--teal)" stroke-width="1.3"/></pattern>
+</defs></svg>
+
+<div class="wrap"><div class="inner">
+  <p class="eyebrow">Odonto.IA · Odontograma v3 — preview para avaliação</p>
+  <h1>O novo odontograma, especialidade por especialidade</h1>
+  <p class="sub">O dentista narra a consulta como sempre fez — e a boca do paciente se pinta sozinha. Cada marcação abaixo nasce de uma frase falada (o exemplo em itálico) ou de um toque na tela. Este material mostra <b>tudo o que cada especialidade registra</b> e as tabelas próprias de Perio e Endo. Alterne claro/escuro no canto superior.</p>
+
+  <div class="legend">
+    <span class="chip"><span class="sw" style="background:var(--coral)"></span><b>Coral</b>&nbsp;= a fazer (indicado/planejado)</span>
+    <span class="chip"><span class="sw" style="background:var(--teal)"></span><b>Verde</b>&nbsp;= feito NESTA clínica</span>
+    <span class="chip"><span class="sw" style="background:var(--slate);background-image:radial-gradient(var(--surface) .8px,transparent .9px);background-size:4px 4px"></span><b>Cinza pontilhado</b>&nbsp;= pré-existente (o paciente já chegou assim)</span>
+    <span class="chip"><span class="sw" style="background:var(--warning)"></span><b>Âmbar</b>&nbsp;= alerta periodontal (bolsa ≥ 4 mm)</span>
+  </div>
+
+  <!-- ══════════════ 1 · A BOCA ══════════════ -->
+  <h2>1 · A visão geral — como numa boca</h2>
+  <p class="note"><b>Orientação anatômica:</b> os superiores aparecem com a <b>raiz para cima e a coroa para baixo</b>; os inferiores, o inverso — as faces mastigadoras se encontram no plano oclusal, como numa boca. Na visão geral, cada dente mostra a <b>cor dominante</b> do que há registrado nele; o detalhe por face fica a um toque (seções 2 e 3). Exemplos pintados: 16 restaurado aqui (verde) · 14 com cárie a tratar (coral) · 26 com coroa antiga (cinza) · 41 ausente.</p>
+  <div class="mouth">
+    <div class="arch">
+      <div class="tw"><span class="num">16</span><svg class="mt" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#t-molar" style="--tc:color-mix(in srgb,var(--teal) 22%,var(--surface-alt));--ts:var(--teal)"/></g></svg></div>
+      <div class="tw"><span class="num">15</span><svg class="mt" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#t-premolar"/></g></svg></div>
+      <div class="tw"><span class="num">14</span><svg class="mt" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#t-premolar" style="--tc:var(--coral-pale);--ts:var(--coral)"/></g></svg></div>
+      <div class="tw"><span class="num">13</span><svg class="mt" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#t-canine"/></g></svg></div>
+      <div class="tw"><span class="num">12</span><svg class="mt" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#t-incisor"/></g></svg></div>
+      <div class="tw"><span class="num">11</span><svg class="mt" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#t-incisor"/></g></svg></div>
+      <div class="tw"><span class="num">21</span><svg class="mt" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#t-incisor"/></g></svg></div>
+      <div class="tw"><span class="num">22</span><svg class="mt" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#t-incisor"/></g></svg></div>
+      <div class="tw"><span class="num">23</span><svg class="mt" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#t-canine"/></g></svg></div>
+      <div class="tw"><span class="num">24</span><svg class="mt" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#t-premolar"/></g></svg></div>
+      <div class="tw"><span class="num">25</span><svg class="mt" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#t-premolar"/></g></svg></div>
+      <div class="tw"><span class="num">26</span><svg class="mt" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#t-molar" style="--tc:var(--slate);--ts:var(--slate)"/></g></svg></div>
+    </div>
+    <div class="midline"><span class="ln"></span><span class="lb">plano oclusal — as coroas se encontram</span><span class="ln"></span></div>
+    <div class="arch lower">
+      <div class="tw"><svg class="mt" viewBox="0 0 96 152"><use href="#t-molar"/></svg><span class="num">46</span></div>
+      <div class="tw"><svg class="mt" viewBox="0 0 96 152"><use href="#t-premolar"/></svg><span class="num">45</span></div>
+      <div class="tw"><svg class="mt" viewBox="0 0 96 152"><use href="#t-premolar"/></svg><span class="num">44</span></div>
+      <div class="tw"><svg class="mt" viewBox="0 0 96 152"><use href="#t-canine"/></svg><span class="num">43</span></div>
+      <div class="tw"><svg class="mt" viewBox="0 0 96 152"><use href="#t-incisor"/></svg><span class="num">42</span></div>
+      <div class="tw"><svg class="mt" viewBox="0 0 96 152"><path d="M26,58 C22,40 22,20 30,12 C36,8 60,8 66,12 C74,20 74,40 70,58 L64,58 C66,88 58,124 48,138 C38,124 30,88 32,58 Z" fill="none" stroke="var(--text-3)" stroke-width="1.4" stroke-dasharray="3 3"/></svg><span class="num" style="color:var(--text-3)">41</span></div>
+      <div class="tw"><svg class="mt" viewBox="0 0 96 152"><use href="#t-incisor"/></svg><span class="num">31</span></div>
+      <div class="tw"><svg class="mt" viewBox="0 0 96 152"><use href="#t-incisor"/></svg><span class="num">32</span></div>
+      <div class="tw"><svg class="mt" viewBox="0 0 96 152"><use href="#t-canine"/></svg><span class="num">33</span></div>
+      <div class="tw"><svg class="mt" viewBox="0 0 96 152"><use href="#t-premolar"/></svg><span class="num">34</span></div>
+      <div class="tw"><svg class="mt" viewBox="0 0 96 152"><use href="#t-premolar"/></svg><span class="num">35</span></div>
+      <div class="tw"><svg class="mt" viewBox="0 0 96 152"><use href="#t-molar"/></svg><span class="num">36</span></div>
+    </div>
+  </div>
+
+  <!-- ══════════════ 2 · INTERAÇÃO ══════════════ -->
+  <h2>2 · Como você ativa cada coisa — três caminhos</h2>
+  <p class="note">Tudo no odontograma nasce por um destes três caminhos — e uma regra vale para todos: <b>nada entra no prontuário sem você revisar e tocar em "Confirmar e salvar"</b>. A IA propõe; quem decide é você.</p>
+  <div class="modes">
+    <div class="mode">
+      <div class="mh"><b>1 · Narrando a consulta</b><span class="mtag">caminho principal</span></div>
+      <ol class="steps">
+        <li>Atenda normalmente — <b>dite ou digite</b> o relato, como já faz hoje.</li>
+        <li>Toque em <b>"Organizar com Dex"</b>.</li>
+        <li>A ficha se estrutura e <b>a boca se pinta sozinha</b> — cada frase vira a marcação certa, no dente e na face certos.</li>
+        <li>Revise na tela de confirmação (qualquer ajuste é por toque) e <b>salve</b>.</li>
+      </ol>
+      <p class="mfoot"><i>"restaurei MOD no 36 com resina"</i> → o 36 pinta verde nas faces M·O·D, com o material anotado. Sem menu, sem clique extra.</p>
+    </div>
+    <div class="mode">
+      <div class="mh"><b>2 · Tocando o dente</b><span class="mtag">correção e registro manual</span></div>
+      <ul class="steps">
+        <li><b>Toque um dente</b> (na arcada ou na lista) → abre o painel de detalhe.</li>
+        <li><b>Toque uma face</b> no mapa oclusal — cada toque avança o estado:</li>
+      </ul>
+      <div class="cycle"><span class="cy">sem registro</span>→<span class="cy c1">a fazer</span>→<span class="cy c2">feito</span>→<span class="cy c3">remove</span></div>
+      <ul class="steps">
+        <li><b>Toque a raiz</b> → alterna o canal (a tratar → tratado).</li>
+        <li>Coroa, implante, pino, incluso, fratura, extração: <b>chips de ação</b> no rodapé do painel.</li>
+        <li>Atalho: extração indicada alterna com <b>toque direto no dente</b> na arcada — nem precisa abrir o painel.</li>
+      </ul>
+    </div>
+    <div class="mode">
+      <div class="mh"><b>3 · Abrindo a ficha própria</b><span class="mtag">exames com tabela</span></div>
+      <ul class="steps">
+        <li><b>Exame inicial</b> — na 1ª consulta de paciente novo, ligue o interruptor <b>"Exame inicial"</b>: tudo que você narrar entra como pré-existente (cinza). Desligue e narre o trabalho de hoje em seguida.</li>
+        <li><b>Periograma</b> — botão <b>"Exame periodontal"</b> (na consulta ou no perfil do paciente): a grade toma a tela; preencha por teclado ou por voz; a revisão final é obrigatória antes de concluir.</li>
+        <li><b>Ficha endodôntica</b> — toque o dente → <b>"Tratamento de canal"</b> → abre a tabela de canais para as medidas.</li>
+        <li><b>Orto</b> — narre a manutenção (vira os chips) ou toque <b>"Igual à última"</b> e ajuste só o que mudou.</li>
+      </ul>
+    </div>
+  </div>
+  <table class="maptbl">
+    <thead><tr><th>Registro</th><th>Pela fala (exemplo)</th><th>Pelo toque</th></tr></thead>
+    <tbody>
+      <tr><td><b>Cárie / restauração</b> (por face)</td><td class="say">"cárie oclusal no 14"</td><td>face no painel do dente</td></tr>
+      <tr><td><b>Selante</b></td><td class="say">"apliquei selante no 16"</td><td>face O no painel</td></tr>
+      <tr><td><b>Canal</b> (a tratar / tratado)</td><td class="say">"vou fazer o canal do 46"</td><td>raiz no painel</td></tr>
+      <tr><td><b>Ficha endodôntica</b> (medidas)</td><td class="say">— (é medida, não narrativa)</td><td>dente → "Tratamento de canal"</td></tr>
+      <tr><td><b>Extração indicada</b></td><td class="say">"vou extrair o 28"</td><td>toque direto no dente (X)</td></tr>
+      <tr><td><b>Extraído / ausente</b></td><td class="say">"extraí o 46"</td><td>chip no painel</td></tr>
+      <tr><td><b>Incluso</b></td><td class="say">"o 38 está incluso"</td><td>chip no painel</td></tr>
+      <tr><td><b>Coroa · implante · pino · fratura</b></td><td class="say">"coroa de zircônia no 26"</td><td>chips no painel</td></tr>
+      <tr><td><b>Ponte</b></td><td class="say">"ponte do 13 ao 15"</td><td>painel do grupo <i>(2ª entrega)</i></td></tr>
+      <tr><td><b>Pré-existente</b> (cinza)</td><td class="say">exame inicial ligado + narrativa</td><td>badge "reclassificar" no painel</td></tr>
+      <tr><td><b>Esfoliado</b> (decíduo)</td><td class="say">"o 74 já caiu"</td><td>chip no painel</td></tr>
+      <tr><td><b>Periograma</b></td><td class="say">números por voz durante o exame</td><td>botão "Exame periodontal" + teclado</td></tr>
+      <tr><td><b>Selo periodontal</b> (âmbar)</td><td class="say" colspan="2">automático — nasce sozinho do exame concluído</td></tr>
+      <tr><td><b>Manutenção de orto</b></td><td class="say">"troquei o arco, ativei…"</td><td>"Igual à última"</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ══════════════ 3 · DENTÍSTICA ══════════════ -->
+  <h2>3 · Dentística &amp; Clínico Geral — o registro por face</h2>
+  <p class="note">Tocar um dente abre o <b>painel de detalhe</b>: o dente anatômico ao lado do <b>mapa oclusal</b> (o dente visto de cima), onde as 5 faces são tocáveis uma a uma. Restauração que cobre mais de uma face (ex.: MOD) é <b>um registro só</b>, com as faces juntas. Nos superiores a face de dentro chama <b>Palatina</b>; nos inferiores, <b>Lingual</b>; nos anteriores a Oclusal vira <b>Incisal</b> — o sistema rotula sozinho.</p>
+  <div class="cat">
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 100 100" style="width:74px">
+        <g clip-path="url(#clipMolar)">
+          <rect width="100" height="100" fill="var(--surface-alt)"/>
+          <g stroke="var(--border)" stroke-width="1.2" fill="none" opacity=".75"><path d="M0,0 L33,33 M100,0 L67,33 M0,100 L33,67 M100,100 L67,67"/><rect x="33" y="33" width="34" height="34"/></g>
+        </g>
+        <path d="M50,5 C67,5 78,3 87,13 C97,22 95,33 95,50 C95,67 97,78 87,87 C78,97 67,95 50,95 C33,95 22,97 13,87 C3,78 5,67 5,50 C5,33 3,22 13,13 C22,3 33,5 50,5 Z" fill="none" stroke="var(--border)" stroke-width="1.7"/>
+        <text x="50" y="54" font-size="12" font-weight="800" text-anchor="middle" fill="var(--text-2)" font-family="var(--mono)">O</text>
+        <text x="50" y="22" font-size="10" font-weight="700" text-anchor="middle" fill="var(--text-3)" font-family="var(--mono)">V</text>
+        <text x="17" y="54" font-size="10" font-weight="700" text-anchor="middle" fill="var(--text-3)" font-family="var(--mono)">M</text>
+        <text x="83" y="54" font-size="10" font-weight="700" text-anchor="middle" fill="var(--text-3)" font-family="var(--mono)">D</text>
+        <text x="50" y="88" font-size="10" font-weight="700" text-anchor="middle" fill="var(--text-3)" font-family="var(--mono)">L</text>
+      </svg>
+      <div class="cl">As 5 faces</div><div class="cc">mapa oclusal tocável<br><i>V · M · O · D · L (Palatina/Lingual)</i></div>
+    </div>
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#t-premolar" style="--tc:var(--coral-pale);--ts:var(--coral)"/></g></svg>
+      <div class="cl">Cárie / a restaurar</div><div class="cc">face pintada em coral<br><i>"tem cárie oclusal no 14"</i></div>
+    </div>
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152"><use href="#t-molar" style="--tc:color-mix(in srgb,var(--teal) 22%,var(--surface-alt));--ts:var(--teal)"/></svg>
+      <div class="cl">Restauração feita</div><div class="cc">verde — feita aqui<br><i>"restaurei MOD no 36 com resina"</i></div>
+    </div>
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#t-molar" style="--tc:var(--slate);--ts:var(--slate)"/><path d="M14,64 C10,42 8,24 18,13 C23,7 29,12 33,8 C37,4 43,10 48,10 C53,10 59,4 63,8 C67,12 73,7 78,13 C88,24 86,42 82,64 Z" fill="url(#dots)" opacity=".5"/></g></svg>
+      <div class="cl">Restauração antiga</div><div class="cc">cinza + textura pontilhada<br><i>exame inicial: "já tem restauração no 26"</i></div>
+    </div>
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#t-molar"/><circle cx="48" cy="30" r="6" fill="var(--teal)"/></g></svg>
+      <div class="cl">Selante</div><div class="cc">ponto na oclusal<br><i>"apliquei selante no 16"</i></div>
+    </div>
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#t-incisor"/><path d="M32,14 L46,28 L36,38 L52,52" fill="none" stroke="var(--coral)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></g></svg>
+      <div class="cl">Fratura</div><div class="cc">traço em zigue-zague<br><i>"o paciente caiu e fraturou o 11"</i></div>
+    </div>
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#t-canine"/><rect x="43" y="62" width="10" height="30" rx="2.5" fill="var(--teal)"/><path d="M48,90 C48,110 48,126 48,138" fill="none" stroke="var(--teal)" stroke-width="2.1" stroke-linecap="round"/></g></svg>
+      <div class="cl">Pino / núcleo</div><div class="cc">no terço da raiz<br><i>"cimentei pino de fibra no 13"</i></div>
+    </div>
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#t-incisor" style="--tc:color-mix(in srgb,var(--teal) 22%,var(--surface-alt));--ts:var(--teal)"/></g></svg>
+      <div class="cl">Faceta / lente</div><div class="cc">registra na face Vestibular<br><i>"faceta no 11" — anotado "faceta/lente"</i></div>
+    </div>
+  </div>
+
+  <!-- ══════════════ 3 · ENDODONTIA ══════════════ -->
+  <h2>4 · Endodontia — o canal e a ficha endodôntica <span class="tag">tabela própria</span></h2>
+  <p class="note">O canal aparece <b>desenhado por inteiro dentro da raiz</b>, e a raiz ganha o tom do estado — visível de longe, sem esforço: canal <b>vazio (só o contorno coral)</b> = para tratar · canal <b>preenchido</b> = tratado (verde aqui, cinza se veio de fora). Achado radiográfico (lesão periapical) é o círculo no ápice — a Radiologia entra por aqui. E além do desenho, a Endo ganha a <b>ficha endodôntica</b>: a odontometria de cada canal, dente a dente.</p>
+  <div class="cat">
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152"><use href="#t-molar" style="--rf:var(--coral-pale);--rs:var(--coral)"/><path d="M29.5,66 L37,66 C37,96 38,124 36.5,141 L36,143 C34,124 30,96 29.5,66 Z" fill="none" stroke="var(--coral)" stroke-width="1.7"/><path d="M52.5,66 L60,66 C60,96 61,124 59.5,141 L59,143 C57,124 53,96 52.5,66 Z" fill="none" stroke="var(--coral)" stroke-width="1.7"/></svg>
+      <div class="cl">Canal a tratar</div><div class="cc">canal vazio + raiz destacada em coral<br><i>"pulpite no 46, vou fazer o canal"</i></div>
+    </div>
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152"><use href="#t-molar" style="--rf:var(--teal-pale);--rs:var(--teal)"/><path d="M29.5,66 L37,66 C37,96 38,124 36.5,141 L36,143 C34,124 30,96 29.5,66 Z" fill="var(--teal)"/><path d="M52.5,66 L60,66 C60,96 61,124 59.5,141 L59,143 C57,124 53,96 52.5,66 Z" fill="var(--teal)"/></svg>
+      <div class="cl">Canal tratado</div><div class="cc">canal preenchido em verde<br><i>"terminei o canal do 46 hoje"</i></div>
+    </div>
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#t-molar" style="--rf:var(--slate-pale);--rs:var(--slate)"/><path d="M29.5,66 L37,66 C37,96 38,124 36.5,141 L36,143 C34,124 30,96 29.5,66 Z" fill="var(--slate)"/><path d="M52.5,66 L60,66 C60,96 61,124 59.5,141 L59,143 C57,124 53,96 52.5,66 Z" fill="var(--slate)"/></g></svg>
+      <div class="cl">Canal antigo</div><div class="cc">canal preenchido em cinza — feito em outro lugar<br><i>exame inicial: "já tem canal no 26"</i></div>
+    </div>
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152"><use href="#t-molar" style="--rf:var(--coral-pale);--rs:var(--coral)"/><path d="M29.5,66 L37,66 C37,96 38,124 36.5,141 L36,143 C34,124 30,96 29.5,66 Z" fill="none" stroke="var(--coral)" stroke-width="1.7"/><path d="M52.5,66 L60,66 C60,96 61,124 59.5,141 L59,143 C57,124 53,96 52.5,66 Z" fill="none" stroke="var(--coral)" stroke-width="1.7"/></svg>
+      <div class="cl">Retratamento</div><div class="cc">canal volta a vazio em coral — o histórico do tratamento anterior fica guardado<br><i>"vou retratar o canal do 36"</i></div>
+    </div>
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#t-premolar"/><path d="M48,62 C48,92 48,116 48,134" fill="none" stroke="var(--slate)" stroke-width="2" stroke-linecap="round"/><circle cx="48" cy="141" r="7" fill="none" stroke="var(--coral)" stroke-width="2.2"/></g></svg>
+      <div class="cl">Lesão periapical</div><div class="cc">círculo no ápice (achado de RX)<br><i>"radiografia mostrou lesão no 25"</i></div>
+    </div>
+  </div>
+  <div class="panel">
+    <h3>Ficha endodôntica — odontometria · dente 26 (3 canais)</h3>
+    <p class="ph">Abre ao tocar o dente e escolher <b>Tratamento de canal</b>. Uma linha por canal; um incisivo tem 1, um molar tem 3 ou mais. Fica no histórico do dente.</p>
+    <table class="tbl">
+      <thead><tr><th>Canal</th><th>Ponto de referência</th><th style="text-align:right">Comprimento da raiz</th><th style="text-align:right">CT (trabalho)</th><th style="text-align:right">Lima final</th></tr></thead>
+      <tbody>
+        <tr><td class="canal">Mésio-vestibular <small>MV</small></td><td>Cúspide MV</td><td class="num">20,5</td><td class="num ctc">19,5</td><td class="num">#35</td></tr>
+        <tr><td class="canal">Disto-vestibular <small>DV</small></td><td>Cúspide MV</td><td class="num">20,0</td><td class="num ctc">19,0</td><td class="num">#30</td></tr>
+        <tr><td class="canal">Palatino <small>P</small></td><td>Cúspide MV</td><td class="num">21,5</td><td class="num ctc">20,5</td><td class="num">#40</td></tr>
+      </tbody>
+    </table>
+    <div class="efoot">
+      <span style="color:var(--teal)">CT = <b>comprimento de trabalho</b> (sugerido: comprimento da raiz − 1 mm, você decide)</span>
+    </div>
+    <div class="efoot" style="margin-top:6px">
+      <span>Obturação: <b>condensação lateral</b></span><span>Cimento: <b>AH Plus</b></span><span>Medidas em milímetros</span>
+    </div>
+  </div>
+
+  <!-- ══════════════ 4 · CIRURGIA ══════════════ -->
+  <h2>5 · Cirurgia oral — extração e incluso</h2>
+  <p class="note">Extração <b>indicada</b> é o X coral (o dente ainda está lá). Depois de extraído, o dente vira só um <b>contorno vazio</b> na arcada. Dente <b>incluso</b> (siso impactado) aparece inteiro em contorno tracejado. Cirurgias de tecido mole e enxertos continuam descritas em texto na ficha.</p>
+  <div class="cat">
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#t-molar"/></g><path d="M24,96 L72,140 M72,96 L24,140" stroke="var(--coral)" stroke-width="3.4" stroke-linecap="round"/></svg>
+      <div class="cl">Extração indicada</div><div class="cc">X coral sobre a coroa<br><i>"vou extrair o 28 na próxima"</i></div>
+    </div>
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152"><path d="M14,64 C10,42 8,24 18,13 C23,7 29,12 33,8 C37,4 43,10 48,10 C53,10 59,4 63,8 C67,12 73,7 78,13 C88,24 86,42 82,64 L78,64 C80,86 74,118 66,144 C63,150 58,150 56,143 C54,117 54,90 51,66 L45,66 C42,90 42,117 40,143 C38,150 33,150 30,144 C22,118 16,86 18,64 Z" fill="none" stroke="var(--text-3)" stroke-width="1.4" stroke-dasharray="3 3"/></svg>
+      <div class="cl">Extraído / ausente</div><div class="cc">só o contorno — "vaga" na arcada<br><i>"o 46 era resto radicular, extraí"</i></div>
+    </div>
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152"><use href="#t-molar" style="--ts:transparent;--rs:transparent"/><path d="M14,64 C10,42 8,24 18,13 C23,7 29,12 33,8 C37,4 43,10 48,10 C53,10 59,4 63,8 C67,12 73,7 78,13 C88,24 86,42 82,64 Z" fill="none" stroke="var(--text-3)" stroke-width="1.6" stroke-dasharray="4 3"/><path d="M18,64 C16,86 22,118 30,144 C33,150 38,150 40,143 C42,117 42,90 45,66 L51,66 C54,90 54,117 56,143 C58,150 63,150 66,144 C74,118 80,86 78,64" fill="none" stroke="var(--text-3)" stroke-width="1.2" stroke-dasharray="4 3" opacity=".7"/></svg>
+      <div class="cl">Incluso / impactado</div><div class="cc">contorno tracejado<br><i>"o 38 está incluso, mesioangulado"</i></div>
+    </div>
+  </div>
+
+  <!-- ══════════════ 5 · IMPLANTO ══════════════ -->
+  <h2>6 · Implantodontia</h2>
+  <p class="note">A raiz é substituída pelo <b>parafuso</b>. As três cores contam a história: planejado (coral) → instalado aqui (verde) → o paciente já chegou com ele (cinza). Marca, diâmetro e comprimento ("Straumann 4.1×10") ficam anotados no registro.</p>
+  <div class="cat">
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152"><path d="M14,64 C10,42 8,24 18,13 C23,7 29,12 33,8 C37,4 43,10 48,10 C53,10 59,4 63,8 C67,12 73,7 78,13 C88,24 86,42 82,64 Z" fill="none" stroke="var(--coral)" stroke-width="1.4" stroke-dasharray="4 3"/><g stroke="var(--coral)" stroke-width="2.4" stroke-linecap="round" opacity=".85"><path d="M35,72 L61,72 M36,84 L60,84 M38,96 L58,96 M40,108 L56,108 M43,120 L53,120 M46,132 L50,140" stroke-dasharray="3 3"/></g></svg>
+      <div class="cl">Implante planejado</div><div class="cc">tracejado coral<br><i>"planejar implante no espaço do 37"</i></div>
+    </div>
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152"><use href="#t-molar" style="--tc:color-mix(in srgb,var(--teal) 20%,var(--surface-alt));--ts:var(--teal);--rf:transparent;--rs:transparent"/><g stroke="var(--teal)" stroke-width="2.6" stroke-linecap="round"><path d="M35,72 L61,72 M36,84 L60,84 M38,96 L58,96 M40,108 L56,108 M43,120 L53,120 M46,132 L50,140"/></g></svg>
+      <div class="cl">Implante instalado</div><div class="cc">verde — feito aqui<br><i>"instalei implante Straumann 4.1×10 no 36"</i></div>
+    </div>
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152"><use href="#t-molar" style="--tc:var(--slate);--ts:var(--slate);--rf:transparent;--rs:transparent"/><g stroke="var(--slate)" stroke-width="2.6" stroke-linecap="round"><path d="M35,72 L61,72 M36,84 L60,84 M38,96 L58,96 M40,108 L56,108 M43,120 L53,120 M46,132 L50,140"/></g></svg>
+      <div class="cl">Implante antigo</div><div class="cc">cinza — pré-existente<br><i>exame inicial: "já tem implante no 46"</i></div>
+    </div>
+  </div>
+
+  <!-- ══════════════ 6 · PRÓTESE ══════════════ -->
+  <h2>7 · Prótese fixa — coroa e ponte <span class="tag">ponte: 2ª entrega</span></h2>
+  <p class="note">Coroa total = <b>contorno duplo</b> na coroa inteira (diferencia de restauração de face). Ponte = <b>colchete</b> conectando os dentes do grupo: pilares nas pontas, pôntico hachurado no meio (o dente que a ponte repõe). A removível (PPR/PT) segue registrada em texto por arcada — não é desenho de dente individual.</p>
+  <div class="cat">
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#t-molar" style="--tc:color-mix(in srgb,var(--teal) 22%,var(--surface-alt));--ts:var(--teal)"/><path d="M11,64 C7,41 5,22 16,10 C22,3 29,9 33,4 C38,-1 44,6 48,6 C52,6 58,-1 63,4 C67,9 74,3 80,10 C91,22 89,41 85,64" fill="none" stroke="var(--teal)" stroke-width="1.4" opacity=".85"/></g></svg>
+      <div class="cl">Coroa total</div><div class="cc">contorno duplo · 3 cores possíveis<br><i>"coroa de zircônia no 26"</i></div>
+    </div>
+    <div class="ccard" style="grid-column:span 2">
+      <svg viewBox="0 0 300 158" style="width:170px;overflow:visible;margin-bottom:8px">
+        <g transform="translate(0,152) scale(1,-1)">
+          <use href="#t-canine" width="96" height="152" style="--tc:color-mix(in srgb,var(--teal) 22%,var(--surface-alt));--ts:var(--teal)"/>
+          <g transform="translate(102,0)"><path d="M20,60 C16,40 15,22 25,12 C31,6 38,12 48,9 C58,12 65,6 71,12 C81,22 80,40 76,60 Z" fill="url(#hatch)" stroke="var(--teal)" stroke-width="1.3"/></g>
+          <g transform="translate(204,0)"><use href="#t-premolar" width="96" height="152" style="--tc:color-mix(in srgb,var(--teal) 22%,var(--surface-alt));--ts:var(--teal)"/></g>
+        </g>
+        <path d="M14,150 L286,150" stroke="var(--teal)" stroke-width="3" stroke-linecap="round"/>
+        <path d="M14,150 L14,142 M286,150 L286,142" stroke="var(--teal)" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+      <div class="cl">Ponte fixa 13 → 15</div><div class="cc">pilares no 13 e 15 · pôntico hachurado no 14 (ausente, reposto pela ponte)<br><i>"ponte do 13 ao 15, pilares no 13 e no 15"</i></div>
+    </div>
+  </div>
+
+  <!-- ══════════════ 7 · PERIO ══════════════ -->
+  <h2>8 · Periodontia — o periograma <span class="tag">tabela própria</span></h2>
+  <p class="note">Exame da <b>boca inteira</b>, 6 pontos por dente (3 vestibulares em cima, 3 linguais embaixo). Preenchimento rápido por teclado — <span class="kbd">3</span> <span class="kbd">Tab</span> <span class="kbd">2</span> <span class="kbd">Tab</span>… — ou por <b>voz</b> ("três… dois… quatro, sangrou…"), com o cursor avançando sozinho. Número grande = profundidade de sondagem. Bolsa ≥ 4 mm fica coral. Pontinhos: <b>vermelho</b> sangramento · <b>âmbar</b> supuração · <b>amarelo</b> placa. Dente ausente colapsa. Mobilidade e furca por toque, abaixo de cada dente.</p>
+  <div class="perio"><div class="prow">
+    <div class="pt"><span class="pt-num">16</span><div class="cells">
+      <div class="crow"><div class="cell"><span class="mm">3</span><span class="ind"><i class="i-plq"></i></span></div><div class="cell"><span class="mm">2</span></div><div class="cell deep"><span class="mm">4</span><span class="ind"><i class="i-bop"></i></span></div></div>
+      <div class="crow"><div class="cell deep"><span class="mm">5</span><span class="ind"><i class="i-bop"></i><i class="i-sup"></i></span></div><div class="cell"><span class="mm">3</span></div><div class="cell"><span class="mm">3</span><span class="ind"><i class="i-plq"></i></span></div></div>
+    </div><div class="mf"><span>MOB 1</span><span>FUR 0</span></div></div>
+    <div class="pt"><span class="pt-num">15</span><div class="cells">
+      <div class="crow"><div class="cell"><span class="mm">2</span></div><div class="cell"><span class="mm">2</span></div><div class="cell"><span class="mm">3</span></div></div>
+      <div class="crow"><div class="cell"><span class="mm">3</span></div><div class="cell cur"><span class="mm">2</span></div><div class="cell"><span class="mm">2</span></div></div>
+    </div><div class="mf"><span>MOB 0</span><span>FUR –</span></div></div>
+    <div class="pt"><span class="pt-num">14</span><div class="absent">ausente</div></div>
+    <div class="pt"><span class="pt-num">13</span><div class="cells">
+      <div class="crow"><div class="cell"><span class="mm">2</span></div><div class="cell"><span class="mm">1</span></div><div class="cell"><span class="mm">2</span></div></div>
+      <div class="crow"><div class="cell deep"><span class="mm">4</span><span class="ind"><i class="i-bop"></i></span></div><div class="cell"><span class="mm">3</span></div><div class="cell"><span class="mm">2</span></div></div>
+    </div><div class="mf"><span>MOB 0</span><span>FUR –</span></div></div>
+  </div></div>
+
+  <div class="panel">
+    <h3>O detalhe de um dente — PS, MG e o NIC calculado sozinho · dente 16</h3>
+    <p class="ph">Você digita a <b>profundidade de sondagem (PS)</b> e, quando houver, a <b>margem gengival / recessão (MG)</b>. O <b>NIC</b> (nível de inserção clínico) o sistema calcula: <b>NIC = PS + MG</b> — nunca digitado.</p>
+    <table class="ptbl">
+      <tr><th class="rowlab"></th><th>MV</th><th>V</th><th>DV</th><th>DL</th><th>L</th><th>ML</th></tr>
+      <tr><td class="rowlab">PS (mm)</td><td>3</td><td>2</td><td class="deep">4</td><td class="deep">5</td><td>3</td><td>3</td></tr>
+      <tr><td class="rowlab">MG (mm)</td><td>1</td><td>0</td><td>1</td><td>2</td><td>0</td><td>0</td></tr>
+      <tr><td class="rowlab">NIC = PS+MG</td><td class="nic">4</td><td class="nic">2</td><td class="nic bad">5</td><td class="nic bad">7</td><td class="nic">3</td><td class="nic">3</td></tr>
+    </table>
+    <p class="ph" style="margin-top:10px">O NIC interdental é o que dirige o estadiamento da periodontite (classificação AAP/EFP 2018) — por isso ele aparece calculado, sítio a sítio.</p>
+  </div>
+
+  <div class="panel">
+    <h3>E o desenho acompanha os números</h3>
+    <p class="ph">Ao preencher o periograma, a <b>linha da gengiva</b> sobe e desce sobre os dentes conforme o que você digitou, e os sítios que sangraram ganham o ponto vermelho. No odontograma geral, o dente com bolsa ≥ 4 mm recebe o <b>selo âmbar</b> com a maior profundidade.</p>
+    <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:flex-end">
+      <svg viewBox="0 0 300 160" style="width:230px;overflow:visible">
+        <use href="#t-molar" width="96" height="152"/><g transform="translate(100,0)"><use href="#t-premolar" width="96" height="152"/></g><g transform="translate(200,0)"><use href="#t-premolar" width="96" height="152"/></g>
+        <path d="M6,52 C30,44 60,40 96,50 C120,58 138,64 158,60 C186,54 214,42 250,38 C270,36 286,38 296,40" fill="none" stroke="var(--coral)" stroke-width="2.2" stroke-linecap="round" opacity=".9"/>
+        <circle cx="64" cy="43" r="3.4" fill="#e11d48"/><circle cx="152" cy="61" r="3.4" fill="#e11d48"/>
+      </svg>
+      <svg viewBox="0 0 96 152" style="width:52px;overflow:visible">
+        <use href="#t-molar"/><circle cx="78" cy="14" r="10" fill="var(--warning)"/><text x="78" y="18.5" font-size="12" font-weight="800" fill="#fff" text-anchor="middle" font-family="var(--mono)">5</text>
+      </svg>
+    </div>
+    <p class="ph" style="margin-top:8px"><i>Esquerda: linha gengival desenhada a partir dos números, com sangramento marcado. Direita: o selo periodontal no odontograma geral — tocar abre o exame daquele dente.</i></p>
+  </div>
+
+  <!-- ══════════════ 8 · PEDO ══════════════ -->
+  <h2>9 · Odontopediatria — decíduos e dentição mista</h2>
+  <p class="note">Os decíduos (51–85) têm <b>aba própria</b> e usam exatamente o mesmo catálogo — cárie, restauração, coroa de aço, pulpotomia. Quando o dente de leite cai, marca-se <b>esfoliado</b>: o dente some e uma seta aponta o permanente que o substitui. A idade do paciente escolhe a aba certa sozinha (menor de 6: Decíduos · 6–12: mista · maior de 12: Permanentes).</p>
+  <div class="cat">
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152" style="width:44px"><use href="#t-molar" style="--tc:color-mix(in srgb,var(--teal) 22%,var(--surface-alt));--ts:var(--teal)"/></svg>
+      <div class="cl">Decíduo restaurado</div><div class="cc">mesmo catálogo, números 51–85<br><i>"restaurei o 74 com ionômero"</i></div>
+    </div>
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152" style="width:44px"><path d="M22,60 C18,40 18,20 28,11 C34,5 41,11 48,8 C55,11 62,5 68,11 C78,20 78,40 74,60 L66,60 C69,92 59,132 48,145 C37,132 27,92 30,60 Z" fill="none" stroke="var(--text-3)" stroke-width="1.4" stroke-dasharray="3 3"/><path d="M48,96 L48,64 M39,74 L48,62 L57,74" fill="none" stroke="var(--teal)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div class="cl">Esfoliado</div><div class="cc">caiu — seta pro permanente<br><i>"o 74 já caiu, o 34 está irrompendo"</i></div>
+    </div>
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152" style="width:44px"><use href="#t-molar" style="--tc:color-mix(in srgb,var(--teal) 22%,var(--surface-alt));--ts:var(--teal)"/></svg>
+      <div class="cl">Coroa de aço / pulpotomia</div><div class="cc">registrados com a anotação certa<br><i>"pulpotomia e coroa de aço no 75"</i></div>
+    </div>
+  </div>
+
+  <!-- ══════════════ 9 · ORTO ══════════════ -->
+  <h2>10 · Ortodontia — manutenção mensal</h2>
+  <p class="note">Manutenção de aparelho é registro <b>da arcada</b>, não de um dente — por isso ela <b>não pinta o odontograma</b>: vira um cartão de chips na evolução. Os dois elásticos são campos separados (corrente na arcada ≠ intermaxilar entre arcadas). Na consulta do mês seguinte, um toque em <b>"Igual à última"</b> repete tudo e você ajusta só o que mudou. A documentação ortodôntica inicial (Angle, apinhamento, fotos) virá num módulo próprio.</p>
+  <div class="panel">
+    <h3>Manutenção · 14/07 — arcada superior</h3>
+    <div class="ochips">
+      <span class="ochip"><small>Arco</small><b>0.018 NiTi</b></span>
+      <span class="ochip"><small>Ativação</small><b>ativado + troca de ligaduras</b></span>
+      <span class="ochip"><small>Elástico corrente</small><b>13 → 23</b></span>
+      <span class="ochip"><small>Intermaxilar</small><b>3/16" Classe II · 13 → 46</b></span>
+      <span class="ghost">⟳ Igual à última</span>
+    </div>
+    <p class="ph" style="margin-top:10px"><i>"Troquei o arco superior, ativei, troquei as borrachinhas, corrente do 13 ao 23, mantive o intermaxilar 3/16."</i> — a fala vira os chips acima, sozinha.</p>
+  </div>
+
+  <!-- ══════════════ 10 · REGISTRO LEGAL ══════════════ -->
+  <h2>11 · Registro e fiscalização — pronto para o CRO</h2>
+  <p class="note">Cada procedimento guarda <b>o que foi feito, em que dente, em que data e por quem</b> (nome e CRO) — exatamente o que o Manual do Prontuário do CFO pede. A data clínica é sua, editável na confirmação; a IA <b>nunca</b> preenche data. O histórico é <b>permanente</b>: corrigir um erro cria um registro novo de retificação, nunca apaga o anterior — e depois que o paciente assina, a ficha congela como está.</p>
+  <div class="panel" style="max-width:760px">
+    <div class="evo">
+      <div class="l1"><b>Restauração MOD · dente 36</b><span class="pill p-teal"><span class="pd"></span>Realizado</span></div>
+      <div class="meta"><span>Realizado em <b>12/03/2026</b></span><span>Registrado em <b>18/07/2026</b> (lançamento retroativo)</span><span>Dr. Exemplo · <b>CRO-SP 12345</b></span><span>Assinatura do paciente: <b>coletada ✓</b></span></div>
+    </div>
+    <p class="ph" style="margin-top:10px">Dois odontogramas em um, como o CFO recomenda: o <b>inicial</b> (tudo que é cinza — a condição em que o paciente chegou) e o <b>final</b> (coral planejado + verde executado) saem do mesmo registro, sem retrabalho.</p>
+  </div>
+
+  <!-- ══════════════ 11 · MAPEAMENTOS ══════════════ -->
+  <h2>12 · O dia a dia que não precisa de símbolo novo</h2>
+  <p class="note">Casos comuns têm registro canônico: o desenho certo + a informação anotada no registro. Você fala naturalmente; o sistema encaixa.</p>
+  <table class="maptbl">
+    <thead><tr><th>Você diz…</th><th>O sistema registra…</th></tr></thead>
+    <tbody>
+      <tr><td class="say">"restaurei com amálgama / resina / ionômero"</td><td class="reg">Restauração feita, com o <b>material</b> anotado</td></tr>
+      <tr><td class="say">"restauração infiltrada no 25"</td><td class="reg">A antiga <b>permanece no histórico</b>; nasce uma nova indicação: <b>substituição — infiltração</b></td></tr>
+      <tr><td class="say">"extração do 14 pra ganhar espaço"</td><td class="reg">Exodontia indicada + <b>finalidade ortodôntica</b></td></tr>
+      <tr><td class="say">"siso mesioangulado incluso"</td><td class="reg">Incluso + <b>classificação (Winter)</b> anotada</td></tr>
+      <tr><td class="say">"implante Straumann 4.1×10 no 36"</td><td class="reg">Implante instalado + <b>marca e medidas</b></td></tr>
+      <tr><td class="say">"pulpotomia no 74"</td><td class="reg">Endodontia em decíduo + <b>"pulpotomia"</b></td></tr>
+      <tr><td class="say">"coroa de aço no 75"</td><td class="reg">Coroa + <b>"coroa de aço"</b></td></tr>
+      <tr><td class="say">"faceta / lente de contato no 11"</td><td class="reg">Registro na <b>face Vestibular</b> + "faceta/lente"</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ══════════════ 12 · FORA DO DESENHO ══════════════ -->
+  <h2>13 · O que continua em texto na ficha (de propósito)</h2>
+  <p class="note">Nem tudo é desenho de dente — e forçar viraria poluição. Estes registros seguem na evolução escrita, com a mesma IA organizando:</p>
+  <ul class="outlist">
+    <li><b>Prótese removível (PPR/total)</b> — registro por arcada, não por dente.</li>
+    <li><b>Lesões de mucosa / estomatologia</b> — tecido mole, fora do odontograma.</li>
+    <li><b>DTM e dor orofacial</b> — articulação e músculo, em texto.</li>
+    <li><b>HOF</b> (botox, preenchimento) — região de face.</li>
+    <li><b>Enxerto ósseo / levantamento de seio</b> — região, com a tomografia anexa.</li>
+    <li><b>Mantenedor de espaço</b> — aparelho, não estado do dente.</li>
+    <li><b>Sutura e pós-operatório</b> — acompanhamento passageiro; o odontograma guarda o durável.</li>
+    <li><b>Desgaste de bruxismo</b> — achado descrito em texto (placa registrada na Orto/DTM).</li>
+    <li><b>Tártaro e flúor</b> — procedimento da consulta; o índice de placa vive no periograma.</li>
+  </ul>
+
+  <p class="foot">Preview de avaliação — nada disto está em produção ainda. As cores vêm do sistema visual do Odonto.IA (verde = marca), funcionam em modo claro e escuro, e todo estado tem reforço além da cor (textura, contorno, rótulo). A ordem dos 6 pontos da sondagem e as colunas da ficha endodôntica são exatamente o que queremos validar com vocês: <b>se a sua rotina usa outra ordem ou outra coluna, é isso que queremos ouvir.</b></p>
+</div></div>
+
+</body></html>

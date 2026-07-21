@@ -329,17 +329,48 @@ export function mesialEsquerda(num: number): boolean {
   return quad === 2 || quad === 3 || quad === 6 || quad === 7;
 }
 
-/** Polígono (points de <polygon>) de cada face no mapa oclusal 0..100. */
+/**
+ * Polígono (points de <polygon>) de cada face no mapa oclusal 0..100.
+ *
+ * As zonas são recortadas pelo contorno (clipPath), então precisam EXTRAPOLAR a caixa —
+ * senão a borda do polígono aparece como corte reto dentro do oval. Bug 21/07: nos
+ * não-molares o contorno é oval (x de 16 a 84) e as bandas retas em x=0/100 cortavam
+ * as faces M/D. Solução: sangria (-15/115) em todas as bordas externas; o clip resolve
+ * a forma final, seja o quadrado do molar ou o oval do pré-molar/anterior.
+ */
 export function occlusalZonePoints(face: FaceDental, num: number): string {
-  const esq = '0,0 33,33 33,67 0,100';        // banda esquerda
-  const dir = '100,0 67,33 67,67 100,100';    // banda direita
+  const B = -15, E = 115;                                  // sangria além da caixa
+  const esq = `${B},${B} 33,33 33,67 ${B},${E}`;           // banda esquerda
+  const dir = `${E},${B} 67,33 67,67 ${E},${E}`;           // banda direita
+  const topo  = `${B},${B} ${E},${B} 67,33 33,33`;
+  const base  = `${B},${E} ${E},${E} 67,67 33,67`;
   const superior = (num >= 11 && num <= 28) || (num >= 51 && num <= 65);
   switch (face) {
     case 'O': return '33,33 67,33 67,67 33,67';
     // V (vestibular) fica no lado EXTERNO da boca: em cima nos superiores, embaixo nos inferiores.
-    case 'V': return superior ? '0,0 100,0 67,33 33,33' : '0,100 100,100 67,67 33,67';
-    case 'L': return superior ? '0,100 100,100 67,67 33,67' : '0,0 100,0 67,33 33,33';
+    case 'V': return superior ? topo : base;
+    case 'L': return superior ? base : topo;
     case 'M': return mesialEsquerda(num) ? esq : dir;
     case 'D': return mesialEsquerda(num) ? dir : esq;
+  }
+}
+
+/**
+ * Posição da LETRA de cada face no mapa oclusal — respeita a largura real do contorno
+ * (oval é mais estreito que o quadrado do molar), pra a letra não cair fora do desenho.
+ */
+export function occlusalLabelPos(face: FaceDental, num: number): { x: number; y: number } {
+  const cls = TOOTH_CLASS[num] ?? 'premolar';
+  const molar = TOOTH_FAMILY[cls] === 'molar';
+  const lateral = molar ? 17 : 26;                          // M/D pra dentro nos ovais
+  const vertical = molar ? 20 : 24;                         // V/L idem
+  const superior = (num >= 11 && num <= 28) || (num >= 51 && num <= 65);
+  const esquerda = mesialEsquerda(num);
+  switch (face) {
+    case 'O': return { x: 50, y: 53 };
+    case 'V': return { x: 50, y: superior ? vertical : 100 - vertical + 4 };
+    case 'L': return { x: 50, y: superior ? 100 - vertical + 4 : vertical };
+    case 'M': return { x: esquerda ? lateral : 100 - lateral, y: 53 };
+    case 'D': return { x: esquerda ? 100 - lateral : lateral, y: 53 };
   }
 }

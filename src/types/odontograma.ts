@@ -115,6 +115,13 @@ export interface OdontogramaEvento {
   papel_no_grupo: PapelNoGrupo | null;
   observacao: string | null;
   /**
+   * Dado clínico da especialidade (migration 106) — odontometria de endo, marca/medidas
+   * de implante. Validado por Zod na LEITURA (safeParse, nunca `as`): dado corrompido
+   * degrada pra "sem tabela", nunca quebra a ficha (§5 da spec-106). null = sem dado
+   * estruturado (a maioria dos tipos: cárie, exodontia, coroa...).
+   */
+  detalhe: unknown | null;
+  /**
    * Data CLÍNICA em que o procedimento foi realizado (fiscalização CRO/judicial).
    * status='realizado' + origem='clinica' → obrigatória (default = data da consulta,
    * editável na confirmação); origem='preexistente' → null permitido ou data aproximada;
@@ -163,6 +170,8 @@ export interface OdontogramaEventoInput {
   grupo_id: string | null;
   papel_no_grupo: PapelNoGrupo | null;
   observacao: string;
+  /** Dado clínico da especialidade (migration 106) — ver comentário em OdontogramaEvento. */
+  detalhe?: unknown | null;
 }
 
 /**

@@ -249,15 +249,15 @@ export function OrcamentosClient({
     const supabase = createClient();
     const { data } = await supabase
       .from('fichas')
-      .select('id, created_at, dentes_afetados, dentes_observacoes, procedimentos_concluidos')
+      .select('id, data_atendimento, dentes_afetados, dentes_observacoes, procedimentos_concluidos')
       .eq('paciente_id', pacienteId)
       .eq('clinica_id', clinicaId)
-      .order('created_at', { ascending: false });
+      .order('data_atendimento', { ascending: false });
 
     const procs: FichaProc[] = [];
     for (const ficha of (data ?? []) as {
       id: string;
-      created_at: string;
+      data_atendimento: string;
       dentes_afetados: number[];
       dentes_observacoes: Record<string, string>;
       procedimentos_concluidos: string[];
@@ -270,7 +270,7 @@ export function OrcamentosClient({
           if (!done.has(key)) {
             procs.push({
               fichaId: ficha.id,
-              fichaDate: ficha.created_at,
+              fichaDate: ficha.data_atendimento,
               tooth,
               descricao: note,
               globalKey: `${ficha.id}::${key}`,
@@ -1914,9 +1914,10 @@ export function OrcamentosClient({
                     <div className="rounded-xl border border-border overflow-hidden">
                       {fichaProcs.map((proc) => {
                         const isSelected = selectedFichaKeys.has(proc.globalKey);
-                        const date = new Date(proc.fichaDate).toLocaleDateString('pt-BR', {
-                          day: '2-digit', month: '2-digit', year: '2-digit',
-                        });
+                        // 'YYYY-MM-DD' formatado na mão — `new Date()` parseia como UTC
+                        // meia-noite e desloca um dia pra trás em fusos negativos (BRT).
+                        const [anoP, mesP, diaP] = proc.fichaDate.split('-');
+                        const date = `${diaP}/${mesP}/${anoP.slice(2)}`;
                         return (
                           <button
                             key={proc.globalKey}

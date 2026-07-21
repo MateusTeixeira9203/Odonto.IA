@@ -1,5 +1,7 @@
 // Shared helpers e builders para export de prontuário e PDF de ficha
 
+import { formatarDataFicha } from './format-data-ficha';
+
 export type PacienteExport = {
   nome: string;
   cpf: string | null;
@@ -15,6 +17,7 @@ export type PacienteExport = {
 export type FichaExport = {
   id: string;
   created_at: string;
+  data_atendimento: string;
   queixa_principal: string | null;
   anotacoes: string | null;
   dentes_afetados: number[] | null;
@@ -230,7 +233,7 @@ function renderFichaCard(f: FichaExport): string {
   return `
     <div class="card">
       <div class="card-header">
-        <span class="card-date">${esc(fmtDateTime(f.created_at))}</span>
+        <span class="card-date">${esc(formatarDataFicha(f.data_atendimento, f.created_at))}</span>
         <span class="badge badge-teal">${esc(f.queixa_principal ?? 'Evolução')}</span>
         <span class="card-prof">Dr(a). ${esc(f.dentista?.nome ?? 'Profissional')}${f.dentista?.cro ? ` · CRO ${esc(f.dentista.cro)}` : ''}</span>
       </div>

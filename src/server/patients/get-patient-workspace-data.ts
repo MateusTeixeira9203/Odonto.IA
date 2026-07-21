@@ -6,6 +6,7 @@ import { getVisibleTimelineEvents, type TimelineEvent } from './get-visible-time
 export type FichaRecente = {
   id: string;
   created_at: string;
+  data_atendimento: string;
   queixa_principal: string | null;
   anotacoes: string | null;
   dentista: { nome: string } | null;
@@ -114,11 +115,11 @@ export async function getPatientWorkspaceData({
           ? supabase
               .from('fichas')
               .select(
-                'id, created_at, queixa_principal, anotacoes, dentista:dentistas(nome)'
+                'id, created_at, data_atendimento, queixa_principal, anotacoes, dentista:dentistas(nome)'
               )
               .eq('paciente_id', patientId)
               .eq('clinica_id', clinicId)
-              .order('created_at', { ascending: false })
+              .order('data_atendimento', { ascending: false })
               .limit(5)
           : Promise.resolve({ data: null, error: null }),
       ]),

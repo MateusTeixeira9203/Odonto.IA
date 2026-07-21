@@ -39,6 +39,7 @@ const DEMO_PACIENTE: Omit<Paciente, 'clinica_id'> = {
 const DEMO_FICHAS_RECENTES = [{
   id: 'demo-ficha',
   created_at: new Date().toISOString(),
+  data_atendimento: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }),
   queixa_principal: 'Dor ao mastigar no lado direito inferior',
   anotacoes: 'Restauração antiga com infiltração no dente 46. Sensibilidade ao frio.',
   dentista: { nome: 'Você' },

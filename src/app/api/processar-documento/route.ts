@@ -3,6 +3,7 @@ export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { withRateLimit } from "@/lib/rate-limit";
+import { extractTextFromFile } from "@/lib/extract-text";
 
 interface ProcessarDocumentoBody {
   ficha_id: string;
@@ -96,27 +97,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   let textoExtraido = "";
 
   try {
-    if (ext === "docx" || ext === "doc") {
-      const mammoth = await import("mammoth");
-      const result = await mammoth.extractRawText({
-        buffer: Buffer.from(fileBuffer),
-      });
-      textoExtraido = result.value;
-    } else if (ext === "pdf") {
-      const pdfParse = (await import("pdf-parse")).default;
-      const result = await pdfParse(Buffer.from(fileBuffer));
-      textoExtraido = result.text;
-    } else if (ext === "txt") {
-      textoExtraido = new TextDecoder("utf-8").decode(fileBuffer);
-    } else if (ext === "pptx") {
-      const officeParser = (await import("officeparser")).default;
-      const resultado = await officeParser.parseOffice(Buffer.from(fileBuffer), {
-        outputErrorToConsole: true,
-        newlineDelimiter: "\n",
-        ignoreNotes: false,
-      });
-      textoExtraido = String(resultado);
-    }
+    textoExtraido = await extractTextFromFile(fileBuffer, ext);
   } catch (err) {
     console.error("Erro ao extrair texto do arquivo:", err);
     return NextResponse.json(

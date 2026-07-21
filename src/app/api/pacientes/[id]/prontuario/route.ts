@@ -33,10 +33,10 @@ export async function GET(
       .maybeSingle(),
     supabase
       .from('fichas')
-      .select('id, created_at, queixa_principal, anotacoes, dentes_afetados, dentes_observacoes, procedimentos_concluidos, assinatura_url, assinado_em, dentista:dentistas(nome)')
+      .select('id, created_at, data_atendimento, queixa_principal, anotacoes, dentes_afetados, dentes_observacoes, procedimentos_concluidos, assinatura_url, assinado_em, dentista:dentistas(nome)')
       .eq('paciente_id', id)
       .eq('clinica_id', dentista.clinica_id)
-      .order('created_at', { ascending: false }),
+      .order('data_atendimento', { ascending: false }),
     supabase
       .from('orcamentos')
       .select('id, status, total, created_at, condicoes_pagamento, orcamento_itens(descricao, preco_total, quantidade), pagamentos(valor, status, forma_pagamento)')

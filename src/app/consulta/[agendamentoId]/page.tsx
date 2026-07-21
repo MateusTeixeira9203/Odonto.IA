@@ -55,10 +55,10 @@ export default async function ConsultaPage({ params }: Props) {
   const [{ data: fichas }, { data: orcamentos }, { data: planejamentoRaw }, { data: procedimentosRaw }, { count: eventosCount }] = await Promise.all([
     supabase
       .from('fichas')
-      .select('created_at, queixa_principal, anotacoes, dentes_afetados, procedimentos, alergias, historico_medico, medicamentos_em_uso, historico_dental')
+      .select('data_atendimento, queixa_principal, anotacoes, dentes_afetados, procedimentos, alergias, historico_medico, medicamentos_em_uso, historico_dental')
       .eq('paciente_id', paciente.id)
       .eq('clinica_id', clinicId)
-      .order('created_at', { ascending: false })
+      .order('data_atendimento', { ascending: false })
       .limit(5),
     supabase
       .from('orcamentos')
@@ -141,7 +141,9 @@ export default async function ConsultaPage({ params }: Props) {
       ultimaQueixa={(ultimaFicha?.queixa_principal as string | null) ?? null}
       ultimasAnotacoes={(ultimaFicha?.anotacoes as string | null) ?? null}
       fichas={(fichas ?? []).map(f => ({
-        data: new Date(f.created_at as string).toLocaleDateString('pt-BR'),
+        // 'YYYY-MM-DD' formatado na mão — `new Date()` parseia como UTC meia-noite
+        // e desloca um dia pra trás em fusos negativos (BRT).
+        data: (f.data_atendimento as string).split('-').reverse().join('/'),
         queixa: (f.queixa_principal as string | null) ?? '',
         anotacoes: (f.anotacoes as string | null) ?? '',
         dentes: (f.dentes_afetados as number[] | null) ?? [],

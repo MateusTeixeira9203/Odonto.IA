@@ -3,20 +3,12 @@
 import * as React from "react";
 import {
   Plus,
-  X,
-  Mic,
-  MicOff,
-  Trash2,
+  X,  Trash2,
   FileText,
   Download,
   Check,
-  User,
-  Loader2,
-  Lock,
-  PenLine,
+  Loader2,  PenLine,
   Pencil,
-  Signature,
-  CircleDollarSign,
   Clock,
   Circle,
   ChevronRight,
@@ -35,15 +27,31 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { HelpTooltip } from "@/components/ui/help-tooltip";
 import { toast } from 'sonner';
-import { temFeature, type PlanoId } from "@/lib/planos";
+import type { PlanoId } from "@/lib/planos";
 import { Odontograma, type ToothStatus } from "@/components/odontograma/Odontograma";
+import { ToothDetailPanel } from "@/components/odontograma/ToothDetailPanel";
 import {
   ARCH_SUPERIOR, ARCH_INFERIOR, ARCH_COMPLETA, ARCH_LABELS,
   QUAD_SUP_DIREITO, QUAD_SUP_ESQUERDO, QUAD_INF_DIREITO, QUAD_INF_ESQUERDO,
 } from "@/lib/arcadas";
 import dynamic from 'next/dynamic';
 import type SignaturePadLib from 'signature_pad';
-import { ApresentarPaciente } from '@/components/pacientes/ApresentarPaciente';
+import { formatarDataFicha } from '@/lib/format-data-ficha';
+import { CapturaLivreCard } from '@/components/fichas/captura-livre-card';
+import { OrtoCard } from '@/components/fichas/orto-card';
+import { RegistroCard, type RegistroCardData } from '@/components/fichas/registro-card';
+import { endoDetalheSchema } from '@/lib/especialidades/endo';
+import { EndoCard } from '@/components/fichas/endo-card';
+import { implanteDetalheSchema } from '@/lib/especialidades/implante';
+import { ImplanteCard } from '@/components/fichas/implante-card';
+import { TIPO_LABEL } from '@/types/odontograma';
+import type {
+  OrtoManutencaoInfo, OdontogramaEventoDraft,
+  TipoRegistroOdontograma, StatusRegistro, OrigemRegistro, AncoraClinica,
+  NivelAncora, Arcada, FaceDental,
+} from '@/types/odontograma';
+import { regravarEventosOdontograma, alternarStatusRegistro } from '@/app/consulta/[agendamentoId]/actions';
+import type { EvolucaoFormatada } from '@/app/api/dex/formatar-evolucao/route';
 const SignaturePad = dynamic(
   () => import('@/components/fichas/SignaturePad').then(m => m.SignaturePad),
   { ssr: false }
@@ -54,7 +62,6 @@ interface ToothNote {
   notes: string[];
 }
 
-type SelectionMode = 'single' | 'multiple' | 'arch';
 
 
 type ProcStatus = ToothStatus;
@@ -72,26 +79,53 @@ const STATUS_META: Record<ProcStatus, { label: string; icon: typeof Check; class
   concluido: { label: 'Concluído', icon: Check, className: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20' },
 };
 
-// #16 D7 — agrega o status dos procedimentos de cada dente pro odontograma-mapa.
-// Sentinelas de arcada/quadrante (>=90) entram no mapa também (mesma agregação),
-// mas o Odontograma não pinta dente a dente com elas — usa só pro "destaque de
-// região" nos rótulos de quadrante (D6).
-function computeToothStatusMap(evo: Evolution): Partial<Record<number, ToothStatus>> {
-  const map: Partial<Record<number, ToothStatus>> = {};
-  evo.teethNotes.forEach((tn) => {
-    const keys = tn.notes.filter(Boolean).map((_, i) => `${tn.tooth}_${i}`);
-    if (keys.length === 0) return;
-    const statuses = keys.map((k) => evo.procedimentosStatus[k] ?? 'nao_iniciado');
-    if (statuses.every((s) => s === 'concluido')) map[tn.tooth] = 'concluido';
-    else if (statuses.some((s) => s === 'concluido' || s === 'em_andamento')) map[tn.tooth] = 'em_andamento';
-    else map[tn.tooth] = 'nao_iniciado';
-  });
-  return map;
+
+/** Evento de odontograma de uma ficha, forma enxuta pra render dos cards §11 (camada 2). */
+interface EventoView {
+  id: string;
+  grupoId: string | null;
+  tipo: TipoRegistroOdontograma;
+  status: StatusRegistro;
+  origem: OrigemRegistro;
+  ancora: AncoraClinica;
+  observacao: string | null;
+  realizadoEm: string | null;
+  registradoEm: string;
+  /** Dado clínico da especialidade (migration 106) — cru, ainda não validado. */
+  detalhe: unknown | null;
 }
+
+/**
+ * Linha crua da tabela odontograma_eventos. A âncora NÃO é uma coluna composta — o schema
+ * (migration 101) achata em nivel/arcada/quadrante/dente/faces, exatamente como a escrita
+ * grava (`montarRowsEventos` em consulta/actions.ts). Ler pedindo uma coluna `ancora` que
+ * não existe falha silenciosamente sem checagem de erro — foi um bug real desta sessão,
+ * invisível enquanto o banco não tinha eventos pra expô-lo.
+ */
+type EventoRow = {
+  id: string;
+  ficha_id: string | null;
+  grupo_id: string | null;
+  tipo: TipoRegistroOdontograma;
+  status: StatusRegistro;
+  origem: OrigemRegistro;
+  nivel: NivelAncora;
+  arcada: Arcada | null;
+  quadrante: number | null;
+  dente: number | null;
+  faces: FaceDental[] | null;
+  observacao: string | null;
+  /** Dado clínico da especialidade (migration 106) — cru, ainda não validado. */
+  detalhe: unknown | null;
+  realizado_em: string | null;
+  registrado_em: string;
+};
 
 interface Evolution {
   id: string;
   date: string;
+  /** Data CLÍNICA do atendimento (pode ser retroativa) — migration 100. ISO 'YYYY-MM-DD'. */
+  dataAtendimento: string;
   type: string;
   observation: string;
   teethNotes: ToothNote[];
@@ -104,20 +138,27 @@ interface Evolution {
   assinaturaUrl: string | null;
   assinadoEm: string | null;
   tratamentoId: string | null;
+  /** Manutenção ortodôntica da consulta (Roadmap A / A0) — registro de arcada, não pinta dente. */
+  ortoManutencao: OrtoManutencaoInfo | null;
   /** Autor da ficha. A ficha é lida por toda a clínica; só o autor escreve (migration 099). */
   dentistaId: string;
+  /** CRO do autor — pro card §11 (fiscalização). */
+  autorCro: string | null;
+  /** Eventos do odontograma desta ficha (camada 2). Vazio nas fichas v2 antigas (sem backfill). */
+  eventos: EventoView[];
 }
 
 type FichaDB = {
   id: string;
   created_at: string;
+  data_atendimento: string;
   queixa_principal: string | null;
   anotacoes: string | null;
   dentes_afetados: number[];
   dentes_observacoes: Record<string, string>;
   status: string;
   dentista_id: string;
-  dentista?: { nome: string } | null;
+  dentista?: { nome: string; cro: string | null } | null;
   procedimentos_concluidos: string[];
   procedimentos_status: Record<string, ProcStatus> | null;
   procedimentos: string[] | null;
@@ -125,19 +166,24 @@ type FichaDB = {
   assinatura_url: string | null;
   assinado_em: string | null;
   tratamento_id: string | null;
+  orto_manutencao: OrtoManutencaoInfo | null;
 };
+
+/**
+ * Exibição da data (§7.1): se `data_atendimento` cai no mesmo dia do `created_at`
+ * (fuso da clínica), mantém `DD/MM/AAAA às HH:MM`; se é retroativa, só a data —
+ * hora falsa (meia-noite) mentiria. Formata `data_atendimento` na mão (não via
+ * `new Date()`) pra não sofrer o shift de fuso de um 'YYYY-MM-DD' parseado como UTC.
+ */
+/** Hoje no fuso da clínica, ISO 'YYYY-MM-DD' — default e teto do campo de data (invariante #5). */
+function hojeBRT(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+}
 
 const mapFichaToEvolution = (f: FichaDB): Evolution => ({
   id: f.id,
-  date: new Date(f.created_at)
-    .toLocaleString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-    .replace(",", " às"),
+  date: formatarDataFicha(f.data_atendimento, f.created_at),
+  dataAtendimento: f.data_atendimento,
   type: f.queixa_principal ?? "Evolução",
   observation: f.anotacoes ?? "",
   teethNotes: (f.dentes_afetados ?? []).map((t) => {
@@ -163,7 +209,111 @@ const mapFichaToEvolution = (f: FichaDB): Evolution => ({
   assinaturaUrl: f.assinatura_url ?? null,
   assinadoEm: f.assinado_em ?? null,
   tratamentoId: f.tratamento_id ?? null,
+  ortoManutencao: f.orto_manutencao ?? null,
+  autorCro: f.dentista?.cro ?? null,
+  eventos: [], // anexados em fetchFichas após buscar a tabela odontograma_eventos
 });
+
+/**
+ * Deriva os campos v2 (`dentes_afetados` / `dentes_observacoes` / `procedimentos`) a partir
+ * dos EVENTOS do odontograma.
+ *
+ * Por que existe: no design definitivo (21/07) o seletor manual de dentes deixou de existir —
+ * quem lança à mão passa pelo perfil do dente, que produz **evento**, não seleção. Sem esta
+ * derivação, orçamento, PDF e progresso (que leem os campos v2) ficariam vazios numa ficha
+ * lançada manualmente. O que o Dex já preencheu tem **precedência**; a derivação só COMPLETA.
+ */
+function derivarV2DosEventos(eventos: OdontogramaEventoDraft[]): {
+  dentes: number[];
+  observacoes: Record<string, string>;
+  procedimentos: string[];
+} {
+  const porDente = new Map<number, string[]>();
+  const procedimentos: string[] = [];
+  for (const ev of eventos) {
+    const rotulo = TIPO_LABEL[ev.tipo] + (ev.status === 'indicado' ? ' - planejado' : '');
+    const linha = ev.observacao ? `${rotulo} (${ev.observacao})` : rotulo;
+    const d = ev.ancora.dente;
+    if (d != null) {
+      const arr = porDente.get(d);
+      if (arr) arr.push(linha); else porDente.set(d, [linha]);
+    }
+    if (!procedimentos.includes(rotulo)) procedimentos.push(rotulo);
+  }
+  return {
+    dentes: [...porDente.keys()],
+    observacoes: Object.fromEntries([...porDente].map(([d, ls]) => [String(d), ls.join('\n')])),
+    procedimentos,
+  };
+}
+
+/** Converte os eventos salvos (EventoView) pra o shape que Odontograma/ToothDetailPanel leem. */
+/**
+ * Agrupa os eventos de uma ficha em cards §11 (camada 2): eventos com o MESMO grupo_id
+ * viram UM card multi-dente ("Exodontia · dentes 31–41"); os isolados, um card cada.
+ * Autor/CRO e estado de assinatura vêm da ficha (na ficha rápida, um autor por ficha).
+ */
+function eventosParaCards(
+  eventos: EventoView[], autorNome: string, autorCro: string | null, assinada: boolean,
+): Array<{ key: string; ids: string[]; data: RegistroCardData }> {
+  const grupos = new Map<string, EventoView[]>();
+  for (const ev of eventos) {
+    // grupo_id une multi-dente; sem grupo, MESMO dente+tipo+status mescla (faces unidas) —
+    // 3 eventos de face do Dex viram 1 card "Restauração LMO · dente 45" (feedback 21/07).
+    const chave = ev.grupoId
+      ?? `m:${ev.ancora.dente ?? `${ev.ancora.nivel}:${ev.ancora.arcada ?? ev.ancora.quadrante ?? ''}`}|${ev.tipo}|${ev.status}`;
+    const arr = grupos.get(chave);
+    if (arr) arr.push(ev); else grupos.set(chave, [ev]);
+  }
+  return [...grupos.values()]
+    .sort((a, b) => (a[0].ancora.dente ?? 99) - (b[0].ancora.dente ?? 99))
+    .map((grupo) => {
+    const primeiro = grupo[0];
+    return {
+      key: primeiro.id,
+      ids: grupo.map((e) => e.id),   // alvo do toggle de status (todos do grupo juntos)
+      data: {
+        tipo: primeiro.tipo,
+        status: primeiro.status,
+        origem: primeiro.origem,
+        ancoras: grupo.map((e) => e.ancora),
+        observacao: primeiro.observacao,
+        detalhe: primeiro.detalhe,
+        realizadoEm: primeiro.realizadoEm,
+        registradoEm: primeiro.registradoEm,
+        autorNome,
+        autorCro,
+        assinada,
+      },
+    };
+  });
+}
+
+/** EventoView (salvo) -> Draft: o shape que Odontograma/ToothDetailPanel consomem. */
+function eventoViewParaDraft(e: EventoView): OdontogramaEventoDraft {
+  return {
+    tipo: e.tipo, status: e.status, origem: e.origem, ancora: e.ancora,
+    grupo_id: e.grupoId, papel_no_grupo: null, observacao: e.observacao ?? '',
+    detalhe: e.detalhe, realizado_em: e.realizadoEm,
+  };
+}
+
+/**
+ * Resolve o corpo de camada 3 (tabela de endo, campos de implante) pra um card §11 —
+ * só monta quando há dado (I2). `detalhe` é lido SEMPRE por safeParse (migration 106,
+ * spec-106 §5): dado corrompido degrada pra "sem tabela", nunca quebra a ficha.
+ */
+function corpoEspecialidade(tipo: TipoRegistroOdontograma, detalhe: unknown): React.ReactNode {
+  if (tipo === 'endodontia') {
+    const r = endoDetalheSchema.safeParse(detalhe);
+    return r.success ? <EndoCard valor={r.data} /> : null;
+  }
+  if (tipo === 'implante') {
+    const r = implanteDetalheSchema.safeParse(detalhe);
+    return r.success ? <ImplanteCard valor={r.data} /> : null;
+  }
+  return null;
+}
 
 // Ficha enlatada do perfil demo (K · spec 3.3) — coerente com o seed da consulta demo (João Silva, dente 46).
 // `dentistaId` fica de fora: é injetado no uso com o dentista real logado, pra a demo continuar
@@ -173,6 +323,7 @@ const DEMO_EVOLUTION: Omit<Evolution, 'dentistaId'> = {
   date: new Date().toLocaleString('pt-BR', {
     day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
   }).replace(',', ' às'),
+  dataAtendimento: hojeBRT(),
   type: 'Dor ao mastigar no lado direito inferior',
   observation:
     'Paciente relata dor à mastigação no lado inferior direito há cerca de duas semanas, ' +
@@ -187,6 +338,9 @@ const DEMO_EVOLUTION: Omit<Evolution, 'dentistaId'> = {
   assinaturaUrl: null,
   assinadoEm: null,
   tratamentoId: null,
+  ortoManutencao: null,
+  autorCro: null,
+  eventos: [],
 };
 
 interface FichasTabProps {
@@ -200,7 +354,7 @@ interface FichasTabProps {
   onGerarOrcamento?: (fichaId: string) => void;
 }
 
-export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName, canWrite = true, onGerarOrcamento }: FichasTabProps) {
+export function FichasTab({ patientId, clinicaId, dentistaId, patientName, canWrite = true, onGerarOrcamento }: FichasTabProps) {
   // O histórico é da CLÍNICA (todo dentista lê), o trabalho é do AUTOR (só ele escreve) —
   // migration 099. `canWrite` cobre papel/plano; a autoria é uma segunda condição, não a
   // mesma. Esconder o controle é conveniência: quem barra de verdade é a RLS (invariante #9).
@@ -213,29 +367,73 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSaving, setIsSaving] = React.useState(false);
   const [isPanelOpen, setIsPanelOpen] = React.useState(false);
-  const [editingId, setEditingId] = React.useState<string | null>(null);
-  const [isRecording, setIsRecording] = React.useState(false);
-  const [isTranscribing, setIsTranscribing] = React.useState(false);
-  const [selectedTeeth, setSelectedTeeth] = React.useState<number[]>([]);
-  const [sharedTeeth, setSharedTeeth] = React.useState<number[]>([]);
-  const [selectionMode, setSelectionMode] = React.useState<SelectionMode>('single');
-  const [sharedNotes, setSharedNotes] = React.useState<string[]>(['']);
-  const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
-  const audioChunksRef = React.useRef<Blob[]>([]);
-  const [showDeleteConfirm, setShowDeleteConfirm] = React.useState<string | null>(null);
+  const [editingId, setEditingId] = React.useState<string | null>(null);  const [selectedTeeth, setSelectedTeeth] = React.useState<number[]>([]);
+  const [sharedTeeth, setSharedTeeth] = React.useState<number[]>([]);  const [sharedNotes, setSharedNotes] = React.useState<string[]>(['']);  const [showDeleteConfirm, setShowDeleteConfirm] = React.useState<string | null>(null);
   const [signingFichaId, setSigningFichaId] = React.useState<string | null>(null);
   const [isSavingSignature, setIsSavingSignature] = React.useState(false);
+  // #9: fica true quando "Organizar com Dex" preenche o form nesta edição — decide
+  // origem no insert (nunca no update). Reseta ao fechar/abrir o painel.
+  const [preenchidoPorDex, setPreenchidoPorDex] = React.useState(false);
   const signaturePadRef = React.useRef<SignaturePadLib | null>(null);
 
   // ── Modo de visualização da ficha ─────────────────────────────────────────
   const [viewingEvo, setViewingEvo] = React.useState<Evolution | null>(null);
-  const [filterTooth, setFilterTooth] = React.useState<number | null>(null);
 
   const [formData, setFormData] = React.useState({
+    dataAtendimento: hojeBRT(),
     type: "Evolução",
     observation: "",
     teethNotes: [] as ToothNote[],
-  } as { type: string; observation: string; teethNotes: ToothNote[] });
+    procedimentos: [] as string[],
+    conduta: "",
+    ortoManutencao: null as OrtoManutencaoInfo | null,
+  } as { dataAtendimento: string; type: string; observation: string; teethNotes: ToothNote[]; procedimentos: string[]; conduta: string; ortoManutencao: OrtoManutencaoInfo | null });
+
+  // Eventos de odontograma propostos pelo "Organizar com Dex" (camada 2). Só o campo
+  // mágico os preenche na ficha rápida; persistem no save via a RPC atômica da consulta
+  // (regravarEventosOdontograma). Vazio = save não toca a tabela de eventos (edição sem
+  // reorganizar preserva os eventos existentes — a action no-opa em lista vazia).
+  const [eventosDraft, setEventosDraft] = React.useState<OdontogramaEventoDraft[]>([]);
+
+  // Camada 1: dente aberto no painel de revisão do odontograma (rascunho do Dex).
+  const [denteAberto, setDenteAberto] = React.useState<number | null>(null);
+
+  // Perfil do dente na ficha SALVA (readOnly) — um por vez, preso à ficha dona.
+  const [denteSalvoAberto, setDenteSalvoAberto] = React.useState<{ fichaId: string; dente: number } | null>(null);
+  // Dente aberto na FICHA SALVA (leitura) — estado separado do de criação, sempre readOnly.
+
+  /**
+   * ZONA 3 — agrupa o rascunho pra render (feedback 21/07: "Restauração M · 45" três
+   * vezes é poluição). Regras: mesmo grupo_id = 1 card multi-dente; sem grupo, MESMO
+   * dente+tipo+status mescla num card só com as faces unidas ("Restauração LMO · 45").
+   * Ordena por dente. Guarda os índices pra edição/remoção in-place.
+   */
+  const gruposDraft = React.useMemo(() => {
+    const m = new Map<string, number[]>();
+    eventosDraft.forEach((ev, i) => {
+      const chave = ev.grupo_id
+        ?? `m:${ev.ancora.dente ?? `${ev.ancora.nivel}:${ev.ancora.arcada ?? ev.ancora.quadrante ?? ''}`}|${ev.tipo}|${ev.status}`;
+      const arr = m.get(chave);
+      if (arr) arr.push(i); else m.set(chave, [i]);
+    });
+    return [...m.entries()]
+      .map(([chave, idxs]) => ({
+        chave,
+        idxs,
+        faces: [...new Set(idxs.flatMap((i) => eventosDraft[i].ancora.faces ?? []))].join(''),
+      }))
+      .sort((a, b) => (eventosDraft[a.idxs[0]].ancora.dente ?? 99) - (eventosDraft[b.idxs[0]].ancora.dente ?? 99));
+  }, [eventosDraft]);
+
+  /** Observação por procedimento (§03 do definitivo) — aplica a todo o grupo. */
+  const atualizarObsGrupo = (idxs: number[], obs: string) => {
+    setEventosDraft((prev) => prev.map((ev, i) => (idxs.includes(i) ? { ...ev, observacao: obs } : ev)));
+  };
+
+  /** Remove o registro (grupo inteiro) do rascunho antes de salvar. */
+  const removerGrupoDraft = (idxs: number[]) => {
+    setEventosDraft((prev) => prev.filter((_, i) => !idxs.includes(i)));
+  };
 
   // Busca fichas do Supabase
   const fetchFichas = React.useCallback(async () => {
@@ -250,13 +448,48 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
       const supabase = createClient();
       const { data, error } = await supabase
         .from("fichas")
-        .select("id, created_at, queixa_principal, anotacoes, dentes_afetados, dentes_observacoes, status, procedimentos_concluidos, procedimentos_status, procedimentos, conduta, assinatura_url, assinado_em, tratamento_id, dentista_id, dentista:dentistas(nome)")
+        .select("id, created_at, data_atendimento, queixa_principal, anotacoes, dentes_afetados, dentes_observacoes, status, procedimentos_concluidos, procedimentos_status, procedimentos, conduta, assinatura_url, assinado_em, tratamento_id, orto_manutencao, dentista_id, dentista:dentistas(nome, cro)")
         .eq("paciente_id", patientId)
         .eq("clinica_id", clinicaId)
+        .order("data_atendimento", { ascending: false })
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setEvolutions((data as unknown as FichaDB[]).map(mapFichaToEvolution));
+      const fichas = (data as unknown as FichaDB[]).map(mapFichaToEvolution);
+
+      // Camada 2: eventos do odontograma (event-log) agrupados por ficha. Fichas v2
+      // antigas não têm eventos → recebem [] e seguem no display legado (fonte híbrida).
+      const { data: evData, error: evError } = await supabase
+        .from("odontograma_eventos")
+        .select("id, ficha_id, grupo_id, tipo, status, origem, nivel, arcada, quadrante, dente, faces, observacao, detalhe, realizado_em, registrado_em")
+        .eq("paciente_id", patientId)
+        .eq("clinica_id", clinicaId);
+
+      // Falha na busca de eventos NUNCA pode ficar silenciosa — já esteve (bug real desta
+      // sessão): erro engolido = camada 2 sempre vazia, sem sinal nenhum de que algo quebrou.
+      if (evError) console.error("Erro ao buscar odontograma_eventos:", evError);
+
+      const eventosPorFicha = new Map<string, EventoView[]>();
+      for (const e of (evData ?? []) as unknown as EventoRow[]) {
+        if (!e.ficha_id) continue;
+        // Reconstrói a âncora a partir das colunas achatadas (espelha montarRowsEventos).
+        const ancora: AncoraClinica = {
+          nivel: e.nivel,
+          ...(e.arcada != null && { arcada: e.arcada }),
+          ...(e.quadrante != null && { quadrante: e.quadrante as AncoraClinica['quadrante'] }),
+          ...(e.dente != null && { dente: e.dente }),
+          ...(e.faces && e.faces.length > 0 && { faces: e.faces }),
+        };
+        const view: EventoView = {
+          id: e.id, grupoId: e.grupo_id, tipo: e.tipo, status: e.status,
+          origem: e.origem, ancora, observacao: e.observacao ?? null, realizadoEm: e.realizado_em, registradoEm: e.registrado_em,
+          detalhe: e.detalhe ?? null,
+        };
+        const arr = eventosPorFicha.get(e.ficha_id);
+        if (arr) arr.push(view); else eventosPorFicha.set(e.ficha_id, [view]);
+      }
+
+      setEvolutions(fichas.map((f) => ({ ...f, eventos: eventosPorFicha.get(f.id) ?? [] })));
     } catch (err) {
       console.error("Erro ao buscar fichas:", err);
     } finally {
@@ -282,84 +515,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
     return set;
   }, [evolutions]);
 
-  const startRecording = async (): Promise<void> => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
 
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data);
-      };
-
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-        await transcribeAudio(audioBlob);
-        stream.getTracks().forEach((track) => track.stop());
-      };
-
-      mediaRecorder.start();
-      setIsRecording(true);
-    } catch (err) {
-      console.error("Erro ao acessar microfone:", err);
-      toast.error('Não foi possível acessar o microfone.');
-    }
-  };
-
-  const stopRecording = (): void => {
-    if (mediaRecorderRef.current && isRecording) {
-      // Trava o botão já aqui — entre parar e o onstop assíncrono disparar
-      // a transcrição, havia uma janela em que o botão voltava a ficar
-      // clicável e dava pra iniciar uma segunda gravação sem perceber,
-      // duplicando o trecho transcrito.
-      setIsTranscribing(true);
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-    }
-  };
-
-  const transcribeAudio = async (blob: Blob): Promise<void> => {
-    setIsTranscribing(true);
-    try {
-      const fd = new FormData();
-      fd.append("audio", blob, "gravacao.webm");
-      const response = await fetch("/api/transcrever", { method: "POST", body: fd });
-      if (!response.ok) throw new Error("Falha na transcrição");
-      const data = await response.json() as { transcricao?: string };
-      if (data.transcricao) {
-        setFormData((f) => ({
-          ...f,
-          observation: f.observation ? `${f.observation}\n${data.transcricao}` : (data.transcricao ?? ""),
-        }));
-      }
-    } catch (error) {
-      console.error("Erro na transcrição:", error);
-    } finally {
-      setIsTranscribing(false);
-    }
-  };
-
-  const toggleTooth = (tooth: number) => {
-    if (selectionMode === 'multiple') {
-      // Modo múltiplos: adiciona/remove do grupo compartilhado
-      setSharedTeeth((prev) =>
-        prev.includes(tooth) ? prev.filter((t) => t !== tooth) : [...prev, tooth]
-      );
-      return;
-    }
-    // Modo individual e arcada: cada dente tem seus próprios procedimentos
-    setSelectedTeeth((prev) => {
-      const isSelected = prev.includes(tooth);
-      if (isSelected) {
-        setFormData((f) => ({ ...f, teethNotes: f.teethNotes.filter((tn) => tn.tooth !== tooth) }));
-        return prev.filter((t) => t !== tooth);
-      } else {
-        setFormData((f) => ({ ...f, teethNotes: [...f.teethNotes, { tooth, notes: [''] }] }));
-        return [...prev, tooth];
-      }
-    });
-  };
 
   const toggleArch = (archNum: number) => {
     setSelectedTeeth((prev) => {
@@ -374,50 +530,76 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
     });
   };
 
-  const handleModeChange = (mode: SelectionMode) => {
-    setSelectionMode(mode);
-    // Não limpa seleções ao trocar de modo — permite transicionar mantendo o que já foi selecionado
-  };
 
-  const handleSharedNoteChange = (index: number, value: string) => {
-    setSharedNotes((prev) => prev.map((n, i) => (i === index ? value : n)));
-  };
+  // Job A Fatia B (§5) — form já preenchido pede confirmação antes do "Organizar"
+  // sobrescrever (o CapturaLivreCard checa isto ANTES de disparar formatar-evolucao).
+  const formDirty = Boolean(
+    formData.observation.trim() ||
+    selectedTeeth.length > 0 ||
+    sharedTeeth.length > 0 ||
+    formData.procedimentos.length > 0 ||
+    formData.conduta.trim()
+  );
 
-  const addSharedNote = () => setSharedNotes((prev) => [...prev, '']);
-
-  const removeSharedNote = (index: number) => {
-    setSharedNotes((prev) => prev.length > 1 ? prev.filter((_, i) => i !== index) : ['']);
-  };
-
-  const handleToothNoteChange = (tooth: number, index: number, value: string) => {
+  // Mapeamento IA → form (§5): "Organizar com Dex" preenche o form existente — o
+  // form É a tela de revisão (invariante #8), nada entra na ficha sem passar por ele.
+  // Dentes preenchidos = dentes SELECIONADOS; o dentista remove o que não confirma
+  // (mesmo princípio da auto-confirmação do consulta, invertido pro idioma do form).
+  const aplicarEvolucaoDoOrganizar = (data: EvolucaoFormatada) => {
     setFormData((f) => ({
       ...f,
-      teethNotes: f.teethNotes.map((tn) =>
-        tn.tooth === tooth
-          ? { ...tn, notes: tn.notes.map((n, i) => (i === index ? value : n)) }
-          : tn
-      ),
+      type: data.queixa_principal || f.type,
+      observation: data.alerta_novo
+        ? `${data.anotacoes}\n\n⚠️ Novo alerta detectado: ${data.alerta_novo}`
+        : data.anotacoes,
+      teethNotes: data.dentes_afetados.map((t) => {
+        const raw = data.dentes_observacoes[String(t)] ?? '';
+        const parts = raw.split('\n').filter(Boolean);
+        return { tooth: t, notes: parts.length > 0 ? parts : [''] };
+      }),
+      procedimentos: data.procedimentos,
+      conduta: data.conduta,
+      ortoManutencao: data.orto_manutencao,
     }));
+    // Camada 2: os eventos viram rascunho, com realizado_em pela mesma regra da consulta
+    // (§1.10, invariante #13: só realizado+clínica ganha a data; IA nunca preenche data).
+    setEventosDraft(
+      (data.odontograma_eventos ?? []).map((ev) => ({
+        ...ev,
+        realizado_em: ev.status === 'realizado' && ev.origem === 'clinica' ? formData.dataAtendimento : null,
+      })),
+    );
+    // Mesmo critério do handleEdit (linha 666): sentinela de arcada entre os dentes
+    // afetados põe o modo em 'arch' — mantém os botões de seleção coerentes com o
+    // que a IA de fato preencheu.    setSharedTeeth([]);
+    setSharedNotes(['']);
+    setSelectedTeeth(data.dentes_afetados);
+    setPreenchidoPorDex(true);
   };
 
-  const addToothNote = (tooth: number) => {
-    setFormData((f) => ({
-      ...f,
-      teethNotes: f.teethNotes.map((tn) =>
-        tn.tooth === tooth ? { ...tn, notes: [...tn.notes, ''] } : tn
-      ),
+  /**
+   * Alterna planejado ⇄ realizado de um registro da ficha SALVA (bug 21/07: não havia
+   * caminho pra marcar o que foi feito). Otimista com rollback — a RLS/action barra o
+   * não-autor e a ficha assinada, e aí a UI volta ao estado real (invariante #9: update
+   * barrado por RLS volta sucesso com 0 linhas, então nunca confiamos sem confirmação).
+   */
+  const toggleStatusRegistro = async (
+    evo: Evolution, ids: string[], statusAtual: StatusRegistro,
+  ) => {
+    const novoStatus: StatusRegistro = statusAtual === 'realizado' ? 'indicado' : 'realizado';
+    const antes = evolutions;
+    setEvolutions((prev) => prev.map((e) => e.id !== evo.id ? e : {
+      ...e,
+      eventos: e.eventos.map((ev) => ids.includes(ev.id)
+        ? { ...ev, status: novoStatus, realizadoEm: novoStatus === 'realizado' ? evo.dataAtendimento : null }
+        : ev),
     }));
-  };
 
-  const removeToothNote = (tooth: number, index: number) => {
-    setFormData((f) => ({
-      ...f,
-      teethNotes: f.teethNotes.map((tn) =>
-        tn.tooth === tooth
-          ? { ...tn, notes: tn.notes.length > 1 ? tn.notes.filter((_, i) => i !== index) : [''] }
-          : tn
-      ),
-    }));
+    const res = await alternarStatusRegistro({ eventoIds: ids, novoStatus, dataClinica: evo.dataAtendimento });
+    if (!res.ok) {
+      setEvolutions(antes);
+      toast.error(res.error ?? 'Não foi possível atualizar o registro.');
+    }
   };
 
   const handleSave = async () => {
@@ -425,11 +607,19 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
 
     try {
       const supabase = createClient();
-      const dentesAfetados = [...selectedTeeth, ...sharedTeeth];
       const validSharedNotes = sharedNotes.filter((n) => n.trim()).join('\n');
 
+      // Design definitivo (21/07): o lançamento manual virou EVENTO (perfil do dente).
+      // Derivamos os campos v2 pra que orçamento / PDF / progresso continuem alimentados.
+      const derivado = derivarV2DosEventos(eventosDraft);
+
+      // União: seleção de região (sentinelas de arcada/quadrante) + dentes dos eventos.
+      const dentesAfetados = [...new Set([...selectedTeeth, ...sharedTeeth, ...derivado.dentes])];
+
       const dentesObservacoes: Record<string, string> = {
-        // Dentes individuais — cada um com seus próprios procedimentos
+        // Base: o que veio dos eventos (perfil do dente ou Dex).
+        ...derivado.observacoes,
+        // Dentes individuais do form — PRECEDÊNCIA sobre a derivação (texto do Dex é mais rico).
         ...Object.fromEntries(
           formData.teethNotes
             .map((tn) => [String(tn.tooth), tn.notes.filter((n) => n.trim()).join('\n')] as [string, string])
@@ -441,33 +631,64 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
           : {}),
       };
 
+      // Procedimentos: os do form primeiro; a derivação só acrescenta o que faltou.
+      const procedimentosFinais = [
+        ...formData.procedimentos,
+        ...derivado.procedimentos.filter((p) => !formData.procedimentos.includes(p)),
+      ];
+
+      let fichaId: string;
       if (editingId) {
         const { error } = await supabase
           .from("fichas")
           .update({
+            // data_atendimento é editável (o dentista pode corrigir a data na edição);
+            // origem NUNCA entra aqui — update não reescreve origem (invariante #9).
+            data_atendimento: formData.dataAtendimento,
             queixa_principal: formData.type,
             anotacoes: formData.observation || null,
             dentes_afetados: dentesAfetados,
             dentes_observacoes: dentesObservacoes,
+            procedimentos: procedimentosFinais,
+            conduta: formData.conduta || null,
+            orto_manutencao: formData.ortoManutencao,
             updated_at: new Date().toISOString(),
           })
           .eq("id", editingId)
           .eq("clinica_id", clinicaId);
 
         if (error) throw error;
+        fichaId = editingId;
       } else {
-        const { error } = await supabase.from("fichas").insert({
+        const { data: novaFicha, error } = await supabase.from("fichas").insert({
           paciente_id: patientId,
           dentista_id: dentistaId,
           clinica_id: clinicaId,
+          data_atendimento: formData.dataAtendimento,
           queixa_principal: formData.type,
           anotacoes: formData.observation || null,
           dentes_afetados: dentesAfetados,
           dentes_observacoes: dentesObservacoes,
+          procedimentos: procedimentosFinais,
+          conduta: formData.conduta || null,
+          orto_manutencao: formData.ortoManutencao,
           status: "aberta",
-        });
+          // #9: só marca ficha_rapida se o preenchimento desta edição veio do Dex.
+          origem: preenchidoPorDex ? 'ficha_rapida' : 'manual',
+        }).select("id").single();
 
         if (error) throw error;
+        if (!novaFicha) throw new Error("Falha ao criar a ficha.");
+        fichaId = novaFicha.id as string;
+      }
+
+      // Camada 2 (Roadmap A / A0): persiste os eventos do odontograma via a RPC atômica
+      // da consulta — idempotente, respeita autoria e imutabilidade da ficha assinada
+      // (migration 104). Fail-soft: a ficha JÁ foi salva; se os eventos falharem, avisa
+      // mas não desfaz. Lista vazia (edição sem reorganizar) = a action no-opa, preserva.
+      if (eventosDraft.length > 0) {
+        const res = await regravarEventosOdontograma({ fichaId, pacienteId: patientId, eventos: eventosDraft });
+        if (!res.ok) toast.error(res.error ?? "A ficha salvou, mas o odontograma não foi gravado.");
       }
 
       await fetchFichas();
@@ -540,10 +761,11 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
     setIsPanelOpen(false);
     setEditingId(null);
     setSelectedTeeth([]);
-    setSharedTeeth([]);
-    setSelectionMode('single');
-    setSharedNotes(['']);
-    setFormData({ type: "Evolução", observation: "", teethNotes: [] } as { type: string; observation: string; teethNotes: ToothNote[] });
+    setSharedTeeth([]);    setSharedNotes(['']);
+    setFormData({ dataAtendimento: hojeBRT(), type: "Evolução", observation: "", teethNotes: [], procedimentos: [], conduta: "", ortoManutencao: null });
+    setEventosDraft([]);
+    setDenteAberto(null);
+    setPreenchidoPorDex(false);
   };
 
   const updateProcStatus = async (fichaId: string, currentStatus: Record<string, ProcStatus>, procKey: string, newStatus: ProcStatus) => {
@@ -584,26 +806,25 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
     }
 
     const sharedTeethSet = new Set(detectedSharedGroup?.teeth ?? []);
-    const individualNotes = evolution.teethNotes.filter((tn) => !sharedTeethSet.has(tn.tooth));
-    const hasArch = individualNotes.some((tn) => tn.tooth in ARCH_LABELS);
-    const startMode: SelectionMode =
-      detectedSharedGroup && individualNotes.length === 0 ? 'multiple' :
-      hasArch ? 'arch' : 'single';
-
-    setSelectionMode(startMode);
-    setSharedTeeth(detectedSharedGroup?.teeth ?? []);
+    const individualNotes = evolution.teethNotes.filter((tn) => !sharedTeethSet.has(tn.tooth));    setSharedTeeth(detectedSharedGroup?.teeth ?? []);
     setSharedNotes(
       detectedSharedGroup ? detectedSharedGroup.notes.split('\n').filter(Boolean) : ['']
     );
     setEditingId(evolution.id);
     setFormData({
+      dataAtendimento: evolution.dataAtendimento,
       type: evolution.type,
       observation: evolution.observation,
       teethNotes: individualNotes.map((tn) => ({
         tooth: tn.tooth,
         notes: tn.notes.length > 0 ? [...tn.notes] : [''],
       })),
+      procedimentos: evolution.procedimentos,
+      conduta: evolution.conduta ?? '',
+      ortoManutencao: evolution.ortoManutencao,
     });
+    // Edição não recarrega eventos: reorganizar substitui, salvar sem reorganizar preserva.
+    setEventosDraft([]);
     setSelectedTeeth(individualNotes.map((tn) => tn.tooth));
     setIsPanelOpen(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -656,17 +877,32 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
             exit={{ opacity: 0, height: 0, marginTop: 0 }}
             className="overflow-hidden"
           >
-            <div className="bg-surface-alt/30 border border-border/60 rounded-2xl p-4 md:p-6 flex flex-col lg:flex-row gap-6 lg:gap-8">
-              {/* Coluna Esquerda */}
-              <div className="flex-[3] flex flex-col gap-6">
-                <div className="flex-1">
-                  <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-[0.15em] mb-2">
+            <div className="flex flex-col gap-4">
+            {/* ═══════ FICHA ÚNICA (design definitivo 21/07, feedback da 1ª rodada) ═══════
+                UM organismo, não três balões: campo mágico → meta → odontograma (esq) +
+                perfil do dente (dir) → registros agrupados → anotações/conduta → ações.
+                Divisores sutis separam as zonas; nada de cards soltos competindo. */}
+            <div className="bg-surface border border-border rounded-2xl p-4 md:p-6 flex flex-col gap-5">
+
+              {/* Campo mágico (Job A Fatia B) — não renderiza no perfil demo (§8: sem clínica real). */}
+              {patientId !== 'demo' && (
+                <CapturaLivreCard
+                  pacienteNome={patientName ?? ''}
+                  formDirty={formDirty}
+                  onOrganizado={aplicarEvolucaoDoOrganizar}
+                />
+              )}
+
+              {/* Meta — tipo + data, compactos no topo (artefato §02) */}
+              <div className="flex gap-4 flex-wrap">
+                <div className="flex-1 min-w-[150px]">
+                  <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-[0.15em] mb-1.5">
                     Tipo de Registro
                   </label>
                   <select
                     value={formData.type}
                     onChange={(e) => setFormData((f) => ({ ...f, type: e.target.value }))}
-                    className="w-full bg-surface-alt border border-border rounded-xl px-4 py-2.5 text-sm font-medium text-text-primary outline-none focus:border-teal transition-colors"
+                    className="w-full bg-surface-alt border border-border rounded-xl px-3.5 py-2 text-sm font-medium text-text-primary outline-none focus:border-teal transition-colors"
                   >
                     <option value="Avaliação">Avaliação</option>
                     <option value="Evolução">Evolução</option>
@@ -675,326 +911,185 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
                     <option value="Procedimento">Procedimento</option>
                   </select>
                 </div>
+                <div className="flex-1 min-w-[150px]">
+                  <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-[0.15em] mb-1.5 flex items-center">
+                    Data do atendimento
+                    <HelpTooltip content="Pode ser retroativa — útil pra lançar histórico de outro sistema. A ficha ordena por esta data, não pela data de digitação." />
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.dataAtendimento}
+                    max={hojeBRT()}
+                    onChange={(e) => setFormData((f) => ({ ...f, dataAtendimento: e.target.value || hojeBRT() }))}
+                    className="w-full bg-surface-alt border border-border rounded-xl px-3.5 py-2 text-sm font-medium text-text-primary outline-none focus:border-teal transition-colors"
+                  />
+                </div>
+              </div>
 
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-[0.15em] flex items-center">
-                      Observações Gerais
-                      <HelpTooltip content="Fale os procedimentos e a IA transcreve automaticamente." />
-                    </label>
-                    {temFeature(plano, 'transcricaoVoz') ? (
+              <div className="border-t border-border/60" />
+
+              {/* Odontograma (esq) + perfil do dente (dir) — clicar no dente abre ao lado */}
+              <div className="flex flex-col gap-3">
+                  <Odontograma
+                    eventos={eventosDraft.length > 0 ? eventosDraft : undefined}
+                    selectedTeeth={selectedTeeth}
+                    sharedTeeth={sharedTeeth}
+                    historicalTeeth={editingId ? historicalTeeth : new Set<number>()}
+                    onToothToggle={setDenteAberto}
+                    hideFilters
+                  />
+                  <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-border/40">
+                    <span className="text-[9.5px] font-bold uppercase tracking-widest text-text-secondary mr-1">Região</span>
+                    {[
+                      { id: ARCH_SUPERIOR, label: 'Arcada sup.' },
+                      { id: ARCH_INFERIOR, label: 'Arcada inf.' },
+                      { id: ARCH_COMPLETA, label: 'Boca toda' },
+                      { id: QUAD_SUP_DIREITO, label: 'Q1' },
+                      { id: QUAD_SUP_ESQUERDO, label: 'Q2' },
+                      { id: QUAD_INF_ESQUERDO, label: 'Q3' },
+                      { id: QUAD_INF_DIREITO, label: 'Q4' },
+                    ].map(({ id, label }) => (
                       <button
-                        onClick={() => {
-                          void (isRecording ? stopRecording() : startRecording());
-                        }}
-                        disabled={isTranscribing}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                          isRecording
-                            ? "bg-red-100 text-red-600 hover:bg-red-200 animate-pulse"
-                            : "bg-teal/10 text-teal hover:bg-teal/20"
+                        key={id}
+                        type="button"
+                        onClick={() => toggleArch(id)}
+                        className={`text-[10.5px] font-bold rounded-full px-2.5 py-1 border transition-colors ${
+                          selectedTeeth.includes(id)
+                            ? 'bg-teal border-teal text-white'
+                            : 'bg-surface border-border text-text-secondary hover:border-teal hover:text-teal-ink'
                         }`}
                       >
-                        {isTranscribing ? (
-                          <>
-                            <span className="w-3.5 h-3.5 inline-block border-2 border-teal border-t-transparent rounded-full animate-spin" />{" "}
-                            Transcrevendo...
-                          </>
-                        ) : isRecording ? (
-                          <>
-                            <MicOff className="w-3.5 h-3.5" /> Parar Gravação
-                          </>
-                        ) : (
-                          <>
-                            <Mic className="w-3.5 h-3.5" /> Gravar Voz (IA)
-                          </>
-                        )}
+                        {label}
                       </button>
-                    ) : (
-                      <span
-                        title="Disponível no Plano Básico"
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-surface-alt text-text-secondary cursor-not-allowed select-none"
-                      >
-                        <Lock className="w-3.5 h-3.5" /> Gravar Voz (IA)
-                      </span>
-                    )}
+                    ))}
                   </div>
+                </div>
+
+              {/* Perfil do dente — abre full-width ao tocar um dente (artefato §04) */}
+              {denteAberto != null && (
+                <ToothDetailPanel
+                  dente={denteAberto}
+                  eventos={eventosDraft}
+                  onChange={setEventosDraft}
+                  onClose={() => setDenteAberto(null)}
+                  dataPadrao={formData.dataAtendimento}
+                />
+              )}
+
+              <div className="border-t border-border/60" />
+
+              {/* Registros — agrupados por dente/procedimento, obs por registro */}
+              <div className="flex flex-col gap-3">
+                <div className="flex items-baseline justify-between px-1">
+                  <h3 className="font-heading text-lg text-text-primary">Registros da consulta</h3>
+                  <span className="text-[11px] font-semibold text-text-secondary">
+                    {gruposDraft.length > 0 ? `${gruposDraft.length} registro${gruposDraft.length > 1 ? 's' : ''}` : 'nenhum ainda'}
+                  </span>
+                </div>
+
+                {gruposDraft.length === 0 ? (
+                  <div className="border border-dashed border-border rounded-2xl px-6 py-7 text-center">
+                    <p className="font-heading text-base text-text-primary mb-1">Nenhum registro ainda</p>
+                    <p className="text-xs text-text-secondary max-w-sm mx-auto">
+                      Narre no campo mágico e toque &ldquo;Organizar&rdquo;, ou toque um dente no odontograma
+                      para lançar à mão. Os registros aparecem aqui.
+                    </p>
+                  </div>
+                ) : (
+                  gruposDraft.map(({ chave, idxs, faces }) => {
+                    const ev = eventosDraft[idxs[0]];
+                    const dentes = [...new Set(idxs.map((i) => eventosDraft[i].ancora.dente).filter((d): d is number => d != null))];
+                    const alvo = dentes.length === 0
+                      ? (ev.ancora.arcada ? `arcada ${ev.ancora.arcada}` : ev.ancora.quadrante ? `quadrante ${ev.ancora.quadrante}` : 'boca')
+                      : dentes.length === 1 ? `dente ${dentes[0]}` : `dentes ${dentes.join(' · ')}`;
+                    const feito = ev.status === 'realizado';
+                    return (
+                      <div key={chave} className="bg-surface border border-dashed border-border rounded-xl overflow-hidden">
+                        <div className="flex items-center gap-3 px-4 py-3 flex-wrap">
+                          <span className="shrink-0 min-w-[30px] h-[30px] px-2 rounded-lg bg-surface-alt border border-border flex items-center justify-center font-mono text-xs font-bold text-text-primary">
+                            {dentes.length === 1 ? dentes[0] : dentes.length > 1 ? `${dentes.length}×` : '—'}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-sm text-text-primary">
+                              {TIPO_LABEL[ev.tipo]}{faces ? ` ${faces}` : ''} · {alvo}
+                            </p>
+                          </div>
+                          <span className={`inline-flex items-center gap-1.5 shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-full ${
+                            feito ? 'bg-teal-pale text-teal-ink' : 'bg-coral-pale text-coral-ink'
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${feito ? 'bg-teal' : 'bg-coral'}`} />
+                            {feito ? 'Realizado' : 'Planejado'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => removerGrupoDraft(idxs)}
+                            className="shrink-0 p-1 rounded-md text-text-secondary hover:text-coral-ink transition-colors"
+                            aria-label="Remover registro"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2 px-4 pb-3">
+                          <span className="text-[9.5px] font-bold uppercase tracking-widest text-text-secondary shrink-0">Obs.</span>
+                          <input
+                            type="text"
+                            value={ev.observacao}
+                            onChange={(e) => atualizarObsGrupo(idxs, e.target.value)}
+                            placeholder="material, técnica, intercorrência…"
+                            className="flex-1 bg-surface-alt border border-dashed border-border rounded-lg px-3 py-1.5 text-xs italic text-text-primary outline-none focus:border-teal transition-colors"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              <div className="border-t border-border/60" />
+
+              {/* Anotações gerais + conduta + ações (zona 5 do definitivo, sem o bloco Procedimentos) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-[0.15em] mb-1.5">
+                    Anotações gerais
+                  </label>
                   <textarea
                     value={formData.observation}
                     onChange={(e) => setFormData((f) => ({ ...f, observation: e.target.value }))}
-                    placeholder="Descreva os procedimentos realizados, queixas do paciente, etc..."
-                    className="w-full bg-surface-alt border border-border rounded-xl px-4 py-3 text-sm font-medium text-text-primary outline-none focus:border-teal transition-colors min-h-[120px] resize-y"
+                    placeholder="Evolução clínica em texto — o que não é procedimento estruturado."
+                    className="w-full bg-surface-alt border border-border rounded-xl px-3.5 py-2.5 text-sm font-medium text-text-primary outline-none focus:border-teal transition-colors min-h-[80px] resize-y"
                   />
                 </div>
-
-                {/* Seção de procedimentos — sempre visível, sem layout shift */}
-                <div className="space-y-3">
-                  <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-[0.15em]">
-                    Procedimentos
+                <div>
+                  <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-[0.15em] mb-1.5">
+                    Conduta
                   </label>
-
-                  {selectedTeeth.length === 0 && sharedTeeth.length === 0 ? (
-                    <div className="min-h-[88px] flex items-center justify-center text-xs text-text-secondary bg-surface-alt rounded-xl border border-dashed border-border/60">
-                      {selectionMode === 'arch'
-                        ? 'Selecione uma arcada ao lado'
-                        : 'Selecione dentes no odontograma ao lado'}
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {/* Dentes individuais (modo single / arcada) */}
-                      {selectedTeeth.length > 0 && (
-                        <div className="space-y-3">
-                          {sharedTeeth.length > 0 && (
-                            <span className="text-xs font-bold text-text-secondary uppercase tracking-widest">Individuais</span>
-                          )}
-                          {selectedTeeth.map((tooth) => {
-                            const tn = formData.teethNotes.find((t) => t.tooth === tooth);
-                            const notes = tn?.notes ?? [''];
-                            return (
-                              <motion.div
-                                key={tooth}
-                                initial={{ opacity: 0, x: -10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                className="flex items-start gap-3"
-                              >
-                                {tooth in ARCH_LABELS ? (
-                                  <div className="shrink-0 rounded-lg bg-teal text-white flex items-center justify-center font-mono text-xs font-bold shadow-sm mt-0.5 px-2 py-2 whitespace-nowrap">
-                                    {ARCH_LABELS[tooth]}
-                                  </div>
-                                ) : (
-                                  <div className="w-10 h-10 shrink-0 rounded-lg bg-teal text-white flex items-center justify-center font-mono text-sm font-bold shadow-sm mt-0.5">
-                                    {tooth}
-                                  </div>
-                                )}
-                                <div className="flex-1 space-y-2">
-                                  {notes.map((note, idx) => (
-                                    <div key={idx} className="flex items-center gap-2">
-                                      <input
-                                        type="text"
-                                        value={note}
-                                        onChange={(e) => handleToothNoteChange(tooth, idx, e.target.value)}
-                                        placeholder={`Procedimento ${idx + 1}...`}
-                                        className="flex-1 bg-surface-alt border border-border rounded-xl px-4 py-2.5 text-sm font-medium text-text-primary outline-none focus:border-teal transition-colors"
-                                      />
-                                      {notes.length > 1 && (
-                                        <button type="button" onClick={() => removeToothNote(tooth, idx)} className="p-1.5 text-text-secondary hover:text-red-500 transition-colors rounded-lg hover:bg-surface-alt">
-                                          <X className="w-3.5 h-3.5" />
-                                        </button>
-                                      )}
-                                    </div>
-                                  ))}
-                                  <button type="button" onClick={() => addToothNote(tooth)} className="flex items-center gap-1.5 text-xs font-semibold text-teal hover:text-teal-lt transition-colors px-1">
-                                    <Plus className="w-3.5 h-3.5" />
-                                    Adicionar procedimento
-                                  </button>
-                                </div>
-                              </motion.div>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      {/* Grupo de dentes (modo múltiplos) */}
-                      {(sharedTeeth.length > 0 || selectionMode === 'multiple') && (
-                        <div className="space-y-3">
-                          {selectedTeeth.length > 0 && (
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 h-px bg-border/60" />
-                              <span className="text-xs font-bold text-text-secondary uppercase tracking-widest shrink-0">Grupo</span>
-                              <div className="flex-1 h-px bg-border/60" />
-                            </div>
-                          )}
-                          {sharedTeeth.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5">
-                              {sharedTeeth.map((tooth) => (
-                                <div key={tooth} className="flex items-center gap-1 bg-teal/15 border border-teal/40 text-teal px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold">
-                                  D{tooth}
-                                  <button type="button" onClick={() => toggleTooth(tooth)} className="ml-0.5 hover:opacity-60 transition-opacity">
-                                    <X className="w-2.5 h-2.5" />
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          {sharedTeeth.length === 0 ? (
-                            <div className="min-h-[60px] flex items-center justify-center text-xs text-text-secondary bg-surface-alt rounded-xl border border-dashed border-border/60">
-                              Selecione os dentes no odontograma
-                            </div>
-                          ) : (
-                            <div className="space-y-2">
-                              {sharedNotes.map((note, idx) => (
-                                <div key={idx} className="flex items-center gap-2">
-                                  <input
-                                    type="text"
-                                    value={note}
-                                    onChange={(e) => handleSharedNoteChange(idx, e.target.value)}
-                                    placeholder={`Procedimento ${idx + 1} para todos os dentes...`}
-                                    className="flex-1 bg-surface-alt border border-teal/30 rounded-xl px-4 py-2.5 text-sm font-medium text-text-primary outline-none focus:border-teal transition-colors"
-                                  />
-                                  {sharedNotes.length > 1 && (
-                                    <button type="button" onClick={() => removeSharedNote(idx)} className="p-1.5 text-text-secondary hover:text-red-500 transition-colors rounded-lg hover:bg-surface-alt">
-                                      <X className="w-3.5 h-3.5" />
-                                    </button>
-                                  )}
-                                </div>
-                              ))}
-                              <button type="button" onClick={addSharedNote} className="flex items-center gap-1.5 text-xs font-semibold text-teal hover:text-teal-lt transition-colors px-1">
-                                <Plus className="w-3.5 h-3.5" />
-                                Adicionar procedimento
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-end gap-3 pt-4 border-t border-border/60">
-                  <button
-                    onClick={closePanel}
-                    className="px-5 py-2.5 rounded-xl font-semibold text-sm text-text-secondary hover:text-text-primary hover:bg-surface-alt transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={() => void handleSave()}
-                    disabled={isSaving}
-                    className="bg-teal hover:bg-teal-lt text-white px-5 py-2.5 rounded-xl font-semibold text-sm flex items-center gap-2 transition-all shadow-[0_0_15px_rgba(47,156,133,0.3)] disabled:opacity-50"
-                  >
-                    {isSaving ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Check className="w-4 h-4" />
-                    )}
-                    {isSaving ? "Salvando..." : "Salvar Evolução"}
-                  </button>
+                  <textarea
+                    value={formData.conduta}
+                    onChange={(e) => setFormData((f) => ({ ...f, conduta: e.target.value }))}
+                    placeholder="Orientações ao paciente, cuidados pós-procedimento, prescrições..."
+                    className="w-full bg-surface-alt border border-border rounded-xl px-3.5 py-2.5 text-sm font-medium text-text-primary outline-none focus:border-teal transition-colors min-h-[80px] resize-y"
+                  />
                 </div>
               </div>
 
-              {/* Odontograma */}
-              <div
-                className="flex-[2] p-6 flex flex-col border-t lg:border-t-0 lg:border-l min-h-[480px]"
-                style={{ borderColor: 'var(--color-border)' }}
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-heading text-lg text-text-primary flex items-center">
-                    Odontograma
-                    <HelpTooltip content="Escolha o tipo de seleção e marque os dentes ou arcadas afetados." />
-                  </h3>
-                  {selectionMode === 'arch' && (
-                    <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-text-secondary">
-                      <div className="w-2.5 h-2.5 rounded-sm bg-teal" /> Selecionado
-                    </div>
-                  )}
-                </div>
-
-                {/* Seletor de modo */}
-                <div className="flex gap-1 p-1 rounded-xl mb-6" style={{ background: 'var(--color-bg)' }}>
-                  {([
-                    { id: 'single', label: 'Dente único' },
-                    { id: 'multiple', label: 'Múltiplos' },
-                    { id: 'arch', label: 'Arcada / Geral' },
-                  ] as const).map(({ id, label }) => (
-                    <button
-                      key={id}
-                      onClick={() => handleModeChange(id)}
-                      className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-bold transition-all ${
-                        selectionMode === id
-                          ? 'bg-surface-alt shadow-sm text-text-primary'
-                          : 'text-text-secondary hover:text-text-primary'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-
-                <AnimatePresence mode="wait" initial={false}>
-                  {selectionMode !== 'arch' ? (
-                    <motion.div
-                      key="odontogram"
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -6 }}
-                      transition={{ duration: 0.16 }}
-                      className="flex-1 flex flex-col justify-center"
-                    >
-                      <Odontograma
-                        selectedTeeth={selectedTeeth}
-                        sharedTeeth={sharedTeeth}
-                        historicalTeeth={editingId ? historicalTeeth : new Set<number>()}
-                        onToothToggle={toggleTooth}
-                        showCheckbox={selectionMode === 'multiple'}
-                        hideFilters
-                      />
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      key="arch"
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -6 }}
-                      transition={{ duration: 0.16 }}
-                      className="flex-1 flex flex-col justify-center gap-3"
-                    >
-                      <p className="text-xs text-text-secondary text-center mb-1">
-                        Selecione a área afetada pelo procedimento
-                      </p>
-                      {[
-                        { id: ARCH_SUPERIOR, label: 'Arcada Superior', sub: 'Dentes 11 a 28' },
-                        { id: ARCH_INFERIOR, label: 'Arcada Inferior', sub: 'Dentes 31 a 48' },
-                        { id: ARCH_COMPLETA, label: 'Boca Toda', sub: 'Todas as arcadas' },
-                      ].map(({ id, label, sub }) => (
-                        <button
-                          key={id}
-                          onClick={() => toggleArch(id)}
-                          className={`w-full px-4 py-3 rounded-xl text-sm font-semibold border-2 transition-all flex items-center justify-between ${
-                            selectedTeeth.includes(id)
-                              ? 'bg-teal border-teal text-white'
-                              : 'bg-surface-alt border-border text-text-primary hover:border-teal hover:text-teal'
-                          }`}
-                        >
-                          <span>{label}</span>
-                          <span className={`text-xs font-normal ${selectedTeeth.includes(id) ? 'text-white/70' : 'text-text-secondary'}`}>
-                            {sub}
-                          </span>
-                        </button>
-                      ))}
-
-                      {/* Quadrante (#16 D5) — raspagem/alisamento por quadrante, seleção manual v1 */}
-                      <div className="flex items-center gap-2 pt-1">
-                        <div className="flex-1 h-px bg-border/60" />
-                        <span className="text-[10px] font-bold text-text-secondary uppercase tracking-widest shrink-0">Ou por quadrante</span>
-                        <div className="flex-1 h-px bg-border/60" />
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        {[
-                          { id: QUAD_SUP_DIREITO, label: 'Sup. Direito' },
-                          { id: QUAD_SUP_ESQUERDO, label: 'Sup. Esquerdo' },
-                          { id: QUAD_INF_DIREITO, label: 'Inf. Direito' },
-                          { id: QUAD_INF_ESQUERDO, label: 'Inf. Esquerdo' },
-                        ].map(({ id, label }) => (
-                          <button
-                            key={id}
-                            onClick={() => toggleArch(id)}
-                            className={`px-3 py-2 rounded-lg text-xs font-semibold border-2 transition-all ${
-                              selectedTeeth.includes(id)
-                                ? 'bg-teal border-teal text-white'
-                                : 'bg-surface-alt border-border text-text-primary hover:border-teal hover:text-teal'
-                            }`}
-                          >
-                            {label}
-                          </button>
-                        ))}
-                      </div>
-
-                      <p className="text-center text-xs text-text-secondary font-medium mt-1">
-                        Procedimentos em toda a arcada, quadrante ou boca.
-                      </p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-border/60">
+                <button
+                  onClick={closePanel}
+                  className="px-5 py-2.5 rounded-xl font-semibold text-sm text-text-secondary hover:text-text-primary hover:bg-surface-alt transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => void handleSave()}
+                  disabled={isSaving}
+                  className="bg-teal hover:bg-teal-lt text-white px-5 py-2.5 rounded-xl font-semibold text-sm flex items-center gap-2 transition-all shadow-[0_0_15px_rgba(47,156,133,0.3)] disabled:opacity-50"
+                >
+                  {isSaving ? (<Loader2 className="w-4 h-4 animate-spin" />) : (<Check className="w-4 h-4" />)}
+                  {isSaving ? "Salvando..." : "Salvar Evolução"}
+                </button>
               </div>
+            </div>
             </div>
           </motion.div>
         )}
@@ -1010,10 +1105,10 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
         </div>
       )}
 
-      <div className="relative space-y-14 before:absolute before:left-[19px] before:top-4 before:bottom-4 before:w-px before:bg-border/40">
+      <div className="space-y-5">
         {/* Lista cronológica plana — todas as fichas (modelo 1 ficha = 1 tratamento) */}
         {evolutions.length > 0 && (
-          <div className="space-y-14">
+          <div className="space-y-5">
             {evolutions.map((evo, idx) => {
               const isExpanded = viewingEvo?.id === evo.id;
               const validKeys = evo.teethNotes.flatMap((tn) =>
@@ -1022,365 +1117,267 @@ export function FichasTab({ patientId, clinicaId, dentistaId, plano, patientName
               const totalProcs = validKeys.length;
               const doneProcs = validKeys.filter((k) => evo.procedimentosStatus[k] === 'concluido').length;
               const allDone = totalProcs > 0 && doneProcs === totalProcs;
-              const pct = totalProcs > 0 ? Math.round((doneProcs / totalProcs) * 100) : 0;
-              const filteredTeethNotes = isExpanded && filterTooth
-                ? evo.teethNotes.filter((tn) => tn.tooth === filterTooth)
-                : evo.teethNotes;
 
               return (
               <motion.div
                 key={evo.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: idx * 0.05 }}
-                className="relative pl-10 sm:pl-12 group"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: Math.min(idx * 0.04, 0.3) }}
               >
-                <div className={`absolute left-0 top-1 w-10 h-10 rounded-full bg-surface border-2 flex items-center justify-center z-10 shadow-sm transition-all ${allDone ? 'border-emerald-500' : 'border-teal'} ${isExpanded ? 'scale-110' : 'group-hover:scale-110'}`}>
-                  {allDone
-                    ? <Check className="w-4 h-4 text-emerald-500" />
-                    : <div className="w-2 h-2 rounded-full bg-teal" />
-                  }
-                </div>
-
-                <div
-                  className={`bg-surface rounded-2xl border transition-all duration-200 ${isExpanded ? 'border-teal/50 shadow-lg' : 'border-border/60 shadow-sm'}`}
-                  style={allDone && !isExpanded ? { boxShadow: '-3px 0 0 0 #10b981, 0 1px 3px rgba(0,0,0,0.06)' } : undefined}
-                >
-                  {/* Header — sempre visível, clicável para expandir */}
+                {/* ═══ Ficha salva — design definitivo (artefato §05, 21/07). Header 1 linha:
+                    tipo · data · autor/CRO · contagem · pills · ações. Expandido: odontograma-
+                    índice + registros (eventos OU derivação v2 no MESMO visual) + orto + textos. */}
+                <div className={`bg-surface rounded-2xl border transition-all duration-200 overflow-hidden ${isExpanded ? 'border-teal/50 shadow-lg' : 'border-border/60 shadow-sm'}`}>
                   <div
                     role="button"
                     tabIndex={0}
-                    onClick={() => { setFilterTooth(null); setViewingEvo(isExpanded ? null : evo); }}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFilterTooth(null); setViewingEvo(isExpanded ? null : evo); } }}
-                    className="p-6 cursor-pointer hover:bg-surface-alt/30 rounded-t-2xl transition-colors"
+                    onClick={() => { setDenteSalvoAberto(null); setViewingEvo(isExpanded ? null : evo); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDenteSalvoAberto(null); setViewingEvo(isExpanded ? null : evo); } }}
+                    className="w-full flex items-center gap-3 px-5 py-4 cursor-pointer flex-wrap"
                   >
-                    <div className="flex flex-wrap justify-between items-start gap-2">
-                      <div className="space-y-1 min-w-0">
-                        <div className="flex items-center gap-3 flex-wrap">
-                          <span className="bg-teal/10 text-teal px-2.5 py-1 rounded-md text-[9px] font-bold uppercase tracking-widest">
-                            {evo.type}
+                    <div className="min-w-0 flex-1">
+                      <p className="font-heading text-lg text-text-primary truncate">
+                        {evo.type} · <span className="font-mono text-base">{evo.date}</span>
+                      </p>
+                      <p className="text-xs text-text-secondary mt-0.5 truncate">
+                        {evo.professional}
+                        {evo.autorCro && <span className="font-mono"> — {evo.autorCro}</span>}
+                        {' · '}
+                        {evo.eventos.length > 0
+                          ? `${evo.eventos.length} registro${evo.eventos.length > 1 ? 's' : ''}`
+                          : `${totalProcs} procedimento${totalProcs !== 1 ? 's' : ''}`}
+                        {evo.assinadoEm && <span className="text-teal-ink font-semibold"> · ✓ assinada</span>}
+                      </p>
+                    </div>
+
+                    {evo.eventos.length > 0 ? (
+                      (() => {
+                        const feitos = evo.eventos.filter((e) => e.status === 'realizado').length;
+                        const plan = evo.eventos.length - feitos;
+                        return (
+                          <span className="flex items-center gap-1.5 shrink-0">
+                            {feitos > 0 && (
+                              <span className="inline-flex items-center gap-1.5 text-[10.5px] font-bold px-2.5 py-1 rounded-full bg-teal-pale text-teal-ink">
+                                <span className="w-1.5 h-1.5 rounded-full bg-teal" />{feitos} feito{feitos > 1 ? 's' : ''}
+                              </span>
+                            )}
+                            {plan > 0 && (
+                              <span className="inline-flex items-center gap-1.5 text-[10.5px] font-bold px-2.5 py-1 rounded-full bg-coral-pale text-coral-ink">
+                                <span className="w-1.5 h-1.5 rounded-full bg-coral" />{plan} planejado{plan > 1 ? 's' : ''}
+                              </span>
+                            )}
                           </span>
-                          <h4 className="text-sm font-bold text-text-primary">{evo.date}</h4>
-                          {totalProcs > 0 && (
-                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold border ${allDone ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/20'}`}>
-                              {allDone ? '✓ Concluído' : `${doneProcs}/${totalProcs} realizados`}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 text-[10px] text-text-secondary font-medium">
-                          <User className="w-3 h-3" /> {evo.professional}
-                          {/* Só marca o que foge do esperado: a ficha do colega. A própria fica
-                              discreta como sempre foi, e numa clínica de um dentista o badge
-                              nunca aparece. Ausência dos botões de editar não é sinal rápido
-                              o bastante — o gate é distinguir sem clicar (spec §9). */}
-                          {canWrite && evo.dentistaId !== dentistaId && (
-                            <span className="px-1.5 py-0.5 rounded border border-border bg-surface-alt text-[9px] font-bold uppercase tracking-wide">
-                              Somente leitura
-                            </span>
-                          )}
-                        </div>
-                      </div>
+                        );
+                      })()
+                    ) : totalProcs > 0 ? (
+                      <span className={`inline-flex items-center gap-1.5 shrink-0 text-[10.5px] font-bold px-2.5 py-1 rounded-full ${allDone ? 'bg-teal-pale text-teal-ink' : 'bg-surface-alt text-text-secondary'}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${allDone ? 'bg-teal' : 'bg-border-strong'}`} style={!allDone ? { background: 'var(--color-border)' } : undefined} />
+                        {doneProcs}/{totalProcs} realizados
+                      </span>
+                    ) : null}
 
-                      <div className="flex items-center gap-2 flex-wrap justify-end">
-                        {/* Ação principal por estado (#5 + #6) — máx. 2 botões grandes */}
-                        {evo.assinadoEm ? (
-                          <>
-                            <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[9px] font-bold">
-                              <Check className="w-3 h-3" />
-                              Assinado em {new Date(evo.assinadoEm).toLocaleDateString('pt-BR')}
-                            </span>
-                            {onGerarOrcamento && (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); onGerarOrcamento(evo.id); }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 min-h-[36px] rounded-lg text-[10px] font-bold bg-teal text-white hover:bg-teal-lt transition-colors shadow-sm"
-                              >
-                                <CircleDollarSign className="w-3.5 h-3.5" />
-                                Gerar orçamento
-                              </button>
-                            )}
-                          </>
-                        ) : (
-                          <>
-                            {onGerarOrcamento && (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); onGerarOrcamento(evo.id); }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 min-h-[36px] rounded-lg text-[10px] font-bold bg-teal text-white hover:bg-teal-lt transition-colors shadow-sm"
-                              >
-                                <CircleDollarSign className="w-3.5 h-3.5" />
-                                Gerar orçamento
-                              </button>
-                            )}
-                            {/* Assinar escreve na ficha (assinatura_url) — é ESCRITA clínica, só o
-                                autor (migration 099). Antes aparecia pra qualquer um: o não-autor (outro
-                                dentista ou secretária) assinava, o PNG subia pro storage (bucket por
-                                clínica), mas o UPDATE era barrado pela RLS em silêncio → "Assinatura
-                                salva" falso + PNG órfão. Gate igual ao editar/excluir. */}
-                            {podeEditarFicha(evo) && (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); setSigningFichaId(evo.id); }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 min-h-[36px] rounded-lg text-[10px] font-bold border border-border text-text-secondary hover:border-teal hover:text-teal transition-colors"
-                              >
-                                <Signature className="w-3.5 h-3.5" />
-                                Assinar
-                              </button>
-                            )}
-                          </>
-                        )}
-
-                        {/* Divisor */}
-                        <div className="w-px h-6 bg-border/60 mx-0.5" />
-
-                        {/* Ações secundárias — ícones (#5). Editar/Excluir só na ficha própria:
-                            a de outro dentista é leitura (migration 099). Baixar o PDF continua
-                            liberado — ler é o ponto de abrir o histórico pra clínica. */}
-                        {podeEditarFicha(evo) && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleEdit(evo); }}
-                            title="Editar"
-                            className="p-2 hover:bg-surface-alt rounded-lg transition-colors text-text-secondary hover:text-teal"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                        )}
+                    <span className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      {onGerarOrcamento && (
                         <button
-                          onClick={(e) => { e.stopPropagation(); window.open(`/api/fichas/${evo.id}/pdf`, '_blank'); }}
-                          title="Baixar"
+                          onClick={() => onGerarOrcamento(evo.id)}
+                          title="Gerar orçamento"
+                          className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-teal-ink hover:bg-teal-pale transition-colors"
+                        >
+                          Gerar orçamento
+                        </button>
+                      )}
+                      {podeEditarFicha(evo) && (
+                        <button
+                          onClick={() => handleEdit(evo)}
+                          title="Editar"
                           className="p-2 hover:bg-surface-alt rounded-lg transition-colors text-text-secondary hover:text-text-primary"
                         >
-                          <Download className="w-4 h-4" />
+                          <Pencil className="w-4 h-4" />
                         </button>
-                        {/* Excluir é escrita clínica — a RLS já barra a secretária e o não-autor;
-                            escondemos o botão pra não dar a falsa impressão de que apagou (update otimista). */}
-                        {podeEditarFicha(evo) && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(evo.id); }}
-                            title="Excluir"
-                            className="p-2 hover:bg-surface-alt rounded-lg transition-colors text-text-secondary hover:text-red-500"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-
-                        <div className={`p-1 text-text-secondary/40 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
-                          <ChevronRight className="w-4 h-4 -rotate-90" />
-                        </div>
-                      </div>
-                    </div>
+                      )}
+                      <button
+                        onClick={() => window.open(`/api/fichas/${evo.id}/pdf`, '_blank')}
+                        title="Baixar"
+                        className="p-2 hover:bg-surface-alt rounded-lg transition-colors text-text-secondary hover:text-text-primary"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
+                      {podeEditarFicha(evo) && (
+                        <button
+                          onClick={() => setShowDeleteConfirm(evo.id)}
+                          title="Excluir"
+                          className="p-2 hover:bg-surface-alt rounded-lg transition-colors text-text-secondary hover:text-red-500"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                      <span className={`p-1 text-text-secondary/40 transition-transform duration-300 inline-flex ${isExpanded ? 'rotate-180' : ''}`}>
+                        <ChevronRight className="w-4 h-4 -rotate-90" />
+                      </span>
+                    </span>
                   </div>
 
-                  {/* Preview — visível quando recolhido */}
+                  {/* Colapsada: 1 linha de resumo — o detalhe mora no expandido (feedback 21/07) */}
                   {!isExpanded && (
-                    <div className="px-6 pb-6">
-                      {evo.procedimentos.length > 0 && (
-                        <div className="mb-4">
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary/60 mb-2">Procedimentos realizados</p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {evo.procedimentos.map((proc, i) => (
-                              <span
-                                key={i}
-                                className="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-medium border"
-                                style={{
-                                  background: 'color-mix(in srgb, var(--color-teal) 8%, transparent)',
-                                  color: 'var(--color-teal)',
-                                  borderColor: 'color-mix(in srgb, var(--color-teal) 18%, var(--color-border))',
-                                }}
-                              >
-                                {proc}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {evo.conduta && (
-                        <div className="mb-4 rounded-xl border border-border/50 px-3 py-2.5 bg-surface-alt/60">
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary/60 mb-1">Conduta</p>
-                          <p className="text-xs text-text-secondary leading-relaxed">{evo.conduta}</p>
-                        </div>
-                      )}
-
-                      {evo.observation && (
-                        <p className="text-sm text-text-secondary leading-relaxed mb-4">{evo.observation}</p>
-                      )}
-
-                      {evo.teethNotes.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mb-4">
-                          {evo.teethNotes.map((tn) => (
-                            <span
-                              key={tn.tooth}
-                              className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-mono font-bold text-teal bg-surface-alt border border-border/40"
-                            >
-                              {tn.tooth in ARCH_LABELS ? ARCH_LABELS[tn.tooth] : `D${tn.tooth}`}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-
-                      {evo.files.length > 0 && (
-                        <div className="flex gap-2">
-                          {evo.files.map((f, i) => (
-                            <div key={i} className="flex items-center gap-2 px-3 py-2 bg-surface-alt rounded-xl border border-border/40 text-[10px] font-bold text-text-primary">
-                              <FileText className="w-3 h-3 text-teal" /> {f}
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                    <div className="px-5 pb-4 flex items-center gap-2 flex-wrap text-[11px] font-semibold text-text-secondary">
+                      {(() => {
+                        const dentes = evo.eventos.length > 0
+                          ? [...new Set(evo.eventos.map((e) => e.ancora.dente).filter((d): d is number => d != null))]
+                          : [...new Set(evo.teethNotes.map((tn) => tn.tooth).filter((t) => !(t in ARCH_LABELS)))];
+                        const regioes = evo.eventos.length === 0
+                          ? evo.teethNotes.map((tn) => tn.tooth).filter((t) => t in ARCH_LABELS).map((t) => ARCH_LABELS[t])
+                          : [];
+                        return (
+                          <>
+                            {dentes.sort((a, b) => a - b).length > 0 && (
+                              <span className="font-mono">{dentes.map((d) => `D${d}`).join(' · ')}</span>
+                            )}
+                            {regioes.map((r) => <span key={r}>{r}</span>)}
+                            {evo.ortoManutencao && <span className="text-slate-ink">· orto</span>}
+                            <span className="text-text-secondary/50 font-normal">— toque para abrir</span>
+                          </>
+                        );
+                      })()}
                     </div>
                   )}
 
-                  {/* Expansão inline — tratamento completo */}
                   <AnimatePresence initial={false}>
                     {isExpanded && (
                       <motion.div
-                        key="expanded"
+                        key="aberta"
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-                        className="overflow-hidden"
+                        transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
                       >
-                        <div className="border-t border-border/40 px-6 pb-6 pt-5 space-y-6">
+                        <div className="border-t border-border/60 px-5 py-5 flex flex-col gap-4">
 
-                          {/* Observações — sempre visível, full-width */}
-                          <div>
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary/70 mb-2">Observações gerais</p>
-                            <div className="bg-surface-alt rounded-xl border border-border/40 px-4 py-3 flex flex-wrap items-start gap-x-6 gap-y-2">
-                              <p className="text-sm leading-relaxed flex-1 min-w-[200px] text-text-secondary">
-                                {evo.observation || <span className="italic text-text-secondary/40">Sem observações registradas.</span>}
-                              </p>
+                          {/* Odontograma — índice: clicar um dente abre o perfil (readOnly) */}
+                          <div className="bg-surface-alt/40 border border-border/60 rounded-2xl p-4">
+                            <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                              <p className="font-heading text-base text-text-primary">Odontograma — índice</p>
+                              <p className="text-[10.5px] text-text-secondary italic">toque um dente para ver o perfil</p>
+                            </div>
+                            <Odontograma
+                              eventos={evo.eventos.length > 0 ? evo.eventos.map(eventoViewParaDraft) : undefined}
+                              selectedTeeth={evo.eventos.length > 0 ? [] : evo.teethNotes.map((tn) => tn.tooth)}
+                              onToothToggle={(d) => setDenteSalvoAberto((cur) => cur?.fichaId === evo.id && cur.dente === d ? null : { fichaId: evo.id, dente: d })}
+                              compact
+                              hideFilters
+                            />
+                          </div>
+
+                          {denteSalvoAberto?.fichaId === evo.id && (
+                            <ToothDetailPanel
+                              dente={denteSalvoAberto.dente}
+                              eventos={evo.eventos.map(eventoViewParaDraft)}
+                              onChange={() => {}}
+                              onClose={() => setDenteSalvoAberto(null)}
+                              dataPadrao={evo.dataAtendimento}
+                              readOnly
+                            />
+                          )}
+
+                          {/* Registros — eventos (novo modelo) OU derivação v2 no MESMO visual */}
+                          {evo.eventos.length > 0 ? (
+                            <div className="flex flex-col gap-2">
+                              {eventosParaCards(evo.eventos, evo.professional, evo.autorCro, evo.assinadoEm != null).map(({ key, ids, data }) => (
+                                <RegistroCard
+                                  key={key}
+                                  data={data}
+                                  onToggleStatus={
+                                    podeEditarFicha(evo) && !evo.assinadoEm
+                                      ? () => void toggleStatusRegistro(evo, ids, data.status)
+                                      : undefined
+                                  }
+                                >
+                                  {corpoEspecialidade(data.tipo, data.detalhe)}
+                                </RegistroCard>
+                              ))}
+                            </div>
+                          ) : evo.teethNotes.length > 0 && (
+                            <div className="flex flex-col gap-2">
+                              {evo.teethNotes.flatMap((tn) =>
+                                tn.notes.filter(Boolean).map((nota, i) => {
+                                  const k = `${tn.tooth}_${i}`;
+                                  const st: ProcStatus = evo.procedimentosStatus[k] ?? 'nao_iniciado';
+                                  const meta = STATUS_META[st];
+                                  const StatusIcon = meta.icon;
+                                  const editavel = podeEditarFicha(evo);
+                                  return (
+                                    <div key={k} className="bg-surface border border-border rounded-xl flex items-center gap-3 px-4 py-2.5 flex-wrap">
+                                      <span className="shrink-0 min-w-[30px] h-[30px] px-2 rounded-lg bg-surface-alt border border-border flex items-center justify-center font-mono text-[11px] font-bold text-text-primary">
+                                        {tn.tooth in ARCH_LABELS ? ARCH_LABELS[tn.tooth] : tn.tooth}
+                                      </span>
+                                      <p className="min-w-0 flex-1 text-sm font-medium text-text-primary">{nota}</p>
+                                      <button
+                                        type="button"
+                                        disabled={!editavel}
+                                        onClick={() => editavel && void updateProcStatus(evo.id, evo.procedimentosStatus, k, STATUS_CYCLE[st])}
+                                        className={`inline-flex items-center gap-1.5 shrink-0 text-[10.5px] font-bold px-2.5 py-1 rounded-full border transition-colors ${meta.className} ${!editavel ? 'cursor-default opacity-70' : ''}`}
+                                      >
+                                        <StatusIcon className="w-3 h-3" />
+                                        {meta.label}
+                                      </button>
+                                    </div>
+                                  );
+                                })
+                              )}
+                            </div>
+                          )}
+
+                          {evo.ortoManutencao && (
+                            <div className="bg-surface-alt/40 border border-border/60 rounded-2xl px-4 py-3">
+                              <OrtoCard valor={evo.ortoManutencao} />
+                            </div>
+                          )}
+
+                          {/* Assinatura por procedimento (artefato §07) — sai do topo, vem
+                              pro rodapé mostrando O QUE ela cobre. Planejado não assina. */}
+                          {podeEditarFicha(evo) && !evo.assinadoEm && (() => {
+                            const realizados = evo.eventos.filter((e) => e.status === 'realizado');
+                            const legado = evo.eventos.length === 0 && totalProcs > 0;
+                            if (realizados.length === 0 && !legado) return null;
+                            return (
+                              <div className="border border-teal/40 bg-teal-pale/40 rounded-2xl px-4 py-3 flex items-center gap-3 flex-wrap">
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-[11px] font-bold uppercase tracking-widest text-teal-ink mb-0.5">
+                                    Assinatura do paciente
+                                  </p>
+                                  <p className="text-xs text-text-secondary">
+                                    {legado
+                                      ? `Cobre os ${doneProcs} procedimento${doneProcs !== 1 ? 's' : ''} concluído${doneProcs !== 1 ? 's' : ''} desta ficha.`
+                                      : `Cobre ${realizados.length} procedimento${realizados.length > 1 ? 's' : ''} realizado${realizados.length > 1 ? 's' : ''}: ${realizados.map((e) => `${TIPO_LABEL[e.tipo]}${e.ancora.dente ? ` ${e.ancora.dente}` : ''}`).join(' · ')}`}
+                                  </p>
+                                </div>
+                                <button
+                                  onClick={() => setSigningFichaId(evo.id)}
+                                  className="shrink-0 bg-teal hover:bg-teal-lt text-white px-4 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors"
+                                >
+                                  <PenLine className="w-3.5 h-3.5" />
+                                  Coletar assinatura
+                                </button>
+                              </div>
+                            );
+                          })()}
+
+                          {(evo.observation || evo.conduta) && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {evo.observation && (
+                                <div className="bg-surface-alt/40 border border-border/60 rounded-2xl px-4 py-3">
+                                  <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary mb-1.5">Anotações gerais</p>
+                                  <p className="text-xs text-text-secondary leading-relaxed whitespace-pre-line">{evo.observation}</p>
+                                </div>
+                              )}
                               {evo.conduta && (
-                                <div className="flex items-center gap-1.5 text-sm text-text-secondary flex-shrink-0">
-                                  <FileText className="w-3.5 h-3.5 text-teal flex-shrink-0" />
-                                  <span><span className="font-bold text-text-primary">Conduta:</span> {evo.conduta}</span>
+                                <div className="bg-surface-alt/40 border border-border/60 rounded-2xl px-4 py-3">
+                                  <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary mb-1.5">Conduta</p>
+                                  <p className="text-xs text-text-secondary leading-relaxed whitespace-pre-line">{evo.conduta}</p>
                                 </div>
                               )}
                             </div>
-                          </div>
-
-                          {/* #16 D12 (revisado) — 2 colunas no modo leitura: odontograma 60% esq / progresso+procedimentos 40% dir.
-                              Invertido do plano original (40/60): cada dente tem largura fixa em px (min-w-max) — a fileira de
-                              16 dentes precisa de ~725px pra não entrar em scroll horizontal, o que só cabe dando 60% à coluna.
-                              Empilha abaixo de lg. */}
-                          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-
-                            {/* Odontograma — 40% */}
-                            <div className="lg:col-span-3">
-                              <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary/70 mb-3">Odontograma</p>
-                              <div className="bg-surface-alt rounded-2xl border border-border/40 px-6 py-5">
-                                <p className="text-[11px] text-text-secondary/60 text-center mb-4 flex items-center justify-center gap-1.5">
-                                  <ChevronRight className="w-3 h-3" />
-                                  Clique em um dente para filtrar os procedimentos
-                                </p>
-                                <Odontograma
-                                  colorMode="status"
-                                  statusTeeth={computeToothStatusMap(evo)}
-                                  selectedTeeth={filterTooth ? [filterTooth] : []}
-                                  onToothToggle={(tooth) => setFilterTooth((prev) => prev === tooth ? null : tooth)}
-                                  hideFilters
-                                />
-                                <div className="flex items-center justify-center gap-4 mt-3 text-[10px] font-semibold text-text-secondary">
-                                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-surface-alt border border-border" /> A fazer</span>
-                                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ background: 'var(--color-warning)' }} /> Em andamento</span>
-                                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-teal" /> Concluído</span>
-                                </div>
-                                {filterTooth && (
-                                  <button
-                                    onClick={() => setFilterTooth(null)}
-                                    className="mt-4 w-full text-center text-xs text-teal hover:underline flex items-center justify-center gap-1"
-                                  >
-                                    <X className="w-3 h-3" /> Limpar filtro (D{filterTooth})
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Progresso + Procedimentos — 60% */}
-                            <div className="lg:col-span-2 space-y-6">
-
-                              {/* Progresso + Apresentar */}
-                              <div>
-                                <div className="flex items-center justify-between mb-2">
-                                  <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary/70">Progresso do tratamento</p>
-                                  <span className="text-xs text-text-secondary">{doneProcs} de {totalProcs} concluídos</span>
-                                </div>
-                                <div className="h-2 w-full rounded-full bg-surface-alt border border-border/40 overflow-hidden">
-                                  <div className="h-2 rounded-full bg-teal transition-all duration-500" style={{ width: `${pct}%` }} />
-                                </div>
-                                <div className="flex items-center justify-between mt-2">
-                                  <div className="flex items-baseline gap-2">
-                                    <span className="text-2xl font-bold text-teal">{pct}%</span>
-                                    <span className="text-sm text-text-secondary">concluído</span>
-                                  </div>
-                                  <ApresentarPaciente
-                                    patientId={patientId}
-                                    clinicaId={clinicaId}
-                                    patientName={patientName ?? ''}
-                                    dentistaId={dentistaId}
-                                    fichaId={evo.id}
-                                    compact
-                                  />
-                                </div>
-                              </div>
-
-                              {/* Procedimentos com status toggle */}
-                              <div>
-                                <div className="flex items-center justify-between mb-3">
-                                  <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary/70">
-                                    Procedimentos
-                                    {filterTooth && <span className="ml-2 text-teal normal-case font-normal">— D{filterTooth}</span>}
-                                  </p>
-                                  <p className="text-[10px] text-text-secondary/60">Clique no status para avançar</p>
-                                </div>
-                                {filteredTeethNotes.length === 0 ? (
-                                  <p className="text-sm text-text-secondary/50 italic">Nenhum procedimento registrado.</p>
-                                ) : (
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    {filteredTeethNotes.map((tn) => {
-                                      const label = tn.tooth in ARCH_LABELS ? ARCH_LABELS[tn.tooth] : `D${tn.tooth}`;
-                                      return (
-                                        <div key={tn.tooth} className="bg-surface-alt rounded-xl border border-border/40 p-4">
-                                          <p className="font-mono text-[10px] font-bold text-teal mb-3">{label}</p>
-                                          <div className="space-y-2">
-                                            {tn.notes.filter(Boolean).map((note, i) => {
-                                              const procKey = `${tn.tooth}_${i}`;
-                                              const status = evo.procedimentosStatus[procKey] ?? 'nao_iniciado';
-                                              const meta = STATUS_META[status] ?? STATUS_META.nao_iniciado;
-                                              return (
-                                                <div key={i} className="flex items-center gap-2">
-                                                  {podeEditarFicha(evo) ? (
-                                                    <button
-                                                      onClick={() => void updateProcStatus(evo.id, evo.procedimentosStatus, procKey, STATUS_CYCLE[status])}
-                                                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold flex-shrink-0 transition-all border ${meta.className}`}
-                                                    >
-                                                      <meta.icon className="w-3 h-3" />
-                                                      {meta.label}
-                                                    </button>
-                                                  ) : (
-                                                    // Vê o status, não altera. Vale pra secretária (papel) E pro dentista
-                                                    // que não é o autor da ficha (migration 099) — a RLS barra os dois.
-                                                    <span
-                                                      title={canWrite && evo.dentistaId !== dentistaId ? `Registrado por ${evo.professional}` : undefined}
-                                                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold flex-shrink-0 border ${meta.className} cursor-default`}
-                                                    >
-                                                      <meta.icon className="w-3 h-3" />
-                                                      {meta.label}
-                                                    </span>
-                                                  )}
-                                                  <span className={`text-xs leading-tight ${status === 'concluido' ? 'line-through text-text-secondary' : 'text-text-primary'}`}>{note}</span>
-                                                </div>
-                                              );
-                                            })}
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-                              </div>
-
-                            </div>
-                          </div>
-
+                          )}
                         </div>
                       </motion.div>
                     )}

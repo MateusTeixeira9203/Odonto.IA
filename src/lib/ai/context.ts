@@ -72,10 +72,10 @@ export async function buildPatientContext(
 
     supabase
       .from('fichas')
-      .select('created_at, queixa_principal, anotacoes, alergias, medicamentos_em_uso, historico_dental')
+      .select('data_atendimento, queixa_principal, anotacoes, alergias, medicamentos_em_uso, historico_dental')
       .eq('paciente_id', patientId)
       .eq('clinica_id', clinicId)
-      .order('created_at', { ascending: false })
+      .order('data_atendimento', { ascending: false })
       .limit(5),
 
     supabase
@@ -108,7 +108,9 @@ export async function buildPatientContext(
   };
 
   const fichasRecentes = (fichasRes.data ?? []).map((f) => ({
-    data: new Date(f.created_at as string).toLocaleDateString('pt-BR'),
+    // 'YYYY-MM-DD' formatado na mão — `new Date()` parseia como UTC meia-noite
+    // e desloca um dia pra trás em fusos negativos (BRT).
+    data: (f.data_atendimento as string).split('-').reverse().join('/'),
     queixa: (f.queixa_principal as string | null) ?? null,
     anotacoes: (f.anotacoes as string | null) ?? null,
     alergias: (f.alergias as string | null) ?? null,

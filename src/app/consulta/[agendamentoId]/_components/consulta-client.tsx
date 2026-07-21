@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -9,7 +9,7 @@ import {
   Check, Edit2, Mic, MicOff, Bot, X, AlertTriangle, PenLine,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useAudioRecorder } from '@/hooks/useAudioRecorder';
+import { useCapturaLivre } from '@/hooks/useCapturaLivre';
 import { useDexGuide } from '@/hooks/useDexGuide';
 import { DexAvatar } from '@/components/ui/dex-avatar';
 import { salvarFichaConsulta, iniciarAtendimentoConsulta, regravarEventosOdontograma } from '../actions';
@@ -20,7 +20,7 @@ import type { EvolucaoFormatada } from '@/app/api/dex/formatar-evolucao/route';
 import type { FocoPrincipal } from '@/lib/persona';
 import { ConsultationSidebar } from './consultation-sidebar';
 import { BotaoMensagemIA } from '@/components/orcamentos/botao-mensagem-ia';
-import { VoiceUX } from './voice-ux';
+import { VoiceUX } from '@/components/fichas/voice-ux';
 import { DraftPendingCard } from './draft-pending-card';
 import { Odontograma } from '@/components/odontograma/Odontograma';
 import { ToothDetailPanel } from '@/components/odontograma/ToothDetailPanel';
@@ -151,7 +151,20 @@ export function ConsultaClient({
 }: ConsultaClientProps) {
   const router = useRouter();
   const [fase, setFase] = useState<FaseConsulta>('captura');
-  const [textoLivre, setTextoLivre] = useState('');
+  // v3 §7 — orquestração de voz/transcrição/detecção extraída pro hook compartilhado
+  // com o FichasTab (Job A Fatia B). liveDetection reproduz o gate original
+  // (`isDemo || fase !== 'captura'` desligava a detecção).
+  const {
+    texto: textoLivre,
+    setTexto: setTextoLivre,
+    toggleVoz: handleVoice,
+    micStatus,
+    isTranscribing,
+    liveTranscript,
+    elapsedSeconds,
+    detectedProcs,
+    isDetecting,
+  } = useCapturaLivre({ liveDetection: !isDemo && fase === 'captura' });
   const [formatLabel, setFormatLabel] = useState('Organizar com DEX');
   const formatTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const [evolucao, setEvolucao] = useState<EvolucaoFormatada | null>(null);
@@ -175,15 +188,11 @@ export function ConsultaClient({
   // Carrega o contexto do onboarding pra o CTA do perfil voltar pro wizard (spec 3.1).
   const irParaPerfilDemo = () =>
     router.push(`/dashboard/pacientes/demo?from=demo${retornoOnboarding ? '&onboarding=1' : ''}`);
-  const [isTranscribing, setIsTranscribing] = useState(false);
   const [aptStatus, setAptStatus] = useState(agendamentoStatus);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [liveTranscript, setLiveTranscript] = useState('');
   // v3 (unificação 18/07): o dente entra na ficha se tem >=1 evento revisado no
   // odontograma — o painel É a confirmação. Sentinelas de arcada/boca (97/98/99)
   // não têm evento individual; ficam neste estado próprio (chips de arcada).
   const [sentinelasSel, setSentinelasSel] = useState<number[]>([]);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // ── Detecção ao vivo (copiloto) ──
@@ -192,79 +201,6 @@ export function ConsultaClient({
     const matches = textoLivre.match(/\b(?:[1-4][1-8]|[5-8][1-5])\b/g) ?? [];
     return [...new Set(matches.map(Number))].sort((a, b) => a - b);
   }, [textoLivre]);
-  // Procedimentos: debounce ~2s na rota leve própria (adendo 13/07 §H) — mesma família
-  // de prompt do organizador, pra o preview não divergir da ficha final.
-  const [detectedProcs, setDetectedProcs] = useState<string[]>([]);
-  const [isDetecting, setIsDetecting] = useState(false);
-  const detectDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Caminho único de pós-gravação: usado pelo stop manual E pelo corte por silêncio.
-  const processarAudio = useCallback(async (blob: Blob | null) => {
-    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
-    if (!blob) { setIsTranscribing(false); return; }
-    setIsTranscribing(true);
-    try {
-      const fd = new FormData();
-      fd.append('audio', blob, 'audio.webm');
-      const res = await fetch('/api/transcrever', { method: 'POST', body: fd });
-      if (!res.ok) throw new Error(`Erro ${res.status}`);
-      const data = await res.json() as { transcricao?: string };
-      const texto = data.transcricao?.trim();
-      if (texto) {
-        setLiveTranscript(texto);
-        setTextoLivre(prev => prev ? `${prev}\n${texto}` : texto);
-      }
-    } catch (err) {
-      console.error('[consulta] transcrever:', err);
-      toast.error('Não foi possível transcrever o áudio. Tente novamente.');
-    } finally { setIsTranscribing(false); }
-  }, []);
-
-  const { status: micStatus, startRecording, stopRecording } = useAudioRecorder({
-    onAutoStop: (blob) => { void processarAudio(blob); },
-  });
-
-  // Detecção ao vivo de procedimentos enquanto o dentista escreve (só na fase de captura).
-  useEffect(() => {
-    // Não roda em demo (sem clínica real) nem fora da fase de captura.
-    if (isDemo || fase !== 'captura') { setDetectedProcs([]); setIsDetecting(false); return; }
-
-    const texto = textoLivre.trim();
-    if (detectDebounceRef.current) clearTimeout(detectDebounceRef.current);
-    if (texto.length < 20) { setDetectedProcs([]); setIsDetecting(false); return; }
-
-    setIsDetecting(true);
-    detectDebounceRef.current = setTimeout(async () => {
-      try {
-        const res = await fetch('/api/dex/detectar-consulta', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ texto }),
-        });
-        if (!res.ok) return;
-        const data = await res.json() as { procedimentos?: { descricao: string; dentes: number[] }[] };
-        setDetectedProcs(
-          (data.procedimentos ?? [])
-            .filter(p => p?.descricao)
-            .map(p => p.dentes.length > 0 ? `${p.descricao} – ${p.dentes.map(denteLabel).join(', ')}` : p.descricao)
-            .slice(0, 12)
-        );
-      } catch (err) {
-        console.error('[consulta] detecção ao vivo:', err);
-      } finally {
-        setIsDetecting(false);
-      }
-    }, 2000);
-
-    return () => { if (detectDebounceRef.current) clearTimeout(detectDebounceRef.current); };
-  }, [textoLivre, isDemo, fase]);
-
-  // Cleanup de timers ao desmontar
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, []);
 
   // Auto-inicia o atendimento ao entrar no Modo Consulta (sem precisar de clique)
   useEffect(() => {
@@ -283,28 +219,6 @@ export function ConsultaClient({
   // balão flutuante: ele duplicava o mascote e cobria o botão "Organizar com DEX".
   const guideId = dentistaId ?? 'guide';
   const { setPhase: setGuidePhase } = useDexGuide(guideId);
-
-  const handleVoice = useCallback(async () => {
-    if (micStatus === 'recording') {
-      setIsTranscribing(true);
-      const blob = await stopRecording();
-      await processarAudio(blob);
-    } else {
-      if (micStatus === 'error') {
-        toast.error('Microfone indisponível. Verifique as permissões do navegador e recarregue a página.');
-        return;
-      }
-      setElapsedSeconds(0);
-      setLiveTranscript('');
-      const started = await startRecording();
-      if (!started) {
-        toast.error('Não foi possível acessar o microfone. Verifique as permissões do navegador.');
-        return;
-      }
-      // Só inicia o timer após confirmar que a gravação começou
-      timerRef.current = setInterval(() => setElapsedSeconds(s => s + 1), 1000);
-    }
-  }, [micStatus, startRecording, stopRecording, processarAudio]);
 
   const handleFormatar = async () => {
     const texto = textoLivre.trim();
