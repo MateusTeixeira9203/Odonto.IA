@@ -1,9 +1,18 @@
 'use client';
 
 // Form manual da odontometria endodôntica (Roadmap A — migration 106, peça 3 do plugin).
-// DESIGN: plans/specs/spec-106-detalhe-especialidade.md §5.1 (espelha a tabela do artefato §04/§05).
-// Campo vazio = null (nunca inferido — invariante I5); CT sugerido é só placeholder visual,
-// nunca preenche o valor sozinho.
+// DESIGN: a base é a tabela do artefato `ficha-dois-modos-2026-07-21-artefato.html` §02
+// (nível "Detalhe"), espelhada aqui em modo edição. Regras herdadas do artefato:
+//   · cabeçalho "Ficha endodôntica" com ponto teal
+//   · números compactos, à direita, DM Mono tabular — nunca campos largos
+//   · CT destacado em teal-ink
+//   · obturação/cimento como RODAPÉ inline, não como dois campos de formulário
+//   · campo não ditado numa linha JÁ preenchida = borda tracejada coral (I5: nunca inferido)
+//
+// Divergência consciente do artefato: a coluna "Referência" existe aqui e não lá. O artefato
+// desenha o modo LEITURA (4 colunas); o ponto de referência é dado que o dentista dita
+// ("referência na cúspide mésio-vestibular") e precisa de entrada — mas ocupa largura fixa,
+// nunca `w-full` (era o que quebrava o layout).
 
 import { Plus, X } from 'lucide-react';
 import type { PluginFormProps } from '@/lib/especialidades/plugin';
@@ -15,8 +24,20 @@ const CANAL_VAZIO: CanalDetalhe = {
 
 const VAZIO: EndoDetalhe = { canais: [{ ...CANAL_VAZIO, nome: 'Único' }], obturacao: null, cimento: null };
 
+/** Nomes canônicos de canal — datalist acelera o preenchimento sem travar entrada livre. */
+const NOMES_CANAL = ['Único', 'MV', 'MV2', 'DV', 'ML', 'DL', 'P', 'V', 'L', 'MB', 'DB'];
+
 const limparTexto = (s: string): string | null => (s.trim() === '' ? null : s);
 const limparNum = (s: string): number | null => (s.trim() === '' ? null : Number(s));
+
+/**
+ * A linha já tem algum dado? Decide o destaque coral: numa linha em branco (recém-criada)
+ * campo vazio é normal e não deve gritar; numa linha PARCIALMENTE preenchida, o vazio é
+ * informação — "isto não foi ditado" — e é o que o artefato marca em coral tracejado.
+ */
+function linhaTemDado(c: CanalDetalhe): boolean {
+  return c.referencia != null || c.comprimentoRaiz != null || c.ct != null || c.limaFinal != null;
+}
 
 export function EndoForm({ valor, onChange, readOnly }: PluginFormProps<EndoDetalhe>) {
   const v = valor ?? VAZIO;
@@ -30,83 +51,105 @@ export function EndoForm({ valor, onChange, readOnly }: PluginFormProps<EndoDeta
     onChange({ ...v, canais: v.canais.filter((_, idx) => idx !== i) });
   };
 
-  const inputCls =
-    'bg-surface-alt border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary font-mono ' +
-    'tabular-nums text-right outline-none focus:border-teal disabled:opacity-60';
-  const labelCls = 'text-[9px] font-bold uppercase tracking-wider text-text-secondary';
+  const th = 'text-[9px] font-bold uppercase tracking-wider text-text-secondary pb-1.5';
+  /** Célula numérica: compacta, à direita, mono tabular — igual ao `.cellin` do artefato. */
+  const num = (faltando: boolean, destaque?: boolean) =>
+    'w-[68px] bg-surface-alt rounded-md px-1.5 py-1 text-xs font-mono tabular-nums text-right ' +
+    'outline-none focus:border-teal disabled:opacity-60 border ' +
+    (faltando ? 'border-dashed border-coral ' : 'border-border ') +
+    (destaque ? 'text-teal-ink font-bold' : 'text-text-primary');
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2.5">
+      <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-teal-ink">
+        <span className="w-1.5 h-1.5 rounded-full bg-teal" aria-hidden="true" />
+        Ficha endodôntica
+      </p>
+
+      <datalist id="nomes-canal">
+        {NOMES_CANAL.map((n) => <option key={n} value={n} />)}
+      </datalist>
+
       <div className="overflow-x-auto">
-        <table className="w-full text-xs border-collapse min-w-[420px]">
+        <table className="text-xs border-collapse">
           <thead>
             <tr>
-              <th className={`${labelCls} text-left pb-1.5 pr-2`}>Canal</th>
-              <th className={`${labelCls} text-left pb-1.5 pr-2`}>Referência</th>
-              <th className={`${labelCls} text-right pb-1.5 pr-2`}>Raiz (mm)</th>
-              <th className={`${labelCls} text-right pb-1.5 pr-2`}>CT (mm)</th>
-              <th className={`${labelCls} text-right pb-1.5 pr-2`}>Lima final</th>
-              {!readOnly && <th className="w-6" />}
+              <th className={`${th} text-left pr-2`}>Canal</th>
+              <th className={`${th} text-left pr-2`}>Referência</th>
+              <th className={`${th} text-right pr-2`}>Raiz (mm)</th>
+              <th className={`${th} text-right pr-2`}>CT (mm)</th>
+              <th className={`${th} text-right`}>Lima final</th>
+              {!readOnly && <th className="w-7" />}
             </tr>
           </thead>
           <tbody>
-            {v.canais.map((c, i) => (
-              <tr key={i} className="border-t border-border">
-                <td className="py-1.5 pr-2">
-                  <input
-                    className="bg-surface-alt border border-border rounded-lg px-2 py-1.5 text-xs font-semibold text-text-primary outline-none focus:border-teal disabled:opacity-60 w-20"
-                    placeholder="MV" disabled={readOnly} value={c.nome}
-                    onChange={(e) => setCanal(i, { nome: e.target.value })}
-                    aria-label="Nome do canal"
-                  />
-                </td>
-                <td className="py-1.5 pr-2">
-                  <input
-                    className="bg-surface-alt border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary outline-none focus:border-teal disabled:opacity-60 w-full"
-                    placeholder="Cúspide MV" disabled={readOnly} value={c.referencia ?? ''}
-                    onChange={(e) => setCanal(i, { referencia: limparTexto(e.target.value) })}
-                    aria-label="Ponto de referência"
-                  />
-                </td>
-                <td className="py-1.5 pr-2">
-                  <input
-                    type="number" step="0.5" className={`${inputCls} w-16`} placeholder="—" disabled={readOnly}
-                    value={c.comprimentoRaiz ?? ''}
-                    onChange={(e) => setCanal(i, { comprimentoRaiz: limparNum(e.target.value) })}
-                    aria-label="Comprimento da raiz"
-                  />
-                </td>
-                <td className="py-1.5 pr-2">
-                  <input
-                    type="number" step="0.5"
-                    className={`${inputCls} w-16 !text-teal-ink !font-bold`}
-                    placeholder={c.comprimentoRaiz != null ? String(c.comprimentoRaiz - 1) : '—'}
-                    disabled={readOnly} value={c.ct ?? ''}
-                    onChange={(e) => setCanal(i, { ct: limparNum(e.target.value) })}
-                    aria-label="Comprimento de trabalho"
-                  />
-                </td>
-                <td className="py-1.5 pr-2">
-                  <input
-                    className={`${inputCls} w-16`} placeholder="#35" disabled={readOnly}
-                    value={c.limaFinal ?? ''}
-                    onChange={(e) => setCanal(i, { limaFinal: limparTexto(e.target.value) })}
-                    aria-label="Lima final"
-                  />
-                </td>
-                {!readOnly && (
-                  <td className="py-1.5">
-                    <button
-                      type="button" onClick={() => removeCanal(i)} disabled={v.canais.length <= 1}
-                      className="p-1 rounded text-text-secondary hover:text-coral-ink disabled:opacity-30 disabled:cursor-not-allowed"
-                      aria-label="Remover canal"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
+            {v.canais.map((c, i) => {
+              const parcial = linhaTemDado(c);
+              return (
+                <tr key={i} className="border-t border-border">
+                  <td className="py-1.5 pr-2">
+                    <input
+                      list="nomes-canal"
+                      className="w-[76px] bg-surface-alt border border-border rounded-md px-2 py-1 text-xs font-semibold text-text-primary outline-none focus:border-teal disabled:opacity-60"
+                      placeholder="MV" disabled={readOnly} value={c.nome}
+                      onChange={(e) => setCanal(i, { nome: e.target.value })}
+                      aria-label={`Nome do canal ${i + 1}`}
+                    />
                   </td>
-                )}
-              </tr>
-            ))}
+                  <td className="py-1.5 pr-2">
+                    <input
+                      className={
+                        'w-[150px] bg-surface-alt rounded-md px-2 py-1 text-xs text-text-primary ' +
+                        'outline-none focus:border-teal disabled:opacity-60 border ' +
+                        (parcial && c.referencia == null ? 'border-dashed border-coral' : 'border-border')
+                      }
+                      placeholder="Cúspide MV" disabled={readOnly} value={c.referencia ?? ''}
+                      onChange={(e) => setCanal(i, { referencia: limparTexto(e.target.value) })}
+                      aria-label={`Ponto de referência do canal ${i + 1}`}
+                    />
+                  </td>
+                  <td className="py-1.5 pr-2">
+                    <input
+                      type="number" step="0.5" inputMode="decimal"
+                      className={num(parcial && c.comprimentoRaiz == null)}
+                      placeholder="—" disabled={readOnly} value={c.comprimentoRaiz ?? ''}
+                      onChange={(e) => setCanal(i, { comprimentoRaiz: limparNum(e.target.value) })}
+                      aria-label={`Comprimento da raiz do canal ${i + 1}`}
+                    />
+                  </td>
+                  <td className="py-1.5 pr-2">
+                    <input
+                      type="number" step="0.5" inputMode="decimal"
+                      className={num(parcial && c.ct == null, true)}
+                      // Sugestão raiz−1mm fica só no placeholder: nunca preenche sozinha (I5).
+                      placeholder={c.comprimentoRaiz != null ? String(c.comprimentoRaiz - 1) : '—'}
+                      disabled={readOnly} value={c.ct ?? ''}
+                      onChange={(e) => setCanal(i, { ct: limparNum(e.target.value) })}
+                      aria-label={`Comprimento de trabalho do canal ${i + 1}`}
+                    />
+                  </td>
+                  <td className="py-1.5">
+                    <input
+                      className={num(parcial && c.limaFinal == null)}
+                      placeholder="#35" disabled={readOnly} value={c.limaFinal ?? ''}
+                      onChange={(e) => setCanal(i, { limaFinal: limparTexto(e.target.value) })}
+                      aria-label={`Lima final do canal ${i + 1}`}
+                    />
+                  </td>
+                  {!readOnly && (
+                    <td className="py-1.5 pl-1">
+                      <button
+                        type="button" onClick={() => removeCanal(i)} disabled={v.canais.length <= 1}
+                        className="p-1 rounded text-text-secondary hover:text-coral-ink disabled:opacity-30 disabled:cursor-not-allowed"
+                        aria-label={`Remover canal ${i + 1}`}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -120,25 +163,27 @@ export function EndoForm({ valor, onChange, readOnly }: PluginFormProps<EndoDeta
         </button>
       )}
 
-      <div className="flex gap-2 flex-wrap">
-        <div className="flex-1 min-w-[140px]">
-          <label className={`${labelCls} block mb-1`} htmlFor="endo-obturacao">Obturação</label>
+      {/* Rodapé inline — espelha o `.efoot` do artefato: rótulo fino, valor em destaque.
+          Não são "campos de formulário" com label em cima; são a última linha da ficha. */}
+      <div className="flex gap-4 flex-wrap items-baseline pt-1.5 border-t border-border">
+        <label className="flex items-baseline gap-1.5 text-[11px] text-text-secondary">
+          Obturação:
           <input
-            id="endo-obturacao" disabled={readOnly}
-            className="w-full bg-surface-alt border border-border rounded-lg px-2.5 py-1.5 text-xs text-text-primary outline-none focus:border-teal disabled:opacity-60"
+            disabled={readOnly}
+            className="w-[150px] bg-surface-alt border border-border rounded-md px-2 py-1 text-[11px] font-semibold text-text-primary outline-none focus:border-teal disabled:opacity-60"
             placeholder="condensação lateral" value={v.obturacao ?? ''}
             onChange={(e) => onChange({ ...v, obturacao: limparTexto(e.target.value) })}
           />
-        </div>
-        <div className="flex-1 min-w-[140px]">
-          <label className={`${labelCls} block mb-1`} htmlFor="endo-cimento">Cimento</label>
+        </label>
+        <label className="flex items-baseline gap-1.5 text-[11px] text-text-secondary">
+          Cimento:
           <input
-            id="endo-cimento" disabled={readOnly}
-            className="w-full bg-surface-alt border border-border rounded-lg px-2.5 py-1.5 text-xs text-text-primary outline-none focus:border-teal disabled:opacity-60"
+            disabled={readOnly}
+            className="w-[120px] bg-surface-alt border border-border rounded-md px-2 py-1 text-[11px] font-semibold text-text-primary outline-none focus:border-teal disabled:opacity-60"
             placeholder="AH Plus" value={v.cimento ?? ''}
             onChange={(e) => onChange({ ...v, cimento: limparTexto(e.target.value) })}
           />
-        </div>
+        </label>
       </div>
     </div>
   );

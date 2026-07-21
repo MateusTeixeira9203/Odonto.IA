@@ -106,6 +106,27 @@ export function ToothDetailPanel({
     onChange(eventos.map((e) => (e === evento ? { ...e, detalhe } : e)));
   }
 
+  /**
+   * Sinal do procedimento (artefato dois-modos §02, nível 1): o único dado que aparece
+   * SEM abrir a tabela. Derivado, nunca digitado — se não há dado, não há sinal.
+   */
+  function sinalDoEvento(ev: OdontogramaEventoDraft): string | null {
+    if (ev.tipo === 'endodontia') {
+      const r = endoDetalheSchema.safeParse(ev.detalhe);
+      if (!r.success) return null;
+      const n = r.data.canais.filter((c) => c.nome.trim() !== '').length;
+      return n > 0 ? `${n} ${n === 1 ? 'canal' : 'canais'}` : null;
+    }
+    if (ev.tipo === 'implante') {
+      const r = implanteDetalheSchema.safeParse(ev.detalhe);
+      if (!r.success) return null;
+      const { diametro, comprimento, marca } = r.data;
+      if (diametro != null && comprimento != null) return `${diametro} × ${comprimento}`;
+      return marca ?? null;
+    }
+    return null;
+  }
+
   const novo = (
     tipo: TipoRegistroOdontograma,
     status: StatusRegistro,
@@ -400,6 +421,17 @@ export function ToothDetailPanel({
                     </span>
                   )}
                   <div className="flex-1" />
+                  {(() => {
+                    const sinal = sinalDoEvento(ev);
+                    return sinal ? (
+                      <span
+                        className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded shrink-0 tabular-nums"
+                        style={{ background: 'var(--color-teal-pale)', color: 'var(--color-teal-ink)' }}
+                      >
+                        {sinal}
+                      </span>
+                    ) : null;
+                  })()}
                   <span
                     className="text-[9.5px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0"
                     style={{
