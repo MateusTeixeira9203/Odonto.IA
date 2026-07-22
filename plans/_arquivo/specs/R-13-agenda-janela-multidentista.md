@@ -64,6 +64,11 @@ O servidor deriva a janela da visão — não existe mais "o mês" como unidade.
 round-trip com `startTransition` (a tela atual fica no ar enquanto carrega), igual ao que as setas
 de Mês já fazem hoje e o usuário aceita.
 
+**O banner "fora da janela" NÃO acompanha a visão** (esclarecido na execução, 22/07). Ele
+continua ancorado no **mês** da âncora — "X agendamentos depois de julho" — em qualquer visão.
+A função dele é descoberta de longo prazo (o retorno marcado pra daqui a 3 meses); amarrá-lo a
+uma janela de 7 dias faria disparar quase sempre e viraria ruído que a recepção aprende a ignorar.
+
 **Trade-off assumido:** cada clique de seta vai ao servidor. A alternativa (buscar uma janela
 folgada e só recarregar ao sair dela) é mais rápida e mais cara de manter — e exige controle de
 range que hoje não existe em lugar nenhum. Fica pra quando o dogfooding provar que incomoda.

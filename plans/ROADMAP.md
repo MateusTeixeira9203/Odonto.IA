@@ -1,7 +1,7 @@
 # Roadmap — Odonto.IA
 
 > **ROADMAP** · **Odonto.IA** · atualizado 2026-07-22
-> **Ativo:** R-13 · **Fila:** 13 · **Concluídos:** 0 · **Congelados:** 0
+> **Ativo:** nenhum · **Fila:** 13 · **Concluídos:** 1 · **Congelados:** 0
 
 > Reconstruído do zero em 2026-07-21 por decisão do Mateus. O histórico anterior está no
 > git (`git show 4a93234:plans/roadmap/roadmap-mestre-2026-07-21.md`) e na pasta
@@ -12,9 +12,7 @@
 
 ## Agora
 
-| ID | Item | Desde | Spec |
-|---|---|---|---|
-| R-13 | 🔵 Agenda: janela de busca, multi-dentista e clique na grade | 2026-07-22 | [R-13](specs/R-13-agenda-janela-multidentista.md) |
+Nada ativo — R-13 fechou em 22/07. Próximo item: ver **Fila**.
 
 > Detalhe do que falta e o que trava: `plans/ESTADO.md`
 
@@ -33,7 +31,7 @@ Peso: **P** (uma sessão) · **M** (2–3 sessões) · **G** (precisa quebrar).
 
 | ID | Item | Objetivo | Peso |
 |---|---|---|---|
-| R-01 | ⏳ Ficha: o registro como unidade de salvamento | Spec pronta em fase `contrato`, [aguardando aprovação](specs/R-01-registro-unidade-salvamento.md). Saiu de 🔵 em 22/07 pra agenda, que é bug em produção com usuário real | M |
+| R-01 | ⏳ Ficha: o registro como unidade de salvamento | Spec pronta em fase `contrato`, [aguardando aprovação](specs/R-01-registro-unidade-salvamento.md). Cedeu a vez em 22/07 pra agenda, que é bug em produção com usuário real | M |
 | R-14 | ⏳ Dashboard da secretária monta "hoje" no fuso do servidor | `dashboard/page.tsx:26-29` usa `setHours` num Server Component: é meia-noite UTC, não BRT. Consulta a partir das 21h BRT some; a de ontem 21h–24h vaza pra dentro. Mesma classe do `feb4b68` | P |
 | R-03 | ⏳ Assinatura e data por procedimento | O paciente assina o que foi feito, registro a registro; registro assinado congela e o resto da ficha segue editável | M |
 | R-04 | ⏳ Encaminhar procedimento a outro dentista da clínica | O registro planejado ganha destino (`encaminhado_para`, já em prod), o destino é notificado e vê a fila dele | M |
@@ -56,6 +54,7 @@ Peso: **P** (uma sessão) · **M** (2–3 sessões) · **G** (precisa quebrar).
 
 | ID | Item | Fechado | Spec |
 |---|---|---|---|
+| R-13 | Agenda: janela de busca, multi-dentista e clique na grade | 2026-07-22 | [R-13](_arquivo/specs/R-13-agenda-janela-multidentista.md) |
 
 ## Cortado
 
