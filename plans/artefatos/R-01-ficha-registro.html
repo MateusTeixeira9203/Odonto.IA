@@ -1,0 +1,893 @@
+<!--
+  ARTEFATO · R-01 — Ficha: o registro como unidade de salvamento
+  Item .............. R-01 (plans/specs/R-01-registro-unidade-salvamento.md)
+  Rota alvo ......... /dashboard/pacientes/[id] → aba Fichas → Nova Evolução
+  Componente alvo ... src/components/pacientes/FichasTab.tsx (painel de criação)
+                      src/components/fichas/registro-card.tsx
+                      src/components/odontograma/ToothDetailPanel.tsx
+  Data .............. 2026-07-21
+  Status ............ base canônica — SUBSTITUI os três artefatos de 21/07
+                      (odontograma v3 · ficha modo de criação · ficha estados e fluxos)
+                      e o ficha-definitiva-2026-07-21-artefato.html, já retirado.
+  Aviso ............. NÃO ler este HTML pro contexto. Abrir no browser.
+                      Os tokens que a implementação segue estão em texto na spec.
+-->
+<style>
+  :root{
+    /* Semântica de estado — a paleta É o vocabulário clínico, não decoração */
+    --teal:#2f9c85; --teal-pale:#e4f4f1; --teal-ink:#1e7060;
+    --coral:#e57373; --coral-pale:#fce8e8; --coral-ink:#b3261e;
+    --slate:#64748b; --slate-pale:#e2e8f0; --slate-ink:#334155;
+    --warning:#f59e0b; --warning-pale:#fef3c7; --warning-ink:#92400e;
+    --bop:#e11d48;
+
+    --bg:#f4f4f6; --surface:#ffffff; --surface-alt:#eef0ef; --input:#f7f8f7;
+    --border:#dcdde0; --border-strong:#c2c2c6;
+    --text:#17181a; --text-2:#5b655f; --text-3:#646c66;
+
+    --shadow:0 1px 2px rgba(20,30,25,.04),0 10px 30px rgba(20,30,25,.06);
+    --shadow-sm:0 1px 2px rgba(20,30,25,.05);
+
+    --font-heading:'DM Serif Display',Georgia,'Times New Roman',serif;
+    --font-sans:'Outfit',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+    --font-mono:'DM Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+    --r:14px; --r-sm:10px; --r-xs:8px;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --teal:#3ba992; --teal-pale:#123a33; --teal-ink:#5dbeb0;
+    --coral:#ef9a9a; --coral-pale:#3d1f1f; --coral-ink:#ef9a9a;
+    --slate:#94a3b8; --slate-pale:#2b3444; --slate-ink:#94a3b8;
+    --warning:#fbbf24; --warning-pale:#41260a; --warning-ink:#fbbf24;
+    --bop:#fb7185;
+    --bg:#0d0d0d; --surface:#141514; --surface-alt:#1c1c1e; --input:#1a1b1a;
+    --border:#2a2c2a; --border-strong:#3a3c3a;
+    /* --text-3 corrigido de #6b716b: reprovava AA (3,4:1) em texto pequeno sobre
+       --surface-alt. Herdado dos artefatos de 21/07 — o defeito vinha de lá. */
+    --text:#f3f4f3; --text-2:#a1a1aa; --text-3:#8d948d;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.45);
+    --shadow-sm:0 1px 2px rgba(0,0,0,.35);
+  }}
+  :root[data-theme="dark"]{
+    --teal:#3ba992; --teal-pale:#123a33; --teal-ink:#5dbeb0;
+    --coral:#ef9a9a; --coral-pale:#3d1f1f; --coral-ink:#ef9a9a;
+    --slate:#94a3b8; --slate-pale:#2b3444; --slate-ink:#94a3b8;
+    --warning:#fbbf24; --warning-pale:#41260a; --warning-ink:#fbbf24;
+    --bop:#fb7185;
+    --bg:#0d0d0d; --surface:#141514; --surface-alt:#1c1c1e; --input:#1a1b1a;
+    --border:#2a2c2a; --border-strong:#3a3c3a;
+    /* --text-3 corrigido de #6b716b: reprovava AA (3,4:1) em texto pequeno sobre
+       --surface-alt. Herdado dos artefatos de 21/07 — o defeito vinha de lá. */
+    --text:#f3f4f3; --text-2:#a1a1aa; --text-3:#8d948d;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.45);
+    --shadow-sm:0 1px 2px rgba(0,0,0,.35);
+  }
+  :root[data-theme="light"]{
+    --teal:#2f9c85; --teal-pale:#e4f4f1; --teal-ink:#1e7060;
+    --coral:#e57373; --coral-pale:#fce8e8; --coral-ink:#b3261e;
+    --slate:#64748b; --slate-pale:#e2e8f0; --slate-ink:#334155;
+    --warning:#f59e0b; --warning-pale:#fef3c7; --warning-ink:#92400e;
+    --bop:#e11d48;
+    --bg:#f4f4f6; --surface:#ffffff; --surface-alt:#eef0ef; --input:#f7f8f7;
+    --border:#dcdde0; --border-strong:#c2c2c6;
+    --text:#17181a; --text-2:#5b655f; --text-3:#646c66;
+    --shadow:0 1px 2px rgba(20,30,25,.04),0 10px 30px rgba(20,30,25,.06);
+    --shadow-sm:0 1px 2px rgba(20,30,25,.05);
+  }
+
+  *{box-sizing:border-box}
+  .page{background:var(--bg);color:var(--text);font-family:var(--font-sans);
+    line-height:1.5;-webkit-font-smoothing:antialiased;padding:34px 20px 72px}
+  .wrap{max-width:1000px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+  .num{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+  :where(a,button,input,[tabindex]):focus-visible{outline:2px solid var(--teal);outline-offset:2px;border-radius:4px}
+
+  /* ── cabeçalho do documento ── */
+  .eyebrow{font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--teal-ink);font-weight:700;margin:0 0 6px}
+  .doc-h1{font-family:var(--font-heading);font-weight:400;font-size:30px;letter-spacing:.01em;margin:0 0 8px;text-wrap:balance}
+  .doc-lead{font-size:14px;color:var(--text-2);margin:0;max-width:66ch}
+  .doc-lead b{color:var(--text);font-weight:600}
+
+  /* ── separador de seção ── */
+  .band-h{display:flex;align-items:center;gap:12px;margin:34px 0 6px}
+  .band-h h2{font-family:var(--font-heading);font-weight:400;font-size:21px;margin:0;flex:none}
+  .band-h .ln{flex:1;height:1px;background:var(--border)}
+  .band-h .flag{flex:none;font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+    padding:3px 9px;border-radius:99px;background:var(--coral-pale);color:var(--coral-ink)}
+  .band-h .flag.ok{background:var(--teal-pale);color:var(--teal-ink)}
+  .band-lead{font-size:13px;color:var(--text-2);margin:0 0 14px;max-width:74ch}
+  .band-lead b{color:var(--text)}
+
+  /* ── a ficha ── */
+  .ficha{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+    box-shadow:var(--shadow);padding:18px;display:flex;flex-direction:column;gap:16px}
+  .fhead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .fhead .ft{font-family:var(--font-heading);font-size:19px}
+  .fhead .fw{font-size:12.5px;color:var(--text-2)}
+  .fhead .fw b{color:var(--text);font-weight:600}
+  .fhead .tally{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+
+  /* campo mágico — colapsado depois de organizar */
+  .magic{border:1px solid var(--teal);border-radius:var(--r-sm);padding:12px 14px;
+    background:linear-gradient(180deg,var(--teal-pale),transparent 150%)}
+  .magic .mrow{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:6px}
+  .magic .tag{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.08em;color:var(--teal-ink)}
+  .magic .tag .dot{width:7px;height:7px;border-radius:99px;background:var(--teal)}
+  .magic .edit{margin-left:auto;font:inherit;font-size:11.5px;font-weight:600;color:var(--teal-ink);
+    background:transparent;border:1px solid var(--teal);border-radius:var(--r-xs);padding:3px 10px;cursor:pointer}
+  .magic p{margin:0;font-size:13px;line-height:1.6;color:var(--text-2)}
+
+  .meta{display:flex;gap:14px;flex-wrap:wrap}
+  .field{display:flex;flex-direction:column;gap:5px;flex:1;min-width:160px}
+  .lab{font-size:9.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--text-2)}
+  .control{background:var(--input);border:1px solid var(--border-strong);border-radius:var(--r-xs);
+    padding:8px 11px;font:inherit;font-size:13.5px;color:var(--text);width:100%}
+
+  .rule{height:1px;background:var(--border)}
+
+  /* odontograma */
+  .band{border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface-alt);padding:14px 12px}
+  .oh{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 2px 10px;flex-wrap:wrap}
+  .oh h3{font-family:var(--font-heading);font-weight:400;font-size:15px;margin:0}
+  .leg{display:flex;gap:11px;font-size:10px;color:var(--text-2);font-weight:600;flex-wrap:wrap}
+  .leg i{display:inline-flex;align-items:center;gap:5px;font-style:normal}
+  .leg .sw{width:9px;height:9px;border-radius:3px;flex:none}
+  .archbadge{display:flex;justify-content:center;margin-bottom:7px}
+  .archbadge span{font-size:10px;font-weight:700;color:var(--slate-ink);background:var(--slate-pale);
+    border-radius:99px;padding:3px 12px}
+  .archwrap{overflow-x:auto;padding-bottom:2px}
+  .arch{display:flex;gap:3px;align-items:flex-end;justify-content:center;min-width:max-content}
+  .arch.lower{align-items:flex-start;margin-top:2px}
+  .tw{display:flex;flex-direction:column;align-items:center;gap:3px;flex:none;position:relative}
+  .tw .n{font-family:var(--font-mono);font-size:9px;font-weight:700;color:var(--text-3)}
+  .tw.on .n{color:var(--teal-ink)} .tw.co .n{color:var(--coral-ink)} .tw.sl .n{color:var(--slate-ink)}
+  .mt{width:30px;height:auto;display:block;overflow:visible}
+  .tw.sel::after{content:"";position:absolute;inset:11px -2px -2px;border:2px solid var(--teal);
+    border-radius:9px;pointer-events:none}
+  .seal{position:absolute;top:9px;right:-1px;width:11px;height:11px;border-radius:99px;
+    background:var(--warning);border:1.5px solid var(--surface-alt)}
+  .midline{display:flex;align-items:center;gap:10px;margin:8px 0}
+  .midline .ln{flex:1;border-top:1.5px dashed var(--border-strong)}
+  .midline .lb{font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-3);
+    font-weight:700;white-space:nowrap}
+
+  /* ── registro ── */
+  .sec-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:0 2px}
+  .sec-h h3{font-family:var(--font-heading);font-weight:400;font-size:17px;margin:0}
+  .sec-h .count{font-size:11px;color:var(--text-3);font-weight:600}
+  .rlist{display:flex;flex-direction:column;gap:9px}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);
+    box-shadow:var(--shadow-sm);overflow:hidden}
+  .card.frozen{background:var(--surface-alt);border-color:var(--border-strong)}
+  .crow{display:flex;align-items:center;gap:10px;padding:11px 13px;flex-wrap:wrap}
+  .tnum{flex:none;min-width:32px;height:32px;padding:0 8px;border-radius:var(--r-xs);display:flex;
+    align-items:center;justify-content:center;font-family:var(--font-mono);font-size:12.5px;
+    font-weight:700;background:var(--surface-alt);color:var(--text);border:1px solid var(--border)}
+  .card.frozen .tnum{background:var(--surface)}
+  .tnum.grp{font-size:11px}
+  .ttl{min-width:0;flex:1}
+  .ttl .t{font-weight:600;font-size:13.5px;color:var(--text)}
+  .ttl .q{display:block;font-size:11.5px;color:var(--text-3);font-style:italic;margin-top:1px}
+  .ttl .by{display:block;font-size:11px;color:var(--text-2);margin-top:2px}
+  .ttl .by b{color:var(--text);font-weight:600}
+  .right{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+  .pill{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;
+    padding:3px 9px;border-radius:99px;white-space:nowrap}
+  .pill .pd{width:6px;height:6px;border-radius:99px;flex:none}
+  .pill.done{background:var(--teal-pale);color:var(--teal-ink)} .pill.done .pd{background:var(--teal)}
+  .pill.plan{background:var(--coral-pale);color:var(--coral-ink)} .pill.plan .pd{background:var(--coral)}
+  .pill.pre{background:var(--slate-pale);color:var(--slate-ink)} .pill.pre .pd{background:var(--slate)}
+  .pill.warn{background:var(--warning-pale);color:var(--warning-ink)} .pill.warn .pd{background:var(--warning)}
+
+  .lock{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;color:var(--teal-ink)}
+  .chev{color:var(--text-3);flex:none}
+
+  /* corpo de especialidade */
+  .spec{border-top:1px solid var(--border);background:var(--surface-alt);padding:12px 13px}
+  .sh{display:flex;align-items:center;gap:7px;margin-bottom:9px}
+  .sh .kd{width:6px;height:6px;border-radius:99px;background:var(--teal);flex:none}
+  .sh .k{font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--teal-ink)}
+
+  .tblwrap{overflow-x:auto}
+  .etbl{width:100%;border-collapse:collapse;font-size:12px}
+  .etbl th{text-align:left;font-size:9px;letter-spacing:.05em;text-transform:uppercase;
+    color:var(--text-3);font-weight:700;padding:5px 7px;border-bottom:1px solid var(--border);white-space:nowrap}
+  .etbl td{padding:6px 7px;border-bottom:1px solid var(--border)}
+  .etbl tr:last-child td{border-bottom:none}
+  .etbl .canal{font-weight:600;white-space:nowrap}
+  .etbl .canal small{color:var(--text-3);font-family:var(--font-mono);font-weight:500;margin-left:3px}
+  .etbl .r{text-align:right}
+  .cellin{font-family:var(--font-mono);font-variant-numeric:tabular-nums;background:var(--input);
+    border:1px solid var(--border);border-radius:6px;padding:3px 7px;width:64px;text-align:right;
+    color:var(--text);font-size:12px;font-weight:600}
+  .cellin.ct{color:var(--teal-ink)}
+  .cellin.missing{border-style:dashed;border-color:var(--coral);background:transparent}
+  .cellin.missing::placeholder{color:var(--coral-ink);opacity:.7}
+  .txtin{font-family:var(--font-sans);background:var(--input);border:1px solid var(--border);
+    border-radius:6px;padding:3px 8px;font-size:12px;color:var(--text);width:132px}
+  .addrow{margin-top:9px;display:inline-flex;align-items:center;gap:5px;font:inherit;font-size:11.5px;
+    font-weight:600;color:var(--teal-ink);background:transparent;border:1px dashed var(--teal);
+    border-radius:var(--r-xs);padding:5px 11px;cursor:pointer}
+  .efoot{margin-top:10px;padding-top:9px;border-top:1px solid var(--border);display:flex;gap:16px;
+    flex-wrap:wrap;font-size:11.5px;color:var(--text-2);align-items:baseline}
+  .efoot b{color:var(--text);font-weight:600}
+  .note{margin-top:9px;font-size:11px;display:flex;gap:6px;align-items:flex-start;line-height:1.45;color:var(--coral-ink)}
+  .note svg{flex:none;margin-top:1px}
+  .note.good{color:var(--teal-ink)}
+
+  .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:9px 18px}
+  .kv .k{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);display:block}
+  .kv .v{font-size:13px;color:var(--text);font-weight:500}
+  .ochips{display:flex;flex-direction:column;gap:6px}
+  .ochip{display:flex;align-items:baseline;gap:10px;font-size:12.5px}
+  .ochip .ok{font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--text-3);width:116px;flex:none}
+  .faces{display:inline-flex;gap:4px}
+  .faces span{font-family:var(--font-mono);font-size:9.5px;font-weight:700;background:var(--teal-pale);
+    color:var(--teal-ink);border:1px solid var(--teal);border-radius:5px;padding:1px 5px}
+
+  /* ── workspace: o odontograma CRESCE quando um dente é selecionado ──
+     Uma borda só. Coluna esquerda = mapa, direita = o dente, faixa inteira
+     embaixo = os registros daquele dente. Nada aqui é caixa nova. */
+  /* Sem borda: o dente abre ao lado, o procedimento abre embaixo dele — a conexão
+     já está dita pela posição. Borda aqui só repetiria o que o fluxo mostra.
+     O que separa a zona do resto da ficha é o fundo, não um contorno. */
+  .ws{border-radius:var(--r-sm);background:var(--surface-alt);overflow:hidden}
+  .ws-cols{display:grid;grid-template-columns:minmax(0,1fr) 322px;gap:0}
+  @media (max-width:900px){.ws-cols{grid-template-columns:minmax(0,1fr)}}
+  .ws-map{padding:14px 12px;min-width:0}
+  .ws-panel{padding:14px;background:var(--surface);border-left:1px solid var(--border)}
+  @media (max-width:900px){.ws-panel{border-left:none;border-top:1px solid var(--border)}}
+  .ws-panel .pt{font-weight:600;font-size:14px;color:var(--teal-ink);display:block;margin-bottom:2px}
+  .ws-panel .ps{font-size:11.5px;color:var(--text-2);display:block;margin-bottom:12px}
+  .ws-regs{background:var(--surface);border-top:1px solid var(--border);padding:13px}
+  .ws-regs .wh{display:flex;align-items:baseline;gap:9px;margin:0 2px 10px;flex-wrap:wrap}
+  .ws-regs .wh h4{font-family:var(--font-heading);font-weight:400;font-size:15px;margin:0}
+  .ws-regs .wh span{font-size:11px;color:var(--text-3);font-weight:600}
+  .ws-stack{display:flex;flex-direction:column;gap:9px}
+
+  .saved{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;
+    color:var(--teal-ink);white-space:nowrap}
+  .saved svg{flex:none}
+
+  /* fluxo — os três caminhos até a tabela */
+  .flow{display:grid;grid-template-columns:repeat(auto-fit,minmax(232px,1fr));gap:12px}
+  .fcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);
+    box-shadow:var(--shadow-sm);padding:14px 15px}
+  .fcard .fk{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--teal-ink);background:var(--teal-pale);
+    border-radius:99px;padding:3px 10px;margin-bottom:9px}
+  .fcard .ft{margin:0 0 7px;font-size:13.5px;font-weight:600;color:var(--text);text-wrap:balance}
+  .fcard .fd{margin:0;font-size:12.5px;color:var(--text-2);line-height:1.55}
+  .fcard .fd b{color:var(--text);font-weight:600}
+
+  /* contrato dos plugins */
+  .rules{margin-top:14px;background:var(--surface);border:1px solid var(--teal);
+    border-radius:var(--r-sm);padding:16px 18px;box-shadow:var(--shadow-sm)}
+  .rules .rh{margin:0 0 11px;font-family:var(--font-heading);font-weight:400;font-size:17px;color:var(--text)}
+  .rules .rl{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:9px;
+    font-size:13px;color:var(--text-2);line-height:1.55}
+  .rules .rl::marker{color:var(--teal-ink)}
+  .rules .rl li b{color:var(--text);font-weight:600}
+  .rules .rl li i{color:var(--text-3)}
+  .rules .rf{margin:13px 0 0;padding-top:11px;border-top:1px solid var(--border);
+    font-size:12px;color:var(--text-3);line-height:1.55}
+
+  .figs{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+  .bigtooth{width:54px;flex:none}
+  .occ{width:100px;height:100px;flex:none}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .dchip{font:inherit;font-size:11.5px;font-weight:600;padding:5px 11px;border-radius:var(--r-xs);
+    border:1px solid var(--border);background:var(--surface);color:var(--text-2);cursor:pointer}
+  .dchip.act{background:var(--teal-pale);border-color:var(--teal);color:var(--teal-ink)}
+  .cyc{font-size:10.5px;color:var(--text-3);display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-weight:600}
+  .cyc .c{padding:2px 9px;border-radius:99px;border:1px solid var(--border);background:var(--surface-alt)}
+  .cyc .c.c1{background:var(--coral-pale);color:var(--coral-ink);border-color:transparent}
+  .cyc .c.c2{background:var(--teal-pale);color:var(--teal-ink);border-color:transparent}
+
+  /* assinatura por procedimento */
+  .sign{border:1px solid var(--teal);border-radius:var(--r);background:var(--surface);overflow:hidden;box-shadow:var(--shadow)}
+  .sign .sh2{padding:13px 16px;background:var(--teal-pale);display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .sign .sh2 h3{font-family:var(--font-heading);font-weight:400;font-size:17px;margin:0;color:var(--teal-ink)}
+  .sign .sh2 p{margin:0;font-size:12px;color:var(--teal-ink);opacity:.85}
+  .srow{display:flex;align-items:center;gap:11px;padding:11px 16px;border-bottom:1px solid var(--border)}
+  .srow.off{background:var(--surface-alt)}
+  .cbx{width:19px;height:19px;border-radius:5px;flex:none;display:flex;align-items:center;justify-content:center;
+    border:2px solid var(--teal);background:var(--teal)}
+  .cbx svg{color:var(--surface)}
+  .cbx.un{background:transparent;border-color:var(--border-strong)}
+  .cbx.dis{background:var(--surface-alt);border-color:var(--border);color:var(--text-3)}
+  .sd{font-size:13px;color:var(--text);font-weight:500;min-width:0}
+  .sd small{display:block;color:var(--text-3);font-weight:400;font-size:11px;margin-top:1px}
+  .srow .sr{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .padwrap{padding:14px 16px;display:flex;flex-direction:column;gap:11px}
+  .pad{border:1.5px dashed var(--border-strong);border-radius:var(--r-sm);height:104px;display:flex;
+    align-items:center;justify-content:center;color:var(--text-3);font-size:12.5px;font-style:italic;background:var(--input)}
+  .signfoot{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .signfoot .who{font-size:12px;color:var(--text-2);flex:1;min-width:180px}
+  .signfoot .who b{color:var(--text);font-weight:600}
+
+  .btn{font:inherit;font-size:13.5px;font-weight:600;border-radius:var(--r-xs);padding:9px 17px;
+    cursor:pointer;border:1px solid var(--border-strong);background:var(--surface);color:var(--text-2)}
+  /* Fundo em --teal-ink, não --teal: branco sobre #2f9c85 dá 3,38:1 e reprova AA no
+     modo claro (defeito herdado dos artefatos de 21/07). Uma regra só serve os dois
+     temas — o -ink inverte de escuro pra claro junto com o tema. */
+  .btn.primary{background:var(--teal-ink);border-color:var(--teal-ink);color:var(--surface);
+    display:inline-flex;align-items:center;gap:7px}
+  .btn.ghost{background:transparent;border-style:dashed;border-color:var(--teal);color:var(--teal-ink);
+    width:100%;justify-content:center;display:flex;align-items:center;gap:7px}
+  .actions{display:flex;justify-content:flex-end;gap:10px;border-top:1px solid var(--border);padding-top:14px}
+
+  /* catálogo de símbolos */
+  .cat{display:grid;grid-template-columns:repeat(auto-fill,minmax(136px,1fr));gap:10px}
+  .ccard{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);
+    box-shadow:var(--shadow-sm);padding:13px 9px 11px;display:flex;flex-direction:column;align-items:center;text-align:center}
+  .ccard .ct{width:46px;height:auto;display:block;overflow:visible;margin-bottom:8px}
+  .ccard .cl{font-size:12px;font-weight:700;color:var(--text);line-height:1.3}
+  .ccard .cc{font-size:10.5px;color:var(--text-2);margin-top:3px;line-height:1.4}
+
+  .foot{margin-top:38px;padding-top:16px;border-top:1px solid var(--border);font-size:12px;
+    color:var(--text-3);line-height:1.6;max-width:74ch}
+  .foot b{color:var(--text-2)}
+  .foot code{font-family:var(--font-mono);font-size:.92em;background:var(--surface-alt);
+    padding:1px 5px;border-radius:4px;color:var(--text-2)}
+
+  @media (prefers-reduced-motion:no-preference){
+    .card{transition:border-color .18s ease}
+    .card:hover{border-color:var(--border-strong)}
+  }
+  @media (max-width:640px){
+    .doc-h1{font-size:24px}
+    .right{width:100%;margin-left:0}
+  }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="molar" viewBox="0 0 96 152" overflow="visible">
+    <path d="M18,64 C16,86 22,118 30,144 C33,150 38,150 40,143 C42,117 42,90 45,66 L51,66 C54,90 54,117 56,143 C58,150 63,150 66,144 C74,118 80,86 78,64 Z" style="fill:var(--rf,var(--surface-alt));stroke:var(--rs,var(--border-strong));opacity:.72"/>
+    <path d="M14,64 C10,42 8,24 18,13 C23,7 29,12 33,8 C37,4 43,10 48,10 C53,10 59,4 63,8 C67,12 73,7 78,13 C88,24 86,42 82,64 Z" style="fill:var(--tc,var(--surface-alt));stroke:var(--ts,var(--border-strong));stroke-width:1.4"/>
+  </symbol>
+  <symbol id="premolar" viewBox="0 0 96 152" overflow="visible">
+    <path d="M25,60 C22,90 32,132 48,147 C64,132 74,90 71,60 Z" style="fill:var(--rf,var(--surface-alt));stroke:var(--rs,var(--border-strong));opacity:.72"/>
+    <path d="M20,60 C16,40 15,22 25,12 C31,6 38,12 48,9 C58,12 65,6 71,12 C81,22 80,40 76,60 Z" style="fill:var(--tc,var(--surface-alt));stroke:var(--ts,var(--border-strong));stroke-width:1.4"/>
+  </symbol>
+  <symbol id="canine" viewBox="0 0 96 152" overflow="visible">
+    <path d="M30,60 C27,92 37,132 48,145 C59,132 69,92 66,60 Z" style="fill:var(--rf,var(--surface-alt));stroke:var(--rs,var(--border-strong));opacity:.72"/>
+    <path d="M22,60 C18,40 18,20 28,11 C34,5 41,11 48,8 C55,11 62,5 68,11 C78,20 78,40 74,60 Z" style="fill:var(--tc,var(--surface-alt));stroke:var(--ts,var(--border-strong));stroke-width:1.4"/>
+  </symbol>
+  <symbol id="incisor" viewBox="0 0 96 152" overflow="visible">
+    <path d="M32,58 C30,88 38,124 48,138 C58,124 66,88 64,58 Z" style="fill:var(--rf,var(--surface-alt));stroke:var(--rs,var(--border-strong));opacity:.72"/>
+    <path d="M26,58 C22,40 22,20 30,12 C36,8 60,8 66,12 C74,20 74,40 70,58 Z" style="fill:var(--tc,var(--surface-alt));stroke:var(--ts,var(--border-strong));stroke-width:1.4"/>
+  </symbol>
+  <pattern id="dots" width="5" height="5" patternUnits="userSpaceOnUse">
+    <circle cx="1.2" cy="1.2" r=".95" fill="var(--surface)"/>
+  </pattern>
+</defs></svg>
+
+<div class="page"><div class="wrap">
+
+  <header>
+    <p class="eyebrow">Odonto.IA · Artefato R-01 · base canônica</p>
+    <h1 class="doc-h1">O registro como unidade da ficha</h1>
+    <p class="doc-lead">Cada procedimento tem <b>data e assinatura próprias</b> — é a proteção legal do
+    dentista. Um registro assinado congela; o resto da ficha continua vivo. Este arquivo substitui os
+    três artefatos de 21/07 e passa a ser a única base da implementação.</p>
+  </header>
+
+  <!-- ══════════ A FICHA ══════════ -->
+  <div class="band-h">
+    <h2>A ficha</h2><span class="ln"></span>
+    <span class="flag ok">já implementado</span>
+  </div>
+  <p class="band-lead">A disposição já está no ar. O que muda aqui é o <b>card</b>: um só desenho de
+  registro, valendo na criação e na leitura, carregando autor, data clínica e estado de assinatura.
+  Nada de especialidade aparece sem dado.</p>
+
+  <div class="ficha">
+    <div class="fhead">
+      <span class="ft">Evolução · <span class="num">20/07/2026</span></span>
+      <span class="fw">João Ferreira · Dr. Exemplo — <span class="num">CRO-SP 12345</span></span>
+      <span class="tally">
+        <span class="pill done"><span class="pd"></span>4 feitos</span>
+        <span class="pill plan"><span class="pd"></span>1 planejado</span>
+      </span>
+    </div>
+
+    <div class="magic">
+      <div class="mrow">
+        <span class="tag"><span class="dot"></span>Organizado com Dex</span>
+        <span style="font-size:11.5px;color:var(--text-2)">5 registros · 4 especialidades</span>
+        <button class="edit" type="button">Editar relato</button>
+      </div>
+      <p>"Restaurei o 36 nas faces mésio-oclusal-distal com resina. Fiz o canal do 26, três canais.
+      Instalei o implante Straumann no 37. Vou extrair 31, 41 e 42 por doença periodontal.
+      Manutenção do aparelho superior: arco 0.018 aço, corrente do 13 ao 23."</p>
+    </div>
+
+    <div class="meta">
+      <label class="field">
+        <span class="lab">Tipo de registro</span>
+        <select class="control"><option>Evolução</option><option>Avaliação</option><option>Retorno</option></select>
+      </label>
+      <label class="field">
+        <span class="lab">Data do atendimento</span>
+        <input class="control num" type="text" value="20/07/2026">
+      </label>
+    </div>
+
+    <div class="rule"></div>
+
+    <div class="ws">
+     <div class="ws-cols">
+      <div class="ws-map">
+      <div class="oh">
+        <h3>Odontograma</h3>
+        <div class="leg">
+          <i><span class="sw" style="background:var(--teal)"></span>feito aqui</i>
+          <i><span class="sw" style="background:var(--coral)"></span>a fazer</i>
+          <i><span class="sw" style="background:var(--slate)"></span>pré-existente</i>
+          <i><span class="sw" style="background:var(--warning)"></span>perio</i>
+        </div>
+      </div>
+      <div class="archbadge"><span>⌒ Ortodontia — manutenção na arcada superior</span></div>
+      <div class="archwrap">
+        <div class="arch">
+          <div class="tw"><span class="n">17</span><svg class="mt" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#molar"/></g></svg></div>
+          <div class="tw"><span class="n">16</span><svg class="mt" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#molar"/></g></svg><span class="seal"></span></div>
+          <div class="tw sl"><span class="n">15</span><svg class="mt" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#premolar" style="--tc:var(--slate);--ts:var(--slate)"/><path d="M20,60 C16,40 15,22 25,12 C31,6 38,12 48,9 C58,12 65,6 71,12 C81,22 80,40 76,60 Z" fill="url(#dots)" opacity=".45"/></g></svg></div>
+          <div class="tw"><span class="n">14</span><svg class="mt" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#premolar"/></g></svg></div>
+          <div class="tw"><span class="n">13</span><svg class="mt" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#canine"/></g></svg></div>
+          <div class="tw"><span class="n">12</span><svg class="mt" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#incisor"/></g></svg></div>
+          <div class="tw"><span class="n">11</span><svg class="mt" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#incisor"/></g></svg></div>
+          <div class="tw"><span class="n">21</span><svg class="mt" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#incisor"/></g></svg></div>
+          <div class="tw"><span class="n">22</span><svg class="mt" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#incisor"/></g></svg></div>
+          <div class="tw"><span class="n">23</span><svg class="mt" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#canine"/></g></svg></div>
+          <div class="tw"><span class="n">24</span><svg class="mt" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#premolar"/></g></svg></div>
+          <div class="tw"><span class="n">25</span><svg class="mt" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#premolar"/></g></svg></div>
+          <div class="tw on sel"><span class="n">26</span><svg class="mt" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#molar" style="--rf:var(--teal-pale);--rs:var(--teal)"/><path d="M29.5,66 L37,66 C37,96 38,124 36.5,141 L36,143 C34,124 30,96 29.5,66 Z" fill="var(--teal)"/><path d="M52.5,66 L60,66 C60,96 61,124 59.5,141 L59,143 C57,124 53,96 52.5,66 Z" fill="var(--teal)"/></g></svg></div>
+          <div class="tw"><span class="n">27</span><svg class="mt" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#molar"/></g></svg></div>
+        </div>
+        <div class="midline"><span class="ln"></span><span class="lb">plano oclusal — as coroas se encontram</span><span class="ln"></span></div>
+        <div class="arch lower">
+          <div class="tw"><svg class="mt" viewBox="0 0 96 152"><use href="#molar"/></svg><span class="n">47</span></div>
+          <div class="tw on"><svg class="mt" viewBox="0 0 96 152"><use href="#molar" style="--tc:transparent;--ts:var(--teal);--rf:transparent;--rs:transparent"/><rect x="43" y="16" width="10" height="36" rx="2.5" fill="var(--teal)"/><path d="M48,52 C48,86 48,116 48,138" fill="none" stroke="var(--teal)" stroke-width="2.6" stroke-linecap="round"/></svg><span class="n">37</span></div>
+          <div class="tw on"><svg class="mt" viewBox="0 0 96 152"><use href="#molar" style="--tc:color-mix(in srgb,var(--teal) 26%,var(--surface-alt));--ts:var(--teal)"/></svg><span class="n">36</span></div>
+          <div class="tw"><svg class="mt" viewBox="0 0 96 152"><use href="#premolar"/></svg><span class="n">35</span></div>
+          <div class="tw"><svg class="mt" viewBox="0 0 96 152"><use href="#premolar"/></svg><span class="n">34</span></div>
+          <div class="tw"><svg class="mt" viewBox="0 0 96 152"><use href="#canine"/></svg><span class="n">33</span></div>
+          <div class="tw"><svg class="mt" viewBox="0 0 96 152"><use href="#incisor"/></svg><span class="n">32</span></div>
+          <div class="tw co"><svg class="mt" viewBox="0 0 96 152"><use href="#incisor"/><path d="M28,92 L68,134 M68,92 L28,134" stroke="var(--coral)" stroke-width="3.2" stroke-linecap="round"/></svg><span class="n">31</span></div>
+          <div class="tw co"><svg class="mt" viewBox="0 0 96 152"><use href="#incisor"/><path d="M28,92 L68,134 M68,92 L28,134" stroke="var(--coral)" stroke-width="3.2" stroke-linecap="round"/></svg><span class="n">41</span></div>
+          <div class="tw co"><svg class="mt" viewBox="0 0 96 152"><use href="#incisor"/><path d="M28,92 L68,134 M68,92 L28,134" stroke="var(--coral)" stroke-width="3.2" stroke-linecap="round"/></svg><span class="n">42</span></div>
+          <div class="tw"><svg class="mt" viewBox="0 0 96 152"><use href="#canine"/></svg><span class="n">43</span></div>
+          <div class="tw"><svg class="mt" viewBox="0 0 96 152"><use href="#premolar"/></svg><span class="n">44</span></div>
+          <div class="tw"><svg class="mt" viewBox="0 0 96 152"><use href="#premolar"/></svg><span class="n">45</span></div>
+          <div class="tw"><svg class="mt" viewBox="0 0 96 152"><use href="#molar"/></svg><span class="n">46</span></div>
+        </div>
+      </div>
+      <p style="margin:9px 2px 0;font-size:10.5px;color:var(--text-3);line-height:1.45">
+        A coluna encolhe, <b style="color:var(--text-2)">o dente não</b> — a arcada rola na
+        horizontal e o dente selecionado entra em vista sozinho. Encolher o desenho levaria o
+        incisivo lateral abaixo do alvo mínimo de toque.
+      </p>
+      </div><!-- /ws-map -->
+
+      <div class="ws-panel">
+        <span class="pt">Dente 26</span>
+        <span class="ps">1º molar superior esquerdo</span>
+        <div class="figs">
+          <svg class="bigtooth" viewBox="0 0 96 152" aria-label="Dente 26 com canais tratados">
+            <use href="#molar" style="--rf:var(--teal-pale);--rs:var(--teal)"/>
+            <path d="M29.5,66 L37,66 C37,96 38,124 36.5,141 L36,143 C34,124 30,96 29.5,66 Z" fill="var(--teal)"/>
+            <path d="M52.5,66 L60,66 C60,96 61,124 59.5,141 L59,143 C57,124 53,96 52.5,66 Z" fill="var(--teal)"/>
+          </svg>
+          <svg class="occ" viewBox="0 0 100 100" aria-label="Mapa oclusal do dente 26 — cinco faces tocáveis">
+            <clipPath id="cm"><path d="M50,6 C66,6 78,4 87,13 C96,22 94,34 94,50 C94,66 96,78 87,87 C78,96 66,94 50,94 C34,94 22,96 13,87 C4,78 6,66 6,50 C6,34 4,22 13,13 C22,4 34,6 50,6 Z"/></clipPath>
+            <g clip-path="url(#cm)">
+              <rect width="100" height="100" fill="var(--surface-alt)"/>
+              <g stroke="var(--border-strong)" stroke-width="1.2" fill="none">
+                <path d="M0,0 L33,33 M100,0 L67,33 M0,100 L33,67 M100,100 L67,67"/>
+                <rect x="33" y="33" width="34" height="34"/>
+              </g>
+            </g>
+            <path d="M50,6 C66,6 78,4 87,13 C96,22 94,34 94,50 C94,66 96,78 87,87 C78,96 66,94 50,94 C34,94 22,96 13,87 C4,78 6,66 6,50 C6,34 4,22 13,13 C22,4 34,6 50,6 Z" fill="none" stroke="var(--border-strong)" stroke-width="1.6"/>
+            <g font-family="var(--font-mono)" font-weight="700" fill="var(--text-3)" text-anchor="middle">
+              <text x="50" y="54" font-size="11">O</text><text x="50" y="21" font-size="9">V</text>
+              <text x="17" y="54" font-size="9">M</text><text x="83" y="54" font-size="9">D</text>
+              <text x="50" y="88" font-size="9">P</text>
+            </g>
+          </svg>
+        </div>
+        <div class="cyc" style="margin-bottom:10px">
+          <span>toque a face:</span><span class="c">sem registro</span>→<span class="c c1">a fazer</span>→<span class="c c2">feito</span>→<span class="c">remove</span>
+        </div>
+        <div class="chips">
+          <button class="dchip act" type="button">Canal · realizado</button>
+          <button class="dchip" type="button">Coroa</button>
+          <button class="dchip" type="button">Pino / núcleo</button>
+          <button class="dchip" type="button">Extração</button>
+          <button class="dchip" type="button">Fratura</button>
+        </div>
+      </div><!-- /ws-panel -->
+     </div><!-- /ws-cols -->
+
+     <div class="ws-regs">
+      <div class="wh">
+        <h4>Registros do dente 26</h4>
+        <span>2 registros · saem da lista abaixo enquanto o dente está aberto</span>
+      </div>
+      <div class="ws-stack">
+
+        <article class="card">
+          <div class="crow">
+            <span class="tnum">26</span>
+            <span class="ttl">
+              <span class="t">Canal · dente 26 <span style="font-weight:500;color:var(--text-3)">— 3 canais</span></span>
+              <span class="by">Realizado em <b class="num">20/07/2026</b> · Dr. Exemplo · <span class="num">CRO-SP 12345</span></span>
+            </span>
+            <span class="right">
+              <span class="saved">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>
+                salvo <span class="num">14:32</span>
+              </span>
+              <span class="pill done"><span class="pd"></span>Realizado</span>
+              <svg class="chev" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" style="transform:rotate(90deg)"><path d="m9 18 6-6-6-6"/></svg>
+            </span>
+          </div>
+          <div class="spec">
+            <div class="sh"><span class="kd"></span><span class="k">Ficha endodôntica</span></div>
+            <div class="tblwrap">
+              <table class="etbl">
+                <thead><tr>
+                  <th>Canal</th><th>Ponto de referência</th>
+                  <th class="r">Raiz (mm)</th><th class="r">CT (mm)</th><th class="r">Lima final</th>
+                </tr></thead>
+                <tbody>
+                  <tr><td class="canal"><input class="txtin" style="width:82px;font-weight:600" value="MV"></td>
+                    <td><input class="txtin" value="Cúspide MV"></td>
+                    <td class="r"><input class="cellin" value="20,5"></td>
+                    <td class="r"><input class="cellin ct" value="19,5"></td>
+                    <td class="r"><input class="cellin" value="#35"></td></tr>
+                  <tr><td class="canal"><input class="txtin" style="width:82px;font-weight:600" value="DV"></td>
+                    <td><input class="txtin" value="Cúspide MV"></td>
+                    <td class="r"><input class="cellin" value="20,0"></td>
+                    <td class="r"><input class="cellin ct" value="19,0"></td>
+                    <td class="r"><input class="cellin" value="#30"></td></tr>
+                  <tr><td class="canal"><input class="txtin" style="width:82px;font-weight:600" value="P"></td>
+                    <td><input class="txtin" value="Cúspide MV"></td>
+                    <td class="r"><input class="cellin" value="21,5"></td>
+                    <td class="r"><input class="cellin ct" value="20,5"></td>
+                    <td class="r"><input class="cellin missing" value="" placeholder="—"></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <button class="addrow" type="button">＋ Adicionar canal</button>
+            <div class="note">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+              <span>As três linhas nasceram nomeadas pela anatomia do 26 — <b>MV · DV · P</b>. Medida
+              nenhuma vem preenchida. A lima do palatino não foi ditada e fica <b>vazia</b>: a ficha
+              salva assim mesmo, e a pendência aparece na linha fechada.</span>
+            </div>
+            <div class="efoot">
+              <span>Obturação: <b>condensação lateral</b></span>
+              <span>Cimento: <b>AH Plus</b></span>
+              <span style="color:var(--text-3)">CT sugerido: raiz − 1</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="crow">
+            <span class="tnum">26</span>
+            <span class="ttl">
+              <span class="t">Coroa total · dente 26</span>
+              <span class="q">"zircônia"</span>
+              <span class="by">Indicado — depois da obturação · Dr. Exemplo · <span class="num">CRO-SP 12345</span></span>
+            </span>
+            <span class="right">
+              <span class="saved">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>
+                salvo <span class="num">14:33</span>
+              </span>
+              <span class="pill plan"><span class="pd"></span>Planejado</span>
+            </span>
+          </div>
+        </article>
+
+      </div>
+     </div><!-- /ws-regs -->
+    </div><!-- /ws -->
+
+    <div class="rule"></div>
+
+    <div class="sec-h"><h3>Registros</h3><span class="count">3 registros · os do dente 26 estão acima</span></div>
+    <div class="rlist">
+
+      <!-- congelado por assinatura — o coração do R-01 -->
+      <article class="card frozen">
+        <div class="crow">
+          <span class="tnum">36</span>
+          <span class="ttl">
+            <span class="t">Restauração MOD · dente 36</span>
+            <span class="q">"resina composta"</span>
+            <span class="by">Realizado em <b class="num">20/07/2026</b> · Dr. Exemplo · <span class="num">CRO-SP 12345</span></span>
+          </span>
+          <span class="right">
+            <span class="faces"><span>M</span><span>O</span><span>D</span></span>
+            <span class="pill done"><span class="pd"></span>Realizado</span>
+            <span class="lock">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+              Assinado <span class="num">20/07</span>
+            </span>
+          </span>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="crow">
+          <span class="tnum">37</span>
+          <span class="ttl">
+            <span class="t">Implante · dente 37</span>
+            <span class="q">"Straumann BLT 4.1 × 10"</span>
+            <span class="by">Realizado em <b class="num">20/07/2026</b> · Dr. Exemplo · <span class="num">CRO-SP 12345</span></span>
+          </span>
+          <span class="right">
+            <span class="pill done"><span class="pd"></span>Realizado</span>
+            <svg class="chev" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" style="transform:rotate(90deg)"><path d="m9 18 6-6-6-6"/></svg>
+          </span>
+        </div>
+        <div class="spec">
+          <div class="sh"><span class="kd"></span><span class="k">Registro do implante</span></div>
+          <div class="kv">
+            <span><span class="k">Sistema</span><span class="v">Straumann BLT</span></span>
+            <span><span class="k">Plataforma</span><span class="v">Cone morse</span></span>
+            <span><span class="k">Diâmetro</span><span class="v num">4.1 mm</span></span>
+            <span><span class="k">Comprimento</span><span class="v num">10 mm</span></span>
+            <span><span class="k">Torque</span><span class="v num">35 Ncm</span></span>
+            <span><span class="k">Lote</span><span class="v num">SLA-88214</span></span>
+          </div>
+          <div class="note good">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
+            <span>O <b>lote</b> existe por rastreabilidade: implante tem recall, e é o lote que
+            localiza o paciente afetado.</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="crow">
+          <span class="tnum grp">31 · 41 · 42</span>
+          <span class="ttl">
+            <span class="t">Extração · 3 dentes</span>
+            <span class="q">"doença periodontal — reabilitação com prótese"</span>
+            <span class="by">Um procedimento, três dentes — agrupado por tipo, estado e observação</span>
+          </span>
+          <span class="right"><span class="pill plan"><span class="pd"></span>Planejado</span></span>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="crow">
+          <span class="tnum grp">Sup.</span>
+          <span class="ttl">
+            <span class="t">Ortodontia · manutenção</span>
+            <span class="q">registro de arcada — não pinta dente</span>
+            <span class="by">Realizado em <b class="num">20/07/2026</b> · Dr. Exemplo · <span class="num">CRO-SP 12345</span></span>
+          </span>
+          <span class="right">
+            <span class="pill done"><span class="pd"></span>Realizado</span>
+            <svg class="chev" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" style="transform:rotate(90deg)"><path d="m9 18 6-6-6-6"/></svg>
+          </span>
+        </div>
+        <div class="spec">
+          <div class="sh"><span class="kd"></span><span class="k">Manutenção · arcada superior</span></div>
+          <div class="ochips">
+            <div class="ochip"><span class="ok">Arco</span><span><span class="num">0.018</span> aço</span></div>
+            <div class="ochip"><span class="ok">Ativação</span><span>ativado + troca de ligaduras</span></div>
+            <div class="ochip"><span class="ok">Elástico corrente</span><span class="num">13 → 23</span></div>
+            <div class="ochip"><span class="ok">Intermaxilar</span><span style="color:var(--text-3)">— não informado</span></div>
+          </div>
+          <button class="addrow" type="button">⟳ Igual à última manutenção</button>
+        </div>
+      </article>
+
+      <button class="btn ghost" type="button">＋ Adicionar registro pelo odontograma</button>
+    </div>
+
+    <div class="actions">
+      <button class="btn" type="button">Cancelar</button>
+      <button class="btn primary" type="button">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg>
+        Salvar evolução
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════ O FLUXO ══════════ -->
+  <div class="band-h">
+    <h2>Como o dentista chega na tabela</h2><span class="ln"></span>
+    <span class="flag">R-01 · fatia 0</span>
+  </div>
+  <p class="band-lead">A odontometria sai do localizador com o dique instalado e a luva contaminada —
+  ninguém pega tablet ali. O lançamento acontece <b>depois</b>, desenluvado, no fim da sessão. Então a
+  tabela não precisa estar a um toque durante o procedimento: precisa ser <b>impossível de perder</b> depois.</p>
+
+  <div class="flow">
+    <div class="fcard">
+      <span class="fk">Ditou</span>
+      <p class="ft">"Fiz o canal do 26, três canais."</p>
+      <p class="fd">O registro nasce do relato. A voz não captura medida — então o card aparece
+      <b>já aberto</b>, com as três linhas nomeadas pela anatomia. Nove números e acabou.
+      O painel do dente nunca precisou ser aberto.</p>
+    </div>
+    <div class="fcard">
+      <span class="fk">Não ditou</span>
+      <p class="ft">Toca o 26 → chip "Canal"</p>
+      <p class="fd">O registro nasce e aparece na faixa embaixo do painel — que é <b>o mesmo card</b>
+      da lista, não uma cópia. Fecha o painel e ele desce pro seu lugar, no mesmo estado.</p>
+    </div>
+    <div class="fcard">
+      <span class="fk">Ver de novo</span>
+      <p class="ft">Rola até o card, ou toca o dente</p>
+      <p class="fd">Tocar o 26 no odontograma <b>rola até o card e destaca</b> — nunca abre uma segunda
+      cópia da tabela. Um dado, um lugar onde ele renderiza, dois jeitos de chegar.</p>
+    </div>
+  </div>
+
+  <div class="rules">
+    <p class="rh">O contrato que toda especialidade obedece</p>
+    <ol class="rl">
+      <li><b>Um lugar só.</b> O corpo da especialidade renderiza dentro do card do registro — nunca
+      no painel do dente, nunca duplicado.</li>
+      <li><b>Nenhum save próprio.</b> Salva com o registro, e o card mostra
+      <span class="saved"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg> salvo <span class="num">14:32</span></span>.
+      Era esse silêncio que fazia parecer que o dado tinha sumido.</li>
+      <li><b>Nunca recusa incompleto.</b> Campo faltando aparece em coral e a ficha grava assim mesmo.</li>
+      <li><b>A pendência aparece fechada.</b> <i>"3 canais · falta a lima do palatino"</i> — o dentista
+      varre a lista e vê o que falta sem abrir nada.</li>
+      <li><b>O formulário nasce certo.</b> A anatomia do dente monta as linhas (26 → MV · DV · P;
+      incisivo → uma linha). Medida nenhuma vem preenchida.</li>
+    </ol>
+    <p class="rf">Especialidade que não couber nas cinco não entra até a regra mudar. É isto que impede
+    a de número quatro de inventar o próprio jeito — e é o que estava faltando quando a endo entrou.</p>
+  </div>
+
+  <!-- ══════════ ASSINATURA POR PROCEDIMENTO ══════════ -->
+  <div class="band-h">
+    <h2>Assinatura por procedimento</h2><span class="ln"></span>
+    <span class="flag">R-01 · fatia 2 · novo</span>
+  </div>
+  <p class="band-lead">O paciente assina <b>o que foi feito</b>. O dentista escolhe quais procedimentos
+  entram nesta coleta e assina <b>uma vez só</b>. Planejado não entra — não há o que atestar.
+  Procedimento já assinado <b>congela</b>: some da lista de seleção e não é mais editável, enquanto o
+  resto da ficha segue vivo.</p>
+
+  <div class="sign">
+    <div class="sh2">
+      <h3>Assinatura do paciente</h3>
+      <p>João Ferreira · <span class="num">20/07/2026</span></p>
+    </div>
+
+    <div class="srow">
+      <span class="cbx"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4"><path d="M20 6 9 17l-5-5"/></svg></span>
+      <span class="sd">Canal · dente 26<small>3 canais · odontometria registrada</small></span>
+      <span class="sr"><span class="pill done"><span class="pd"></span>Realizado <span class="num">20/07</span></span></span>
+    </div>
+
+    <div class="srow">
+      <span class="cbx"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4"><path d="M20 6 9 17l-5-5"/></svg></span>
+      <span class="sd">Implante · dente 37<small>Straumann BLT 4.1 × 10 · lote SLA-88214</small></span>
+      <span class="sr"><span class="pill done"><span class="pd"></span>Realizado <span class="num">20/07</span></span></span>
+    </div>
+
+    <div class="srow">
+      <span class="cbx un"></span>
+      <span class="sd">Ortodontia · manutenção da arcada superior<small>arco 0.018 aço · corrente 13 → 23</small></span>
+      <span class="sr"><span class="pill done"><span class="pd"></span>Realizado <span class="num">20/07</span></span></span>
+    </div>
+
+    <div class="srow off">
+      <span class="cbx dis">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12h14"/></svg>
+      </span>
+      <span class="sd" style="color:var(--text-3)">Extração · dentes 31 · 41 · 42<small>ainda não foi feito — não há o que assinar</small></span>
+      <span class="sr"><span class="pill plan"><span class="pd"></span>Planejado</span></span>
+    </div>
+
+    <div class="srow off">
+      <span class="cbx dis">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      </span>
+      <span class="sd" style="color:var(--text-3)">Restauração MOD · dente 36<small>assinado em 20/07/2026 — registro congelado</small></span>
+      <span class="sr"><span class="lock">Assinado</span></span>
+    </div>
+
+    <div class="padwrap">
+      <div class="pad">o paciente assina aqui</div>
+      <div class="signfoot">
+        <span class="who"><b>2 procedimentos</b> nesta coleta · assinados por <b>João Ferreira</b>
+        em <span class="num">20/07/2026</span></span>
+        <button class="btn" type="button">Cancelar</button>
+        <button class="btn primary" type="button">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg>
+          Coletar assinatura
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ SÍMBOLOS ══════════ -->
+  <div class="band-h">
+    <h2>Os símbolos do odontograma</h2><span class="ln"></span>
+    <span class="flag">R-02</span>
+  </div>
+  <p class="band-lead">O vocabulário que veio do preview aprovado pelos dentistas, preservado aqui pra
+  não depender de link externo. Três cores contam a história de todo procedimento: <b>coral</b> a fazer,
+  <b>verde</b> feito nesta clínica, <b>cinza pontilhado</b> o paciente já chegou assim.</p>
+
+  <div class="cat">
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#premolar" style="--tc:var(--coral-pale);--ts:var(--coral)"/></g></svg>
+      <span class="cl">Cárie a restaurar</span><span class="cc">face em coral</span>
+    </div>
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152"><use href="#molar" style="--tc:color-mix(in srgb,var(--teal) 24%,var(--surface-alt));--ts:var(--teal)"/></svg>
+      <span class="cl">Restauração feita</span><span class="cc">verde — feita aqui</span>
+    </div>
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#molar" style="--tc:var(--slate);--ts:var(--slate)"/><path d="M14,64 C10,42 8,24 18,13 C23,7 29,12 33,8 C37,4 43,10 48,10 C53,10 59,4 63,8 C67,12 73,7 78,13 C88,24 86,42 82,64 Z" fill="url(#dots)" opacity=".5"/></g></svg>
+      <span class="cl">Restauração antiga</span><span class="cc">cinza pontilhado</span>
+    </div>
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152"><use href="#molar" style="--rf:var(--coral-pale);--rs:var(--coral)"/><path d="M29.5,66 L37,66 C37,96 38,124 36.5,141 L36,143 C34,124 30,96 29.5,66 Z" fill="none" stroke="var(--coral)" stroke-width="1.7"/><path d="M52.5,66 L60,66 C60,96 61,124 59.5,141 L59,143 C57,124 53,96 52.5,66 Z" fill="none" stroke="var(--coral)" stroke-width="1.7"/></svg>
+      <span class="cl">Canal a tratar</span><span class="cc">canal vazio, contorno coral</span>
+    </div>
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152"><use href="#molar" style="--rf:var(--teal-pale);--rs:var(--teal)"/><path d="M29.5,66 L37,66 C37,96 38,124 36.5,141 L36,143 C34,124 30,96 29.5,66 Z" fill="var(--teal)"/><path d="M52.5,66 L60,66 C60,96 61,124 59.5,141 L59,143 C57,124 53,96 52.5,66 Z" fill="var(--teal)"/></svg>
+      <span class="cl">Canal tratado</span><span class="cc">canal preenchido</span>
+    </div>
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#premolar"/><path d="M48,62 C48,92 48,116 48,134" fill="none" stroke="var(--slate)" stroke-width="2"/><circle cx="48" cy="141" r="7" fill="none" stroke="var(--coral)" stroke-width="2.2"/></g></svg>
+      <span class="cl">Lesão periapical</span><span class="cc">círculo no ápice</span>
+    </div>
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#molar"/></g><path d="M24,96 L72,140 M72,96 L24,140" stroke="var(--coral)" stroke-width="3.4" stroke-linecap="round"/></svg>
+      <span class="cl">Extração indicada</span><span class="cc">X coral sobre a coroa</span>
+    </div>
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152"><path d="M14,64 C10,42 8,24 18,13 C23,7 29,12 33,8 C37,4 43,10 48,10 C53,10 59,4 63,8 C67,12 73,7 78,13 C88,24 86,42 82,64 L78,64 C80,86 74,118 66,144 C63,150 58,150 56,143 C54,117 54,90 51,66 L45,66 C42,90 42,117 40,143 C38,150 33,150 30,144 C22,118 16,86 18,64 Z" fill="none" stroke="var(--text-3)" stroke-width="1.4" stroke-dasharray="3 3"/></svg>
+      <span class="cl">Extraído</span><span class="cc">só o contorno — vaga na arcada</span>
+    </div>
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152"><use href="#molar" style="--tc:transparent;--ts:var(--teal);--rf:transparent;--rs:transparent"/><rect x="43" y="16" width="10" height="36" rx="2.5" fill="var(--teal)"/><path d="M48,52 C48,86 48,116 48,138" fill="none" stroke="var(--teal)" stroke-width="2.6" stroke-linecap="round"/></svg>
+      <span class="cl">Implante instalado</span><span class="cc">a raiz vira parafuso</span>
+    </div>
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#canine"/><rect x="43" y="62" width="10" height="30" rx="2.5" fill="var(--teal)"/><path d="M48,90 C48,110 48,126 48,138" fill="none" stroke="var(--teal)" stroke-width="2.1" stroke-linecap="round"/></g></svg>
+      <span class="cl">Pino / núcleo</span><span class="cc">no terço da raiz</span>
+    </div>
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#molar"/><circle cx="48" cy="30" r="6" fill="var(--teal)"/></g></svg>
+      <span class="cl">Selante</span><span class="cc">ponto na oclusal</span>
+    </div>
+    <div class="ccard">
+      <svg class="ct" viewBox="0 0 96 152"><g transform="translate(0,152) scale(1,-1)"><use href="#incisor"/><path d="M32,14 L46,28 L36,38 L52,52" fill="none" stroke="var(--coral)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></g></svg>
+      <span class="cl">Fratura</span><span class="cc">traço em zigue-zague</span>
+    </div>
+  </div>
+
+  <p class="foot">
+    <b>O que esta base substitui.</b> Este arquivo é a base canônica única do R-01 e do R-02.
+    Saem de circulação: <code>ficha-definitiva-2026-07-21-artefato.html</code>,
+    <code>ficha-dois-modos-2026-07-21-artefato.html</code> e os três artefatos publicados em
+    21/07 (odontograma v3 · ficha modo de criação · ficha estados e fluxos). Duas bases ao mesmo
+    tempo é o que fez a implementação escolher sozinha e derivar — por isso só uma sobrevive.<br><br>
+    <b>Fora deste artefato, de propósito:</b> periograma completo (tela própria, item futuro),
+    ponte e esfoliação (ainda barradas no schema do modelo), e prótese removível, lesão de mucosa,
+    DTM, HOF, enxerto, mantenedor, sutura, bruxismo e tártaro — que seguem em texto na evolução,
+    porque forçá-los no odontograma viraria poluição.
+  </p>
+
+</div></div>
