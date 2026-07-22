@@ -30,7 +30,7 @@ const AssinaturaRecepcaoModal = dynamic(
   () => import('@/components/fichas/AssinaturaRecepcaoModal').then(m => m.AssinaturaRecepcaoModal),
   { ssr: false }
 );
-import { buildClinicDatetime } from './date-helpers';
+import { buildClinicDatetime, CLINIC_TZ_OFFSET } from './date-helpers';
 import { useState, useMemo, useCallback, useTransition, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PageContainer } from '@/components/layout/page-container';
@@ -195,30 +195,51 @@ export function AgendamentosClient({
     setAgendamentos(inicial);
   }, [inicial]);
 
-  // Multi-user: atualiza dados do mês quando a janela recupera foco (throttle 30s)
+  // Multi-user: recarrega os agendamentos do mês.
+  //
+  // Bug relatado pela recepção (21/07): "conflita com um agendamento que não existe,
+  // e o F5 resolve". A causa é esta lista — `conflitoNovo` calcula o aviso de conflito
+  // em cima dela, e ela só era recarregada no `focus` da janela. Quem passa o dia na
+  // mesma aba nunca via a agenda mudar: o dentista cancelava um horário e a recepção
+  // continuava vendo o fantasma.
+  const lastRefreshRef = useRef(Date.now());
+  const recarregarAgendamentos = useCallback(async (forcar = false) => {
+    if (!forcar && Date.now() - lastRefreshRef.current < 30_000) return;
+    lastRefreshRef.current = Date.now();
+    const mes = parseISO(`${mesAtual}-01`);
+    // Bordas do mês em BRT explícito — o resto do arquivo já usa `buildClinicDatetime`
+    // com offset; sem ele o Postgres lia a string ingênua como UTC e a janela andava 3h.
+    const mesInicio = `${format(startOfMonth(mes), 'yyyy-MM-dd')}T00:00:00${CLINIC_TZ_OFFSET}`;
+    const mesFim    = `${format(endOfMonth(mes),   'yyyy-MM-dd')}T23:59:59${CLINIC_TZ_OFFSET}`;
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('agendamentos')
+      .select('id, clinica_id, paciente_id, dentista_id, data_hora, duracao_minutos, status, origem, observacoes, created_at, paciente:pacientes(id, nome, observacoes), dentista:dentistas!agendamentos_dentista_id_fkey(id, nome), criador:dentistas!agendamentos_created_by_fkey(id, nome)')
+      .eq('clinica_id', _clinicaId)
+      .gte('data_hora', mesInicio)
+      .lte('data_hora', mesFim)
+      .order('data_hora');
+    // Antes o erro era engolido (`if (data)`) e a lista ficava velha em silêncio —
+    // e é dela que sai o aviso de conflito. Falhar calado aqui é mentir na tela.
+    if (error) {
+      console.error('[agenda] recarregar falhou:', error.message);
+      toast.error('Não foi possível atualizar a agenda. Recarregue a página.');
+      return;
+    }
+    if (data) setAgendamentos(data as unknown as AgendamentoRow[]);
+  }, [_clinicaId, mesAtual]);
+
   useEffect(() => {
-    let lastRefresh = Date.now();
-    const handler = async () => {
-      const now = Date.now();
-      if (now - lastRefresh > 30_000) {
-        lastRefresh = now;
-        const mes = parseISO(`${mesAtual}-01`);
-        const mesInicio = format(startOfMonth(mes), "yyyy-MM-dd'T'00:00:00");
-        const mesFim = format(endOfMonth(mes), "yyyy-MM-dd'T'23:59:59");
-        const supabase = createClient();
-        const { data } = await supabase
-          .from('agendamentos')
-          .select('id, clinica_id, paciente_id, dentista_id, data_hora, duracao_minutos, status, origem, observacoes, created_at, paciente:pacientes(id, nome, observacoes), dentista:dentistas!agendamentos_dentista_id_fkey(id, nome), criador:dentistas!agendamentos_created_by_fkey(id, nome)')
-          .eq('clinica_id', _clinicaId)
-          .gte('data_hora', mesInicio)
-          .lte('data_hora', mesFim)
-          .order('data_hora');
-        if (data) setAgendamentos(data as unknown as AgendamentoRow[]);
-      }
-    };
+    const handler = () => { void recarregarAgendamentos(); };
     window.addEventListener('focus', handler);
     return () => window.removeEventListener('focus', handler);
-  }, [_clinicaId, mesAtual]);
+  }, [recarregarAgendamentos]);
+
+  // O momento em que dado velho custa caro: abrir o formulário de novo agendamento.
+  // Ignora o throttle de propósito — é uma requisição por abertura de modal.
+  useEffect(() => {
+    if (isNewModalOpen) void recarregarAgendamentos(true);
+  }, [isNewModalOpen, recarregarAgendamentos]);
 
   // Auto-abre o drawer e limpa ?novo=1 da URL sem reload nem flicker
   useEffect(() => {
