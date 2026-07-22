@@ -36,7 +36,6 @@ async function SecretaryDashboardServer({
   const [
     { data: agendamentosRaw },
     { data: dentistasRaw },
-    { data: orcamentosRaw },
     { data: pagamentosVencendoRaw },
     { data: pagamentosVencidosRaw },
     { data: followupsRaw },
@@ -59,11 +58,6 @@ async function SecretaryDashboardServer({
       .neq('role', 'secretaria')
       .eq('ativo', true)
       .order('nome', { ascending: true }),
-    supabase
-      .from('orcamentos')
-      .select('total')
-      .eq('clinica_id', clinicaId)
-      .in('status', ['rascunho', 'enviado']),
     supabase
       .from('pagamentos')
       .select('data_vencimento, valor')
@@ -95,10 +89,6 @@ async function SecretaryDashboardServer({
 
   const agendamentos = (agendamentosRaw ?? []) as unknown as AgendamentoHoje[];
   const dentistas = (dentistasRaw ?? []) as DentistaItem[];
-  const aReceber = (orcamentosRaw ?? []).reduce(
-    (sum, o) => sum + (Number(o.total) || 0),
-    0,
-  );
 
   const pagamentosVencendo = (pagamentosVencendoRaw ?? []) as {
     data_vencimento: string;
@@ -165,7 +155,7 @@ async function SecretaryDashboardServer({
         nome={nome}
         agendamentos={agendamentos}
         dentistas={dentistas}
-        metricas={{ totalHoje, confirmados, aguardando, aReceber, venceHoje, venceSemana }}
+        metricas={{ totalHoje, confirmados, aguardando, venceHoje, venceSemana }}
         pendencias={pendencias.slice(0, 8)}
       />
     </PageTransition>

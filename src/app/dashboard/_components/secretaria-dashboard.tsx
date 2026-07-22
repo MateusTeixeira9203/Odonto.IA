@@ -65,7 +65,6 @@ export type SecretariaDashboardProps = {
     totalHoje: number;
     confirmados: number;
     aguardando: number;
-    aReceber: number;
     venceHoje: number;
     venceSemana: number;
   };
@@ -314,7 +313,7 @@ export function SecretariaDashboard({
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.05 }}
-        className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8"
+        className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-8"
       >
         <MetricCard
           icon={Calendar}
@@ -334,12 +333,6 @@ export function SecretariaDashboard({
           label="Aguardando"
           value={metricas.aguardando}
           sub="sem confirmação"
-        />
-        <MetricCard
-          icon={DollarSign}
-          label="A receber"
-          value={`R$ ${metricas.aReceber.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`}
-          sub="orçamentos pendentes"
         />
       </motion.div>
 
