@@ -35,6 +35,23 @@ export function saudacaoBRT(d: Date = new Date()): string {
   return 'Boa noite';
 }
 
+/**
+ * "2026-07-22" — o dia da clínica, não o do servidor.
+ *
+ * Usar isto (e não `format(new Date(), 'yyyy-MM-dd')`) sempre que a data virar chave, filtro
+ * ou parâmetro de URL: depois das 21h BRT o servidor em UTC já está no dia seguinte, e a
+ * agenda abriria em amanhã sozinha.
+ */
+export function hojeBRT(d: Date = new Date()): string {
+  // 'en-CA' é o locale que formata como yyyy-MM-dd nativamente.
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(d);
+}
+
 /** "quarta-feira, 22 de julho" — dia da clínica, não do servidor. */
 export function dataExtensaBRT(d: Date = new Date()): string {
   return new Intl.DateTimeFormat('pt-BR', {

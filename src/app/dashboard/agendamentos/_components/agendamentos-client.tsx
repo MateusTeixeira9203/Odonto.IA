@@ -30,7 +30,8 @@ const AssinaturaRecepcaoModal = dynamic(
   () => import('@/components/fichas/AssinaturaRecepcaoModal').then(m => m.AssinaturaRecepcaoModal),
   { ssr: false }
 );
-import { buildClinicDatetime, CLINIC_TZ_OFFSET } from './date-helpers';
+import { buildClinicDatetime, janelaDaVisao, type VisaoAgenda } from './date-helpers';
+import type { DentistaAgenda } from './cor-dentista';
 import { useState, useMemo, useCallback, useTransition, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PageContainer } from '@/components/layout/page-container';
@@ -119,14 +120,20 @@ interface Props {
   clinicaId: string;
   role: DentistaRole;
   dentistaAtualId: string;
-  /** Lista de dentistas para filtro/form (apenas preenchida para secretária) */
-  dentistas: { id: string; nome: string }[];
+  /**
+   * Lista de dentistas para filtro/form (apenas preenchida para secretária). Vem do servidor em
+   * ordem de `created_at` — é essa ordem que fixa o slot de cor. Exibição em chip/select é
+   * alfabética; ver `dentistasOrdenados`.
+   */
+  dentistas: DentistaAgenda[];
   /** Mapa dentistaId → GCal conectado (secretária) */
   calendarConnectedPerDentista: Record<string, boolean>;
   /** Clínica tem pelo menos uma secretária ativa */
   temSecretaria: boolean;
-  /** Mês atual no formato 'YYYY-MM' — controlado via URL search param */
-  mesAtual: string;
+  /** Visão ativa — vem da URL (`?v=`), não de estado local. */
+  visao: VisaoAgenda;
+  /** Dia de referência da janela carregada, 'yyyy-MM-dd' — vem da URL (`?d=`). */
+  ancora: string;
   /** Pode criar agendamentos: plano SOLO ou secretária */
   canEdit: boolean;
   /** Auto-abre o drawer de novo agendamento (via ?novo=1 na URL) */
@@ -143,7 +150,8 @@ export function AgendamentosClient({
   dentistas,
   calendarConnectedPerDentista,
   temSecretaria,
-  mesAtual,
+  visao,
+  ancora,
   canEdit,
   autoOpenNovo = false,
   foraDaJanela,
@@ -151,24 +159,41 @@ export function AgendamentosClient({
   const router = useRouter();
   const isSecretaria = role === 'secretaria';
 
-  // currentMonth é derivado do prop (controlado pelo servidor via URL)
-  const currentMonth = parseISO(`${mesAtual}-01`);
+  // A âncora é a fonte da data em toda a tela. `T12:00` de propósito: `parseISO('2026-08-05')`
+  // devolve meia-noite local e, num fuso a leste, cai no dia 4.
+  const ancoraDate = parseISO(`${ancora}T12:00:00`);
+  const currentMonth = startOfMonth(ancoraDate);
 
-  // Navegação de mês via URL para que o servidor re-faça a query filtrada
+  /**
+   * TODA navegação de data passa por aqui, e por aqui passa pela URL.
+   *
+   * Era esse o bug: só as setas de MÊS avisavam o servidor. Semana e Dia mexiam em estado
+   * local, então atravessar a virada do mês mostrava uma grade vazia — os dados do mês
+   * seguinte nunca tinham sido buscados. Agora a janela carregada e a janela desenhada saem
+   * do mesmo lugar, e não têm como divergir.
+   */
   const [isPending, startTransition] = useTransition();
-  const goToMonth = (date: Date) => {
-    const mes = format(date, 'yyyy-MM');
-    startTransition(() => {
-      router.push(`/dashboard/agendamentos?mes=${mes}`);
-    });
-  };
+  const irPara = useCallback(
+    (novaVisao: VisaoAgenda, novaAncora: Date | string) => {
+      const d = typeof novaAncora === 'string' ? novaAncora : format(novaAncora, 'yyyy-MM-dd');
+      startTransition(() => {
+        router.push(`/dashboard/agendamentos?v=${novaVisao}&d=${d}`);
+      });
+    },
+    [router],
+  );
 
   const [agendamentos, setAgendamentos] = useState(inicial);
-  // selectedDate: hoje se estiver no mês atual, senão o 1º dia do mês
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const today = new Date();
-    return isSameMonth(today, currentMonth) ? today : currentMonth;
-  });
+
+  /**
+   * Dia em foco DENTRO da janela carregada — só a visão de Mês usa, pra listar o dia clicado
+   * sem ir ao servidor (o mês inteiro já está em memória). Dia e Semana leem a âncora direto.
+   */
+  const [diaFocado, setDiaFocado] = useState<Date>(ancoraDate);
+  useEffect(() => { setDiaFocado(parseISO(`${ancora}T12:00:00`)); }, [ancora]);
+
+  // Na visão de Dia quem manda é a âncora; nas outras, o dia clicado no calendário.
+  const selectedDate = visao === 'dia' ? ancoraDate : diaFocado;
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedApt, setSelectedApt] = useState<AgendamentoRow | null>(null);
@@ -190,6 +215,25 @@ export function AgendamentosClient({
   // Filtro por dentista (somente secretária)
   const [filtroDentistaId, setFiltroDentistaId] = useState<string>('todos');
 
+  // Dia destacado na grade cheia da Semana — só existe depois de um clique no mapa de
+  // carga (spec §3.4). Trocar o chip manualmente limpa (ver os onClick dos chips abaixo).
+  const [diaDestacado, setDiaDestacado] = useState<Date | null>(null);
+
+  // Cor por dentista (spec §3.2) — mapa id → slot, na ordem que o servidor mandou
+  // (created_at). A ordem do ARRAY não importa aqui; só a associação id→slot importa.
+  const slotPorDentista = useMemo(
+    () => Object.fromEntries(dentistas.map((d) => [d.id, d.slot])),
+    [dentistas],
+  );
+
+  // Chip, select e o fallback de "dentista padrão" mostram/usam nome em ordem alfabética —
+  // ordem de EXIBIÇÃO e ordem de COR são coisas diferentes (spec §5.2). Precisa vir ANTES
+  // dos useState de formulário abaixo, que já usam o primeiro nome como default.
+  const dentistasOrdenados = useMemo(
+    () => [...dentistas].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')),
+    [dentistas],
+  );
+
   // MANTÉM SINCRONIA: Garante que os dados locais reflitam o banco após F5 ou revalidatePath
   useEffect(() => {
     setAgendamentos(inicial);
@@ -206,18 +250,17 @@ export function AgendamentosClient({
   const recarregarAgendamentos = useCallback(async (forcar = false) => {
     if (!forcar && Date.now() - lastRefreshRef.current < 30_000) return;
     lastRefreshRef.current = Date.now();
-    const mes = parseISO(`${mesAtual}-01`);
-    // Bordas do mês em BRT explícito — o resto do arquivo já usa `buildClinicDatetime`
-    // com offset; sem ele o Postgres lia a string ingênua como UTC e a janela andava 3h.
-    const mesInicio = `${format(startOfMonth(mes), 'yyyy-MM-dd')}T00:00:00${CLINIC_TZ_OFFSET}`;
-    const mesFim    = `${format(endOfMonth(mes),   'yyyy-MM-dd')}T23:59:59${CLINIC_TZ_OFFSET}`;
+    // MESMA janela que o servidor buscou. Antes isto recarregava o mês inteiro enquanto a
+    // tela podia estar mostrando outra coisa — dois cálculos de janela em dois lugares, que
+    // é como o defeito nasceu. Agora há um só, e ele mora em `janelaDaVisao`.
+    const janela = janelaDaVisao(visao, ancora);
     const supabase = createClient();
     const { data, error } = await supabase
       .from('agendamentos')
       .select('id, clinica_id, paciente_id, dentista_id, data_hora, duracao_minutos, status, origem, observacoes, created_at, paciente:pacientes(id, nome, observacoes), dentista:dentistas!agendamentos_dentista_id_fkey(id, nome), criador:dentistas!agendamentos_created_by_fkey(id, nome)')
       .eq('clinica_id', _clinicaId)
-      .gte('data_hora', mesInicio)
-      .lte('data_hora', mesFim)
+      .gte('data_hora', janela.de)
+      .lt('data_hora', janela.ate)
       .order('data_hora');
     // Antes o erro era engolido (`if (data)`) e a lista ficava velha em silêncio —
     // e é dela que sai o aviso de conflito. Falhar calado aqui é mentir na tela.
@@ -227,7 +270,7 @@ export function AgendamentosClient({
       return;
     }
     if (data) setAgendamentos(data as unknown as AgendamentoRow[]);
-  }, [_clinicaId, mesAtual]);
+  }, [_clinicaId, visao, ancora]);
 
   useEffect(() => {
     const handler = () => { void recarregarAgendamentos(); };
@@ -281,7 +324,7 @@ export function AgendamentosClient({
     hora: '09:00',
     duracao: '30',
     observacoes: '',
-    dentistaId: dentistas[0]?.id ?? '',
+    dentistaId: dentistasOrdenados[0]?.id ?? '',
   });
   const [pacienteSugestoes, setPacienteSugestoes] = useState<{ id: string; nome: string }[]>([]);
   const [showSugestoes, setShowSugestoes] = useState(false);
@@ -289,9 +332,8 @@ export function AgendamentosClient({
   /** O servidor recusou por conflito do DENTISTA — libera o "marcar mesmo assim". */
   const [conflitoServidor, setConflitoServidor] = useState(false);
 
-  type ViewMode = 'day' | 'week' | 'month';
-  const [viewMode, setViewMode] = useState<ViewMode>('week');
-  const [selectedWeek, setSelectedWeek] = useState(() => new Date());
+  // `visao` e a semana desenhada vêm da URL. Não existe mais estado local de navegação —
+  // era exatamente a duplicação que deixava a grade e os dados discordarem.
 
   // Cancel dialog
   const [cancelDialog, setCancelDialog] = useState<{ aptId: string; aptNome: string } | null>(null);
@@ -309,7 +351,7 @@ export function AgendamentosClient({
     pacienteNome: '',
     hora: '09:00',
     duracao: '30',
-    dentistaId: dentistas[0]?.id ?? '',
+    dentistaId: dentistasOrdenados[0]?.id ?? '',
   });
   const [encaixeSugestoes, setEncaixeSugestoes] = useState<{ id: string; nome: string }[]>([]);
   const [showEncaixeSugestoes, setShowEncaixeSugestoes] = useState(false);
@@ -326,6 +368,28 @@ export function AgendamentosClient({
 
   // True quando a secretária tem um dentista específico selecionado
   const isFiltered = isSecretaria && filtroDentistaId !== 'todos';
+
+  /**
+   * Colunas que o Dia deve desenhar (spec §3.3/§5.3). Length <= 1 → coluna única, e o Dia
+   * nem sabe que existe filtro — ele só recebe o array pronto. Com "Todos" e >1 dentista
+   * ativo, cada um vira uma coluna; senão, é a coluna do único dentista relevante.
+   */
+  const colunasParaDayView = useMemo(() => {
+    if (!isSecretaria) return [];
+    if (filtroDentistaId === 'todos') return dentistasOrdenados;
+    const alvo = dentistas.find((d) => d.id === filtroDentistaId);
+    return alvo ? [alvo] : [];
+  }, [isSecretaria, filtroDentistaId, dentistasOrdenados, dentistas]);
+
+  /**
+   * Dado que o Dia recebe. Multi-coluna precisa ver TODOS os dentistas pra repartir por
+   * coluna; nos outros casos, `agendamentosFiltrados` já está corretamente escopado (a um
+   * dentista, ou a tudo quando só há um na clínica).
+   */
+  const agendamentosParaDayView = useMemo(() => {
+    if (isSecretaria && filtroDentistaId === 'todos' && dentistasOrdenados.length > 1) return agendamentos;
+    return agendamentosFiltrados;
+  }, [isSecretaria, filtroDentistaId, dentistasOrdenados, agendamentos, agendamentosFiltrados]);
 
   // Dias do calendário para o mês atual
   const calendarDays = useMemo(() => {
@@ -397,21 +461,43 @@ export function AgendamentosClient({
    * filtro de quando o listener foi montado — o mesmo bug pela porta dos fundos.
    */
   const dentistaPadraoForm = useCallback(
-    () => (isSecretaria && filtroDentistaId !== 'todos' ? filtroDentistaId : dentistas[0]?.id) ?? '',
-    [isSecretaria, filtroDentistaId, dentistas],
+    () => (isSecretaria && filtroDentistaId !== 'todos' ? filtroDentistaId : dentistasOrdenados[0]?.id) ?? '',
+    [isSecretaria, filtroDentistaId, dentistasOrdenados],
   );
 
   /**
-   * Abre o "Novo Agendamento" já apontado pro dentista que está na tela.
+   * Abre o "Novo Agendamento" — sem argumento, aponta pro dentista que está na tela
+   * (comportamento de sempre). Com `pre`, chega pré-preenchido com dia/hora/dentista —
+   * é o que o clique no espaço vazio da grade usa (spec §3.5/§5.4): a recepção clica
+   * na quinta às 14h e o drawer já abre lá, sem digitar nada.
+   *
    * Precisa existir separado do `resetForm` porque o reset roda ao FECHAR: sem isto,
    * trocar o filtro e reabrir o drawer traria o dentista da vez anterior.
    */
-  const abrirNovoAgendamento = useCallback(() => {
+  const abrirNovoAgendamento = useCallback((pre?: { data?: string; hora?: string; dentistaId?: string }) => {
     setSaveError(null);
     setConflitoServidor(false);
-    setNovoForm((f) => ({ ...f, dentistaId: dentistaPadraoForm() }));
+    setNovoForm((f) => ({
+      ...f,
+      ...(pre?.data ? { data: pre.data } : {}),
+      ...(pre?.hora ? { hora: pre.hora } : {}),
+      dentistaId: pre?.dentistaId ?? dentistaPadraoForm(),
+    }));
     setIsNewModalOpen(true);
   }, [dentistaPadraoForm]);
+
+  // Clique no espaço vazio da grade (Dia ou Semana) — mesmo handler pras duas, o `dentistaId`
+  // só chega preenchido quando a coluna clicada tem dono conhecido (spec §3.5).
+  const handleSlotVazioClick = useCallback((data: Date, hora: string, dentistaId?: string) => {
+    abrirNovoAgendamento({ data: format(data, 'yyyy-MM-dd'), hora, dentistaId });
+  }, [abrirNovoAgendamento]);
+
+  // Clique numa célula do mapa de carga (spec §3.4): troca o filtro pro dentista da
+  // célula e destaca o dia — NÃO navega de rota, a Semana continua sendo a Semana.
+  const handleCargaClick = useCallback((dentistaId: string, dia: Date) => {
+    setFiltroDentistaId(dentistaId);
+    setDiaDestacado(dia);
+  }, []);
 
   // Keyboard shortcuts — apenas quando nenhum input/drawer está focado
   useEffect(() => {
@@ -437,25 +523,27 @@ export function AgendamentosClient({
           break;
         case 't':
         case 'T':
-          if (!modalOpen) { e.preventDefault(); setSelectedDate(new Date()); }
+          // "Hoje" agora recarrega a janela: se a recepção estava em agosto, voltar pra hoje
+          // sem avisar o servidor traria a grade de julho sem dado nenhum.
+          if (!modalOpen) { e.preventDefault(); irPara(visao, new Date()); }
           break;
         case 'ArrowLeft':
-          if (!modalOpen && viewMode === 'day') {
+          if (!modalOpen && visao === 'dia') {
             e.preventDefault();
-            setSelectedDate(d => subDays(d, 1));
+            irPara('dia', subDays(ancoraDate, 1));
           }
           break;
         case 'ArrowRight':
-          if (!modalOpen && viewMode === 'day') {
+          if (!modalOpen && visao === 'dia') {
             e.preventDefault();
-            setSelectedDate(d => addDays(d, 1));
+            irPara('dia', addDays(ancoraDate, 1));
           }
           break;
       }
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [isNewModalOpen, isDetailModalOpen, isEncaixeOpen, cancelDialog, assinaturaModal, canEdit, viewMode, isSecretaria, abrirNovoAgendamento, dentistaPadraoForm]);
+  }, [isNewModalOpen, isDetailModalOpen, isEncaixeOpen, cancelDialog, assinaturaModal, canEdit, visao, ancoraDate, irPara, isSecretaria, abrirNovoAgendamento, dentistaPadraoForm]);
 
   // Busca pacientes por nome (autocomplete) — debounced 300ms + AbortController
   const buscarPacientes = useCallback((nome: string) => {
@@ -569,20 +657,10 @@ export function AgendamentosClient({
             ? `${result.imported} evento${result.imported !== 1 ? 's' : ''} importado${result.imported !== 1 ? 's' : ''}! (${result.skipped} já existiam)`
             : `Nenhum evento novo. ${result.skipped} já importado${result.skipped !== 1 ? 's' : ''}.`,
         );
-        if (result.imported > 0) {
-          const mes = parseISO(`${mesAtual}-01`);
-          const mesInicio = format(startOfMonth(mes), "yyyy-MM-dd'T'00:00:00");
-          const mesFim = format(endOfMonth(mes), "yyyy-MM-dd'T'23:59:59");
-          const supabase = createClient();
-          const { data } = await supabase
-            .from('agendamentos')
-            .select('id, clinica_id, paciente_id, dentista_id, data_hora, duracao_minutos, status, origem, observacoes, created_at, paciente:pacientes(id, nome, observacoes), dentista:dentistas!agendamentos_dentista_id_fkey(id, nome), criador:dentistas!agendamentos_created_by_fkey(id, nome)')
-            .eq('clinica_id', _clinicaId)
-            .gte('data_hora', mesInicio)
-            .lte('data_hora', mesFim)
-            .order('data_hora');
-          if (data) setAgendamentos(data as unknown as AgendamentoRow[]);
-        }
+        // Era uma TERCEIRA cópia da mesma busca, com a janela montada sem o offset da clínica
+        // (`yyyy-MM-dd'T'00:00:00` cru, que o Postgres lê como UTC) e engolindo erro. Reusa a
+        // função que já faz isso certo: uma janela, um lugar.
+        if (result.imported > 0) await recarregarAgendamentos(true);
       }
     } catch {
       if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
@@ -654,8 +732,10 @@ export function AgendamentosClient({
       setAgendamentos((prev) => [...prev, novoAgt]);
       setIsNewModalOpen(false);
       resetForm();
-      // Navega o calendário para o dia do agendamento criado
-      setSelectedDate(new Date(ano, mes - 1, dia));
+      // Vai pro dia do agendamento criado — pela URL, não só mudando o foco local.
+      // A recepção marca em agosto olhando a semana de julho o tempo todo: sem recarregar a
+      // janela, ela acabou de criar algo que a tela não tem como mostrar.
+      irPara(visao, new Date(ano, mes - 1, dia));
     }
     setIsSaving(false);
   };
@@ -871,7 +951,7 @@ export function AgendamentosClient({
           {isSecretaria && dentistas.length > 0 && (
             <div className="flex items-center gap-1.5 flex-wrap">
               <button
-                onClick={() => setFiltroDentistaId('todos')}
+                onClick={() => { setFiltroDentistaId('todos'); setDiaDestacado(null); }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                   filtroDentistaId === 'todos'
                     ? 'bg-teal text-white shadow-sm'
@@ -880,10 +960,10 @@ export function AgendamentosClient({
               >
                 Todos
               </button>
-              {dentistas.map((d) => (
+              {dentistasOrdenados.map((d) => (
                 <button
                   key={d.id}
-                  onClick={() => setFiltroDentistaId(d.id)}
+                  onClick={() => { setFiltroDentistaId(d.id); setDiaDestacado(null); }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                     filtroDentistaId === d.id
                       ? 'bg-teal text-white shadow-sm'
@@ -910,33 +990,49 @@ export function AgendamentosClient({
 
           {/* View mode toggle */}
           <div className="flex items-center gap-0.5 bg-surface-alt border border-border rounded-xl p-1">
+            {/* Trocar de visão troca a JANELA, então vai pela URL como o resto da navegação.
+                A âncora é preservada: quem está em 5 de agosto e clica em "Mês" vê agosto,
+                não o mês de hoje. */}
             <button
-              onClick={() => setViewMode('day')}
+              onClick={() => irPara('dia', selectedDate)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                viewMode === 'day' ? 'bg-surface shadow-sm text-text-primary' : 'text-text-secondary hover:text-text-primary'
+                visao === 'dia' ? 'bg-surface shadow-sm text-text-primary' : 'text-text-secondary hover:text-text-primary'
               }`}
             >
               <CalendarCheck className="w-3.5 h-3.5" />
               Dia
             </button>
             <button
-              onClick={() => setViewMode('week')}
+              onClick={() => irPara('semana', selectedDate)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                viewMode === 'week' ? 'bg-surface shadow-sm text-text-primary' : 'text-text-secondary hover:text-text-primary'
+                visao === 'semana' ? 'bg-surface shadow-sm text-text-primary' : 'text-text-secondary hover:text-text-primary'
               }`}
             >
               <CalendarDays className="w-3.5 h-3.5" />
               Semana
             </button>
             <button
-              onClick={() => setViewMode('month')}
+              onClick={() => irPara('mes', selectedDate)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                viewMode === 'month' ? 'bg-surface shadow-sm text-text-primary' : 'text-text-secondary hover:text-text-primary'
+                visao === 'mes' ? 'bg-surface shadow-sm text-text-primary' : 'text-text-secondary hover:text-text-primary'
               }`}
             >
               <LayoutGrid className="w-3.5 h-3.5" />
               Mês
             </button>
+          </div>
+
+          {/* Ir para uma data — pra distância grande (mês que vem, ano que vem) sem repetir
+              clique de seta. O seletor nativo já resolve mês/ano; não construímos stepper. */}
+          <div className="relative">
+            <CalendarClock className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-secondary/50 pointer-events-none" />
+            <Input
+              type="date"
+              aria-label="Ir para uma data"
+              value={ancora}
+              onChange={(e) => e.target.value && irPara(visao, e.target.value)}
+              className="h-9 w-[9.5rem] pl-8 text-xs font-semibold rounded-xl bg-surface-alt border-border text-text-primary cursor-pointer"
+            />
           </div>
 
           {/* Atender agora — walk-in do dentista: cai direto na consulta (#2) */}
@@ -968,7 +1064,7 @@ export function AgendamentosClient({
           {/* Novo Agendamento — plano SOLO ou secretária */}
           {canEdit && (
             <button
-              onClick={abrirNovoAgendamento}
+              onClick={() => abrirNovoAgendamento()}
               className="bg-gradient-to-r from-teal to-teal-lt text-white px-5 py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all shadow-[0_8px_32px_rgba(47,156,133,0.38)] hover:-translate-y-0.5 active:scale-[0.98] w-full sm:w-auto group"
             >
               <Plus className="w-4 h-4" />
@@ -989,7 +1085,7 @@ export function AgendamentosClient({
         <motion.button
           initial={{ opacity: 0, y: -4 }}
           animate={{ opacity: 1, y: 0 }}
-          onClick={() => goToMonth(parseISO(`${foraDaJanela.proximoMes}-01`))}
+          onClick={() => irPara('mes', foraDaJanela.proximaAncora)}
           className="w-full flex items-center justify-between gap-3 mb-4 px-4 py-2.5 rounded-xl border border-border bg-surface-alt/60 hover:bg-surface-alt hover:border-teal/40 transition-colors group text-left"
         >
           <span className="flex items-center gap-2 text-xs text-text-secondary">
@@ -1013,7 +1109,7 @@ export function AgendamentosClient({
 
       {/* ── Views ─────────────────────────────────────────────────────── */}
       <AnimatePresence mode="wait">
-      {viewMode === 'day' && (
+      {visao === 'dia' && (
         <motion.div
           key="day"
           initial={{ opacity: 0, y: 8 }}
@@ -1023,9 +1119,9 @@ export function AgendamentosClient({
           className="bg-surface rounded-3xl border border-border shadow-sm overflow-hidden h-[440px] sm:h-[560px] lg:h-[680px]"
         >
           <DayView
-            agendamentos={agendamentosFiltrados}
+            agendamentos={agendamentosParaDayView}
             selectedDate={selectedDate}
-            onDateChange={setSelectedDate}
+            onDateChange={(d) => irPara('dia', d)}
             onAppointmentClick={handleOpenDetail}
             isSecretaria={isSecretaria}
             isFiltered={isFiltered}
@@ -1034,11 +1130,14 @@ export function AgendamentosClient({
             onNoShow={(id) => void handleNoShow(id)}
             onCancel={(apt) => { setCancelDialog({ aptId: apt.id, aptNome: apt.paciente?.nome ?? '' }); setCancelMotivo(''); }}
             onVerFicha={(pacienteId) => router.push(`/dashboard/pacientes/${pacienteId}`)}
+            slotPorDentista={slotPorDentista}
+            colunas={colunasParaDayView}
+            onSlotVazioClick={handleSlotVazioClick}
           />
         </motion.div>
       )}
 
-      {viewMode === 'week' && (
+      {visao === 'semana' && (
         <motion.div
           key="week"
           initial={{ opacity: 0, y: 8 }}
@@ -1048,17 +1147,23 @@ export function AgendamentosClient({
           className="bg-surface rounded-3xl border border-border shadow-sm overflow-hidden"
         >
           <WeekView
-            agendamentos={agendamentosFiltrados}
-            selectedWeek={selectedWeek}
-            onWeekChange={setSelectedWeek}
+            agendamentos={agendamentos}
+            selectedWeek={ancoraDate}
+            onWeekChange={(d) => irPara('semana', d)}
             onAppointmentClick={handleOpenDetail}
-            onDayClick={(d) => { setSelectedDate(d); setViewMode('day'); }}
+            onDayClick={(d) => irPara('dia', d)}
             isSecretaria={isSecretaria}
+            slotPorDentista={slotPorDentista}
+            filtroDentistaId={filtroDentistaId}
+            dentistas={dentistas}
+            diaDestacado={diaDestacado}
+            onSlotVazioClick={handleSlotVazioClick}
+            onCargaClick={handleCargaClick}
           />
         </motion.div>
       )}
 
-      {viewMode === 'month' && (
+      {visao === 'mes' && (
         <motion.div
           key="month"
           initial={{ opacity: 0, y: 8 }}
@@ -1070,10 +1175,11 @@ export function AgendamentosClient({
           currentMonth={currentMonth}
           calendarDays={calendarDays}
           selectedDate={selectedDate}
-          onDaySelect={setSelectedDate}
+          // Clicar num dia do calendário não recarrega: o mês inteiro já está em memória.
+          onDaySelect={setDiaFocado}
           isPending={isPending}
-          onPrevMonth={() => goToMonth(subMonths(currentMonth, 1))}
-          onNextMonth={() => goToMonth(addMonths(currentMonth, 1))}
+          onPrevMonth={() => irPara('mes', subMonths(currentMonth, 1))}
+          onNextMonth={() => irPara('mes', addMonths(currentMonth, 1))}
           todayCount={agendamentosFiltrados.filter((a) => isDateToday(parseISO(a.data_hora))).length}
           selectedDayCount={filteredAppointments.length}
           appointments={filteredAppointments}
@@ -1154,7 +1260,7 @@ export function AgendamentosClient({
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="bg-surface border-border">
-                    {dentistas.map((d) => (
+                    {dentistasOrdenados.map((d) => (
                       <SelectItem key={d.id} value={d.id}>
                         {d.nome}
                       </SelectItem>
@@ -1562,7 +1668,7 @@ export function AgendamentosClient({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-surface border-border">
-                    {dentistas.map(d => <SelectItem key={d.id} value={d.id}>{d.nome}</SelectItem>)}
+                    {dentistasOrdenados.map(d => <SelectItem key={d.id} value={d.id}>{d.nome}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

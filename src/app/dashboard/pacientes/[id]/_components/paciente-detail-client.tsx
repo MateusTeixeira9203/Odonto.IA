@@ -1100,18 +1100,22 @@ export function PacienteDetailClient({
     if (result.error) {
       setRetornoError(result.error);
     } else {
-      // A agenda filtra por mês e, sem ?mes= na URL, abre no corrente: um retorno marcado
-      // pra outro mês existe e não aparece. Um retorno de 30 dias cai no mês seguinte por
-      // definição — então o toast diz a data e, quando ela sai do mês, leva até lá.
-      // Ler antes de limpar o form.
-      const mes = retornoForm.data.slice(0, 7);
-      const quando = `${format(parseISO(retornoForm.data), 'dd/MM/yyyy')} às ${retornoForm.hora}`;
+      // A agenda carrega uma janela por vez: um retorno marcado pra fora dela existe e não
+      // aparece. Um retorno de 30 dias cai fora por definição — então o toast diz a data e
+      // leva até lá. Ler antes de limpar o form.
+      //
+      // A URL da agenda é `?v=…&d=yyyy-MM-dd` (R-13 Fatia 0). O `?mes=` foi removido: um link
+      // com ele hoje é ignorado em silêncio e abre a semana de hoje, que é exatamente o
+      // sumiço que este toast existe pra evitar.
+      const dia = retornoForm.data;
+      const quando = `${format(parseISO(dia), 'dd/MM/yyyy')} às ${retornoForm.hora}`;
       setIsMarcarRetornoOpen(false);
       setRetornoForm({ data: '', hora: '', duracao: '30', observacoes: '' });
       setAgendamentosTabData(null); // força recarregar a aba Agenda na próxima abertura
       toast.success(`Retorno marcado para ${quando}`, {
-        action: mes !== format(new Date(), 'yyyy-MM')
-          ? { label: 'Ver na agenda', onClick: () => router.push(`/dashboard/agendamentos?mes=${mes}`) }
+        // Fora da semana corrente já justifica o atalho — a janela agora é a semana, não o mês.
+        action: dia !== format(new Date(), 'yyyy-MM-dd')
+          ? { label: 'Ver na agenda', onClick: () => router.push(`/dashboard/agendamentos?v=dia&d=${dia}`) }
           : undefined,
       });
     }
