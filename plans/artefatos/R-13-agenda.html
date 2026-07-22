@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<!--
+  ARTEFATO · R-13 — Agenda: janela, multi-dentista e clique na grade
+  Item:             R-13
+  Rota alvo:        /dashboard/agendamentos
+  Componente alvo:  _components/day-view.tsx · week-view.tsx · month-view.tsx
+  Data:             2026-07-22
+  Status:           aguardando aprovação do Mateus
+
+  Tokens: copiados de src/app/globals.css (linhas 44-83 claro, 121-131 escuro) e de
+  _components/status-config.ts. NADA de cor inventada — o que é novo aqui é só a
+  paleta de dentista (8 slots), e ela vem medida no painel de contraste no rodapé.
+
+  Pacientes são FICTÍCIOS. Horários e nomes de dentista espelham a Clindent real
+  (quarta, 22/07) só pra a densidade da grade ser honesta.
+-->
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>R-13 · Agenda — Dia, Semana e Mês</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --teal:#2f9c85; --teal-lt:#5dbeb0; --teal-pale:#e4f4f1; --teal-dark:#1e7060;
+  --coral:#e57373;
+  --bg:#f4f4f6; --surface:#ffffff; --surface-alt:#dadade; --border:#c2c2c6;
+  --text-primary:#09090b; --text-secondary:#4b5563; --text-muted:#6b7280;
+  --grid-line:rgba(0,0,0,.07);
+  --slot-hover:rgba(47,156,133,.09);
+  --slot-hover-border:rgba(47,156,133,.45);
+}
+[data-theme="dark"]{
+  --teal-pale:#1e3a35; --coral:#ef9a9a;
+  --bg:#0d0d0d; --surface:#111112; --surface-alt:#1c1c1e; --border:#27272a;
+  --text-primary:#fafafa; --text-secondary:#a1a1aa; --text-muted:#404040;
+  --grid-line:rgba(255,255,255,.06);
+  --slot-hover:rgba(47,156,133,.16);
+  --slot-hover-border:rgba(93,190,176,.5);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:var(--bg);color:var(--text-primary);
+  font-family:'Outfit',system-ui,sans-serif;font-size:14px;line-height:1.5;
+  padding:28px 20px 64px;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1180px;margin:0 auto}
+h1{font-family:'DM Serif Display',serif;font-size:34px;font-weight:400;line-height:1.15;letter-spacing:-.01em}
+h2{font-family:'DM Serif Display',serif;font-size:22px;font-weight:400;margin-bottom:4px}
+.eyebrow{
+  font-family:'DM Mono',monospace;font-size:10px;font-weight:500;text-transform:uppercase;
+  letter-spacing:.2em;color:var(--text-secondary);display:block;margin-bottom:6px;
+}
+.sub{color:var(--text-secondary);font-size:13px;max-width:66ch}
+
+/* ── toolbar ─────────────────────────────────────────── */
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:22px 0 26px}
+.seg{display:flex;gap:2px;background:var(--surface-alt);border:1px solid var(--border);border-radius:12px;padding:3px}
+.seg button{
+  font:inherit;font-size:12px;font-weight:600;color:var(--text-secondary);
+  background:none;border:0;border-radius:9px;padding:7px 15px;cursor:pointer;transition:all .15s;
+}
+.seg button:hover{color:var(--text-primary)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--text-primary);box-shadow:0 1px 3px rgba(0,0,0,.09)}
+.ghost{
+  font:inherit;font-size:12px;font-weight:600;color:var(--text-secondary);
+  background:var(--surface);border:1px solid var(--border);border-radius:11px;
+  padding:8px 15px;cursor:pointer;transition:all .15s;
+}
+.ghost:hover{color:var(--text-primary);border-color:var(--teal)}
+
+/* ── legenda de dentistas ────────────────────────────── */
+.legend{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.legend .lbl{font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.16em;color:var(--text-secondary);margin-right:2px}
+.chip{
+  display:inline-flex;align-items:center;gap:7px;background:var(--surface);
+  border:1px solid var(--border);border-radius:999px;padding:5px 13px 5px 9px;
+  font-size:12px;font-weight:600;color:var(--text-primary);
+}
+.chip i{width:4px;height:15px;border-radius:2px;display:block}
+
+/* ── card / painel ───────────────────────────────────── */
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:22px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.panel-head{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:13px 18px;border-bottom:1px solid var(--border);background:var(--surface-alt);
+}
+.panel-head .when{font-size:14px;font-weight:700;text-transform:capitalize}
+.panel-head .count{font-size:12px;color:var(--text-secondary);font-weight:500}
+.navbtns{display:flex;gap:6px;align-items:center}
+.navbtns button{
+  width:28px;height:28px;border-radius:9px;border:1px solid var(--border);background:var(--surface);
+  color:var(--text-secondary);cursor:pointer;font-size:13px;line-height:1;display:grid;place-items:center;
+}
+.navbtns button:hover{color:var(--text-primary);border-color:var(--teal)}
+
+/* ── grade ───────────────────────────────────────────── */
+.grid{display:flex;overflow-x:auto}
+.gutter{width:52px;flex:none;position:relative;border-right:1px solid var(--grid-line)}
+.gutter span{
+  position:absolute;right:9px;font-family:'DM Mono',monospace;font-size:10px;
+  color:var(--text-secondary);opacity:.65;
+}
+.cols{display:flex;flex:1;min-width:0}
+.col{flex:1;min-width:132px;position:relative;border-left:1px solid var(--grid-line)}
+.col.week{min-width:104px}
+/* Dia que veio do clique no mapa de carga — liga as duas telas, some ao trocar de chip. */
+.col.alvo{background:var(--slot-hover)}
+.col.alvo .colhead{background:var(--teal);border-bottom-color:var(--teal)}
+.col.alvo .colhead .nm,.col.alvo .colhead .qt{color:#fff}
+.colhead{
+  position:sticky;top:0;z-index:3;padding:9px 10px;text-align:center;
+  background:var(--surface);border-bottom:1px solid var(--border);
+}
+.colhead .nm{font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px}
+.colhead .nm i{width:8px;height:8px;border-radius:3px;display:block;flex:none}
+.colhead .qt{font-size:10px;color:var(--text-secondary);margin-top:2px;font-family:'DM Mono',monospace}
+.colhead.today .nm{color:var(--teal)}
+.body{position:relative}
+.hline{position:absolute;left:0;right:0;border-top:1px solid var(--grid-line)}
+
+/* slot vazio clicável */
+.slot{position:absolute;left:0;right:0;cursor:pointer}
+.slot:hover{background:var(--slot-hover);box-shadow:inset 0 0 0 1.5px var(--slot-hover-border);border-radius:7px}
+.slot:hover::after{
+  content:attr(data-hint);position:absolute;left:7px;top:4px;
+  font-family:'DM Mono',monospace;font-size:10px;font-weight:500;color:var(--teal-dark);
+}
+[data-theme="dark"] .slot:hover::after{color:var(--teal-lt)}
+
+/* card de agendamento */
+.apt{
+  position:absolute;border-radius:9px;overflow:hidden;cursor:pointer;
+  border:1px solid;border-left-width:4px;padding:5px 8px;
+  transition:filter .15s;
+}
+.apt:hover{filter:brightness(.96)}
+[data-theme="dark"] .apt:hover{filter:brightness(1.15)}
+.apt .t{display:flex;align-items:center;gap:6px;margin-bottom:1px}
+.apt .hh{font-family:'DM Mono',monospace;font-size:10px;font-weight:500}
+.apt .st{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:1px 5px;border-radius:5px}
+.apt .nm{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.apt .dr{font-size:10px;opacity:.62;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ── mês ─────────────────────────────────────────────── */
+.month{display:grid;grid-template-columns:repeat(7,1fr)}
+.mhead{
+  padding:9px 0;text-align:center;font-family:'DM Mono',monospace;font-size:10px;
+  text-transform:uppercase;letter-spacing:.16em;color:var(--text-secondary);
+  border-bottom:1px solid var(--border);background:var(--surface-alt);
+}
+.day{
+  min-height:96px;border-left:1px solid var(--grid-line);border-top:1px solid var(--grid-line);
+  padding:7px 7px 8px;cursor:pointer;transition:background .15s;
+}
+.day:hover{background:var(--slot-hover)}
+.day.out{opacity:.34}
+.day .n{font-size:12px;font-weight:600;margin-bottom:5px}
+.day.today .n{
+  background:var(--teal);color:#fff;width:22px;height:22px;border-radius:999px;
+  display:grid;place-items:center;font-weight:700;margin-bottom:5px;
+}
+.dot{display:flex;align-items:center;gap:5px;margin-bottom:2.5px}
+.dot i{width:4px;height:12px;border-radius:2px;flex:none}
+.dot span{font-size:10px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.more{font-size:10px;color:var(--text-secondary);font-weight:600;margin-top:2px}
+
+/* ── semana: chips de dentista ───────────────────────── */
+.wkchips{display:flex;gap:6px;flex-wrap:wrap;padding:11px 18px;border-bottom:1px solid var(--border)}
+.wkchips button{
+  font:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;
+  display:inline-flex;align-items:center;gap:7px;
+  background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:5px 13px 5px 9px;
+  color:var(--text-secondary);
+}
+.wkchips button i{width:4px;height:14px;border-radius:2px;display:block;flex:none;background:var(--text-muted)}
+.wkchips button:hover{color:var(--text-primary);border-color:var(--teal)}
+.wkchips button[aria-pressed="true"]{background:var(--teal);border-color:var(--teal);color:#fff}
+.wkchips button[aria-pressed="true"] i{background:rgba(255,255,255,.85)}
+
+/* ── semana "Todos": mapa de carga ───────────────────── */
+.carga{padding:16px 18px 20px}
+.cgrid{display:grid;grid-template-columns:112px repeat(7,1fr);gap:7px;align-items:end}
+.chead{
+  font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.14em;
+  color:var(--text-secondary);text-align:center;padding-bottom:3px;
+}
+.chead.today{color:var(--teal);font-weight:700}
+.cname{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;height:62px}
+.cname i{width:4px;height:16px;border-radius:2px;flex:none}
+.ccell{
+  height:62px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px;
+  border-radius:9px;cursor:pointer;padding:4px;transition:background .15s;
+}
+.ccell:hover{background:var(--slot-hover)}
+.cbar{width:100%;border-radius:4px}
+.cqt{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-secondary);line-height:1}
+.ccell.zero{cursor:default}
+.ccell.zero:hover{background:none}
+.ccell.zero .cqt{opacity:.3}
+
+/* ── notas e contraste ───────────────────────────────── */
+.note{
+  background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--teal);
+  border-radius:0 14px 14px 0;padding:14px 18px;margin-top:16px;font-size:13px;color:var(--text-secondary);
+}
+.note b{color:var(--text-primary);font-weight:700}
+.section{margin-top:40px}
+table{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px}
+th,td{text-align:left;padding:8px 11px;border-bottom:1px solid var(--border)}
+th{
+  font-family:'DM Mono',monospace;font-size:9.5px;text-transform:uppercase;letter-spacing:.13em;
+  color:var(--text-secondary);font-weight:500;
+}
+td.mono{font-family:'DM Mono',monospace}
+.sw{width:15px;height:15px;border-radius:4px;display:inline-block;vertical-align:-3px;margin-right:7px}
+.ok{color:var(--teal);font-weight:700}
+.bad{color:var(--coral);font-weight:700}
+.hide{display:none !important}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <span class="eyebrow">Artefato R-13 · /dashboard/agendamentos</span>
+  <h1>Agenda — Dia, Semana e Mês</h1>
+  <p class="sub" style="margin-top:8px">
+    Visão da secretária, filtro em “Todos”. O que é novo: coluna por dentista no Dia, faixa de cor
+    do dentista nas três visões, e o slot vazio clicável. Passe o mouse na grade pra ver o alvo do clique.
+  </p>
+
+  <div class="toolbar">
+    <div class="seg" role="group" aria-label="Visão">
+      <button data-view="dia"    aria-pressed="false">Dia</button>
+      <button data-view="semana" aria-pressed="true">Semana</button>
+      <button data-view="mes"    aria-pressed="false">Mês</button>
+    </div>
+    <button class="ghost" id="theme">☾ Escuro</button>
+    <button class="ghost" id="who">Ver como: <b id="whoLbl">secretária</b></button>
+  </div>
+
+  <div class="legend" id="legend"></div>
+
+  <!-- ══ DIA ══ -->
+  <div class="panel hide" id="v-dia">
+    <div class="panel-head">
+      <div class="navbtns">
+        <button>‹</button>
+        <div class="when">quarta, 22 de julho</div>
+        <button>›</button>
+      </div>
+      <div class="count">15 consultas · 4 dentistas</div>
+    </div>
+    <div class="grid" id="diaGrid"></div>
+  </div>
+
+  <!-- ══ SEMANA ══ -->
+  <div class="panel" id="v-semana">
+    <div class="panel-head">
+      <div class="navbtns">
+        <button>‹</button>
+        <div class="when">19 – 25 de julho de 2026</div>
+        <button>›</button>
+      </div>
+      <div class="count">a cor da faixa diz de quem é</div>
+    </div>
+    <div class="wkchips" id="wkChips"></div>
+    <div class="grid" id="semGrid"></div>
+    <div class="carga" id="semCarga"></div>
+  </div>
+
+  <!-- ══ MÊS ══ -->
+  <div class="panel hide" id="v-mes">
+    <div class="panel-head">
+      <div class="navbtns">
+        <button>‹</button>
+        <div class="when">julho de 2026</div>
+        <button>›</button>
+      </div>
+      <div class="count">clique no dia abre o Dia daquele dia</div>
+    </div>
+    <div class="month" id="mesGrid"></div>
+  </div>
+
+  <div class="note" id="note"></div>
+
+  <!-- ══ CONTRASTE MEDIDO ══ -->
+  <div class="section">
+    <h2>Paleta do dentista — contraste medido</h2>
+    <p class="sub">
+      8 slots, atribuídos por ordem de <code>created_at</code> na clínica: entra dentista novo, ele
+      pega o próximo slot e <b>ninguém muda de cor</b>. Os 4 primeiros são os mais distantes entre si
+      de propósito — quase toda clínica para em 4. Medido agora, nesta página, contra o fundo real
+      do card nos dois temas. Piso exigido: <b>3:1</b>.
+    </p>
+    <table id="ctab">
+      <thead><tr><th>Slot</th><th>Cor</th><th>Hex</th><th>vs. card claro</th><th>vs. card escuro</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>O conflito que este artefato resolve</h2>
+    <p class="sub">
+      O card tem <b>um</b> fundo e duas coisas querem ele. Hoje a cor é o <b>status</b> — informação
+      de trabalho da recepção, não dá pra tirar. A proposta: status fica no preenchimento e no texto,
+      dentista vai pra faixa de 4px na borda esquerda. Abaixo, os 7 status com a mesma faixa de dentista,
+      pra você julgar se os dois canais convivem ou brigam.
+    </p>
+    <div id="statusRow" style="display:flex;gap:9px;flex-wrap:wrap;margin-top:14px"></div>
+  </div>
+
+</div>
+
+<script>
+/* ─── dados ────────────────────────────────────────────────────────────── */
+const PALETA = [
+  {hex:'#2563eb', nome:'azul'},
+  {hex:'#c2410c', nome:'laranja'},
+  {hex:'#15803d', nome:'verde'},
+  {hex:'#c026d3', nome:'fúcsia'},
+  {hex:'#0e7490', nome:'ciano'},
+  {hex:'#4d7c0f', nome:'lima'},
+  {hex:'#db2777', nome:'rosa'},
+  {hex:'#6366f1', nome:'índigo'},   // era #4338ca — reprovou no escuro (2.39:1), clareado
+];
+
+// slot = posição por created_at na clínica
+const DENTISTAS = [
+  {id:'ren', nome:'Renato',  slot:0},
+  {id:'arm', nome:'Armando', slot:1},
+  {id:'jen', nome:'Jenaina', slot:2},
+  {id:'gab', nome:'Gabriel', slot:3},
+];
+
+const STATUS = {
+  scheduled  :{label:'Agendado',       bg:'rgba(245,158,11,0.10)', border:'rgba(245,158,11,0.28)', text:'#d97706'},
+  confirmed  :{label:'Confirmado',     bg:'var(--teal-pale)',      border:'rgba(47,156,133,0.25)', text:'var(--teal)'},
+  checked_in :{label:'Na Recepção',    bg:'rgba(59,130,246,0.08)', border:'rgba(59,130,246,0.28)', text:'#3b82f6'},
+  in_progress:{label:'Em Atendimento', bg:'rgba(168,85,247,0.12)', border:'rgba(168,85,247,0.32)', text:'#a855f7'},
+  completed  :{label:'Realizado',      bg:'var(--surface-alt)',    border:'var(--border)',         text:'var(--text-secondary)'},
+  cancelled  :{label:'Cancelado',      bg:'var(--surface-alt)',    border:'var(--border)',         text:'var(--text-secondary)'},
+  no_show    :{label:'Faltou',         bg:'rgba(239,68,68,0.10)',  border:'rgba(239,68,68,0.28)',  text:'#ef4444'},
+};
+
+// quarta 22/07 — horários espelham a densidade real da Clindent. Pacientes fictícios.
+const DIA = [
+  {d:'ren', h:'07:00', min:30, p:'Helena Vasques',   s:'completed'},
+  {d:'arm', h:'08:00', min:45, p:'Otávio Rangel',    s:'checked_in'},
+  {d:'jen', h:'08:00', min:30, p:'Beatriz Lemos',    s:'confirmed'},
+  {d:'ren', h:'08:30', min:30, p:'Caio Bentes',      s:'no_show'},
+  {d:'jen', h:'09:00', min:60, p:'Marina Fontes',    s:'in_progress'},
+  {d:'ren', h:'10:00', min:30, p:'Ivo Salgado',      s:'confirmed'},
+  {d:'gab', h:'10:00', min:45, p:'Teresa Aguiar',    s:'scheduled'},
+  {d:'ren', h:'13:00', min:60, p:'Nadia Prado',      s:'scheduled'},
+  {d:'arm', h:'13:30', min:30, p:'Rui Camargo',      s:'scheduled'},
+  {d:'ren', h:'14:30', min:45, p:'Elisa Tavora',     s:'scheduled'},
+  {d:'arm', h:'14:30', min:30, p:'Décio Mourão',     s:'scheduled'},
+  {d:'ren', h:'15:30', min:30, p:'Selma Andrade',    s:'scheduled'},
+  {d:'arm', h:'15:30', min:60, p:'Gustavo Peixoto',  s:'cancelled'},
+  {d:'arm', h:'17:00', min:30, p:'Laura Quintela',   s:'scheduled'},
+  {d:'ren', h:'18:00', min:45, p:'Ângela Bittar',    s:'scheduled'},
+];
+
+// semana 19–25/07 — [diaDaSemana 0=dom, dentista, hora, min, paciente, status]
+const SEMANA = [
+  [1,'ren','07:30',30,'Paulo Neves','completed'],   [1,'arm','08:15',45,'Rita Sampaio','completed'],
+  [1,'jen','09:00',30,'Cláudia Braz','completed'],  [1,'gab','10:30',30,'Hugo Barbosa','completed'],
+  [1,'ren','14:00',60,'Vera Lúcia Pinho','completed'], [1,'arm','15:30',30,'Iara Mendes','completed'],
+  [2,'ren','07:30',30,'Miguel Arruda','completed'], [2,'arm','08:15',30,'Sara Coutinho','completed'],
+  [2,'jen','08:00',45,'Tiago Rebelo','completed'],  [2,'ren','13:00',30,'Alice Furtado','no_show'],
+  [2,'gab','14:00',45,'Bruno Sá','scheduled'],      [2,'arm','16:30',30,'Célia Rocha','cancelled'],
+  [2,'ren','18:00',30,'Fábio Correia','confirmed'],
+  [3,'ren','07:00',30,'Helena Vasques','completed'],[3,'arm','08:00',45,'Otávio Rangel','checked_in'],
+  [3,'jen','08:00',30,'Beatriz Lemos','confirmed'], [3,'ren','08:30',30,'Caio Bentes','no_show'],
+  [3,'jen','09:00',60,'Marina Fontes','in_progress'],[3,'ren','10:00',30,'Ivo Salgado','confirmed'],
+  [3,'gab','10:00',45,'Teresa Aguiar','scheduled'], [3,'ren','13:00',60,'Nadia Prado','scheduled'],
+  [3,'arm','13:30',30,'Rui Camargo','scheduled'],   [3,'ren','14:30',45,'Elisa Tavora','scheduled'],
+  [3,'arm','15:30',60,'Gustavo Peixoto','cancelled'],[3,'ren','18:00',45,'Ângela Bittar','scheduled'],
+  [4,'ren','07:00',30,'Dora Vilela','scheduled'],   [4,'jen','08:00',30,'Enzo Galvão','scheduled'],
+  [4,'arm','08:00',45,'Rafael Nunes','scheduled'],  [4,'ren','08:30',30,'Silvia Mota','scheduled'],
+  [4,'jen','09:00',30,'Pedro Aires','scheduled'],   [4,'arm','13:00',60,'Joana Vidal','scheduled'],
+  [4,'ren','13:00',30,'Marcos Dias','scheduled'],   [4,'jen','14:30',45,'Luana Cesar','scheduled'],
+  [4,'arm','17:00',30,'Nara Bastos','scheduled'],   [4,'ren','18:00',30,'Ivan Portela','scheduled'],
+  [5,'ren','07:30',30,'Cecília Lobo','scheduled'],  [5,'jen','08:00',45,'Artur Vaz','scheduled'],
+  [5,'arm','08:00',30,'Bianca Reis','scheduled'],   [5,'ren','09:30',30,'Emílio Faria','scheduled'],
+  [5,'arm','13:30',45,'Olívia Pires','scheduled'],  [5,'gab','15:00',30,'Renan Bulhões','scheduled'],
+  [5,'ren','16:00',60,'Tânia Sobral','scheduled'],
+];
+
+const H0=7, H1=20;
+const SLOT_DIA=76, SLOT_SEM=52;
+const dMap = Object.fromEntries(DENTISTAS.map(d=>[d.id,d]));
+const cor  = id => PALETA[dMap[id].slot].hex;
+const toMin= hh => (+hh.slice(0,2))*60 + (+hh.slice(3,5));
+
+let modo = 'secretaria';
+
+/* ─── contraste ────────────────────────────────────────────────────────── */
+function lum(hex){
+  const c=[1,3,5].map(i=>parseInt(hex.substr(i,2),16)/255)
+    .map(v=>v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4));
+  return .2126*c[0]+.7152*c[1]+.0722*c[2];
+}
+const ratio=(a,b)=>{const [x,y]=[lum(a),lum(b)].sort((m,n)=>n-m);return (x+.05)/(y+.05);};
+
+/* ─── legenda ──────────────────────────────────────────────────────────── */
+function legenda(){
+  document.getElementById('legend').innerHTML =
+    '<span class="lbl">Dentista</span>' +
+    DENTISTAS.map(d=>`<span class="chip"><i style="background:${cor(d.id)}"></i>${d.nome}</span>`).join('');
+}
+
+/* ─── grade: gutter + linhas ───────────────────────────────────────────── */
+function gutter(slot){
+  const h=(H1-H0)*slot;
+  let s=`<div class="gutter" style="height:${h}px;margin-top:38px">`;
+  for(let x=H0;x<H1;x++) s+=`<span style="top:${(x-H0)*slot-4}px">${String(x).padStart(2,'0')}h</span>`;
+  return s+'</div>';
+}
+function linhas(slot){
+  let s='';
+  for(let x=H0;x<H1;x++) s+=`<div class="hline" style="top:${(x-H0)*slot}px"></div>`;
+  return s;
+}
+function slotsVazios(slot,label){
+  let s='';
+  for(let x=H0;x<H1;x++) for(const q of [0,.5]){
+    const t=(x-H0+q)*slot, hh=`${String(x).padStart(2,'0')}:${q?'30':'00'}`;
+    s+=`<div class="slot" style="top:${t}px;height:${slot/2}px" data-hint="+ ${hh}${label?' · '+label:''}"></div>`;
+  }
+  return s;
+}
+/* Repartição em faixas — porte fiel de _components/layout-sobreposicao.ts.
+   Agrupa por CAIXA (px), não por tempo: o piso de altura infla consultas curtas, então
+   dois agendamentos podem não se cruzar no relógio e ainda colidir na tela. */
+const FOLGA=0.5;
+function calcularFaixas(caixas){
+  const layout=new Map(), box=caixas.map(c=>({...c,bottom:c.top+c.height}));
+  let i=0;
+  while(i<box.length){
+    let fimCluster=box[i].bottom, j=i+1;
+    while(j<box.length && box[j].top < fimCluster-FOLGA){ fimCluster=Math.max(fimCluster,box[j].bottom); j++; }
+    const cluster=box.slice(i,j), fimPorFaixa=[];
+    const faixaDe=cluster.map(b=>{
+      let f=fimPorFaixa.findIndex(fim=>b.top>=fim-FOLGA);
+      if(f===-1){ f=fimPorFaixa.length; fimPorFaixa.push(b.bottom); } else fimPorFaixa[f]=b.bottom;
+      return f;
+    });
+    const n=fimPorFaixa.length;
+    cluster.forEach((b,k)=>layout.set(b.id,{leftPct:(faixaDe[k]/n)*100,widthPct:(1/n)*100,faixa:faixaDe[k],faixas:n}));
+    i=j;
+  }
+  return layout;
+}
+
+/** Calcula caixa + faixa de uma lista já ordenada por horário. */
+function comFaixas(lista,slot,compact){
+  const caixas=lista.map((a,i)=>({
+    id:String(i),
+    top:(toMin(a.h)-H0*60)/60*slot,
+    height:Math.max(a.min/60*slot-3, compact?21:40),
+  })).sort((x,y)=>x.top-y.top);
+  const fx=calcularFaixas(caixas);
+  return lista.map((a,i)=>({a, box:caixas.find(c=>c.id===String(i)), fx:fx.get(String(i))}));
+}
+
+function cardApt(a,box,fx,compact){
+  const st=STATUS[a.s];
+  const L=fx?.leftPct??0, W=fx?.widthPct??100, sozinho=(fx?.faixas??1)===1;
+  // Faixa estreita não cabe nome — vira só a barra de cor + hora.
+  const estreito = W<60;
+  return `<div class="apt" style="top:${box.top}px;height:${box.height}px;
+    left:calc(${L}% + 3px);width:calc(${W}% - 6px);z-index:${sozinho?1:(fx.faixa+2)};
+    background:${st.bg};border-color:${st.border};border-left-color:${cor(a.d)};color:${st.text}"
+    title="${a.h} · ${a.p} · Dr. ${dMap[a.d].nome} · ${st.label}">
+    <div class="t"><span class="hh">${a.h}</span>${(compact||estreito)?'':`<span class="st" style="background:${st.text}1f">${st.label}</span>`}</div>
+    ${estreito?'':`<div class="nm">${compact?a.p.split(' ')[0]:a.p}</div>`}
+    ${!compact&&!estreito&&box.height>58?`<div class="dr">Dr. ${dMap[a.d].nome}</div>`:''}
+  </div>`;
+}
+
+/* ─── DIA: uma coluna por dentista ─────────────────────────────────────── */
+function renderDia(){
+  const alvo = modo==='secretaria' ? DENTISTAS : [dMap['ren']];
+  const dados= modo==='secretaria' ? DIA : DIA.filter(a=>a.d==='ren');
+  const h=(H1-H0)*SLOT_DIA;
+  let s=gutter(SLOT_DIA)+'<div class="cols">';
+  for(const d of alvo){
+    const meus=dados.filter(a=>a.d===d.id);
+    s+=`<div class="col">
+      <div class="colhead"><div class="nm"><i style="background:${cor(d.id)}"></i>${d.nome}</div>
+      <div class="qt">${meus.length} consulta${meus.length===1?'':'s'}</div></div>
+      <div class="body" style="height:${h}px">${linhas(SLOT_DIA)}${slotsVazios(SLOT_DIA,d.nome)}
+      ${comFaixas(meus,SLOT_DIA,false).map(x=>cardApt(x.a,x.box,x.fx,false)).join('')}</div></div>`;
+  }
+  document.getElementById('diaGrid').innerHTML=s+'</div>';
+}
+
+/* ─── SEMANA: dois estados ─────────────────────────────────────────────────
+   "Todos"  → mapa de CARGA. Não desenha consulta: responde "quem está lotado, em que dia".
+   1 dentista → grade cheia, card de largura inteira. Responde "que horário está livre".
+
+   Por que não existe "Todos" com cards: a coluna de um dia tem ~104px. Com 4 dentistas
+   viram 4 faixas de 26px, e nome de paciente não cabe em 26px. Medido no print de 22/07. */
+let wkFiltro='todos';
+/** Dia que veio do clique no mapa de carga — destacado na grade pra ligar as duas telas. */
+let wkDiaDestaque=null;
+const DIAS_SEM=['dom 19','seg 20','ter 21','qua 22','qui 23','sex 24','sáb 25'];
+
+function renderChipsSemana(){
+  const el=document.getElementById('wkChips');
+  if(modo!=='secretaria'){ el.classList.add('hide'); return; }
+  el.classList.remove('hide');
+  el.innerHTML =
+    `<button data-f="todos" aria-pressed="${wkFiltro==='todos'}"><i style="background:var(--text-muted)"></i>Todos · carga</button>` +
+    DENTISTAS.map(d=>`<button data-f="${d.id}" aria-pressed="${wkFiltro===d.id}"><i style="background:${cor(d.id)}"></i>${d.nome}</button>`).join('');
+  el.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    wkFiltro=b.dataset.f; wkDiaDestaque=null; renderSemana();
+  });
+}
+
+function renderSemana(){
+  renderChipsSemana();
+  const grade=document.getElementById('semGrid'), carga=document.getElementById('semCarga');
+  const alvo = modo==='secretaria' ? wkFiltro : 'ren';
+
+  if(alvo==='todos'){                                  // ── mapa de carga
+    grade.classList.add('hide'); carga.classList.remove('hide');
+    const cont={};
+    for(const d of DENTISTAS) cont[d.id]=Array(7).fill(0);
+    for(const r of SEMANA) cont[r[1]][r[0]]++;
+    const pico=Math.max(...Object.values(cont).flat(),1);
+    let s='<div class="cgrid"><div></div>'+DIAS_SEM.map((n,i)=>`<div class="chead${i===3?' today':''}">${n}</div>`).join('');
+    for(const d of DENTISTAS){
+      s+=`<div class="cname"><i style="background:${cor(d.id)}"></i>${d.nome}</div>`;
+      s+=cont[d.id].map((q,dow)=>`<div class="ccell${q?'':' zero'}" data-d="${d.id}" data-dow="${dow}"
+        title="${q?`${d.nome} · ${DIAS_SEM[dow]} · ${q} consulta${q===1?'':'s'} — abre a semana dele`:`${d.nome} · ${DIAS_SEM[dow]} · livre`}">
+        ${q?`<div class="cbar" style="height:${Math.round(6+(q/pico)*30)}px;background:${cor(d.id)};opacity:${.45+(q/pico)*.55}"></div>`:''}
+        <div class="cqt">${q?q+'x':'—'}</div></div>`).join('');
+    }
+    carga.innerHTML=s+'</div>';
+    // Clique na célula → abre a SEMANA daquele dentista, com o dia clicado destacado.
+    carga.querySelectorAll('.ccell:not(.zero)').forEach(c=>c.onclick=()=>{
+      wkDiaDestaque=+c.dataset.dow; wkFiltro=c.dataset.d; renderSemana();
+    });
+    return;
+  }
+
+  // ── grade cheia de UM dentista
+  grade.classList.remove('hide'); carga.classList.add('hide');
+  const h=(H1-H0)*SLOT_SEM;
+  let s=gutter(SLOT_SEM)+'<div class="cols">';
+  DIAS_SEM.forEach((nome,i)=>{
+    const meus=SEMANA.filter(r=>r[0]===i && r[1]===alvo).map(r=>({d:r[1],h:r[2],min:r[3],p:r[4],s:r[5]}));
+    s+=`<div class="col week${i===wkDiaDestaque?' alvo':''}">
+      <div class="colhead${i===3?' today':''}"><div class="nm">${nome}</div>
+      <div class="qt">${meus.length?meus.length+'x':'—'}</div></div>
+      <div class="body" style="height:${h}px">${linhas(SLOT_SEM)}${slotsVazios(SLOT_SEM,'')}
+      ${comFaixas(meus,SLOT_SEM,true).map(x=>cardApt(x.a,x.box,x.fx,true)).join('')}</div></div>`;
+  });
+  grade.innerHTML=s+'</div>';
+}
+
+/* ─── MÊS ──────────────────────────────────────────────────────────────── */
+function renderMes(){
+  const nomes=['dom','seg','ter','qua','qui','sex','sáb'];
+  let s=nomes.map(n=>`<div class="mhead">${n}</div>`).join('');
+  // julho/2026: dia 1 = quarta. 0=dom
+  for(let cel=0;cel<35;cel++){
+    const n=cel-2;                       // 1º de julho cai na célula 3
+    const fora=n<1||n>31;
+    const num=fora?(n<1?30+n:n-31):n;
+    const hoje=n===22;
+    let carga='';
+    if(!fora){
+      const base=(n*7)%5;
+      const quais = modo==='secretaria' ? DENTISTAS : [dMap['ren']];
+      const dow=cel%7;
+      if(dow!==0&&dow!==6){
+        const vis=quais.slice(0,Math.max(1,(base%quais.length)+1));
+        carga=vis.map(d=>`<div class="dot"><i style="background:${cor(d.id)}"></i><span>${2+(n+d.slot)%4}x ${d.nome}</span></div>`).join('');
+        if(quais.length>vis.length) carga+=`<div class="more">+${quais.length-vis.length}</div>`;
+      }
+    }
+    s+=`<div class="day${fora?' out':''}${hoje?' today':''}"><div class="n">${num}</div>${carga}</div>`;
+  }
+  document.getElementById('mesGrid').innerHTML=s;
+}
+
+/* ─── tabela de contraste ──────────────────────────────────────────────── */
+function contraste(){
+  const CLARO='#ffffff', ESCURO='#111112';
+  document.querySelector('#ctab tbody').innerHTML = PALETA.map((p,i)=>{
+    const a=ratio(p.hex,CLARO), b=ratio(p.hex,ESCURO);
+    const cls=v=>v>=3?'ok':'bad';
+    const usado=i<DENTISTAS.length?'':' <span style="color:var(--text-muted)">(livre)</span>';
+    return `<tr>
+      <td class="mono">${i}${usado}</td>
+      <td><span class="sw" style="background:${p.hex}"></span>${p.nome}</td>
+      <td class="mono">${p.hex}</td>
+      <td class="mono ${cls(a)}">${a.toFixed(2)}:1</td>
+      <td class="mono ${cls(b)}">${b.toFixed(2)}:1</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ─── amostra status × faixa ───────────────────────────────────────────── */
+function amostras(){
+  document.getElementById('statusRow').innerHTML = Object.entries(STATUS).map(([k,st],i)=>`
+    <div style="background:${st.bg};border:1px solid ${st.border};border-left:4px solid ${PALETA[i%4].hex};
+                border-radius:9px;padding:7px 11px;min-width:132px;color:${st.text}">
+      <div style="font-family:'DM Mono',monospace;font-size:10px">09:30</div>
+      <div style="font-size:12px;font-weight:600">${st.label}</div>
+      <div style="font-size:10px;opacity:.62">Dr. ${DENTISTAS[i%4].nome}</div>
+    </div>`).join('');
+}
+
+/* ─── nota contextual por visão ────────────────────────────────────────── */
+const NOTAS={
+  dia:`<b>O ganho real está aqui.</b> Buraco na agenda do Armando vira buraco na coluna do Armando —
+       a recepção acha encaixe de relance, sem clicar em nada. Clicar num vazio abre o agendamento
+       <b>já com o dentista daquela coluna</b>, o dia e a hora. É o passo em que hoje se erra de profissional.`,
+  semana:`<b>Corrigido em 22/07 pelo print do Mateus.</b> A versão anterior desenhava os 4 dentistas
+       na mesma coluna e os cards se atropelavam. Não era só bug de desenho: uma coluna de dia tem
+       ~104px, 4 dentistas viram 4 faixas de <b>26px</b>, e nome de paciente não cabe em 26px.
+       A conta não fecha em hipótese nenhuma — no máximo 2 faixas legíveis por dia.<br><br>
+       Agora a Semana tem <b>dois estados</b>, e nenhum deles mente:
+       <b>“Todos” virou mapa de carga</b> (quem está lotado, em que dia — não desenha horário), e
+       <b>um dentista abre a grade cheia</b>, com card de largura inteira (que horário está livre).
+       Troque no chip acima da grade.`,
+  mes:`Mês é mapa, não mesa de trabalho: mostra <b>carga por dentista</b>, não consulta a consulta.
+       Clique no dia leva pro Dia daquele dia — que é onde se marca.`,
+};
+
+/* ─── wiring ───────────────────────────────────────────────────────────── */
+function mostrar(v){
+  ['dia','semana','mes'].forEach(k=>document.getElementById('v-'+k).classList.toggle('hide',k!==v));
+  document.querySelectorAll('.seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===v));
+  document.getElementById('note').innerHTML=NOTAS[v];
+}
+document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>mostrar(b.dataset.view));
+
+document.getElementById('theme').onclick=e=>{
+  const dark=document.documentElement.dataset.theme==='dark';
+  document.documentElement.dataset.theme=dark?'light':'dark';
+  e.target.textContent=dark?'☾ Escuro':'☀ Claro';
+};
+
+document.getElementById('who').onclick=()=>{
+  modo = modo==='secretaria' ? 'dentista' : 'secretaria';
+  document.getElementById('whoLbl').textContent = modo==='secretaria'?'secretária':'dentista (Renato)';
+  document.getElementById('legend').classList.toggle('hide', modo!=='secretaria');
+  renderDia();renderSemana();renderMes();
+};
+
+legenda();renderDia();renderSemana();renderMes();contraste();amostras();mostrar('semana');
+</script>
+</body>
+</html>
