@@ -54,7 +54,7 @@ Peso: **P** (uma sessão) · **M** (2–3 sessões) · **G** (precisa quebrar).
 
 | ID | Item | Fechado | Spec |
 |---|---|---|---|
-| R-13 | Agenda: janela de busca, multi-dentista e clique na grade | 2026-07-22 | [R-13](_arquivo/specs/R-13-agenda-janela-multidentista.md) |
+| R-13 | ✅ Agenda: janela de busca, multi-dentista e clique na grade | 2026-07-22 | [R-13](_arquivo/specs/R-13-agenda-janela-multidentista.md) |
 
 ## Cortado
 
