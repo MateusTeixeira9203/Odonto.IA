@@ -1,5 +1,4 @@
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { saudacaoBRT, dataExtensaBRT } from '@/lib/hora-brt';
 import { DexDayButton } from './dex-day-button';
 
 type AtendimentoDia = {
@@ -16,18 +15,13 @@ interface DashboardHeaderProps {
   atendimentos: AtendimentoDia[];
 }
 
-function getHoraSaudacao(now: Date): string {
-  const hour = now.getHours();
-  if (hour < 12) return 'Bom dia';
-  if (hour < 18) return 'Boa tarde';
-  return 'Boa noite';
-}
-
 export function DashboardHeader({ nome, now, atendimentos }: DashboardHeaderProps) {
   // Remove prefixo "Dr."/"Dra." do nome cadastrado pra não duplicar ("Dr. Dr.").
   const primeiroNome = nome.replace(/^(dr\.?|dra\.?)\s*/i, '').trim().split(' ')[0] || nome;
-  const saudacao = getHoraSaudacao(now);
-  const dataFormatada = format(now, "EEEE, dd 'de' MMMM", { locale: ptBR });
+  // BRT explícito: este componente é renderizado no servidor (dentista-dashboard não
+  // é 'use client'), onde `getHours()` devolvia UTC — 9h virava "Boa tarde".
+  const saudacao = saudacaoBRT(now);
+  const dataFormatada = dataExtensaBRT(now);
 
   return (
     <div className="mb-8 md:mb-10">
