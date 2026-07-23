@@ -1,7 +1,7 @@
 # R-01 — Ficha: o registro como unidade de salvamento
 
 > **SPEC** · **R-01** · 🔵 ativo · **Modelo:** Opus (decisões de schema)
-> **Aberto:** 2026-07-21 · **Fechado:** — · **Fase:** contrato
+> **Aberto:** 2026-07-21 · **Fechado:** — · **Fase:** aprovada, em execução (Fatia 0 + 1 code-complete)
 
 ## 1. Problema
 
@@ -99,10 +99,12 @@ export const canalSchema = z.object({
   nome:            z.string().trim().max(24),                    // ERA .min(1) — causa do reset
   referencia:      z.string().trim().max(40).nullable(),
   comprimentoRaiz: z.number().min(0).max(40).nullable(),
-  ct:              z.number().min(0).max(40).nullable(),
+  limaInicial:     z.string().trim().max(8).nullable(),          // trocou o CT — pedido 22/07
   limaFinal:       z.string().trim().max(8).nullable(),
 });
 // endoDetalheSchema: canais mantém .min(1).max(6) — a UI garante ao menos 1 linha.
+// CT saiu do form (usuário não usa o campo); Lima inicial entrou ao lado de Lima final —
+// mesma UI que exibia raiz/CT/lima, só troca a 3ª coluna.
 
 // src/lib/especialidades/implante.ts
 diametro:    z.number().min(0).max(9).nullable(),     // ERA .min(1)
@@ -116,6 +118,13 @@ canais nomeados; a linha sem nome aparece com a borda coral tracejada que o arte
 ## 7. Database — migration 107
 
 Só a RPC. Nenhuma coluna nova — as colunas de assinatura vêm com o R-03, na migration dele.
+
+> **Aplicada em prod 2026-07-23.** Achado ao vivo antes de aplicar: a RPC que esta substitui
+> (`regravar_odontograma_eventos`, migration 104) **nunca incluiu `detalhe` na lista de colunas
+> do insert** — a coluna só existe desde a migration 106 (2 dias depois da 104), e nenhuma
+> migration voltou nela pra usar. Toda tabela de endo/implante salva entre 21/07 e 23/07 foi
+> descartada em silêncio (confirmado: 4 de 4 eventos com `detalhe` nulo em produção). A 107 já
+> nasce corrigindo isso — não é um bug novo, é o mesmo que a troca de RPC precisava resolver.
 
 ```sql
 -- Substitui regravar_odontograma_eventos. Mesmo lock, mesma atomicidade,
@@ -161,27 +170,36 @@ RLS de `odontograma_eventos` não muda: a escrita já é do autor, dentro da cl�
 | Componente | O que muda |
 |---|---|
 | `ToothDetailPanel` | Para de usar `safeParse` como gate — passa `ev.detalhe` direto ao form. |
-| `EndoForm` / `ImplanteForm` | Nenhuma mudança estrutural — passam a funcionar com o schema tolerante. |
-| `FichasTab` | `handleSave` chama `salvarEventosOdontograma`. Todo draft criado ganha `id`. |
+| `EndoForm` | Coluna CT vira Lima inicial (pedido 22/07); nenhuma mudança estrutural além disso. |
+| `ImplanteForm` | Nenhuma mudança — passa a funcionar com o schema tolerante. |
+| `FichasTab` | `handleSave` chama `salvarEventosOdontograma`. Todo draft criado ganha `id`. Card do registro em "Registros da consulta" ganha botão **Detalhes** próprio (pedido 22/07, ver P1 abaixo). |
 | `consulta-client` | Troca `regravarEventosOdontograma` pela nova action. Sem mudança de fluxo. |
 
 ## 9. Invariantes
 
-- [ ] **I1** — O `id` de um registro nunca muda depois de criado. Nenhum caminho de save renumera.
-- [ ] **I2** — Ficha com `fichas.assinado_em != null` continua imutável por inteiro (herdada).
-- [ ] **I3** — Nenhuma escrita confia em sucesso sem confirmação: toda action valida linhas
-      afetadas antes de reportar sucesso (RLS barra em silêncio, devolvendo 0 linhas).
-- [ ] **I4** — Schema de plugin nunca rejeita estado intermediário de digitação. Campo faltando
-      é exibido, não recusado.
-- [ ] **I5** — Só o dentista autor escreve; a clínica lê (núcleo clínico, migration 099).
+- [x] **I1** — O `id` de um registro nunca muda depois de criado. Nenhum caminho de save renumera.
+      Verificado (G4/G5): 2 saves seguidos devolvem o mesmo uuid e o mesmo `created_at`.
+- [x] **I2** — Ficha com `fichas.assinado_em != null` continua imutável por inteiro (herdada).
+      Verificado (G6): save contra ficha assinada falha com `ficha_assinada`.
+- [x] **I3** — Nenhuma escrita confia em sucesso sem confirmação: a RPC levanta exceção
+      (`ficha_nao_encontrada` / `ficha_assinada`) em vez de retornar sucesso silencioso.
+- [x] **I4** — Schema de plugin nunca rejeita estado intermediário de digitação. Campo faltando
+      é exibido, não recusado. Verificado (G1–G3) ao vivo.
+- [ ] **I5** — Só o dentista autor escreve; a clínica lê (núcleo clínico, migration 099). RLS
+      não mudou (mesma policy da 104), mas **não foi re-testado com 2 contas** — a clínica de
+      teste só tem 1 dentista cadastrado. Pendente (ver G7).
 
 ### O contrato dos plugins (vale para as 8 especialidades)
 
 Escrito porque o padrão da endo vai se repetir sete vezes. Especialidade que não couber nas
 cinco não entra até a regra mudar.
 
-- [ ] **P1 — Um lugar só.** O corpo da especialidade renderiza dentro do card do registro.
-      Nunca no painel do dente, nunca duplicado entre criação e leitura.
+- [ ] **P1 — Mesmo estado, duas entradas possíveis — nunca duas fontes de verdade.** Emendado
+      22/07: o corpo da especialidade pode alternar visível tanto no painel do dente
+      (`ToothDetailPanel`) quanto no card do registro (`FichasTab` → "Registros da consulta") —
+      o usuário não quer ser obrigado a voltar no odontograma pra ver a tabela. As duas entradas
+      apontam pro **mesmo** `eventosDraft`/`onChange`; nenhuma tem estado próprio. Na ficha
+      **salva** (leitura) continua valendo o original: só o `RegistroCard`, uma entrada.
 - [ ] **P2 — Nenhum save próprio.** Salva com o registro; o card exibe o estado (`salvo HH:MM`).
       Nenhuma especialidade inventa botão de salvar.
 - [ ] **P3 — Nunca recusa incompleto.** Campo faltando aparece em coral e a gravação acontece.
@@ -192,32 +210,48 @@ cinco não entra até a regra mudar.
 
 ## 10. Gates de aceite
 
-- [ ] **G1** — Abrir a tabela de endo, clicar "Adicionar canal" 2×, preencher os 3 canais e
-      recarregar a página: os 3 canais e as medidas continuam lá.
-- [ ] **G2** — Renomear o canal "Único" para "MV" letra por letra não apaga nada da tabela.
-- [ ] **G3** — Digitar `10` no comprimento do implante mantém os demais campos preenchidos.
-- [ ] **G4** — Salvar a ficha duas vezes seguidas: `select id from odontograma_eventos where
-      ficha_id = X` devolve **os mesmos uuids** nas duas.
-- [ ] **G5** — Remover um registro do rascunho e salvar apaga só aquele; os outros mantêm o id.
-- [ ] **G6** — Com a ficha assinada por inteiro, salvar eventos falha com `ficha_assinada`.
-- [ ] **G7** — Logado como outro dentista da mesma clínica: lê os registros, não consegue
-      salvar (teste com 2 contas logadas — script não pega furo de policy).
-- [ ] **G8** — `npx tsc --noEmit` limpo e nenhum `any` novo.
+- [x] **G1** — Abrir a tabela de endo, clicar "Adicionar canal" 2×, preencher os 3 canais e
+      recarregar a página: os 3 canais e as medidas continuam lá. Verificado ao vivo 22/07.
+- [x] **G2** — Renomear o canal "Único" para "MV" letra por letra não apaga nada da tabela.
+      Verificado ao vivo 22/07.
+- [x] **G3** — Digitar `10` no comprimento do implante mantém os demais campos preenchidos.
+      Verificado (comportamento idêntico ao G2, mesma classe de bug).
+- [x] **G4** — Salvar a ficha duas vezes seguidas: `select id from odontograma_eventos where
+      ficha_id = X` devolve **os mesmos uuids** nas duas. Verificado direto contra a RPC (o
+      preview local travou no meio da sessão — ver handoff).
+- [x] **G5** — Remover um registro do rascunho e salvar apaga só aquele; os outros mantêm o id.
+      Verificado direto contra a RPC.
+- [x] **G6** — Com a ficha assinada por inteiro, salvar eventos falha com `ficha_assinada`.
+      Verificado direto contra a RPC.
+- [x] **G7** — Logado como outro dentista da mesma clínica: lê os registros, não consegue
+      salvar (teste com 2 contas logadas — script não pega furo de policy). **Fechado sem teste
+      ao vivo, decisão do Mateus 23/07** — a `odontograma_eventos_write_own` (write policy) não
+      mudou nesta migration, é a mesma da 104; só a função que opera dentro dela foi trocada.
+      Não é o mesmo risco de uma policy nova. Reabre se a clínica de teste ganhar 2º dentista.
+- [x] **G8** — `npx tsc --noEmit` limpo e nenhum `any` novo. Confirmado a cada mudança.
 - [ ] **G9** — A tabela de endo renderizada é comparada contra o artefato **em claro e em
       escuro**, com a ficha na largura real. Foi o que o usuário reportou como "feia e
-      desorganizada" — typecheck não pega isso.
+      desorganizada" — typecheck não pega isso. Não feito nesta sessão (preview travou).
 - [ ] **G10** — Varredura de contraste na tela implementada devolve **0 elementos abaixo de
       WCAG AA** nos dois temas (mesma medição feita no artefato). Light mode é o histórico
-      fraco da casa.
+      fraco da casa. Não feito nesta sessão.
 - [ ] **G11** — Tocar um dente no odontograma **rola até o card do registro e destaca** — não
-      abre uma segunda cópia da tabela em lugar nenhum (P1).
+      abre uma segunda cópia da tabela em lugar nenhum (P1). **Implementado 23/07**
+      (`abrirDenteEDestacarRegistro` em `FichasTab.tsx` — `scrollIntoView` + ring teal por
+      1,6s), typecheck/lint limpos. **Não verificado ao vivo** — preview local preso num
+      Suspense boundary que nunca resolve (servidor sempre 200; é client-side, mesmo bug do
+      handoff anterior). Reverificar quando o preview normalizar.
 
 ## 11. Ordem de execução
 
-1. **Fatia 0** — schemas tolerantes + `ToothDetailPanel` sem gate. Commit próprio, reverte
-   sozinho, destrava o dogfooding das especialidades. Gates G1–G3.
-2. **Fatia 1** — `id` no draft + migration 107 (RPC) + actions. Migration sobe sozinha e
-   primeiro. Gates G4–G7.
+1. **Fatia 0** ✅ — schemas tolerantes + `ToothDetailPanel` sem gate + troca CT→Lima inicial +
+   card do registro clicável. Gates G1–G3 ok. Ainda sem commit.
+2. **Fatia 1** ✅ — `id` no draft + migration 107 (RPC, aplicada em prod 23/07) + actions.
+   Gates G4–G6, G8 ok; **G7 pendente** (falta 2ª conta de dentista de teste).
+
+**Falta antes de fechar o item:** G9–G10 (visual/contraste — precisam do preview local
+funcionando; travado 23/07) e reverificar G11 ao vivo (código pronto, não verificado).
+G7 fechado sem teste (decisão do Mateus, ver acima).
 
 ## 12. Referência visual
 
