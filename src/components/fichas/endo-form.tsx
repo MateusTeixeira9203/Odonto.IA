@@ -45,7 +45,13 @@ export function EndoForm({ valor, onChange, readOnly }: PluginFormProps<EndoDeta
   const setCanal = (i: number, patch: Partial<CanalDetalhe>) => {
     onChange({ ...v, canais: v.canais.map((c, idx) => (idx === i ? { ...c, ...patch } : c)) });
   };
-  const addCanal = () => onChange({ ...v, canais: [...v.canais, { ...CANAL_VAZIO }] });
+  const addCanal = () => {
+    // "Único" só faz sentido com um canal — ao entrar o segundo, limpa o rótulo do primeiro.
+    const canais = v.canais.map((c, idx) =>
+      idx === 0 && v.canais.length === 1 && c.nome === 'Único' ? { ...c, nome: '' } : c,
+    );
+    onChange({ ...v, canais: [...canais, { ...CANAL_VAZIO }] });
+  };
   const removeCanal = (i: number) => {
     if (v.canais.length <= 1) return; // sempre ao menos 1 linha
     onChange({ ...v, canais: v.canais.filter((_, idx) => idx !== i) });
@@ -91,7 +97,7 @@ export function EndoForm({ valor, onChange, readOnly }: PluginFormProps<EndoDeta
                     <input
                       list="nomes-canal"
                       className="w-[76px] bg-surface-alt border border-border rounded-md px-2 py-1 text-xs font-semibold text-text-primary outline-none focus:border-teal disabled:opacity-60"
-                      placeholder="MV" disabled={readOnly} value={c.nome}
+                      disabled={readOnly} value={c.nome}
                       onChange={(e) => setCanal(i, { nome: e.target.value })}
                       aria-label={`Nome do canal ${i + 1}`}
                     />
@@ -103,7 +109,7 @@ export function EndoForm({ valor, onChange, readOnly }: PluginFormProps<EndoDeta
                         'outline-none focus:border-teal disabled:opacity-60 border ' +
                         (parcial && c.referencia == null ? 'border-dashed border-coral' : 'border-border')
                       }
-                      placeholder="Cúspide MV" disabled={readOnly} value={c.referencia ?? ''}
+                      disabled={readOnly} value={c.referencia ?? ''}
                       onChange={(e) => setCanal(i, { referencia: limparTexto(e.target.value) })}
                       aria-label={`Ponto de referência do canal ${i + 1}`}
                     />
@@ -112,7 +118,7 @@ export function EndoForm({ valor, onChange, readOnly }: PluginFormProps<EndoDeta
                     <input
                       type="number" step="0.5" inputMode="decimal"
                       className={num(parcial && c.comprimentoRaiz == null)}
-                      placeholder="—" disabled={readOnly} value={c.comprimentoRaiz ?? ''}
+                      disabled={readOnly} value={c.comprimentoRaiz ?? ''}
                       onChange={(e) => setCanal(i, { comprimentoRaiz: limparNum(e.target.value) })}
                       aria-label={`Comprimento da raiz do canal ${i + 1}`}
                     />
@@ -120,7 +126,7 @@ export function EndoForm({ valor, onChange, readOnly }: PluginFormProps<EndoDeta
                   <td className="py-1.5 pr-2 text-right">
                     <input
                       className={num(parcial && c.limaInicial == null)}
-                      placeholder="#15" disabled={readOnly} value={c.limaInicial ?? ''}
+                      disabled={readOnly} value={c.limaInicial ?? ''}
                       onChange={(e) => setCanal(i, { limaInicial: limparTexto(e.target.value) })}
                       aria-label={`Lima inicial do canal ${i + 1}`}
                     />
@@ -128,7 +134,7 @@ export function EndoForm({ valor, onChange, readOnly }: PluginFormProps<EndoDeta
                   <td className="py-1.5 text-right">
                     <input
                       className={num(parcial && c.limaFinal == null)}
-                      placeholder="#35" disabled={readOnly} value={c.limaFinal ?? ''}
+                      disabled={readOnly} value={c.limaFinal ?? ''}
                       onChange={(e) => setCanal(i, { limaFinal: limparTexto(e.target.value) })}
                       aria-label={`Lima final do canal ${i + 1}`}
                     />
@@ -168,7 +174,7 @@ export function EndoForm({ valor, onChange, readOnly }: PluginFormProps<EndoDeta
           <input
             disabled={readOnly}
             className="w-[150px] bg-surface-alt border border-border rounded-md px-2 py-1 text-[11px] font-semibold text-text-primary outline-none focus:border-teal disabled:opacity-60"
-            placeholder="condensação lateral" value={v.obturacao ?? ''}
+            value={v.obturacao ?? ''}
             onChange={(e) => onChange({ ...v, obturacao: limparTexto(e.target.value) })}
           />
         </label>
@@ -177,7 +183,7 @@ export function EndoForm({ valor, onChange, readOnly }: PluginFormProps<EndoDeta
           <input
             disabled={readOnly}
             className="w-[120px] bg-surface-alt border border-border rounded-md px-2 py-1 text-[11px] font-semibold text-text-primary outline-none focus:border-teal disabled:opacity-60"
-            placeholder="AH Plus" value={v.cimento ?? ''}
+            value={v.cimento ?? ''}
             onChange={(e) => onChange({ ...v, cimento: limparTexto(e.target.value) })}
           />
         </label>
