@@ -44,9 +44,9 @@ export function EndoCard({ valor }: PluginCardProps<EndoDetalhe>) {
               <tr key={i} className="border-t border-border">
                 <td className="py-1.5 pr-2 font-semibold text-text-primary">{c.nome || '—'}</td>
                 <td className="py-1.5 pr-2 text-text-secondary">{c.referencia ?? '—'}</td>
-                <td className="py-1.5 pr-2"><Cel valor={c.comprimentoRaiz} /></td>
-                <td className="py-1.5 pr-2"><Cel valor={c.limaInicial} /></td>
-                <td className="py-1.5"><Cel valor={c.limaFinal} /></td>
+                <td className="py-1.5 pr-2 text-right"><Cel valor={c.comprimentoRaiz} /></td>
+                <td className="py-1.5 pr-2 text-right"><Cel valor={c.limaInicial} /></td>
+                <td className="py-1.5 text-right"><Cel valor={c.limaFinal} /></td>
               </tr>
             ))}
           </tbody>

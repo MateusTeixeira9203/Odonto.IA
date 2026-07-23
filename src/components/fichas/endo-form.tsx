@@ -108,7 +108,7 @@ export function EndoForm({ valor, onChange, readOnly }: PluginFormProps<EndoDeta
                       aria-label={`Ponto de referência do canal ${i + 1}`}
                     />
                   </td>
-                  <td className="py-1.5 pr-2">
+                  <td className="py-1.5 pr-2 text-right">
                     <input
                       type="number" step="0.5" inputMode="decimal"
                       className={num(parcial && c.comprimentoRaiz == null)}
@@ -117,7 +117,7 @@ export function EndoForm({ valor, onChange, readOnly }: PluginFormProps<EndoDeta
                       aria-label={`Comprimento da raiz do canal ${i + 1}`}
                     />
                   </td>
-                  <td className="py-1.5 pr-2">
+                  <td className="py-1.5 pr-2 text-right">
                     <input
                       className={num(parcial && c.limaInicial == null)}
                       placeholder="#15" disabled={readOnly} value={c.limaInicial ?? ''}
@@ -125,7 +125,7 @@ export function EndoForm({ valor, onChange, readOnly }: PluginFormProps<EndoDeta
                       aria-label={`Lima inicial do canal ${i + 1}`}
                     />
                   </td>
-                  <td className="py-1.5">
+                  <td className="py-1.5 text-right">
                     <input
                       className={num(parcial && c.limaFinal == null)}
                       placeholder="#35" disabled={readOnly} value={c.limaFinal ?? ''}
