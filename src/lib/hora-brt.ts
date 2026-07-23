@@ -61,3 +61,20 @@ export function dataExtensaBRT(d: Date = new Date()): string {
     month: 'long',
   }).format(d);
 }
+
+/**
+ * Início do dia da clínica (00:00:00 BRT), como instante — para filtrar colunas
+ * timestamptz (`gte`/`lte`). Brasil é BRT fixo (UTC-3, sem horário de verão).
+ *
+ * Usar isto (e não `new Date(d); setHours(0,0,0,0)`) sempre que a janela "hoje" for
+ * usada numa query: `setHours` roda no fuso do servidor, e na Vercel isso é UTC —
+ * três horas à frente do Brasil.
+ */
+export function inicioDoDiaBRT(d: Date = new Date()): Date {
+  return new Date(`${hojeBRT(d)}T00:00:00.000-03:00`);
+}
+
+/** Fim do dia da clínica (23:59:59.999 BRT), como instante — ver {@link inicioDoDiaBRT}. */
+export function fimDoDiaBRT(d: Date = new Date()): Date {
+  return new Date(`${hojeBRT(d)}T23:59:59.999-03:00`);
+}

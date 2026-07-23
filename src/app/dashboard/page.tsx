@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { getDentistaCached } from '@/lib/get-dentista';
+import { hojeBRT, inicioDoDiaBRT, fimDoDiaBRT } from '@/lib/hora-brt';
 import { createClient } from '@/lib/supabase/server';
 import { PageTransition } from '@/components/layout/page-transition';
 import { PageContainer } from '@/components/layout/page-container';
@@ -23,15 +24,11 @@ async function SecretaryDashboardServer({
   const supabase = await createClient();
   const now = new Date();
 
-  const startOfDay = new Date(now);
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(now);
-  endOfDay.setHours(23, 59, 59, 999);
+  const startOfDay = inicioDoDiaBRT(now);
+  const endOfDay = fimDoDiaBRT(now);
 
-  const todayStr = now.toISOString().split('T')[0];
-  const endOfWeekDate = new Date(now);
-  endOfWeekDate.setDate(endOfWeekDate.getDate() + 7);
-  const endOfWeekStr = endOfWeekDate.toISOString().split('T')[0];
+  const todayStr = hojeBRT(now);
+  const endOfWeekStr = hojeBRT(new Date(startOfDay.getTime() + 7 * 86_400_000));
 
   const [
     { data: agendamentosRaw },
