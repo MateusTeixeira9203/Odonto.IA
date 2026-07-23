@@ -1,7 +1,7 @@
 # Roadmap — Odonto.IA
 
 > **ROADMAP** · **Odonto.IA** · atualizado 2026-07-23
-> **Ativo:** nenhum · **Fila:** 13 · **Concluídos:** 2 · **Congelados:** 0
+> **Ativo:** nenhum · **Fila:** 12 · **Concluídos:** 3 · **Congelados:** 0
 
 > Reconstruído do zero em 2026-07-21 por decisão do Mateus. O histórico anterior está no
 > git (`git show 4a93234:plans/roadmap/roadmap-mestre-2026-07-21.md`) e na pasta
@@ -37,7 +37,6 @@ Peso: **P** (uma sessão) · **M** (2–3 sessões) · **G** (precisa quebrar).
 
 | ID | Item | Objetivo | Peso |
 |---|---|---|---|
-| R-14 | ⏳ Dashboard da secretária monta "hoje" no fuso do servidor | `dashboard/page.tsx:26-29` usa `setHours` num Server Component: é meia-noite UTC, não BRT. Consulta a partir das 21h BRT some; a de ontem 21h–24h vaza pra dentro. Mesma classe do `feb4b68` | P |
 | R-03 | ⏳ Assinatura e data por procedimento | O paciente assina o que foi feito, registro a registro; registro assinado congela e o resto da ficha segue editável | M |
 | R-04 | ⏳ Encaminhar procedimento a outro dentista da clínica | O registro planejado ganha destino (`encaminhado_para`, já em prod), o destino é notificado e vê a fila dele | M |
 | R-02 | ⏳ Ficha viva + fidelidade ao artefato | Um card só na criação e na leitura, ordenação por estado, agrupamento por procedimento e símbolos do odontograma fiéis ao artefato. Incorpora `grupo_id` de dupla função (multi-dente + multi-consulta = "o trabalho") e etapa derivada, "ativo" = grupo aberto — ver R-15 | M |
@@ -61,6 +60,7 @@ Peso: **P** (uma sessão) · **M** (2–3 sessões) · **G** (precisa quebrar).
 | ID | Item | Fechado | Spec |
 |---|---|---|---|
 | R-01 | ✅ Ficha: o registro como unidade de salvamento | 2026-07-23 | [R-01](_arquivo/specs/R-01-registro-unidade-salvamento.md) |
+| R-14 | ✅ Dashboard da secretária monta "hoje" no fuso do servidor | 2026-07-23 | sem spec (pontual — mesma classe do `feb4b68`) |
 | R-13 | ✅ Agenda: janela de busca, multi-dentista e clique na grade | 2026-07-22 | [R-13](_arquivo/specs/R-13-agenda-janela-multidentista.md) |
 
 ## Cortado
