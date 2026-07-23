@@ -374,9 +374,6 @@ export function FichasTab({ patientId, clinicaId, dentistaId, patientName, canWr
   const [sharedTeeth, setSharedTeeth] = React.useState<number[]>([]);  const [sharedNotes, setSharedNotes] = React.useState<string[]>(['']);  const [showDeleteConfirm, setShowDeleteConfirm] = React.useState<string | null>(null);
   const [signingFichaId, setSigningFichaId] = React.useState<string | null>(null);
   const [isSavingSignature, setIsSavingSignature] = React.useState(false);
-  // #9: fica true quando "Organizar com Dex" preenche o form nesta edição — decide
-  // origem no insert (nunca no update). Reseta ao fechar/abrir o painel.
-  const [preenchidoPorDex, setPreenchidoPorDex] = React.useState(false);
   const signaturePadRef = React.useRef<SignaturePadLib | null>(null);
 
   // ── Modo de visualização da ficha ─────────────────────────────────────────
@@ -605,7 +602,6 @@ export function FichasTab({ patientId, clinicaId, dentistaId, patientName, canWr
     // que a IA de fato preencheu.    setSharedTeeth([]);
     setSharedNotes(['']);
     setSelectedTeeth(data.dentes_afetados);
-    setPreenchidoPorDex(true);
   };
 
   /**
@@ -704,8 +700,10 @@ export function FichasTab({ patientId, clinicaId, dentistaId, patientName, canWr
           conduta: formData.conduta || null,
           orto_manutencao: formData.ortoManutencao,
           status: "aberta",
-          // #9: só marca ficha_rapida se o preenchimento desta edição veio do Dex.
-          origem: preenchidoPorDex ? 'ficha_rapida' : 'manual',
+          // Ficha rápida grava sempre 'manual' — a constraint fichas_origem_check só aceita
+          // 'modo_consulta' | 'manual'. O antigo 'ficha_rapida' era rejeitado pelo banco (a
+          // ficha nem salvava) e não era lido em lugar nenhum. Bug achado 23/07.
+          origem: 'manual',
         }).select("id").single();
 
         if (error) throw error;
@@ -797,7 +795,6 @@ export function FichasTab({ patientId, clinicaId, dentistaId, patientName, canWr
     setFormData({ dataAtendimento: hojeBRT(), type: "Evolução", observation: "", teethNotes: [], procedimentos: [], conduta: "", ortoManutencao: null });
     setEventosDraft([]);
     setDenteAberto(null);
-    setPreenchidoPorDex(false);
   };
 
   const updateProcStatus = async (fichaId: string, currentStatus: Record<string, ProcStatus>, procKey: string, newStatus: ProcStatus) => {
