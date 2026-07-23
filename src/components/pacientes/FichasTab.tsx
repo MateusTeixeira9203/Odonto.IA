@@ -852,8 +852,10 @@ export function FichasTab({ patientId, clinicaId, dentistaId, patientName, canWr
       conduta: evolution.conduta ?? '',
       ortoManutencao: evolution.ortoManutencao,
     });
-    // Edição não recarrega eventos: reorganizar substitui, salvar sem reorganizar preserva.
-    setEventosDraft([]);
+    // Edição RECARREGA os eventos salvos como rascunho (mesmo id, via eventoViewParaDraft):
+    // senão o registro do dente some ao editar e não dá pra mexer no canal/detalhe. Salvar
+    // faz upsert por id (R-01), não duplica nem renumera. Bug achado 23/07.
+    setEventosDraft(evolution.eventos.map(eventoViewParaDraft));
     setSelectedTeeth(individualNotes.map((tn) => tn.tooth));
     setIsPanelOpen(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
