@@ -1,7 +1,7 @@
 # Roadmap — Odonto.IA
 
 > **ROADMAP** · **Odonto.IA** · atualizado 2026-07-23
-> **Ativo:** R-01 · **Fila:** 13 · **Concluídos:** 1 · **Congelados:** 0
+> **Ativo:** nenhum · **Fila:** 13 · **Concluídos:** 2 · **Congelados:** 0
 
 > Reconstruído do zero em 2026-07-21 por decisão do Mateus. O histórico anterior está no
 > git (`git show 4a93234:plans/roadmap/roadmap-mestre-2026-07-21.md`) e na pasta
@@ -12,11 +12,9 @@
 
 ## Agora
 
-**R-01 — Ficha: o registro como unidade de salvamento** 🔵. Fatia 0 e Fatia 1 code-complete,
-gates G1–G11 todos fechados, commits feitos (não pushados). Falta a decisão do Mateus de
-fechar o item (arquivar spec/artefato).
+Nada ativo — R-01 fechou em 23/07. Próximo item: ver **Fila**.
 
-> Detalhe do que falta e o que trava: `plans/ESTADO.md` · contrato: [spec R-01](specs/R-01-registro-unidade-salvamento.md)
+> Detalhe: `plans/ESTADO.md`
 
 ## Fila
 
@@ -50,7 +48,7 @@ Peso: **P** (uma sessão) · **M** (2–3 sessões) · **G** (precisa quebrar).
 | R-08 | ⏳ Periodontia: periograma | Tela própria (6 sítios × 32 dentes), tabela `perio_exames` — hoje só existe a declaração no registry. NIC calculado, nunca digitado | G |
 | R-10 | ⏳ Rótulo do procedimento no orçamento e no PDF | `derivarV2DosEventos` gera "Extração - planejado (resto radicular)" — jargão interno e observação clínica no documento que o paciente lê | P |
 | R-11 | ⏳ Unificar o caminho de gravação da ficha | Consulta usa server action e grava `status: concluida`; ficha rápida escreve do browser e grava `aberta`. Mesmo artefato clínico, dois contratos | M |
-| R-12 | ⏳ Contraste AA nos tokens do app | `--text-3` e o botão primário reprovam WCAG AA (2,34:1 e 3,38:1 no claro). Valores corrigidos já estão na spec do R-01; falta aplicar no app inteiro | P |
+| R-12 | ⏳ Contraste AA nos tokens do app | `--text-3` e o botão primário reprovam WCAG AA (2,34:1 e 3,38:1 no claro); achado novo 23/07 — `--color-text-muted` no escuro dá 1,82:1 (`ToothDetailPanel`). Valores corrigidos já estão na [spec arquivada do R-01](_arquivo/specs/R-01-registro-unidade-salvamento.md); falta aplicar no app inteiro | P |
 | R-15 | ⏳ Modo consulta: o cockpit do atendimento | Vira o cockpit do atendimento — procedimentos ativos, odontograma vivo, tabelas, implante, raio-x, gravação como canto pequeno; motor compartilhado com a ficha rápida. [Visão em debate](specs/R-15-modo-consulta-cockpit.md); depende de R-01 · R-02 · plugins | G |
 
 ## Congelado
@@ -62,6 +60,7 @@ Peso: **P** (uma sessão) · **M** (2–3 sessões) · **G** (precisa quebrar).
 
 | ID | Item | Fechado | Spec |
 |---|---|---|---|
+| R-01 | ✅ Ficha: o registro como unidade de salvamento | 2026-07-23 | [R-01](_arquivo/specs/R-01-registro-unidade-salvamento.md) |
 | R-13 | ✅ Agenda: janela de busca, multi-dentista e clique na grade | 2026-07-22 | [R-13](_arquivo/specs/R-13-agenda-janela-multidentista.md) |
 
 ## Cortado
