@@ -1,47 +1,39 @@
 # Estado — Odonto.IA
 
-> **ESTADO** · atualizado 2026-07-23 · sessão de execução do R-01 (Fatia 0 + Fatia 1 + gates)
-> **Item ativo:** R-01 · **Modo da sessão:** execução
+> **ESTADO** · atualizado 2026-07-23 01:15 · sessão longa (visão do cockpit + R-01 completo)
+> **Item ativo:** nenhum · **Modo da última sessão:** execução (fechamento)
 
 ## Agora
 
-**R-01 — Ficha: o registro como unidade de salvamento. Todos os gates (G1–G11) fechados.**
+*(Sem item ativo. R-01 fechou nesta sessão — ver `plans/ROADMAP.md` → Concluído, spec e
+artefato em `plans/_arquivo/`. Raciocínio completo, decisões e os 2 bugs achados/corrigidos:
+`plans/handoffs/handoff-2026-07-23-0115.md`.)*
 
-- Schemas tolerantes (endo/implante), id estável + upsert (migration 107, aplicada em prod),
-  campo do endo trocado (CT→Lima inicial), card do registro clicável, scroll+destaque ao
-  tocar o dente (G11) — tudo verificado ao vivo ou por medição direta nesta sessão.
-- **Bug achado e corrigido, mesma raiz do item:** a RPC antiga nunca gravava `detalhe` — toda
-  tabela de endo/implante salva entre 21/07 e 23/07 tinha sido descartada em silêncio.
-- **Bug de alinhamento achado por você** (print do card salvo): colunas numéricas da tabela
-  de endo flutuavam à esquerda em vez de alinhar sob o cabeçalho — corrigido em `endo-card.tsx`
-  e `endo-form.tsx` (mesma causa nos dois).
-- G9 (comparação com o artefato) e G10 (contraste) rodados via medição direta (JS/computed
-  style), não no olho — ver spec para os números.
-
-**Dois achados fora do escopo do R-01, não mexidos:**
-- Fontes `Outfit`/`DM Mono` aparecem `unloaded` nesta sessão de dev — página inteira cai pro
-  fallback do navegador. Não é código meu; provável efeito dos vários restart+clear `.next`
-  de hoje. **Conferir num browser normal antes de tratar como bug real.**
-- `--color-text-muted` no escuro dá **1.82:1** contra `--color-surface` (falha AA feia) —
-  usado no `ToothDetailPanel`, pré-existente, é exatamente o escopo do **R-12** (já na fila).
-
-Commits feitos: migration (`5920f94`), código do R-01 (`1f01bba`), docs (`4837c40`), fix de
-alinhamento (`0e236d8`). Nada pushado.
+Pra retomar: escolher o próximo item da fila (ver abaixo) e rodar `/planejar` ou `/executar`
+conforme o caso.
 
 ## Travado
 
 Nada travado.
 
+| O quê | Trava o quê | Hipótese / próximo passo |
+|---|---|---|
+| Preview local ainda trava às vezes (Suspense boundary que não resolve, servidor sempre 200) | Verificação visual ao vivo em sessões futuras | Recorrente — mesma classe já registrada em handoffs anteriores. Se voltar: restart + `.next` limpo + aba nova; às vezes recupera sozinho depois de um tempo, sem causa raiz identificada |
+
 ## Esperando você
 
-- [ ] **Fechar o R-01?** Todos os gates passam. Fechar move a spec + artefato pro `_arquivo/`
-      e marca ✅ no roadmap — confirma se é isso ou se quer segurar mais uma sessão.
-- [ ] Itens antigos ainda abertos (não mexi neles nesta sessão): resíduo de dado de 14/07 na
-      Clindent, pergunta pra Portaria sobre o mapa de carga da agenda, chips de duração no
-      agendamento — detalhe no handoff de 22/07.
+- [ ] **Conferir num browser normal** se `Outfit`/`DM Mono` carregam certo — nesta sessão de dev
+      apareceram `unloaded` (app inteiro caindo pro fallback do navegador). Suspeita forte é
+      efeito dos vários `rm -rf .next` que rodei tentando destravar o preview, não código.
+- [ ] **Resíduo de dado:** 1 agendamento de 14/07 na Clindent com `dentista_id` = Portaria em vez
+      de dentista. Sobra de bug já corrigido. Consertar é escrita em produção: só com seu ok.
+- [ ] **Perguntar pra Portaria:** o mapa de carga da agenda mostra o dia num número só — não
+      distingue "4 espalhadas" de "4 grudadas de manhã". Se fizer falta, a barra vira por turno.
+- [ ] **Chips do formulário de agendamento** — pedido antigo era tirar chips de horário, mas hora
+      já é campo livre. Os únicos chips são de **duração**. São esses, ou outra tela?
 
 ## Próximo da fila
 
-Depois do R-01 fechar: `R-14` (fuso do dashboard da secretária, bug em prod, peso P) e `R-03`
+`R-14` (fuso do dashboard da secretária, bug em prod com usuário real, peso P) e `R-03`
 (assinatura por procedimento — já depende do id estável que o R-01 acabou de entregar). Fila
-completa em `plans/ROADMAP.md`.
+completa e ordem em `plans/ROADMAP.md`.
