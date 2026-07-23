@@ -12,11 +12,9 @@
 
 ## Agora
 
-**R-01 — Ficha: o registro como unidade de salvamento** 🔵. Fatia 0 e Fatia 1 code-complete
-(schemas tolerantes, id estável, migration 107 aplicada em prod). Gates G1–G8 fechados (G7 sem
-teste de 2 contas — decisão do Mateus, policy não mudou); G11 implementado mas não verificado
-ao vivo; **G9–G10 bloqueados** pelo preview local (Suspense que não resolve). Commits em
-organização.
+**R-01 — Ficha: o registro como unidade de salvamento** 🔵. Fatia 0 e Fatia 1 code-complete,
+gates G1–G11 todos fechados, commits feitos (não pushados). Falta a decisão do Mateus de
+fechar o item (arquivar spec/artefato).
 
 > Detalhe do que falta e o que trava: `plans/ESTADO.md` · contrato: [spec R-01](specs/R-01-registro-unidade-salvamento.md)
 

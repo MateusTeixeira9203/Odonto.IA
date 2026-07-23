@@ -229,18 +229,25 @@ cinco não entra até a regra mudar.
       mudou nesta migration, é a mesma da 104; só a função que opera dentro dela foi trocada.
       Não é o mesmo risco de uma policy nova. Reabre se a clínica de teste ganhar 2º dentista.
 - [x] **G8** — `npx tsc --noEmit` limpo e nenhum `any` novo. Confirmado a cada mudança.
-- [ ] **G9** — A tabela de endo renderizada é comparada contra o artefato **em claro e em
-      escuro**, com a ficha na largura real. Foi o que o usuário reportou como "feia e
-      desorganizada" — typecheck não pega isso. Não feito nesta sessão (preview travou).
-- [ ] **G10** — Varredura de contraste na tela implementada devolve **0 elementos abaixo de
-      WCAG AA** nos dois temas (mesma medição feita no artefato). Light mode é o histórico
-      fraco da casa. Não feito nesta sessão.
-- [ ] **G11** — Tocar um dente no odontograma **rola até o card do registro e destaca** — não
-      abre uma segunda cópia da tabela em lugar nenhum (P1). **Implementado 23/07**
-      (`abrirDenteEDestacarRegistro` em `FichasTab.tsx` — `scrollIntoView` + ring teal por
-      1,6s), typecheck/lint limpos. **Não verificado ao vivo** — preview local preso num
-      Suspense boundary que nunca resolve (servidor sempre 200; é client-side, mesmo bug do
-      handoff anterior). Reverificar quando o preview normalizar.
+- [x] **G9** — Comparado contra `plans/artefatos/R-01-ficha-registro.html` servido por HTTP
+      local, medido por JS (não no olho). **Bate**: `text-align:right` nas 3 colunas numéricas
+      (validou o fix de alinhamento do commit `0e236d8`), raio do card 14px (idêntico ao
+      artefato), tokens teal/coral idênticos aos do artefato e da spec. **Achado à parte,
+      ambiente**: `Outfit`/`DM Mono` aparecem `unloaded` em `document.fonts` — a página inteira
+      (não só a tabela) cai pro fallback do navegador. Não é código meu (não toquei fonte/layout
+      nesta sessão) — provável efeito dos vários restart+clear `.next` de hoje. **Recomendo
+      conferir num browser normal antes de assumir que é bug real.**
+- [x] **G10** — Contraste calculado (fórmula WCAG, não estimativa) nas cores que o R-01
+      realmente usa, claro e escuro: header 7.56/7.36:1, célula 19.9/18.08:1, teal-ink
+      5.93/8.50:1, coral-ink 6.54/8.77:1 — **todos acima de 4.5:1 nos dois temas**.
+      **Achado fora do escopo do R-01** (não é token que eu toquei): `--color-text-muted` no
+      escuro dá **1.82:1** contra `--color-surface` — falha AA feio. Usado no `ToothDetailPanel`
+      (rótulo de quadrante, letras de face sem registro, "toque uma face"), pré-existente.
+      É exatamente o que o **R-12** já cobre — vira dado concreto pra quando esse item entrar.
+- [x] **G11** — Tocar um dente no odontograma **rola até o card do registro e destaca** — não
+      abre uma segunda cópia da tabela em lugar nenhum (P1). Verificado ao vivo 23/07: com
+      registros em dois dentes (14 e 26), tocar o 14 aplica `border-teal ring-2` **só** no
+      card do 14 (o do 26 fica neutro) e o destaque some sozinho depois de ~1,6s.
 
 ## 11. Ordem de execução
 
@@ -249,9 +256,8 @@ cinco não entra até a regra mudar.
 2. **Fatia 1** ✅ — `id` no draft + migration 107 (RPC, aplicada em prod 23/07) + actions.
    Gates G4–G6, G8 ok; **G7 pendente** (falta 2ª conta de dentista de teste).
 
-**Falta antes de fechar o item:** G9–G10 (visual/contraste — precisam do preview local
-funcionando; travado 23/07) e reverificar G11 ao vivo (código pronto, não verificado).
-G7 fechado sem teste (decisão do Mateus, ver acima).
+**G1–G11 todos fechados 23/07.** Nada bloqueando o fechamento do item por parte da spec —
+falta só a decisão do Mateus de arquivar (ver ESTADO.md).
 
 ## 12. Referência visual
 

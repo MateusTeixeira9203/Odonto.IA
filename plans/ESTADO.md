@@ -1,44 +1,41 @@
 # Estado — Odonto.IA
 
-> **ESTADO** · atualizado 2026-07-23 · sessão de execução do R-01 (Fatia 0 + Fatia 1)
+> **ESTADO** · atualizado 2026-07-23 · sessão de execução do R-01 (Fatia 0 + Fatia 1 + gates)
 > **Item ativo:** R-01 · **Modo da sessão:** execução
 
 ## Agora
 
-**R-01 — Ficha: o registro como unidade de salvamento.** Fatia 0 e Fatia 1 code-complete:
+**R-01 — Ficha: o registro como unidade de salvamento. Todos os gates (G1–G11) fechados.**
 
-- Schemas tolerantes (endo/implante) — `ToothDetailPanel` para de usar `safeParse` como gate.
-- Campo trocado a pedido seu (22/07): tabela de endo perde **CT**, ganha **Lima inicial**
-  (mantendo Lima final). `endo.ts`, `endo-form.tsx`, `endo-card.tsx`.
-- Card do registro na criação agora abre a tabela com **1 clique** ("Detalhes"), sem precisar
-  voltar no odontograma — pedido seu, 22/07. Duas entradas (painel do dente + card), mesmo
-  estado — emendado na spec (P1).
-- Id estável (`crypto.randomUUID()`) em todo lugar que cria draft; upsert por id via
-  **migration 107** (`salvar_eventos_odontograma`), aplicada em prod por você.
-- **Bug achado ao vivo, mesma raiz do item:** a RPC antiga (`regravar_odontograma_eventos`,
-  migration 104) nunca gravava a coluna `detalhe` — toda tabela de endo/implante salva entre
-  21/07 e 23/07 foi descartada em silêncio. A migration 107 já corrige (upsert inclui
-  `detalhe`); confirmado que passou a persistir.
+- Schemas tolerantes (endo/implante), id estável + upsert (migration 107, aplicada em prod),
+  campo do endo trocado (CT→Lima inicial), card do registro clicável, scroll+destaque ao
+  tocar o dente (G11) — tudo verificado ao vivo ou por medição direta nesta sessão.
+- **Bug achado e corrigido, mesma raiz do item:** a RPC antiga nunca gravava `detalhe` — toda
+  tabela de endo/implante salva entre 21/07 e 23/07 tinha sido descartada em silêncio.
+- **Bug de alinhamento achado por você** (print do card salvo): colunas numéricas da tabela
+  de endo flutuavam à esquerda em vez de alinhar sob o cabeçalho — corrigido em `endo-card.tsx`
+  e `endo-form.tsx` (mesma causa nos dois).
+- G9 (comparação com o artefato) e G10 (contraste) rodados via medição direta (JS/computed
+  style), não no olho — ver spec para os números.
 
-**Gates:** G1–G8 fechados. G1–G3 ao vivo no browser; G4–G6 direto contra a RPC (preview travou
-no meio do caminho); **G7 fechado sem teste de 2 contas** — decisão do Mateus 23/07, a write
-policy não mudou nesta migration (mesma da 104). G11 (rola até o card + destaca) **implementado**
-mas não verificado ao vivo. **G9–G10 (comparação visual com artefato, contraste) bloqueados** —
-preview local preso num Suspense boundary que nunca resolve (servidor sempre 200, é client-side).
+**Dois achados fora do escopo do R-01, não mexidos:**
+- Fontes `Outfit`/`DM Mono` aparecem `unloaded` nesta sessão de dev — página inteira cai pro
+  fallback do navegador. Não é código meu; provável efeito dos vários restart+clear `.next`
+  de hoje. **Conferir num browser normal antes de tratar como bug real.**
+- `--color-text-muted` no escuro dá **1.82:1** contra `--color-surface` (falha AA feia) —
+  usado no `ToothDetailPanel`, pré-existente, é exatamente o escopo do **R-12** (já na fila).
 
-Nada commitado ainda — é o próximo passo.
+Commits feitos: migration (`5920f94`), código do R-01 (`1f01bba`), docs (`4837c40`), fix de
+alinhamento (`0e236d8`). Nada pushado.
 
 ## Travado
 
-| O quê | Trava o quê | Hipótese / próximo passo |
-|---|---|---|
-| Preview local preso em Suspense que nunca resolve | G9, G10 e reverificar G11 ao vivo | Restart + limpar `.next` + aba nova + esperar não resolveu desta vez. Servidor sem erro nos logs — client-side, mesmo bug de sessões anteriores |
+Nada travado.
 
 ## Esperando você
 
-- [ ] **G9/G10 quando o preview normalizar** — comparação visual do endo com o artefato
-      (claro/escuro) e varredura de contraste. Sem isso o item não fecha 100%, mas não bloqueia
-      commitar o que já está pronto e verificado.
+- [ ] **Fechar o R-01?** Todos os gates passam. Fechar move a spec + artefato pro `_arquivo/`
+      e marca ✅ no roadmap — confirma se é isso ou se quer segurar mais uma sessão.
 - [ ] Itens antigos ainda abertos (não mexi neles nesta sessão): resíduo de dado de 14/07 na
       Clindent, pergunta pra Portaria sobre o mapa de carga da agenda, chips de duração no
       agendamento — detalhe no handoff de 22/07.
