@@ -180,5 +180,10 @@ export interface OdontogramaEventoInput {
  * da consulta, editável na confirmação; null em indicado/pré-existente sem data.
  */
 export interface OdontogramaEventoDraft extends OdontogramaEventoInput {
+  /**
+   * uuid gerado no cliente (`crypto.randomUUID()`) na criação do registro (R-01).
+   * Estável: sobrevive a re-render, a save e a reload. Nunca renumerado.
+   */
+  id: string;
   realizado_em: string | null;
 }

@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import { useCapturaLivre } from '@/hooks/useCapturaLivre';
 import { useDexGuide } from '@/hooks/useDexGuide';
 import { DexAvatar } from '@/components/ui/dex-avatar';
-import { salvarFichaConsulta, iniciarAtendimentoConsulta, regravarEventosOdontograma } from '../actions';
+import { salvarFichaConsulta, iniciarAtendimentoConsulta, salvarEventosOdontograma } from '../actions';
 import { ConsultaAssinaturaModal } from './consulta-assinatura-modal';
 import { EmitirDocumentoModal } from '@/components/pacientes/EmitirDocumentoModal';
 import { ApresentarPaciente } from '@/components/pacientes/ApresentarPaciente';
@@ -250,6 +250,7 @@ export function ConsultaClient({
       setEventosDraft(
         (data.odontograma_eventos ?? []).map((ev) => ({
           ...ev,
+          id: crypto.randomUUID(), // R-01 — id estável nasce aqui, na entrada do rascunho
           realizado_em: ev.status === 'realizado' && ev.origem === 'clinica' ? dataProcedimento : null,
         })),
       );
@@ -375,7 +376,7 @@ export function ConsultaClient({
     // exatamente o silêncio que o item 0.3 existe pra eliminar.
     let res: { ok: boolean; error?: string };
     try {
-      res = await regravarEventosOdontograma({
+      res = await salvarEventosOdontograma({
         fichaId:    savedFichaId,
         pacienteId: paciente.id,
         eventos:    eventosPendentes,

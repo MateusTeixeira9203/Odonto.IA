@@ -35,8 +35,8 @@ export function EndoCard({ valor }: PluginCardProps<EndoDetalhe>) {
               <th className="text-left text-[9px] font-bold uppercase tracking-wider text-text-secondary pb-1.5 pr-2">Canal</th>
               <th className="text-left text-[9px] font-bold uppercase tracking-wider text-text-secondary pb-1.5 pr-2">Referência</th>
               <th className="text-right text-[9px] font-bold uppercase tracking-wider text-text-secondary pb-1.5 pr-2">Raiz</th>
-              <th className="text-right text-[9px] font-bold uppercase tracking-wider text-text-secondary pb-1.5 pr-2">CT</th>
-              <th className="text-right text-[9px] font-bold uppercase tracking-wider text-text-secondary pb-1.5">Lima</th>
+              <th className="text-right text-[9px] font-bold uppercase tracking-wider text-text-secondary pb-1.5 pr-2">Lima inicial</th>
+              <th className="text-right text-[9px] font-bold uppercase tracking-wider text-text-secondary pb-1.5">Lima final</th>
             </tr>
           </thead>
           <tbody>
@@ -45,7 +45,7 @@ export function EndoCard({ valor }: PluginCardProps<EndoDetalhe>) {
                 <td className="py-1.5 pr-2 font-semibold text-text-primary">{c.nome || '—'}</td>
                 <td className="py-1.5 pr-2 text-text-secondary">{c.referencia ?? '—'}</td>
                 <td className="py-1.5 pr-2"><Cel valor={c.comprimentoRaiz} /></td>
-                <td className="py-1.5 pr-2"><Cel valor={c.ct} destaque /></td>
+                <td className="py-1.5 pr-2"><Cel valor={c.limaInicial} /></td>
                 <td className="py-1.5"><Cel valor={c.limaFinal} /></td>
               </tr>
             ))}

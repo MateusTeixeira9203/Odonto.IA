@@ -40,17 +40,19 @@ import { formatarDataFicha } from '@/lib/format-data-ficha';
 import { CapturaLivreCard } from '@/components/fichas/captura-livre-card';
 import { OrtoCard } from '@/components/fichas/orto-card';
 import { RegistroCard, type RegistroCardData } from '@/components/fichas/registro-card';
-import { endoDetalheSchema } from '@/lib/especialidades/endo';
+import { endoDetalheSchema, type EndoDetalhe } from '@/lib/especialidades/endo';
 import { EndoCard } from '@/components/fichas/endo-card';
-import { implanteDetalheSchema } from '@/lib/especialidades/implante';
+import { EndoForm } from '@/components/fichas/endo-form';
+import { implanteDetalheSchema, type ImplanteDetalhe } from '@/lib/especialidades/implante';
 import { ImplanteCard } from '@/components/fichas/implante-card';
+import { ImplanteForm } from '@/components/fichas/implante-form';
 import { TIPO_LABEL } from '@/types/odontograma';
 import type {
   OrtoManutencaoInfo, OdontogramaEventoDraft,
   TipoRegistroOdontograma, StatusRegistro, OrigemRegistro, AncoraClinica,
   NivelAncora, Arcada, FaceDental,
 } from '@/types/odontograma';
-import { regravarEventosOdontograma, alternarStatusRegistro } from '@/app/consulta/[agendamentoId]/actions';
+import { salvarEventosOdontograma, alternarStatusRegistro } from '@/app/consulta/[agendamentoId]/actions';
 import type { EvolucaoFormatada } from '@/app/api/dex/formatar-evolucao/route';
 const SignaturePad = dynamic(
   () => import('@/components/fichas/SignaturePad').then(m => m.SignaturePad),
@@ -292,6 +294,7 @@ function eventosParaCards(
 /** EventoView (salvo) -> Draft: o shape que Odontograma/ToothDetailPanel consomem. */
 function eventoViewParaDraft(e: EventoView): OdontogramaEventoDraft {
   return {
+    id: e.id, // já existe no banco — o draft de EDIÇÃO reusa o id, nunca gera outro (R-01)
     tipo: e.tipo, status: e.status, origem: e.origem, ancora: e.ancora,
     grupo_id: e.grupoId, papel_no_grupo: null, observacao: e.observacao ?? '',
     detalhe: e.detalhe, realizado_em: e.realizadoEm,
@@ -391,7 +394,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, patientName, canWr
 
   // Eventos de odontograma propostos pelo "Organizar com Dex" (camada 2). Só o campo
   // mágico os preenche na ficha rápida; persistem no save via a RPC atômica da consulta
-  // (regravarEventosOdontograma). Vazio = save não toca a tabela de eventos (edição sem
+  // (salvarEventosOdontograma). Vazio = save não toca a tabela de eventos (edição sem
   // reorganizar preserva os eventos existentes — a action no-opa em lista vazia).
   const [eventosDraft, setEventosDraft] = React.useState<OdontogramaEventoDraft[]>([]);
 
@@ -400,6 +403,12 @@ export function FichasTab({ patientId, clinicaId, dentistaId, patientName, canWr
 
   // Perfil do dente na ficha SALVA (readOnly) — um por vez, preso à ficha dona.
   const [denteSalvoAberto, setDenteSalvoAberto] = React.useState<{ fichaId: string; dente: number } | null>(null);
+  // Tabela de especialidade aberta direto no card do registro (rascunho) — um por vez,
+  // sem precisar reabrir o dente no odontograma (feedback 22/07).
+  const [grupoDetalheAberto, setGrupoDetalheAberto] = React.useState<string | null>(null);
+  // G11 — tocar um dente rola até o card do registro correspondente e destaca (some sozinho).
+  const registroCardRefs = React.useRef<Map<string, HTMLDivElement>>(new Map());
+  const [grupoDestacado, setGrupoDestacado] = React.useState<string | null>(null);
   // Dente aberto na FICHA SALVA (leitura) — estado separado do de criação, sempre readOnly.
 
   /**
@@ -425,6 +434,22 @@ export function FichasTab({ patientId, clinicaId, dentistaId, patientName, canWr
       .sort((a, b) => (eventosDraft[a.idxs[0]].ancora.dente ?? 99) - (eventosDraft[b.idxs[0]].ancora.dente ?? 99));
   }, [eventosDraft]);
 
+  /**
+   * G11 — abre o painel do dente (como sempre) E rola até o card do registro correspondente,
+   * destacando por 1,6s. Não abre tabela nenhuma sozinho — só direciona a atenção (P1: o
+   * corpo da especialidade só aparece se o usuário tocar "Detalhes" em uma das duas entradas).
+   */
+  const abrirDenteEDestacarRegistro = React.useCallback((dente: number | null) => {
+    setDenteAberto(dente);
+    if (dente == null) return;
+    const grupo = gruposDraft.find(({ idxs }) => idxs.some((i) => eventosDraft[i].ancora.dente === dente));
+    if (!grupo) return;
+    const el = registroCardRefs.current.get(grupo.chave);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setGrupoDestacado(grupo.chave);
+    window.setTimeout(() => setGrupoDestacado((cur) => (cur === grupo.chave ? null : cur)), 1600);
+  }, [gruposDraft, eventosDraft]);
+
   /** Observação por procedimento (§03 do definitivo) — aplica a todo o grupo. */
   const atualizarObsGrupo = (idxs: number[], obs: string) => {
     setEventosDraft((prev) => prev.map((ev, i) => (idxs.includes(i) ? { ...ev, observacao: obs } : ev)));
@@ -433,6 +458,11 @@ export function FichasTab({ patientId, clinicaId, dentistaId, patientName, canWr
   /** Remove o registro (grupo inteiro) do rascunho antes de salvar. */
   const removerGrupoDraft = (idxs: number[]) => {
     setEventosDraft((prev) => prev.filter((_, i) => !idxs.includes(i)));
+  };
+
+  /** Atualiza o `detalhe` (tabela de especialidade) de UM evento do rascunho por índice. */
+  const atualizarDetalheDraft = (idx: number, detalhe: unknown) => {
+    setEventosDraft((prev) => prev.map((ev, i) => (i === idx ? { ...ev, detalhe } : ev)));
   };
 
   // Busca fichas do Supabase
@@ -566,6 +596,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, patientName, canWr
     setEventosDraft(
       (data.odontograma_eventos ?? []).map((ev) => ({
         ...ev,
+        id: crypto.randomUUID(), // R-01 — id estável nasce aqui, na entrada do rascunho
         realizado_em: ev.status === 'realizado' && ev.origem === 'clinica' ? formData.dataAtendimento : null,
       })),
     );
@@ -683,11 +714,12 @@ export function FichasTab({ patientId, clinicaId, dentistaId, patientName, canWr
       }
 
       // Camada 2 (Roadmap A / A0): persiste os eventos do odontograma via a RPC atômica
-      // da consulta — idempotente, respeita autoria e imutabilidade da ficha assinada
-      // (migration 104). Fail-soft: a ficha JÁ foi salva; se os eventos falharem, avisa
-      // mas não desfaz. Lista vazia (edição sem reorganizar) = a action no-opa, preserva.
+      // da consulta — upsert por id, idempotente, respeita autoria e imutabilidade da
+      // ficha assinada (migration 107, R-01). Fail-soft: a ficha JÁ foi salva; se os
+      // eventos falharem, avisa mas não desfaz. Lista vazia (edição sem reorganizar) =
+      // a action no-opa, preserva.
       if (eventosDraft.length > 0) {
-        const res = await regravarEventosOdontograma({ fichaId, pacienteId: patientId, eventos: eventosDraft });
+        const res = await salvarEventosOdontograma({ fichaId, pacienteId: patientId, eventos: eventosDraft });
         if (!res.ok) toast.error(res.error ?? "A ficha salvou, mas o odontograma não foi gravado.");
       }
 
@@ -935,7 +967,7 @@ export function FichasTab({ patientId, clinicaId, dentistaId, patientName, canWr
                     selectedTeeth={selectedTeeth}
                     sharedTeeth={sharedTeeth}
                     historicalTeeth={editingId ? historicalTeeth : new Set<number>()}
-                    onToothToggle={setDenteAberto}
+                    onToothToggle={abrirDenteEDestacarRegistro}
                     hideFilters
                   />
                   <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-border/40">
@@ -1003,8 +1035,22 @@ export function FichasTab({ patientId, clinicaId, dentistaId, patientName, canWr
                       ? (ev.ancora.arcada ? `arcada ${ev.ancora.arcada}` : ev.ancora.quadrante ? `quadrante ${ev.ancora.quadrante}` : 'boca')
                       : dentes.length === 1 ? `dente ${dentes[0]}` : `dentes ${dentes.join(' · ')}`;
                     const feito = ev.status === 'realizado';
+                    // Só registro de UM evento tem tabela de especialidade — grupo multi-dente
+                    // não tem "o" detalhe pra editar (mesma regra do ToothDetailPanel).
+                    const temDetalhe = idxs.length === 1 && (ev.tipo === 'endodontia' || ev.tipo === 'implante');
+                    const detalheAberto = temDetalhe && grupoDetalheAberto === chave;
+                    const destacado = grupoDestacado === chave;
                     return (
-                      <div key={chave} className="bg-surface border border-dashed border-border rounded-xl overflow-hidden">
+                      <div
+                        key={chave}
+                        ref={(el) => {
+                          if (el) registroCardRefs.current.set(chave, el);
+                          else registroCardRefs.current.delete(chave);
+                        }}
+                        className={`bg-surface border rounded-xl overflow-hidden transition-shadow duration-300 ${
+                          destacado ? 'border-teal ring-2 ring-teal/40' : 'border-dashed border-border'
+                        }`}
+                      >
                         <div className="flex items-center gap-3 px-4 py-3 flex-wrap">
                           <span className="shrink-0 min-w-[30px] h-[30px] px-2 rounded-lg bg-surface-alt border border-border flex items-center justify-center font-mono text-xs font-bold text-text-primary">
                             {dentes.length === 1 ? dentes[0] : dentes.length > 1 ? `${dentes.length}×` : '—'}
@@ -1020,6 +1066,16 @@ export function FichasTab({ patientId, clinicaId, dentistaId, patientName, canWr
                             <span className={`w-1.5 h-1.5 rounded-full ${feito ? 'bg-teal' : 'bg-coral'}`} />
                             {feito ? 'Realizado' : 'Planejado'}
                           </span>
+                          {temDetalhe && (
+                            <button
+                              type="button"
+                              onClick={() => setGrupoDetalheAberto(detalheAberto ? null : chave)}
+                              className="flex items-center gap-0.5 shrink-0 text-[10.5px] font-bold text-teal-ink outline-none focus-visible:ring-1 focus-visible:ring-teal rounded px-1"
+                            >
+                              Detalhes
+                              <ChevronRight className={`w-3 h-3 transition-transform ${detalheAberto ? 'rotate-90' : ''}`} />
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => removerGrupoDraft(idxs)}
@@ -1039,6 +1095,22 @@ export function FichasTab({ patientId, clinicaId, dentistaId, patientName, canWr
                             className="flex-1 bg-surface-alt border border-dashed border-border rounded-lg px-3 py-1.5 text-xs italic text-text-primary outline-none focus:border-teal transition-colors"
                           />
                         </div>
+                        {detalheAberto && (
+                          <div className="px-4 pb-3 pt-1 border-t border-border/60 bg-surface-alt/40">
+                            {ev.tipo === 'endodontia' && (
+                              <EndoForm
+                                valor={(ev.detalhe ?? null) as EndoDetalhe | null}
+                                onChange={(v) => atualizarDetalheDraft(idxs[0], v)}
+                              />
+                            )}
+                            {ev.tipo === 'implante' && (
+                              <ImplanteForm
+                                valor={(ev.detalhe ?? null) as ImplanteDetalhe | null}
+                                onChange={(v) => atualizarDetalheDraft(idxs[0], v)}
+                              />
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })

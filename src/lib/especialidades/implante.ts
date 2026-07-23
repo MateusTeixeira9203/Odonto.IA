@@ -13,14 +13,14 @@ import { ImplanteForm } from '@/components/fichas/implante-form';
 import { ImplanteCard } from '@/components/fichas/implante-card';
 
 export const implanteDetalheSchema = z.object({
-  marca:       z.string().trim().min(1).max(40).nullable(),   // "Straumann", "Neodent"
-  linha:       z.string().trim().min(1).max(40).nullable(),   // "BLT", "Grand Morse"
-  diametro:    z.number().min(1).max(9).nullable(),           // mm — 4.1
-  comprimento: z.number().min(4).max(25).nullable(),          // mm — 10
+  marca:       z.string().trim().max(40).nullable(),          // "Straumann", "Neodent"
+  linha:       z.string().trim().max(40).nullable(),          // "BLT", "Grand Morse"
+  diametro:    z.number().min(0).max(9).nullable(),           // mm — 4.1 (min saiu, R-01)
+  comprimento: z.number().min(0).max(25).nullable(),          // mm — 10 (min(4) resetava ao digitar "10")
   plataforma:  z.enum(['cone_morse', 'hexagono_externo', 'hexagono_interno', 'outro']).nullable(),
   torque:      z.number().min(0).max(80).nullable(),          // Ncm de inserção
   carga:       z.enum(['imediata', 'precoce', 'tardia']).nullable(),
-  lote:        z.string().trim().min(1).max(40).nullable(),
+  lote:        z.string().trim().max(40).nullable(),
 });
 export type ImplanteDetalhe = z.infer<typeof implanteDetalheSchema>;
 

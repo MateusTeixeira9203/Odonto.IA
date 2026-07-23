@@ -19,7 +19,7 @@ import type { PluginFormProps } from '@/lib/especialidades/plugin';
 import type { CanalDetalhe, EndoDetalhe } from '@/lib/especialidades/endo';
 
 const CANAL_VAZIO: CanalDetalhe = {
-  nome: '', referencia: null, comprimentoRaiz: null, ct: null, limaFinal: null,
+  nome: '', referencia: null, comprimentoRaiz: null, limaInicial: null, limaFinal: null,
 };
 
 const VAZIO: EndoDetalhe = { canais: [{ ...CANAL_VAZIO, nome: 'Único' }], obturacao: null, cimento: null };
@@ -36,7 +36,7 @@ const limparNum = (s: string): number | null => (s.trim() === '' ? null : Number
  * informação — "isto não foi ditado" — e é o que o artefato marca em coral tracejado.
  */
 function linhaTemDado(c: CanalDetalhe): boolean {
-  return c.referencia != null || c.comprimentoRaiz != null || c.ct != null || c.limaFinal != null;
+  return c.referencia != null || c.comprimentoRaiz != null || c.limaInicial != null || c.limaFinal != null;
 }
 
 export function EndoForm({ valor, onChange, readOnly }: PluginFormProps<EndoDetalhe>) {
@@ -77,7 +77,7 @@ export function EndoForm({ valor, onChange, readOnly }: PluginFormProps<EndoDeta
               <th className={`${th} text-left pr-2`}>Canal</th>
               <th className={`${th} text-left pr-2`}>Referência</th>
               <th className={`${th} text-right pr-2`}>Raiz (mm)</th>
-              <th className={`${th} text-right pr-2`}>CT (mm)</th>
+              <th className={`${th} text-right pr-2`}>Lima inicial</th>
               <th className={`${th} text-right`}>Lima final</th>
               {!readOnly && <th className="w-7" />}
             </tr>
@@ -119,13 +119,10 @@ export function EndoForm({ valor, onChange, readOnly }: PluginFormProps<EndoDeta
                   </td>
                   <td className="py-1.5 pr-2">
                     <input
-                      type="number" step="0.5" inputMode="decimal"
-                      className={num(parcial && c.ct == null, true)}
-                      // Sugestão raiz−1mm fica só no placeholder: nunca preenche sozinha (I5).
-                      placeholder={c.comprimentoRaiz != null ? String(c.comprimentoRaiz - 1) : '—'}
-                      disabled={readOnly} value={c.ct ?? ''}
-                      onChange={(e) => setCanal(i, { ct: limparNum(e.target.value) })}
-                      aria-label={`Comprimento de trabalho do canal ${i + 1}`}
+                      className={num(parcial && c.limaInicial == null)}
+                      placeholder="#15" disabled={readOnly} value={c.limaInicial ?? ''}
+                      onChange={(e) => setCanal(i, { limaInicial: limparTexto(e.target.value) })}
+                      aria-label={`Lima inicial do canal ${i + 1}`}
                     />
                   </td>
                   <td className="py-1.5">

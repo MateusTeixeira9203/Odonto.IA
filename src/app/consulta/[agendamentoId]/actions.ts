@@ -9,7 +9,7 @@ import type { OdontogramaEventoDraft } from '@/types/odontograma';
 
 /**
  * Monta as linhas de `odontograma_eventos` a partir dos drafts revisados pelo dentista.
- * Extraído pra ser reusado pelo save inicial E pelo retry (`regravarEventosOdontograma`) —
+ * Extraído pra ser reusado pelo save inicial E pelo retry (`salvarEventosOdontograma`) —
  * a data clínica e as âncoras precisam ser idênticas nos dois caminhos.
  */
 function montarRowsEventos(
@@ -18,6 +18,7 @@ function montarRowsEventos(
 ) {
   const hoje = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
   return eventos.map((ev) => ({
+    id:             ev.id, // id estável gerado no client (R-01) — upsert por id, nunca renumera
     clinica_id:     ctx.clinicId,
     paciente_id:    ctx.pacienteId,
     dentista_id:    ctx.dentistaId,
@@ -60,7 +61,7 @@ export async function salvarFichaConsulta(params: {
   odontograma_eventos?: OdontogramaEventoDraft[];
   /**
    * `eventosFalharam` sinaliza que a ficha salvou mas o event-log do odontograma NÃO —
-   * o chamador mostra aviso não-bloqueante + retry (`regravarEventosOdontograma`).
+   * o chamador mostra aviso não-bloqueante + retry (`salvarEventosOdontograma`).
    */
 }): Promise<{ fichaId?: string; error?: string; eventosFalharam?: boolean }> {
   const { supabase, user, clinicId, role } = await requireClinicContext();
@@ -151,11 +152,12 @@ export async function salvarFichaConsulta(params: {
 }
 
 /**
- * Retry do event-log do odontograma quando o insert do save falhou (fail-soft — ver
- * `salvarFichaConsulta`). Idempotente por ficha: apaga os eventos já gravados daquela
- * ficha antes de reinserir, pra um retry após sucesso parcial não duplicar o desenho.
+ * Salva o event-log do odontograma — retry do save inicial (fail-soft, ver
+ * `salvarFichaConsulta`) E caminho único de save da ficha rápida (FichasTab).
+ * Upsert por id (migration 107, R-01): registro que saiu do rascunho é apagado,
+ * os demais são atualizados no lugar mantendo o id — nunca renumera.
  */
-export async function regravarEventosOdontograma(params: {
+export async function salvarEventosOdontograma(params: {
   fichaId:    string;
   pacienteId: string;
   eventos:    OdontogramaEventoDraft[];
@@ -193,11 +195,11 @@ export async function regravarEventosOdontograma(params: {
     fichaId:    params.fichaId,
   });
 
-  // RPC atômica (migration 104): lock da ficha + delete + insert no mesmo
+  // RPC atômica (migration 107): lock da ficha + upsert por id no mesmo
   // statement — serializa retries concorrentes (2 abas) e reforça no servidor
   // que ficha assinada é imutável (invariante #14), mesmo que a UI já esconda
   // o botão nesse caso.
-  const { error } = await supabase.rpc('regravar_odontograma_eventos', {
+  const { error } = await supabase.rpc('salvar_eventos_odontograma', {
     p_ficha_id:    params.fichaId,
     p_clinica_id:  clinicId,
     p_paciente_id: params.pacienteId,
@@ -208,8 +210,8 @@ export async function regravarEventosOdontograma(params: {
     if (error.message.includes('ficha_assinada')) {
       return { ok: false, error: 'Esta ficha já foi assinada e não pode mais ser alterada.' };
     }
-    console.error('[regravarEventosOdontograma]', error.message);
-    return { ok: false, error: 'Não foi possível regravar o odontograma.' };
+    console.error('[salvarEventosOdontograma]', error.message);
+    return { ok: false, error: 'Não foi possível salvar o odontograma.' };
   }
 
   revalidatePath(`/dashboard/pacientes/${params.pacienteId}`);

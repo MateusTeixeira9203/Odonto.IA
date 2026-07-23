@@ -24,9 +24,9 @@ import { ToothSVG, buildResumos, TOOTH_NAMES, getQuadrantLabel } from './Odontog
 // Detalhe de especialidade (migration 106) — resolvido por tipo CONCRETO, não pelo
 // registry apagado (o registry só lê metadados; Form/Card são invocados com o tipo
 // real, mesma convenção do orto em FichasTab).
-import { endoDetalheSchema } from '@/lib/especialidades/endo';
+import { endoDetalheSchema, type EndoDetalhe } from '@/lib/especialidades/endo';
 import { EndoForm } from '@/components/fichas/endo-form';
-import { implanteDetalheSchema } from '@/lib/especialidades/implante';
+import { implanteDetalheSchema, type ImplanteDetalhe } from '@/lib/especialidades/implante';
 import { ImplanteForm } from '@/components/fichas/implante-form';
 
 const FACES: FaceDental[] = ['V', 'M', 'O', 'D', 'L'];
@@ -132,6 +132,7 @@ export function ToothDetailPanel({
     status: StatusRegistro,
     ancora: AncoraClinica,
   ): OdontogramaEventoDraft => ({
+    id: crypto.randomUUID(),
     tipo,
     status,
     origem: 'clinica',
@@ -484,14 +485,14 @@ export function ToothDetailPanel({
                   <div className="pb-3 pl-4">
                     {ev.tipo === 'endodontia' && (
                       <EndoForm
-                        valor={endoDetalheSchema.safeParse(ev.detalhe).success ? (endoDetalheSchema.parse(ev.detalhe)) : null}
+                        valor={(ev.detalhe ?? null) as EndoDetalhe | null}
                         onChange={(v) => atualizarDetalhe(ev, v)}
                         readOnly={readOnly}
                       />
                     )}
                     {ev.tipo === 'implante' && (
                       <ImplanteForm
-                        valor={implanteDetalheSchema.safeParse(ev.detalhe).success ? (implanteDetalheSchema.parse(ev.detalhe)) : null}
+                        valor={(ev.detalhe ?? null) as ImplanteDetalhe | null}
                         onChange={(v) => atualizarDetalhe(ev, v)}
                         readOnly={readOnly}
                       />

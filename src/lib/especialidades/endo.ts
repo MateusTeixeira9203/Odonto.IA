@@ -5,8 +5,7 @@
 //
 // A tabela de odontometria (canal por canal) é o `detalhe` do evento tipo='endodontia'
 // (persistencia: 'evento-detalhe', coluna `odontograma_eventos.detalhe` jsonb — migration
-// 106). Campo não ditado fica null, nunca inferido (invariante I5) — CT sugerido não
-// preenche sozinho, é só um placeholder visual no form.
+// 106). Campo não ditado fica null, nunca inferido (invariante I5).
 
 import { z } from 'zod';
 import type { EspecialidadePlugin } from './plugin';
@@ -14,18 +13,18 @@ import { EndoForm } from '@/components/fichas/endo-form';
 import { EndoCard } from '@/components/fichas/endo-card';
 
 export const canalSchema = z.object({
-  nome:            z.string().trim().min(1).max(24),        // "MV", "DV", "P", "Único"
-  referencia:       z.string().trim().min(1).max(40).nullable(),
+  nome:            z.string().trim().max(24),               // "MV", "DV", "P", "Único" — vazio ok (R-01)
+  referencia:       z.string().trim().max(40).nullable(),
   comprimentoRaiz:  z.number().min(0).max(40).nullable(),    // mm
-  ct:               z.number().min(0).max(40).nullable(),    // comprimento de trabalho
-  limaFinal:        z.string().trim().min(1).max(8).nullable(), // "#35"
+  limaInicial:      z.string().trim().max(8).nullable(),     // "#15" — troca do CT (22/07)
+  limaFinal:        z.string().trim().max(8).nullable(),     // "#35"
 });
 export type CanalDetalhe = z.infer<typeof canalSchema>;
 
 export const endoDetalheSchema = z.object({
   canais:    z.array(canalSchema).min(1).max(6),
-  obturacao: z.string().trim().min(1).max(60).nullable(),  // "condensação lateral"
-  cimento:   z.string().trim().min(1).max(60).nullable(),  // "AH Plus"
+  obturacao: z.string().trim().max(60).nullable(),  // "condensação lateral"
+  cimento:   z.string().trim().max(60).nullable(),  // "AH Plus"
 });
 export type EndoDetalhe = z.infer<typeof endoDetalheSchema>;
 
