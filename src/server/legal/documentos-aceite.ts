@@ -1,3 +1,4 @@
+import { descricaoComComposicao, type ComponenteGrupoOrcamento } from '@/lib/orcamentos/grupos';
 import { Buffer } from 'buffer';
 import { gerarPDFDocumento } from '@/lib/pdf/documento';
 import { createServiceClient } from '@/lib/supabase/service';
@@ -53,7 +54,7 @@ type AssinaturaProcedimentos = {
 };
 
 type SnapshotOrcamento = {
-  itens?: Array<{ descricao?: string | null; quantidade?: number | null; precoTotal?: number | null }>;
+  itens?: Array<{ composicao?: ComponenteGrupoOrcamento[] | null; descricao?: string | null; quantidade?: number | null; precoTotal?: number | null }>;
   total?: number | null;
   condicoesPagamento?: string | null;
 };
@@ -246,7 +247,7 @@ export async function criarDocumentoAceiteOrcamento(input: {
 
   const snapshot = aceiteRaw.termos_snapshot;
   const itens = (snapshot.itens ?? []).map((item) => ({
-    descricao: item.descricao ?? 'Procedimento',
+    descricao: descricaoComComposicao(item.descricao ?? 'Procedimento', item.composicao),
     quantidade: item.quantidade ?? 1,
     precoTotal: item.precoTotal ?? 0,
   }));

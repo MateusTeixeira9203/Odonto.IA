@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import { composicaoGrupoSchema, observacaoAcordoSchema } from "@/lib/orcamentos/grupos";
 import { requireClinicContext } from "@/server/auth/clinic";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -54,6 +55,7 @@ const criarCobrancaEtapaSchema = z.object({
   desconto: z.number().finite().min(0).multipleOf(0.01),
   numeroParcelas: z.number().int().min(1).max(24),
   primeiroVencimento: z.string().date(),
+  observacoes: observacaoAcordoSchema,
 });
 const recebimentoCobrancaSchema = z.object({
   cobrancaId: z.string().uuid(),
@@ -660,6 +662,7 @@ const criarOrcamentoSchema = z.object({
     quantidade: z.number().int().min(1).max(99),
     precoUnitario: z.number().finite().min(0),
     eventoIds: z.array(z.string().uuid()).max(100).default([]),
+    composicao: composicaoGrupoSchema.nullable().optional(),
   })).min(1).max(100),
   dentistaId: z.string().uuid().optional(),
   /** Ficha de origem do orçamento — vincula orçamento↔ficha p/ a apresentação não vazar entre tratamentos. */
@@ -673,6 +676,10 @@ export async function criarOrcamento(dados: z.input<typeof criarOrcamentoSchema>
     return { error: 'Revise os itens e os valores do orçamento antes de salvar.' };
   }
   const entrada = parsed.data;
+  if (entrada.itens.some((item) => item.composicao) && (entrada.desconto ?? 0) > 0) {
+    return { error: 'Ajuste o preço de cada grupo ou conceda o desconto na cobrança da etapa.' };
+  }
+
   if (!entrada.fichaId || entrada.itens.some((item) => item.eventoIds.length === 0)) {
     return { error: 'Crie o orçamento a partir de uma ficha com procedimentos estruturados.' };
   }
@@ -706,7 +713,7 @@ export async function criarOrcamento(dados: z.input<typeof criarOrcamentoSchema>
   }
 
   const dentistaAlvoId = entrada.dentistaId ?? dentistaPerfil.id;
-  const { data: orcamentoId, error } = await supabase.rpc('criar_orcamento_com_eventos', {
+  const { data: orcamentoId, error } = await supabase.rpc(entrada.itens.some((item) => item.composicao) ? 'criar_orcamento_com_eventos_r157' : 'criar_orcamento_com_eventos', {
     p_paciente_id: entrada.pacienteId,
     p_dentista_id: dentistaAlvoId,
     p_ficha_id: entrada.fichaId ?? null,
@@ -717,6 +724,7 @@ export async function criarOrcamento(dados: z.input<typeof criarOrcamentoSchema>
       quantidade: item.quantidade,
       preco_unitario: item.precoUnitario,
       evento_ids: item.eventoIds,
+      composicao: item.composicao ?? null,
     })),
   });
 
@@ -804,6 +812,7 @@ export async function criarCobrancaEtapa(dados: {
   desconto: number;
   numeroParcelas: number;
   primeiroVencimento: string;
+  observacoes?: string;
 }): Promise<{ error?: string; id?: string }> {
   const parsed = criarCobrancaEtapaSchema.safeParse(dados);
   if (!parsed.success) return { error: 'Revise os procedimentos, o desconto e as parcelas da etapa.' };
@@ -816,6 +825,7 @@ export async function criarCobrancaEtapa(dados: {
     p_desconto: parsed.data.desconto,
     p_numero_parcelas: parsed.data.numeroParcelas,
     p_primeiro_vencimento: parsed.data.primeiroVencimento,
+    p_observacoes: parsed.data.observacoes || null,
   });
   if (error) return { error: erroFinanceiro(error.message) };
 
@@ -1010,6 +1020,7 @@ const adicionarItensAoOrcamentoSchema = z.object({
     quantidade: z.number().int().min(1).max(99),
     precoUnitario: z.number().finite().min(0),
     eventoIds: z.array(z.string().uuid()).max(100).default([]),
+    composicao: composicaoGrupoSchema.nullable().optional(),
   })).min(1).max(100),
 });
 
@@ -1034,7 +1045,7 @@ export async function adicionarItensAoOrcamento(
     .maybeSingle();
   if (!orcamento) return { error: 'Orçamento não encontrado.' };
 
-  const { data: valorAdicionado, error } = await supabase.rpc('adicionar_itens_orcamento_com_eventos', {
+  const { data: valorAdicionado, error } = await supabase.rpc(entrada.itens.some((item) => item.composicao) ? 'adicionar_itens_orcamento_com_eventos_r157' : 'adicionar_itens_orcamento_com_eventos', {
     p_orcamento_id: entrada.orcamentoId,
     p_itens: entrada.itens.map((item) => ({
       procedimento_id: item.procedimentoId,
@@ -1042,6 +1053,7 @@ export async function adicionarItensAoOrcamento(
       quantidade: item.quantidade,
       preco_unitario: item.precoUnitario,
       evento_ids: item.eventoIds,
+      composicao: item.composicao ?? null,
     })),
   });
 
@@ -1127,11 +1139,17 @@ export async function editarOrcamento(
   // é só-dono. RLS barrada devolve SUCESSO com 0 linhas, não erro — então o insert abaixo
   // rodava por cima dos itens que não saíram e a lista duplicava a cada save.
   // Provado em produção: 3 orçamentos da ClinDent com item repetido, o último em 15/08.
-  const { data: itensAntes } = await supabase
+  const { data: itensAntes, error: erroItensAntes } = await supabase
     .from("orcamento_itens")
-    .select("id, aprovado")
+    .select("id, aprovado, composicao")
     .eq("orcamento_id", orcamentoId)
     .eq("clinica_id", clinicId);
+
+  if (erroItensAntes) return { error: "Não foi possível conferir os itens. O orçamento foi preservado." };
+
+  if ((itensAntes ?? []).some((item) => item.composicao != null)) {
+    return { error: 'Este orçamento contém grupos com composição preservada. A edição da lista inteira não está disponível.' };
+  }
 
   // R-114 (I5) — editarOrcamento reescreve TUDO (apaga e reinsere); item novo sempre nasce
   // aprovado=false. Se algum item já era aprovado, esta edição apagaria a aprovação do

@@ -1,3 +1,4 @@
+import type { ComponenteGrupoOrcamento } from '@/lib/orcamentos/grupos';
 // Shared helpers e builders para export de prontuário e PDF de ficha
 
 import { formatarDataFicha } from './format-data-ficha';
@@ -340,6 +341,7 @@ export type OrcamentoHtmlData = {
   paciente: { nome: string; telefone: string | null } | null;
   dentista: { nome: string } | null;
   itens: Array<{
+    composicao?: ComponenteGrupoOrcamento[] | null;
     descricao: string | null;
     quantidade: number;
     preco_unitario: number | null;
@@ -604,8 +606,8 @@ export function buildOrcamentoHTML(o: OrcamentoHtmlData): string {
   const itensHtml = itensAprovados.map((item, idx) => `
     <div class="orc-item">
       <div class="orc-item-num">${idx + 1}</div>
-      <div class="orc-item-desc">${esc(item.descricao ?? '—')}${mostrarValor && item.quantidade > 1 ? `<div class="orc-item-qty">${item.quantidade} unid. × ${fmtMoney(item.preco_unitario)}</div>` : ''}</div>
-      ${mostrarValor ? `<div class="orc-item-price">${fmtMoney(item.preco_total)}</div>` : ''}
+      <div class="orc-item-desc">${esc(item.descricao ?? '—')}${item.composicao?.length ? `<ul>${item.composicao.map((membro) => `<li>${membro.quantidade} × ${esc(membro.descricao)}</li>`).join('')}</ul>` : ''}${mostrarValor && item.quantidade > 1 ? `<div class="orc-item-qty">${item.quantidade} unid. × ${fmtMoney(item.preco_unitario)}</div>` : ''}</div>
+      ${mostrarValor || item.composicao?.length ? `<div class="orc-item-price">${fmtMoney(item.preco_total)}</div>` : ''}
     </div>`).join('');
 
   const totalsHtml = `

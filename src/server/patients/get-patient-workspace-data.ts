@@ -1,3 +1,4 @@
+import type { ComponenteGrupoOrcamento } from '@/lib/orcamentos/grupos';
 import { createClient } from '@/lib/supabase/server';
 import type { ClinicRole } from '@/server/auth/clinic';
 import type { Paciente } from '@/types/database';
@@ -23,6 +24,7 @@ export type AgendamentoProximo = {
 };
 
 export type OrcamentoItem = {
+  composicao?: ComponenteGrupoOrcamento[] | null;
   id: string;
   descricao: string | null;
   preco_total: number | null;
@@ -46,6 +48,7 @@ export type Pagamento = {
 };
 
 export type CobrancaEtapa = {
+  observacoes?: string | null;
   id: string;
   subtotal: number;
   desconto: number;
@@ -147,7 +150,7 @@ export async function getPatientWorkspaceData({
           .from('orcamentos')
           .select(
             // R-114 — valor_acordado entra pro devido derivado (I1); itens ganham `aprovado`.
-            'id, status, total, valor_acordado, plano_forma, desconto, created_at, validade_dias, condicoes_pagamento, mostrar_valor_por_item, dentista_id, aprovado_em, aprovado_por:dentistas!orcamentos_aprovado_por_id_fkey(nome), itens:orcamento_itens(id, descricao, preco_total, quantidade, aprovado), pagamentos(id, cobranca_id, valor, status, forma_pagamento, data_pagamento, data_vencimento, parcela_numero, total_parcelas, marcado_por:dentistas!pagamentos_marcado_por_id_fkey(nome)), aceite:assinaturas!assinaturas_orcamento_id_fkey(id, assinado_por, cro_no_ato, assinatura_ref, assinado_em, termos_snapshot)'
+            'id, status, total, valor_acordado, plano_forma, desconto, created_at, validade_dias, condicoes_pagamento, mostrar_valor_por_item, dentista_id, aprovado_em, aprovado_por:dentistas!orcamentos_aprovado_por_id_fkey(nome), itens:orcamento_itens(id, descricao, preco_total, quantidade, aprovado, composicao), pagamentos(id, cobranca_id, valor, status, forma_pagamento, data_pagamento, data_vencimento, parcela_numero, total_parcelas, marcado_por:dentistas!pagamentos_marcado_por_id_fkey(nome)), aceite:assinaturas!assinaturas_orcamento_id_fkey(id, assinado_por, cro_no_ato, assinatura_ref, assinado_em, termos_snapshot)'
           )
           .eq('paciente_id', patientId)
           .eq('clinica_id', clinicId)
@@ -198,7 +201,7 @@ export async function getPatientWorkspaceData({
     const { data, error } = await supabase
       .from('orcamento_cobrancas')
       .select(
-        'id, orcamento_id, subtotal, desconto, valor_final, numero_parcelas, primeiro_vencimento, situacao, created_at, itens:orcamento_cobranca_itens!orcamento_cobranca_itens_cobranca_id_fkey(orcamento_item_id, preco_total_snapshot), pagamentos:pagamentos!pagamentos_cobranca_id_fkey(id, cobranca_id, valor, status, forma_pagamento, data_pagamento, data_vencimento, parcela_numero, total_parcelas, marcado_por:dentistas!pagamentos_marcado_por_id_fkey(nome))'
+        'id, orcamento_id, observacoes, subtotal, desconto, valor_final, numero_parcelas, primeiro_vencimento, situacao, created_at, itens:orcamento_cobranca_itens!orcamento_cobranca_itens_cobranca_id_fkey(orcamento_item_id, preco_total_snapshot), pagamentos:pagamentos!pagamentos_cobranca_id_fkey(id, cobranca_id, valor, status, forma_pagamento, data_pagamento, data_vencimento, parcela_numero, total_parcelas, marcado_por:dentistas!pagamentos_marcado_por_id_fkey(nome))'
       )
       .eq('clinica_id', clinicId)
       .in('orcamento_id', orcamentoIds);
