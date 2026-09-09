@@ -22,7 +22,7 @@
 
 | ID | Item | Estado |
 |---|---|---|
-| [**R-154**](specs/R-154-plano-tratamento-fluido.md) | **Plano de tratamento fluido no Meu Dia** — fila clínica completa, responsabilidade explícita e transição de status sem recarregar | 🔵 implementação local concluída; aguarda validação manual autenticada e auditoria final. |
+| [**R-154**](specs/R-154-plano-tratamento-fluido.md) | **Plano de tratamento fluido no Meu Dia** — fila clínica completa, responsabilidade explícita e transição de status sem recarregar | 🟡 incluído na versão publicada; validação manual autenticada e auditoria final ainda pendentes. |
 
 ## Publicado, aguardando validação dirigida
 
@@ -89,3 +89,8 @@
   operação necessária da secretária.
 - **R-36:** ✂️ substituído pela gestão colaborativa e cobrança individual.
 - **R-09:** ✂️ absorvido por R-49.
+
+## R-157 — Financeiro e orçamento por grupos
+
+🔵 ativo — [contrato](specs/R-157-financeiro-orcamento-por-grupos.md); candidato em preview,
+aguardando validação do usuário. Detalhes e evidências pertencem à spec e ao relatório.
