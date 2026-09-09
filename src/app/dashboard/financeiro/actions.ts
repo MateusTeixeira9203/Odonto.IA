@@ -5,6 +5,11 @@ import { requireClinicContext } from '@/server/auth/clinic';
 import { inserirNotificacao } from '@/lib/notificacoes';
 import { buildCsv } from '@/lib/export/csv';
 import { registrarPagamento, type FormaPagamento } from '@/app/dashboard/orcamentos/actions';
+import { horasLiquidasNoMes, janelaDoMes, mesBRT, mesesAte, ultimosDiasBRT, type TurnoClinico } from '@/lib/financeiro/calculos';
+import { dentistaFinanceiroSchema, despesaFinanceiroSchema, mesFinanceiroSchema, receitaFinanceiroSchema } from '@/lib/financeiro/schemas';
+import { cobrançasAtivasComSaldo } from '@/lib/financeiro/cobrancas';
+import { agregarFluxoFinanceiro } from '@/lib/financeiro/agregacao';
+import { deriveEstadoOrcamento } from '@/lib/orcamentos/estado';
 
 export type Despesa = {
   id: string;
@@ -98,20 +103,38 @@ export type PagamentoPendente = {
 
 const MES_PT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
-function mesWindow(mesISO: string): { inicio: string; fim: string; inicioDate: string; fimDate: string } {
-  const [y, m] = mesISO.split('-').map(Number);
-  const inicio = new Date(y, m - 1, 1);
-  const fim    = new Date(y, m,     1);
-  return {
-    inicio:     inicio.toISOString(),
-    fim:        fim.toISOString(),
-    inicioDate: inicio.toISOString().split('T')[0],
-    fimDate:    fim.toISOString().split('T')[0],
-  };
+function mesWindow(mesISO: string): { inicioDate: string; fimDate: string } {
+  const parsed = mesFinanceiroSchema.safeParse(mesISO);
+  if (!parsed.success) throw new Error('Mês inválido.');
+  const { inicio, fim } = janelaDoMes(parsed.data);
+  return { inicioDate: inicio, fimDate: fim };
 }
 
-export async function listarDespesas(mesISO: string): Promise<Despesa[]> {
-  const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
+async function resolverDentistaFiltro(
+  context: Awaited<ReturnType<typeof requireClinicContext>>,
+  dentistaFiltro?: string,
+): Promise<string | null> {
+  if (context.role !== 'secretaria') return context.dentistaId;
+  if (!dentistaFiltro) return null;
+  const parsed = dentistaFinanceiroSchema.safeParse(dentistaFiltro);
+  if (!parsed.success) throw new Error('Dentista selecionado inválido.');
+  const { data, error } = await context.supabase
+    .from('dentistas')
+    .select('id')
+    .eq('id', parsed.data)
+    .eq('clinica_id', context.clinicId)
+    .eq('ativo', true)
+    .in('role', ['admin', 'dentista'])
+    .maybeSingle();
+  if (error) throw new Error(`Falha ao validar dentista: ${error.message}`);
+  if (!data) throw new Error('Dentista selecionado não está ativo nesta clínica.');
+  return data.id;
+}
+
+export async function listarDespesas(mesISO: string, dentistaFiltro?: string): Promise<Despesa[]> {
+  const context = await requireClinicContext();
+  const { supabase, clinicId } = context;
+  const dentistaId = await resolverDentistaFiltro(context, dentistaFiltro);
 
   const { inicioDate, fimDate } = mesWindow(mesISO);
 
@@ -123,8 +146,7 @@ export async function listarDespesas(mesISO: string): Promise<Despesa[]> {
     .lt('data', fimDate)
     .order('data', { ascending: false });
 
-  // Admin e dentista têm escopo individual: veem apenas os próprios registros
-  if (role !== 'secretaria') {
+  if (dentistaId) {
     query = query.eq('dentista_id', dentistaId);
   }
 
@@ -133,11 +155,12 @@ export async function listarDespesas(mesISO: string): Promise<Despesa[]> {
   return (data ?? []) as Despesa[];
 }
 
-export async function calcularSaldoMes(mesISO: string): Promise<SaldoMes> {
-  const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
+export async function calcularSaldoMes(mesISO: string, dentistaFiltro?: string): Promise<SaldoMes> {
+  const context = await requireClinicContext();
+  const { supabase, clinicId } = context;
+  const dentistaId = await resolverDentistaFiltro(context, dentistaFiltro);
 
-  const { inicio, fim, inicioDate, fimDate } = mesWindow(mesISO);
-  const scopado = role !== 'secretaria';
+  const { inicioDate, fimDate } = mesWindow(mesISO);
 
   let despesasQuery = supabase
     .from('despesas')
@@ -165,7 +188,7 @@ export async function calcularSaldoMes(mesISO: string): Promise<SaldoMes> {
     .gte('data', inicioDate)
     .lt('data', fimDate);
 
-  if (scopado) {
+  if (dentistaId) {
     despesasQuery   = despesasQuery.eq('dentista_id', dentistaId);
     pagamentosQuery = pagamentosQuery.eq('dentista_id', dentistaId);
     receitasQuery   = receitasQuery.eq('dentista_id', dentistaId);
@@ -181,25 +204,21 @@ export async function calcularSaldoMes(mesISO: string): Promise<SaldoMes> {
     throw new Error(`Falha ao calcular saldo do mês: ${(errPag ?? errDesp ?? errRec)?.message}`);
   }
 
-  const receitaPagamentos = (pagamentos  ?? []).reduce((s, p) => s + Number(p.valor), 0);
-  const receitaManuais    = (receitasData ?? []).reduce((s, r) => s + Number(r.valor), 0);
-  const receita  = receitaPagamentos + receitaManuais;
-  const despesas = (despesasData ?? []).reduce((s, d) => s + Number(d.valor), 0);
-  return { receita, despesas, saldo: receita - despesas };
+  return agregarFluxoFinanceiro({
+    pagamentos: (pagamentos ?? []).map((pagamento) => ({ valor: Number(pagamento.valor), status: 'pago' })),
+    receitasManuais: (receitasData ?? []).map((receita) => ({ valor: Number(receita.valor) })),
+    despesas: (despesasData ?? []).map((despesa) => ({ valor: Number(despesa.valor) })),
+  });
 }
 
-export async function listarUltimos7Dias(): Promise<DayPoint[]> {
-  const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
+export async function listarUltimos7Dias(dentistaFiltro?: string): Promise<DayPoint[]> {
+  const context = await requireClinicContext();
+  const { supabase, clinicId } = context;
+  const dentistaId = await resolverDentistaFiltro(context, dentistaFiltro);
 
-  const now = new Date();
-  const dias: Date[] = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    dias.push(d);
-  }
-  const inicioDate = dias[0].toISOString().split('T')[0];
-  const scopado = role !== 'secretaria';
+  const dias = ultimosDiasBRT(7);
+  const inicioDate = dias[0]?.diaISO;
+  if (!inicioDate) return [];
 
   let despesas7Query = supabase
     .from('despesas')
@@ -215,42 +234,50 @@ export async function listarUltimos7Dias(): Promise<DayPoint[]> {
     .eq('status', 'pago')
     .gte('data_pagamento', inicioDate);
 
-  if (scopado) {
+  let receitasQuery = supabase
+    .from('receitas_manuais')
+    .select('valor, data')
+    .eq('clinica_id', clinicId)
+    .gte('data', inicioDate);
+
+  if (dentistaId) {
     despesas7Query  = despesas7Query.eq('dentista_id', dentistaId);
     pagamentosQuery = pagamentosQuery.eq('dentista_id', dentistaId);
+    receitasQuery = receitasQuery.eq('dentista_id', dentistaId);
   }
 
-  const [{ data: pagamentos, error: errPag }, { data: despesasData, error: errDesp }] = await Promise.all([
+  const [{ data: pagamentos, error: errPag }, { data: despesasData, error: errDesp }, { data: receitas, error: errRec }] = await Promise.all([
     pagamentosQuery,
     despesas7Query,
+    receitasQuery,
   ]);
-  if (errPag || errDesp) {
-    throw new Error(`Falha ao carregar últimos 7 dias: ${(errPag ?? errDesp)?.message}`);
+  if (errPag || errDesp || errRec) {
+    throw new Error(`Falha ao carregar últimos 7 dias: ${(errPag ?? errDesp ?? errRec)?.message}`);
   }
 
-  const DIAS_PT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-
-  return dias.map((d, i) => {
-    const diaISO = d.toISOString().split('T')[0];
-
-    const receita = (pagamentos ?? [])
-      .filter(p => (p.data_pagamento as string) === diaISO)
-      .reduce((s, p) => s + Number(p.valor), 0);
-
-    const despesas = (despesasData ?? [])
-      .filter(x => (x.data as string) === diaISO)
-      .reduce((s, x) => s + Number(x.valor), 0);
-
-    return { dia: i === 6 ? 'Hoje' : DIAS_PT[d.getDay()], diaISO, receita, despesas };
+  return dias.map(({ dia, diaISO }) => {
+    const fluxo = agregarFluxoFinanceiro({
+      pagamentos: (pagamentos ?? []).filter((pagamento) => pagamento.data_pagamento === diaISO)
+        .map((pagamento) => ({ valor: Number(pagamento.valor), status: 'pago' })),
+      receitasManuais: (receitas ?? []).filter((receita) => receita.data === diaISO)
+        .map((receita) => ({ valor: Number(receita.valor) })),
+      despesas: (despesasData ?? []).filter((despesa) => despesa.data === diaISO)
+        .map((despesa) => ({ valor: Number(despesa.valor) })),
+    });
+    return { dia, diaISO, receita: fluxo.receita, despesas: fluxo.despesas };
   });
 }
 
-export async function listarUltimosMeses(n = 6): Promise<ChartPoint[]> {
-  const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
+export async function listarUltimosMeses(n = 6, mesReferencia?: string, dentistaFiltro?: string): Promise<ChartPoint[]> {
+  const context = await requireClinicContext();
+  const { supabase, clinicId } = context;
+  const dentistaId = await resolverDentistaFiltro(context, dentistaFiltro);
+  if (!Number.isInteger(n) || n < 1 || n > 24) throw new Error('Janela de meses inválida.');
 
-  const now = new Date();
-  const inicioJanela = new Date(now.getFullYear(), now.getMonth() - n + 1, 1);
-  const scopado = role !== 'secretaria';
+  const referencia = mesReferencia ?? mesBRT();
+  const meses = mesesAte(referencia, n);
+  if (meses.length === 0) throw new Error('Mês inválido.');
+  const inicioJanela = `${meses[0]}-01`;
 
   // R-114 — regra única (I7): pagamento pago conta, sem condição por status do pai.
   let pagamentosQuery = supabase
@@ -258,42 +285,49 @@ export async function listarUltimosMeses(n = 6): Promise<ChartPoint[]> {
     .select('valor, data_pagamento')
     .eq('clinica_id', clinicId)
     .eq('status', 'pago')
-    .gte('data_pagamento', inicioJanela.toISOString().split('T')[0]);
+    .gte('data_pagamento', inicioJanela);
 
   let despesasQuery = supabase
     .from('despesas')
     .select('valor, data')
     .eq('clinica_id', clinicId)
-    .gte('data', inicioJanela.toISOString().split('T')[0]);
+    .gte('data', inicioJanela);
 
-  if (scopado) {
+  let receitasQuery = supabase
+    .from('receitas_manuais')
+    .select('valor, data')
+    .eq('clinica_id', clinicId)
+    .gte('data', inicioJanela);
+
+  if (dentistaId) {
     pagamentosQuery = pagamentosQuery.eq('dentista_id', dentistaId);
     despesasQuery   = despesasQuery.eq('dentista_id', dentistaId);
+    receitasQuery   = receitasQuery.eq('dentista_id', dentistaId);
   }
 
-  const [{ data: pagamentos, error: errPag }, { data: despesasData, error: errDesp }] = await Promise.all([
+  const [{ data: pagamentos, error: errPag }, { data: despesasData, error: errDesp }, { data: receitas, error: errRec }] = await Promise.all([
     pagamentosQuery,
     despesasQuery,
+    receitasQuery,
   ]);
-  if (errPag || errDesp) {
-    throw new Error(`Falha ao carregar últimos meses: ${(errPag ?? errDesp)?.message}`);
+  if (errPag || errDesp || errRec) {
+    throw new Error(`Falha ao carregar últimos meses: ${(errPag ?? errDesp ?? errRec)?.message}`);
   }
 
   const result: ChartPoint[] = [];
 
-  for (let i = n - 1; i >= 0; i--) {
-    const d      = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const mesISO = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  for (const mesISO of meses) {
+    const d = new Date(`${mesISO}-01T12:00:00Z`);
 
-    const receita = (pagamentos ?? [])
-      .filter(p => (p.data_pagamento as string)?.startsWith(mesISO))
-      .reduce((s, p) => s + Number(p.valor), 0);
-
-    const desp = (despesasData ?? [])
-      .filter(x => (x.data as string).startsWith(mesISO))
-      .reduce((s, x) => s + Number(x.valor), 0);
-
-    result.push({ mes: MES_PT[d.getMonth()], mesISO, receita, despesas: desp });
+    const fluxo = agregarFluxoFinanceiro({
+      pagamentos: (pagamentos ?? []).filter((pagamento) => pagamento.data_pagamento?.startsWith(mesISO))
+        .map((pagamento) => ({ valor: Number(pagamento.valor), status: 'pago' })),
+      receitasManuais: (receitas ?? []).filter((receita) => receita.data.startsWith(mesISO))
+        .map((receita) => ({ valor: Number(receita.valor) })),
+      despesas: (despesasData ?? []).filter((despesa) => despesa.data.startsWith(mesISO))
+        .map((despesa) => ({ valor: Number(despesa.valor) })),
+    });
+    result.push({ mes: MES_PT[d.getUTCMonth()], mesISO, receita: fluxo.receita, despesas: fluxo.despesas });
   }
 
   return result;
@@ -302,10 +336,19 @@ export async function listarUltimosMeses(n = 6): Promise<ChartPoint[]> {
 export async function criarDespesa(
   form: NovaDespesaForm,
 ): Promise<{ ok: boolean; id?: string; erro?: string }> {
-  const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
+  const parsed = despesaFinanceiroSchema.safeParse(form);
+  if (!parsed.success) return { ok: false, erro: parsed.error.issues[0]?.message ?? 'Dados inválidos.' };
+  const context = await requireClinicContext();
+  const { supabase, clinicId, dentistaId, role } = context;
+  const dados = parsed.data;
 
   // Secretária precisa especificar o dentista alvo; dentista/admin usa o próprio ID
-  const dentistaAlvoId = role === 'secretaria' ? form.dentistaId ?? null : dentistaId;
+  let dentistaAlvoId: string | null;
+  try {
+    dentistaAlvoId = role === 'secretaria' ? await resolverDentistaFiltro(context, dados.dentistaId) : dentistaId;
+  } catch (error) {
+    return { ok: false, erro: error instanceof Error ? error.message : 'Não foi possível validar o dentista.' };
+  }
 
   if (role === 'secretaria' && !dentistaAlvoId) {
     return { ok: false, erro: 'Selecione o dentista responsável pela despesa' };
@@ -316,11 +359,11 @@ export async function criarDespesa(
     .insert({
       clinica_id:  clinicId,
       dentista_id: dentistaAlvoId,
-      valor:       form.valor,
-      categoria:   form.categoria.trim() || 'outro',
-      tipo:        form.tipo,
-      data:        form.data,
-      descricao:   form.descricao?.trim() || null,
+      valor:       dados.valor,
+      categoria:   dados.categoria,
+      tipo:        dados.tipo,
+      data:        dados.data,
+      descricao:   dados.descricao || null,
     })
     .select('id')
     .single();
@@ -328,15 +371,15 @@ export async function criarDespesa(
   if (error) return { ok: false, erro: error.message };
 
   if (role === 'secretaria' && dentistaAlvoId) {
-    const valor = form.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const valor = dados.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     await inserirNotificacao(supabase, {
       clinicaId:      clinicId,
       paraRole:       'dentista',
       paraDentistaId: dentistaAlvoId,
       deDentistaId:   dentistaId,
       tipo:           'sistema',
-      titulo:         `Nova despesa lançada — ${form.categoria}`,
-      mensagem:       `A secretária registrou uma saída de ${valor}${form.descricao ? ` (${form.descricao})` : ''} em seu nome.`,
+      titulo:         `Nova despesa lançada — ${dados.categoria}`,
+      mensagem:       `A secretária registrou uma saída de ${valor}${dados.descricao ? ` (${dados.descricao})` : ''} em seu nome.`,
       href:           '/dashboard/financeiro',
     });
   }
@@ -349,23 +392,31 @@ export async function criarDespesa(
 export async function excluirDespesa(
   id: string,
 ): Promise<{ ok: boolean; erro?: string }> {
-  const { supabase, clinicId } = await requireClinicContext();
+  const parsed = dentistaFinanceiroSchema.safeParse(id);
+  if (!parsed.success) return { ok: false, erro: 'Lançamento inválido.' };
+  const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
 
-  const { error } = await supabase
+  let query = supabase
     .from('despesas')
     .delete()
-    .eq('id', id)
-    .eq('clinica_id', clinicId);
+    .eq('id', parsed.data)
+    .eq('clinica_id', clinicId)
+    .select('id');
+  if (role !== 'secretaria') query = query.eq('dentista_id', dentistaId);
+  const { data, error } = await query;
 
   if (error) return { ok: false, erro: error.message };
+  if (!data?.length) return { ok: false, erro: 'Lançamento não encontrado ou sem permissão.' };
 
   revalidatePath('/dashboard');
   revalidatePath('/dashboard/financeiro');
   return { ok: true };
 }
 
-export async function listarReceitas(mesISO: string): Promise<ReceitaManual[]> {
-  const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
+export async function listarReceitas(mesISO: string, dentistaFiltro?: string): Promise<ReceitaManual[]> {
+  const context = await requireClinicContext();
+  const { supabase, clinicId } = context;
+  const dentistaId = await resolverDentistaFiltro(context, dentistaFiltro);
 
   const { inicioDate, fimDate } = mesWindow(mesISO);
 
@@ -377,7 +428,7 @@ export async function listarReceitas(mesISO: string): Promise<ReceitaManual[]> {
     .lt('data', fimDate)
     .order('data', { ascending: false });
 
-  if (role !== 'secretaria') {
+  if (dentistaId) {
     query = query.eq('dentista_id', dentistaId);
   }
 
@@ -389,9 +440,18 @@ export async function listarReceitas(mesISO: string): Promise<ReceitaManual[]> {
 export async function criarReceita(
   form: NovaReceitaForm,
 ): Promise<{ ok: boolean; id?: string; erro?: string }> {
-  const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
+  const parsed = receitaFinanceiroSchema.safeParse(form);
+  if (!parsed.success) return { ok: false, erro: parsed.error.issues[0]?.message ?? 'Dados inválidos.' };
+  const context = await requireClinicContext();
+  const { supabase, clinicId, dentistaId, role } = context;
+  const dados = parsed.data;
 
-  const dentistaAlvoId = role === 'secretaria' ? form.dentistaId ?? null : dentistaId;
+  let dentistaAlvoId: string | null;
+  try {
+    dentistaAlvoId = role === 'secretaria' ? await resolverDentistaFiltro(context, dados.dentistaId) : dentistaId;
+  } catch (error) {
+    return { ok: false, erro: error instanceof Error ? error.message : 'Não foi possível validar o dentista.' };
+  }
 
   if (role === 'secretaria' && !dentistaAlvoId) {
     return { ok: false, erro: 'Selecione o dentista responsável pela entrada' };
@@ -402,10 +462,10 @@ export async function criarReceita(
     .insert({
       clinica_id:  clinicId,
       dentista_id: dentistaAlvoId,
-      valor:       form.valor,
-      forma:       form.forma,
-      data:        form.data,
-      descricao:   form.descricao?.trim() || null,
+      valor:       dados.valor,
+      forma:       dados.forma,
+      data:        dados.data,
+      descricao:   dados.descricao || null,
     })
     .select('id')
     .single();
@@ -413,8 +473,8 @@ export async function criarReceita(
   if (error) return { ok: false, erro: error.message };
 
   if (role === 'secretaria' && dentistaAlvoId) {
-    const valor = form.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    const forma = { pix: 'PIX', dinheiro: 'Dinheiro', transferencia: 'Transferência', outro: 'Outro' }[form.forma] ?? form.forma;
+    const valor = dados.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const forma = { pix: 'PIX', dinheiro: 'Dinheiro', transferencia: 'Transferência', outro: 'Outro' }[dados.forma] ?? dados.forma;
     await inserirNotificacao(supabase, {
       clinicaId:      clinicId,
       paraRole:       'dentista',
@@ -422,7 +482,7 @@ export async function criarReceita(
       deDentistaId:   dentistaId,
       tipo:           'pagamento_confirmado',
       titulo:         `Pagamento confirmado — ${forma}`,
-      mensagem:       `A secretária registrou uma entrada de ${valor}${form.descricao ? ` (${form.descricao})` : ''} em seu nome.`,
+      mensagem:       `A secretária registrou uma entrada de ${valor}${dados.descricao ? ` (${dados.descricao})` : ''} em seu nome.`,
       href:           '/dashboard/financeiro',
     });
   }
@@ -435,40 +495,51 @@ export async function criarReceita(
 export async function excluirReceita(
   id: string,
 ): Promise<{ ok: boolean; erro?: string }> {
-  const { supabase, clinicId } = await requireClinicContext();
+  const parsed = dentistaFinanceiroSchema.safeParse(id);
+  if (!parsed.success) return { ok: false, erro: 'Lançamento inválido.' };
+  const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
 
-  const { error } = await supabase
+  let query = supabase
     .from('receitas_manuais')
     .delete()
-    .eq('id', id)
-    .eq('clinica_id', clinicId);
+    .eq('id', parsed.data)
+    .eq('clinica_id', clinicId)
+    .select('id');
+  if (role !== 'secretaria') query = query.eq('dentista_id', dentistaId);
+  const { data, error } = await query;
 
   if (error) return { ok: false, erro: error.message };
+  if (!data?.length) return { ok: false, erro: 'Lançamento não encontrado ou sem permissão.' };
 
   revalidatePath('/dashboard');
   revalidatePath('/dashboard/financeiro');
   return { ok: true };
 }
 
-export async function calcularHoraClinica(mesISO: string): Promise<HoraClinicaResult> {
-  const { supabase, clinicId } = await requireClinicContext();
+export async function calcularHoraClinica(mesISO: string, dentistaFiltro?: string): Promise<HoraClinicaResult> {
+  const context = await requireClinicContext();
+  const { supabase, clinicId } = context;
+  const dentistaId = await resolverDentistaFiltro(context, dentistaFiltro);
 
   const { inicioDate, fimDate } = mesWindow(mesISO);
 
-  const [{ data: despesasFixas, error: errDesp }, { data: horarios, error: errHor }] = await Promise.all([
-    supabase
+  let despesasQuery = supabase
       .from('despesas')
       .select('valor')
       .eq('clinica_id', clinicId)
       .eq('tipo', 'fixo')
       .gte('data', inicioDate)
-      .lt('data', fimDate),
-    supabase
+      .lt('data', fimDate);
+  let horariosQuery = supabase
       .from('horarios_disponiveis')
-      .select('dia_semana, hora_inicio, hora_fim')
+      .select('dentista_id, dia_semana, hora_inicio, hora_fim, almoco_inicio, almoco_fim')
       .eq('clinica_id', clinicId)
-      .eq('ativo', true),
-  ]);
+      .eq('ativo', true);
+  if (dentistaId) {
+    despesasQuery = despesasQuery.eq('dentista_id', dentistaId);
+    horariosQuery = horariosQuery.eq('dentista_id', dentistaId);
+  }
+  const [{ data: despesasFixas, error: errDesp }, { data: horarios, error: errHor }] = await Promise.all([despesasQuery, horariosQuery]);
   if (errDesp || errHor) {
     throw new Error(`Falha ao calcular custo por hora: ${(errDesp ?? errHor)?.message}`);
   }
@@ -479,23 +550,23 @@ export async function calcularHoraClinica(mesISO: string): Promise<HoraClinicaRe
     return { despesasFixas: totalFixas, horasNoMes: null, custoPorHora: null };
   }
 
-  const [ano, mes] = mesISO.split('-').map(Number);
-  const diasNoMes = new Date(ano, mes, 0).getDate();
-  const contadorDia: Record<number, number> = {};
-  for (let d = 1; d <= diasNoMes; d++) {
-    const dow = new Date(ano, mes - 1, d).getDay();
-    contadorDia[dow] = (contadorDia[dow] ?? 0) + 1;
-  }
-
-  let horasNoMes = 0;
-  for (const h of horarios) {
-    const [sh, sm] = (h.hora_inicio as string).split(':').map(Number);
-    const [eh, em] = (h.hora_fim as string).split(':').map(Number);
-    const hPorDia = (eh + em / 60) - (sh + sm / 60);
-    if (hPorDia > 0) {
-      horasNoMes += hPorDia * (contadorDia[h.dia_semana as number] ?? 0);
-    }
-  }
+  type HorarioRaw = {
+    dentista_id: string;
+    dia_semana: number;
+    hora_inicio: string;
+    hora_fim: string;
+    almoco_inicio: string | null;
+    almoco_fim: string | null;
+  };
+  const turnos: TurnoClinico[] = ((horarios ?? []) as unknown as HorarioRaw[]).map((horario) => ({
+    dentistaId: horario.dentista_id,
+    diaSemana: horario.dia_semana,
+    horaInicio: horario.hora_inicio,
+    horaFim: horario.hora_fim,
+    almocoInicio: horario.almoco_inicio,
+    almocoFim: horario.almoco_fim,
+  }));
+  const horasNoMes = horasLiquidasNoMes(mesISO, turnos);
 
   const custoPorHora = horasNoMes > 0 ? totalFixas / horasNoMes : null;
   return { despesasFixas: totalFixas, horasNoMes, custoPorHora };
@@ -505,10 +576,12 @@ export async function calcularHoraClinica(mesISO: string): Promise<HoraClinicaRe
 
 export async function exportarFinanceiroCsv(
   mesISO: string,
+  dentistaFiltro?: string,
 ): Promise<{ csv: string; filename: string }> {
-  const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
+  const context = await requireClinicContext();
+  const { supabase, clinicId } = context;
+  const dentistaId = await resolverDentistaFiltro(context, dentistaFiltro);
   const { inicioDate, fimDate } = mesWindow(mesISO);
-  const scopado = role !== 'secretaria';
 
   type Row = { tipo: string; data: string; descricao: string; forma: string; valor: number };
 
@@ -523,7 +596,7 @@ export async function exportarFinanceiroCsv(
     .eq('clinica_id', clinicId).eq('status', 'pago')
     .gte('data_pagamento', inicioDate).lt('data_pagamento', fimDate);
 
-  if (scopado) {
+  if (dentistaId) {
     despesasQ   = despesasQ.eq('dentista_id', dentistaId);
     receitasQ   = receitasQ.eq('dentista_id', dentistaId);
     pagamentosQ = pagamentosQ.eq('dentista_id', dentistaId);
@@ -578,8 +651,10 @@ export async function exportarFinanceiroCsv(
   return { csv, filename: `financeiro-${mesISO}.csv` };
 }
 
-export async function listarPagamentosPagos(mesISO: string): Promise<PagamentoPago[]> {
-  const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
+export async function listarPagamentosPagos(mesISO: string, dentistaFiltro?: string): Promise<PagamentoPago[]> {
+  const context = await requireClinicContext();
+  const { supabase, clinicId } = context;
+  const dentistaId = await resolverDentistaFiltro(context, dentistaFiltro);
 
   const { inicioDate, fimDate } = mesWindow(mesISO);
 
@@ -593,7 +668,7 @@ export async function listarPagamentosPagos(mesISO: string): Promise<PagamentoPa
     .lt('data_pagamento', fimDate)
     .order('data_pagamento', { ascending: false });
 
-  if (role !== 'secretaria') {
+  if (dentistaId) {
     query = query.eq('dentista_id', dentistaId);
   }
 
@@ -623,8 +698,10 @@ export async function listarPagamentosPagos(mesISO: string): Promise<PagamentoPa
     }));
 }
 
-export async function listarPagamentosPendentes(): Promise<PagamentoPendente[]> {
-  const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
+export async function listarPagamentosPendentes(dentistaFiltro?: string): Promise<PagamentoPendente[]> {
+  const context = await requireClinicContext();
+  const { supabase, clinicId } = context;
+  const dentistaId = await resolverDentistaFiltro(context, dentistaFiltro);
 
   // R-114 — mesma regra única do resto do arquivo (I7). Uma pendência só existe porque a
   // escrita (registrarPagamento/registrarPagamentoRapido) já exigiu item aprovado antes de
@@ -636,7 +713,7 @@ export async function listarPagamentosPendentes(): Promise<PagamentoPendente[]> 
     .eq('status', 'pendente')
     .order('data_vencimento', { ascending: true, nullsFirst: false });
 
-  if (role !== 'secretaria') {
+  if (dentistaId) {
     query = query.eq('dentista_id', dentistaId);
   }
 
@@ -665,65 +742,123 @@ export async function listarPagamentosPendentes(): Promise<PagamentoPendente[]> 
 
 export type OrcamentoPendente = {
   id: string;
+  cobrancaId: string | null;
   total: number | null;
   descricao_resumo: string;
   valor_pendente: number;
+  dentistaId: string | null;
+  dentistaNome: string | null;
 };
 
 export type BuscarOrcamentosPendentesResult = {
   orcamentos: OrcamentoPendente[];
-  dentistaId: string | null;
-  dentistaNome: string | null;
 };
 
 export async function buscarOrcamentosPendentesPorPaciente(
   pacienteId: string,
 ): Promise<BuscarOrcamentosPendentesResult> {
-  const { supabase, clinicId } = await requireClinicContext();
+  const context = await requireClinicContext();
+  const { supabase, clinicId } = context;
+  const dentistaDoEscopo = await resolverDentistaFiltro(context);
 
-  const { data: paciente } = await supabase
-    .from('pacientes')
-    .select('dentista_id, dentista:dentistas(id, nome)')
-    .eq('id', pacienteId)
+  const paciente = dentistaFinanceiroSchema.safeParse(pacienteId);
+  if (!paciente.success) throw new Error('Paciente inválido.');
+
+  let cobrancasQuery = supabase
+    .from('orcamento_cobrancas')
+    .select('id, orcamento_id, dentista_id, valor_final, situacao, itens:orcamento_cobranca_itens!orcamento_cobranca_itens_cobranca_id_fkey(preco_total_snapshot, item:orcamento_itens!orcamento_cobranca_itens_orcamento_item_id_fkey(descricao))')
     .eq('clinica_id', clinicId)
-    .maybeSingle();
+    .eq('paciente_id', paciente.data)
+    .eq('situacao', 'aberta');
+  if (dentistaDoEscopo) cobrancasQuery = cobrancasQuery.eq('dentista_id', dentistaDoEscopo);
+  const { data: cobrancasRaw, error: cobrancasError } = await cobrancasQuery;
+  if (cobrancasError) throw new Error(`Falha ao carregar cobranças: ${cobrancasError.message}`);
 
-  const { data: orcamentosRaw } = await supabase
+  const cobrancas = (cobrancasRaw ?? []) as unknown as Array<{
+    id: string; orcamento_id: string; dentista_id: string; valor_final: number;
+    itens: { preco_total_snapshot: number; item: { descricao: string | null } | null }[];
+  }>;
+  let cobrancasComoOrcamentos: OrcamentoPendente[] = [];
+  if (cobrancas.length > 0) {
+    const { data: pagamentosRaw, error: pagamentosError } = await supabase
+      .from('pagamentos')
+      .select('cobranca_id, valor, status')
+      .eq('clinica_id', clinicId)
+      .in('cobranca_id', cobrancas.map((c) => c.id));
+    if (pagamentosError) throw new Error(`Falha ao carregar recebimentos: ${pagamentosError.message}`);
+    const pagamentos = (pagamentosRaw ?? []) as Array<{ cobranca_id: string | null; valor: number; status: string }>;
+    cobrancasComoOrcamentos = cobrançasAtivasComSaldo(
+        cobrancas.map((cobranca) => ({
+          id: cobranca.id,
+          orcamentoId: cobranca.orcamento_id,
+          dentistaId: cobranca.dentista_id,
+          valorFinal: Number(cobranca.valor_final),
+          descricoes: cobranca.itens.map((item) => item.item?.descricao ?? null),
+        })),
+        pagamentos.map((pagamento) => ({ cobrancaId: pagamento.cobranca_id, valor: Number(pagamento.valor), status: pagamento.status })),
+        new Map<string, string>(),
+      ).map((cobranca) => ({
+        id: cobranca.id,
+        cobrancaId: cobranca.cobrancaId,
+        total: cobranca.total,
+        descricao_resumo: cobranca.descricaoResumo,
+        valor_pendente: cobranca.valorPendente,
+        dentistaId: cobranca.dentistaId,
+        dentistaNome: cobranca.dentistaNome,
+      }));
+  }
+  const orcamentosComCobrancaAberta = new Set(cobrancas.map((cobranca) => cobranca.orcamento_id));
+
+  let orcamentosQuery = supabase
     .from('orcamentos')
-    .select('id, total, valor_acordado, itens:orcamento_itens(descricao), pagamentos(id, valor, status)')
+    .select('id, total, valor_acordado, dentista_id, itens:orcamento_itens(descricao, preco_total, aprovado), pagamentos(id, valor, status)')
     .eq('clinica_id', clinicId)
-    .eq('paciente_id', pacienteId)
-    .eq('status', 'aprovado');
+    .eq('paciente_id', paciente.data);
+  if (dentistaDoEscopo) orcamentosQuery = orcamentosQuery.eq('dentista_id', dentistaDoEscopo);
+  const { data: orcamentosRaw, error: orcamentosError } = await orcamentosQuery;
+  if (orcamentosError) throw new Error(`Falha ao carregar orçamentos: ${orcamentosError.message}`);
 
   const orcamentos: OrcamentoPendente[] = ((orcamentosRaw ?? []) as unknown as Array<{
     id: string;
     total: number | null;
     valor_acordado: number | null;
-    itens: { descricao: string | null }[];
+    dentista_id: string;
+    itens: { descricao: string | null; preco_total: number | null; aprovado: boolean }[];
     pagamentos: { valor: number; status: string }[];
   }>)
     .map((o) => {
-      const totalPago = o.pagamentos
-        .filter((p) => p.status === 'pago')
-        .reduce((s, p) => s + p.valor, 0);
-      const valorDevido = o.valor_acordado ?? o.total ?? 0; // I1
-      const valorPendente = Math.max(0, valorDevido - totalPago);
+      const estado = deriveEstadoOrcamento({
+        valorAcordado: o.valor_acordado,
+        itens: o.itens.map((item) => ({ precoTotal: item.preco_total, aprovado: item.aprovado })),
+        pagamentos: o.pagamentos.map((pagamento) => ({ valor: Number(pagamento.valor), status: pagamento.status })),
+      });
+      const valorPendente = Math.max(0, estado.valorDevido - estado.valorPago);
       const descricao =
         o.itens
           .map((i) => i.descricao)
           .filter(Boolean)
           .slice(0, 2)
           .join(', ') || 'Orçamento aprovado';
-      return { id: o.id, total: o.total, descricao_resumo: descricao, valor_pendente: valorPendente };
+      return { id: o.id, cobrancaId: null, total: estado.valorDevido, descricao_resumo: descricao, valor_pendente: valorPendente, dentistaId: o.dentista_id, dentistaNome: null, estado: estado.estado };
     })
-    .filter((o) => o.valor_pendente > 0);
-
-  const dentistaRaw = paciente?.dentista as unknown;
-  const dentista: { id: string; nome: string } | null = Array.isArray(dentistaRaw)
-    ? (dentistaRaw as { id: string; nome: string }[])[0] ?? null
-    : (dentistaRaw as { id: string; nome: string } | null | undefined) ?? null;
-
-  return { orcamentos, dentistaId: dentista?.id ?? null, dentistaNome: dentista?.nome ?? null };
+    .filter((o) => !orcamentosComCobrancaAberta.has(o.id) && o.estado === 'aceito' && o.valor_pendente > 0)
+    .map((orcamento) => ({
+      id: orcamento.id,
+      cobrancaId: orcamento.cobrancaId,
+      total: orcamento.total,
+      descricao_resumo: orcamento.descricao_resumo,
+      valor_pendente: orcamento.valor_pendente,
+      dentistaId: orcamento.dentistaId,
+      dentistaNome: orcamento.dentistaNome,
+    }));
+  const { data: dentistasRaw, error: dentistasError } = await supabase
+    .from('dentistas')
+    .select('id, nome')
+    .eq('clinica_id', clinicId)
+    .in('id', [...new Set([...cobrancasComoOrcamentos, ...orcamentos].map((orcamento) => orcamento.dentistaId).filter((id): id is string => id !== null))]);
+  if (dentistasError) throw new Error(`Falha ao carregar responsáveis: ${dentistasError.message}`);
+  const nomes = new Map((dentistasRaw ?? []).map((dentista) => [dentista.id, dentista.nome]));
+  return { orcamentos: [...cobrancasComoOrcamentos, ...orcamentos].map((orcamento) => ({ ...orcamento, dentistaNome: orcamento.dentistaId ? nomes.get(orcamento.dentistaId) ?? null : null })) };
 }
 
 export type FormaRecebimento = 'pix' | 'dinheiro' | 'transferencia' | 'cartao_credito' | 'cartao_debito' | 'boleto' | 'outro';

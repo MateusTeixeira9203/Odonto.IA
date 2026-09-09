@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { createClient } from '@/lib/supabase/client';
@@ -31,9 +31,11 @@ import type {
   PagamentoPago, PagamentoPendente, OrcamentoPendente, FormaRecebimento,
 } from '../actions';
 import { criarDespesa, excluirDespesa, criarReceita, excluirReceita, exportarFinanceiroCsv, buscarOrcamentosPendentesPorPaciente, registrarRecebimento } from '../actions';
+import { registrarRecebimentoCobranca } from '@/app/dashboard/orcamentos/actions';
 import { downloadCsv } from '@/lib/export/csv';
 import { parseValorBR, formatValorBR } from '@/lib/valor-br';
 import { normalizarNome } from '@/lib/normalizar-nome';
+import { hojeBRT } from '@/lib/hora-brt';
 import type { DentistaRole } from '@/types/database';
 import type { PlanoId } from '@/lib/planos';
 import { PlanGuard } from '@/components/plan-guard';
@@ -112,6 +114,7 @@ interface Props {
   role:                 DentistaRole;
   plano:                PlanoId;
   dentistaId:           string;
+  clinicaId:            string;
   dentistasClinica:     { id: string; nome: string }[];
   pagamentosPagosIniciais:     PagamentoPago[];
   pagamentosPendentesIniciais: PagamentoPendente[];
@@ -125,7 +128,7 @@ type SheetMode = 'saida' | 'entrada' | null;
 
 export function FinanceiroClient({
   mesAtual, despesasIniciais, receitasIniciais, saldoInicial,
-  chartData, horaClinica, role, plano, dentistaId, dentistasClinica,
+  chartData, horaClinica, role, plano, dentistaId, clinicaId, dentistasClinica,
   pagamentosPagosIniciais, pagamentosPendentesIniciais,
   initialDentistaFiltro = '',
 }: Props) {
@@ -151,41 +154,60 @@ export function FinanceiroClient({
   const [recDentistaId, setRecDentistaId]             = useState('');
   const [recOrcamentos, setRecOrcamentos]             = useState<OrcamentoPendente[]>([]);
   const [recOrcamentoId, setRecOrcamentoId]           = useState('');
+  const [recCobrancaId, setRecCobrancaId]             = useState<string | null>(null);
   const [recValor, setRecValor]                       = useState('');
   const [recForma, setRecForma]                       = useState<FormaRecebimento>('pix');
-  const [recData, setRecData]                         = useState(() => new Date().toISOString().split('T')[0]);
+  const [recData, setRecData]                         = useState(hojeBRT);
   const [recLoading, setRecLoading]                   = useState(false);
   const [recBuscando, setRecBuscando]                 = useState(false);
   const [recError, setRecError]                       = useState<string | null>(null);
   const supabaseClient = useMemo(() => createClient(), []);
+  const buscaPacientesSequencia = useRef(0);
+  const buscaCobrancasSequencia = useRef(0);
 
   const buscarPacientesRec = useCallback(async (nome: string) => {
+    const sequencia = ++buscaPacientesSequencia.current;
     if (nome.length < 2) { setRecSugestoes([]); return; }
-    const { data } = await supabaseClient
+    const { data, error } = await supabaseClient
       .from('pacientes')
       .select('id, nome')
+      .eq('clinica_id', clinicaId)
       .ilike('nome_busca', `%${normalizarNome(nome)}%`)
       .limit(6);
-    setRecSugestoes(data ?? []);
-  }, [supabaseClient]);
+    if (sequencia === buscaPacientesSequencia.current) setRecSugestoes(error ? [] : data ?? []);
+  }, [clinicaId, supabaseClient]);
 
   const aoSelecionarPaciente = async (id: string, nome: string) => {
+    const sequencia = ++buscaCobrancasSequencia.current;
     setRecPacienteId(id);
     setRecPacienteNome(nome);
     setRecShowSugestoes(false);
     setRecBuscando(true);
     setRecOrcamentos([]);
     setRecOrcamentoId('');
+    setRecCobrancaId(null);
+    setRecDentistaId('');
+    setRecDentistaNome('');
     setRecValor('');
-    const result = await buscarOrcamentosPendentesPorPaciente(id);
-    setRecDentistaNome(result.dentistaNome ?? '');
-    setRecDentistaId(result.dentistaId ?? '');
-    setRecOrcamentos(result.orcamentos);
-    if (result.orcamentos.length === 1) {
-      setRecOrcamentoId(result.orcamentos[0].id);
-      setRecValor(formatValorBR(result.orcamentos[0].valor_pendente));
+    setRecError(null);
+    try {
+      const result = await buscarOrcamentosPendentesPorPaciente(id);
+      if (sequencia !== buscaCobrancasSequencia.current) return;
+      setRecOrcamentos(result.orcamentos);
+      if (result.orcamentos.length === 1) {
+        const unica = result.orcamentos[0];
+        setRecOrcamentoId(unica.id);
+        setRecCobrancaId(unica.cobrancaId);
+        setRecDentistaNome(unica.dentistaNome ?? '');
+        setRecDentistaId(unica.dentistaId ?? '');
+        setRecValor(formatValorBR(unica.valor_pendente));
+      }
+    } catch {
+      if (sequencia !== buscaCobrancasSequencia.current) return;
+      setRecError('Não foi possível carregar as cobranças do paciente.');
+    } finally {
+      if (sequencia === buscaCobrancasSequencia.current) setRecBuscando(false);
     }
-    setRecBuscando(false);
   };
 
   const handleRegistrarRecebimento = async () => {
@@ -195,30 +217,36 @@ export function FinanceiroClient({
     if (!valorNum || valorNum <= 0) { setRecError('Informe um valor válido.'); return; }
     setRecError(null);
     setRecLoading(true);
-    const result = await registrarRecebimento({
-      pacienteId:     recPacienteId,
-      orcamentoId:    recOrcamentoId,
-      valor:          valorNum,
-      formaPagamento: recForma,
-      data:           recData,
-      dentistaId:     recDentistaId || undefined,
-    });
-    if (result.error) {
-      setRecError(result.error);
-    } else {
-      setIsRecebimentoOpen(false);
-      setRecPacienteSearch(''); setRecPacienteId(''); setRecPacienteNome('');
-      setRecOrcamentos([]); setRecOrcamentoId(''); setRecValor('');
-      router.refresh();
-      toast.success('Recebimento registrado!');
+    try {
+      const result = recCobrancaId
+        ? await registrarRecebimentoCobranca({
+          cobrancaId: recCobrancaId, pacienteId: recPacienteId, valor: valorNum,
+          formaPagamento: recForma === 'transferencia' ? 'outro' : recForma, data: recData,
+        })
+        : await registrarRecebimento({
+          pacienteId: recPacienteId, orcamentoId: recOrcamentoId, valor: valorNum,
+          formaPagamento: recForma, data: recData, dentistaId: recDentistaId || undefined,
+        });
+      if (result.error) {
+        setRecError(result.error);
+      } else {
+        setIsRecebimentoOpen(false);
+        setRecPacienteSearch(''); setRecPacienteId(''); setRecPacienteNome('');
+        setRecOrcamentos([]); setRecOrcamentoId(''); setRecCobrancaId(null); setRecValor('');
+        router.refresh();
+        toast.success('Recebimento registrado!');
+      }
+    } catch {
+      setRecError('Não foi possível registrar o recebimento. Tente novamente.');
+    } finally {
+      setRecLoading(false);
     }
-    setRecLoading(false);
   };
 
   async function handleExportCsv() {
     setIsExporting(true);
     try {
-      const { csv, filename } = await exportarFinanceiroCsv(mesAtual);
+      const { csv, filename } = await exportarFinanceiroCsv(mesAtual, selectedDentistaId || undefined);
       downloadCsv(csv, filename);
     } catch {
       toast.error('Não foi possível exportar. Tente novamente.');
@@ -229,13 +257,20 @@ export function FinanceiroClient({
 
   // ID do dentista persistido entre trocas de mês (via URL) — apenas secretária
   const [selectedDentistaId, setSelectedDentistaId] = useState<string>(
-    () => initialDentistaFiltro || dentistasClinica[0]?.id || ''
+    () => initialDentistaFiltro
   );
+
+  useEffect(() => {
+    setDespesas(despesasIniciais);
+    setReceitas(receitasIniciais);
+    setSaldo(saldoInicial);
+    setSelectedDentistaId(initialDentistaFiltro);
+  }, [despesasIniciais, receitasIniciais, saldoInicial, initialDentistaFiltro]);
 
   // ── Estados: formulário saída ─────────────────────────────────────────────
   const [form, setForm] = useState<Omit<NovaDespesaForm, 'valor'> & { valor: string }>({
     valor: '', categoria: 'Outro', tipo: 'variavel',
-    data: format(new Date(), 'yyyy-MM-dd'), descricao: '',
+    data: hojeBRT(), descricao: '',
     dentistaId: role === 'secretaria' ? (initialDentistaFiltro || dentistasClinica[0]?.id || '') : dentistaId,
   });
   const [salvando,  setSalvando]  = useState(false);
@@ -244,17 +279,13 @@ export function FinanceiroClient({
   // ── Estados: formulário entrada ───────────────────────────────────────────
   const [formReceita, setFormReceita] = useState<Omit<NovaReceitaForm, 'valor'> & { valor: string }>({
     valor: '', forma: 'pix',
-    data: format(new Date(), 'yyyy-MM-dd'), descricao: '',
+    data: hojeBRT(), descricao: '',
     dentistaId: role === 'secretaria' ? (initialDentistaFiltro || dentistasClinica[0]?.id || '') : dentistaId,
   });
   const [salvandoReceita,  setSalvandoReceita]  = useState(false);
   const [removendoReceita, setRemovendoReceita] = useState<string | null>(null);
 
   const mesDate = parseISO(`${mesAtual}-01`);
-  const mesLabel = format(mesDate, "MMMM 'de' yyyy", { locale: ptBR });
-
-  const priv = (v: number) => isPrivacy ? '••••••' : fmt(v);
-
   type LancamentoUnif =
     | { kind: 'saida';     id: string; data: string; item: Despesa }
     | { kind: 'entrada';   id: string; data: string; item: ReceitaManual }
@@ -276,6 +307,22 @@ export function FinanceiroClient({
     );
   }
 
+  function aplicarFiltroDentista(valor: string) {
+    const filtro = valor === 'todos' ? '' : valor;
+    setSelectedDentistaId(filtro);
+    if (filtro) {
+      setForm((atual) => ({ ...atual, dentistaId: filtro }));
+      setFormReceita((atual) => ({ ...atual, dentistaId: filtro }));
+    }
+    const params = new URLSearchParams({ mes: mesAtual });
+    if (filtro) params.set('dentista', filtro);
+    router.push(`/dashboard/financeiro?${params.toString()}`);
+  }
+
+  function lancamentoEstaNoFiltro(dentistaLancamento: string | undefined): boolean {
+    return !isSecretaria || !selectedDentistaId || dentistaLancamento === selectedDentistaId;
+  }
+
   // ── Handlers: saída ───────────────────────────────────────────────────────
 
   async function handleSubmit(e: React.FormEvent) {
@@ -289,7 +336,7 @@ export function FinanceiroClient({
     try {
       const res = await criarDespesa({ ...form, valor: valorNum });
       if (!res.ok) { toast.error(res.erro ?? 'Erro ao salvar'); return; }
-      if (form.data.startsWith(mesAtual)) {
+      if (form.data.startsWith(mesAtual) && lancamentoEstaNoFiltro(form.dentistaId)) {
         const nova: Despesa = {
           id: res.id ?? crypto.randomUUID(), clinica_id: '',
           dentista_id: form.dentistaId ?? null, valor: valorNum,
@@ -302,6 +349,7 @@ export function FinanceiroClient({
       toast.success('Saída registrada!');
       setForm(f => ({ ...f, valor: '', descricao: '', dentistaId: role === 'secretaria' ? selectedDentistaId : dentistaId }));
       setSheetMode(null);
+      router.refresh();
     } finally { setSalvando(false); }
   }
 
@@ -315,6 +363,7 @@ export function FinanceiroClient({
       setDespesas(prev => prev.filter(x => x.id !== id));
       setSaldo(prev => ({ ...prev, despesas: prev.despesas - d.valor, saldo: prev.saldo + d.valor }));
       toast.success('Saída removida');
+      router.refresh();
     } finally { setRemovendo(null); }
   }
 
@@ -331,7 +380,7 @@ export function FinanceiroClient({
     try {
       const res = await criarReceita({ ...formReceita, valor: valorNum });
       if (!res.ok) { toast.error(res.erro ?? 'Erro ao salvar'); return; }
-      if (formReceita.data.startsWith(mesAtual)) {
+      if (formReceita.data.startsWith(mesAtual) && lancamentoEstaNoFiltro(formReceita.dentistaId)) {
         const nova: ReceitaManual = {
           id: res.id ?? crypto.randomUUID(), clinica_id: '',
           dentista_id: formReceita.dentistaId ?? null, valor: valorNum,
@@ -344,6 +393,7 @@ export function FinanceiroClient({
       toast.success('Entrada registrada!');
       setFormReceita(f => ({ ...f, valor: '', descricao: '', dentistaId: role === 'secretaria' ? selectedDentistaId : dentistaId }));
       setSheetMode(null);
+      router.refresh();
     } finally { setSalvandoReceita(false); }
   }
 
@@ -357,6 +407,7 @@ export function FinanceiroClient({
       setReceitas(prev => prev.filter(x => x.id !== id));
       setSaldo(prev => ({ ...prev, receita: prev.receita - r.valor, saldo: prev.saldo - r.valor }));
       toast.success('Entrada removida');
+      router.refresh();
     } finally { setRemovendoReceita(null); }
   }
 
@@ -397,7 +448,7 @@ export function FinanceiroClient({
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto sm:flex-nowrap">
           {isSecretaria && (
             <button
               onClick={() => setIsRecebimentoOpen(true)}
@@ -424,6 +475,7 @@ export function FinanceiroClient({
 
           <div className="flex items-center gap-2">
             <button
+              aria-label="Mês anterior"
               onClick={() => navMes(-1)}
               className="w-11 h-11 rounded-xl border border-border flex items-center justify-center hover:bg-surface-alt transition-colors"
             >
@@ -433,13 +485,27 @@ export function FinanceiroClient({
               {format(mesDate, 'MMM yyyy', { locale: ptBR })}
             </span>
             <button
+              aria-label="Próximo mês"
               onClick={() => navMes(1)}
-              disabled={mesAtual >= format(new Date(), 'yyyy-MM')}
+              disabled={mesAtual >= hojeBRT().slice(0, 7)}
               className="w-11 h-11 rounded-xl border border-border flex items-center justify-center hover:bg-surface-alt transition-colors disabled:opacity-40"
             >
               <ChevronRight className="w-4 h-4 text-text-secondary" />
             </button>
           </div>
+          {isSecretaria && (
+            <Select value={selectedDentistaId || 'todos'} onValueChange={(valor) => { if (valor !== null) aplicarFiltroDentista(valor); }}>
+              <SelectTrigger aria-label="Filtrar por dentista" className="h-11 min-w-44 rounded-xl border-border bg-surface text-sm text-text-primary">
+                <SelectValue>{dentistasClinica.find((d) => d.id === selectedDentistaId)?.nome ?? 'Todos os dentistas'}</SelectValue>
+              </SelectTrigger>
+              <SelectContent className="bg-surface border-border">
+                <SelectItem value="todos">Todos os dentistas</SelectItem>
+                {dentistasClinica.map((dentista) => (
+                  <SelectItem key={dentista.id} value={dentista.id}>{dentista.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
       </div>
 
@@ -464,9 +530,9 @@ export function FinanceiroClient({
                   isPrivacy={isPrivacy}
                 />
                 <IntelCard
-                  label="Margem operacional"
+                  label="Saldo sobre entradas"
                   value={margemPct != null ? `${margemPct.toFixed(1)}%` : '—'}
-                  sub="receita líquida / bruta"
+                  sub="saldo de caixa / entradas"
                   positive={margemPct != null ? margemPct >= 0 : null}
                   isPrivacy={isPrivacy}
                 />
@@ -512,7 +578,7 @@ export function FinanceiroClient({
                           <span className="text-lg font-mono text-text-secondary">/h</span>
                         </div>
                         <p className="text-sm text-text-secondary mt-2">
-                          {Math.round(horasNoMes!)}h trabalhadas este mês
+                          {Math.round(horasNoMes!)}h estimadas com a grade atual
                           {' · '}
                           <span className="font-mono">
                             {isPrivacy ? '••••••' : `R$ ${fmt(despesasFixas)}`}
@@ -540,7 +606,7 @@ export function FinanceiroClient({
                       isPrivacy={isPrivacy}
                     />
                     <MiniKpi
-                      label="Lucro"
+                      label="Saldo de caixa"
                       valor={saldo.saldo}
                       color={saldo.saldo >= 0 ? 'teal' : 'coral'}
                       icon={<CircleDollarSign className="w-3.5 h-3.5" />}
@@ -568,7 +634,11 @@ export function FinanceiroClient({
                   </div>
                 </div>
                 <div className="h-[200px]">
-                  <GanhosDespesasChart data={chartData} />
+                  {isPrivacy ? (
+                    <div className="h-full flex items-center justify-center text-sm text-text-secondary">Valores ocultos</div>
+                  ) : (
+                    <GanhosDespesasChart data={chartData} />
+                  )}
                 </div>
               </div>
             </>
@@ -755,8 +825,8 @@ export function FinanceiroClient({
                 </div>
               </div>
               <div className="divide-y divide-border">
-                {pagamentosPendentes.slice(0, 8).map(p => {
-                  const vencido = p.data_vencimento != null && p.data_vencimento < new Date().toISOString().split('T')[0];
+                {pagamentosPendentes.map(p => {
+                  const vencido = p.data_vencimento != null && p.data_vencimento < hojeBRT();
                   return (
                     <div key={p.id} className="flex items-center gap-3 px-6 py-3.5 hover:bg-surface-alt transition-colors">
                       <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
@@ -823,7 +893,6 @@ export function FinanceiroClient({
                   <DentistaSelector
                     value={form.dentistaId ?? ''}
                     onChange={v => {
-                      setSelectedDentistaId(v);
                       setForm(f => ({ ...f, dentistaId: v || undefined }));
                       setFormReceita(f => ({ ...f, dentistaId: v || undefined }));
                     }}
@@ -833,7 +902,7 @@ export function FinanceiroClient({
                 <div className="space-y-1.5">
                   <Label className="text-sm text-text-secondary">Valor (R$)</Label>
                   <Input
-                    type="text" inputMode="decimal" placeholder="0,00"
+                    aria-label="Valor (R$)" type="text" inputMode="decimal" placeholder="0,00"
                     value={form.valor}
                     onChange={e => setForm(f => ({ ...f, valor: e.target.value }))}
                     className="rounded-xl font-mono" required
@@ -841,7 +910,7 @@ export function FinanceiroClient({
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-sm text-text-secondary">Categoria</Label>
-                  <Select value={form.categoria} onValueChange={v => { if (v) setForm(f => ({ ...f, categoria: v })); }}>
+                  <Select items={CATEGORIAS.map((c) => ({ value: c, label: c }))} value={form.categoria} onValueChange={v => { if (v) setForm(f => ({ ...f, categoria: v })); }}>
                     <SelectTrigger className="w-full h-10 rounded-xl border border-border bg-surface text-text-primary focus:ring-2 focus:ring-teal/50">
                       <SelectValue />
                     </SelectTrigger>
@@ -871,7 +940,7 @@ export function FinanceiroClient({
                 <div className="space-y-1.5">
                   <Label className="text-sm text-text-secondary">Data</Label>
                   <Input
-                    type="date" value={form.data}
+                    aria-label="Data" type="date" value={form.data}
                     onChange={e => setForm(f => ({ ...f, data: e.target.value }))}
                     className="rounded-xl font-mono" required
                   />
@@ -879,7 +948,7 @@ export function FinanceiroClient({
                 <div className="space-y-1.5">
                   <Label className="text-sm text-text-secondary">Descrição <span className="text-xs">(opcional)</span></Label>
                   <Input
-                    value={form.descricao}
+                    aria-label="Descrição" value={form.descricao}
                     onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))}
                     placeholder="Ex: Compra de luvas e máscaras"
                     className="rounded-xl" maxLength={200}
@@ -892,7 +961,6 @@ export function FinanceiroClient({
                   <DentistaSelector
                     value={formReceita.dentistaId ?? ''}
                     onChange={v => {
-                      setSelectedDentistaId(v);
                       setForm(f => ({ ...f, dentistaId: v || undefined }));
                       setFormReceita(f => ({ ...f, dentistaId: v || undefined }));
                     }}
@@ -902,7 +970,7 @@ export function FinanceiroClient({
                 <div className="space-y-1.5">
                   <Label className="text-sm text-text-secondary">Valor (R$)</Label>
                   <Input
-                    type="text" inputMode="decimal" placeholder="0,00"
+                    aria-label="Valor (R$)" type="text" inputMode="decimal" placeholder="0,00"
                     value={formReceita.valor}
                     onChange={e => setFormReceita(f => ({ ...f, valor: e.target.value }))}
                     className="rounded-xl font-mono" required
@@ -910,7 +978,7 @@ export function FinanceiroClient({
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-sm text-text-secondary">Forma de recebimento</Label>
-                  <Select value={formReceita.forma} onValueChange={v => setFormReceita(f => ({ ...f, forma: v as NovaReceitaForm['forma'] }))}>
+                  <Select items={FORMAS_ENTRADA} value={formReceita.forma} onValueChange={v => setFormReceita(f => ({ ...f, forma: v as NovaReceitaForm['forma'] }))}>
                     <SelectTrigger className="w-full h-10 rounded-xl border border-border bg-surface text-text-primary focus:ring-2 focus:ring-teal/50">
                       <SelectValue />
                     </SelectTrigger>
@@ -922,7 +990,7 @@ export function FinanceiroClient({
                 <div className="space-y-1.5">
                   <Label className="text-sm text-text-secondary">Data</Label>
                   <Input
-                    type="date" value={formReceita.data}
+                    aria-label="Data" type="date" value={formReceita.data}
                     onChange={e => setFormReceita(f => ({ ...f, data: e.target.value }))}
                     className="rounded-xl font-mono" required
                   />
@@ -930,7 +998,7 @@ export function FinanceiroClient({
                 <div className="space-y-1.5">
                   <Label className="text-sm text-text-secondary">Descrição <span className="text-xs">(opcional)</span></Label>
                   <Input
-                    value={formReceita.descricao}
+                    aria-label="Descrição" value={formReceita.descricao}
                     onChange={e => setFormReceita(f => ({ ...f, descricao: e.target.value }))}
                     placeholder="Ex: Repasse convênio Amil"
                     className="rounded-xl" maxLength={200}
@@ -981,7 +1049,7 @@ export function FinanceiroClient({
                   <p className="text-white/70 text-xs mt-0.5">Vincule o pagamento ao paciente e orçamento.</p>
                 </div>
               </div>
-              <SheetClose render={<button className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors" />}>
+              <SheetClose render={<button aria-label="Fechar recebimento" className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors" />}>
                 <X className="w-4 h-4 text-white" />
               </SheetClose>
             </div>
@@ -998,14 +1066,23 @@ export function FinanceiroClient({
               <div className="relative">
                 <UserRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary/40 pointer-events-none" />
                 <Input
-                  placeholder="Buscar pelo nome..."
+                  aria-label="Paciente" placeholder="Buscar pelo nome..."
                   value={recPacienteSearch}
                   autoComplete="off"
                   onChange={(e) => {
                     const v = e.target.value;
+                    buscaCobrancasSequencia.current += 1;
                     setRecPacienteSearch(v);
                     setRecPacienteId('');
                     setRecPacienteNome('');
+                    setRecOrcamentos([]);
+                    setRecOrcamentoId('');
+                    setRecCobrancaId(null);
+                    setRecDentistaId('');
+                    setRecDentistaNome('');
+                    setRecValor('');
+                    setRecError(null);
+                    setRecBuscando(false);
                     setRecShowSugestoes(true);
                     void buscarPacientesRec(v);
                   }}
@@ -1057,11 +1134,17 @@ export function FinanceiroClient({
                   <div className="space-y-2">
                     {recOrcamentos.map((o) => (
                       <button
-                        key={o.id}
+                        key={o.cobrancaId ?? o.id}
                         type="button"
-                        onClick={() => { setRecOrcamentoId(o.id); setRecValor(String(o.valor_pendente)); }}
+                        onClick={() => {
+                          setRecOrcamentoId(o.id);
+                          setRecCobrancaId(o.cobrancaId);
+                          setRecDentistaId(o.dentistaId ?? '');
+                          setRecDentistaNome(o.dentistaNome ?? '');
+                          setRecValor(formatValorBR(o.valor_pendente));
+                        }}
                         className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all text-left ${
-                          recOrcamentoId === o.id
+                          (o.cobrancaId ? recCobrancaId === o.cobrancaId : recOrcamentoId === o.id)
                             ? 'border-teal bg-teal/8 text-teal'
                             : 'border-border bg-surface-alt text-text-primary hover:border-teal/40'
                         }`}
@@ -1069,10 +1152,10 @@ export function FinanceiroClient({
                         <div>
                           <p className="text-sm font-semibold">{o.descricao_resumo}</p>
                           <p className="text-xs text-text-secondary mt-0.5">
-                            Pendente: R$ {o.valor_pendente.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            {o.cobrancaId ? 'Etapa' : 'Orçamento'} · Pendente: R$ {o.valor_pendente.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </p>
                         </div>
-                        {recOrcamentoId === o.id && <CheckCircle2 className="w-4 h-4 text-teal shrink-0" />}
+                        {(o.cobrancaId ? recCobrancaId === o.cobrancaId : recOrcamentoId === o.id) && <CheckCircle2 className="w-4 h-4 text-teal shrink-0" />}
                       </button>
                     ))}
                   </div>
@@ -1089,7 +1172,7 @@ export function FinanceiroClient({
                       Valor (R$) <span className="text-coral">*</span>
                     </Label>
                     <Input
-                      type="text" inputMode="decimal"
+                      aria-label="Valor (R$)" type="text" inputMode="decimal"
                       value={recValor}
                       onChange={(e) => setRecValor(e.target.value)}
                       className="rounded-xl bg-surface-alt border-border text-text-primary font-mono"
@@ -1099,7 +1182,7 @@ export function FinanceiroClient({
                   <div className="space-y-2">
                     <Label className="text-[10px] font-bold uppercase tracking-[0.18em] text-text-secondary">Data</Label>
                     <Input
-                      type="date" value={recData}
+                      aria-label="Data do recebimento" type="date" value={recData}
                       onChange={(e) => setRecData(e.target.value)}
                       className="rounded-xl bg-surface-alt border-border text-text-primary"
                     />
@@ -1108,8 +1191,8 @@ export function FinanceiroClient({
                 <div className="space-y-2">
                   <Label className="text-[10px] font-bold uppercase tracking-[0.18em] text-text-secondary">Forma de Pagamento</Label>
                   <Select value={recForma} onValueChange={(v) => setRecForma(v as FormaRecebimento)}>
-                    <SelectTrigger className="rounded-xl bg-surface-alt border-border text-text-primary">
-                      <SelectValue />
+                    <SelectTrigger aria-label="Forma de pagamento" className="rounded-xl bg-surface-alt border-border text-text-primary">
+                      <SelectValue>{FORMAS_ENTRADA.find((f) => f.value === recForma)?.label ?? recForma}</SelectValue>
                     </SelectTrigger>
                     <SelectContent className="bg-surface border-border">
                       <SelectItem value="pix">PIX</SelectItem>
@@ -1172,8 +1255,8 @@ function DentistaSelector({
         <span className="text-coral">*</span>
       </Label>
       <Select value={value} onValueChange={v => { if (v !== null) onChange(v); }}>
-        <SelectTrigger className="w-full h-10 rounded-xl border border-border bg-surface text-text-primary focus:ring-2 focus:ring-teal/50">
-          <SelectValue placeholder="Selecione o dentista..." />
+        <SelectTrigger aria-label="Dentista responsável" className="w-full h-10 rounded-xl border border-border bg-surface text-text-primary focus:ring-2 focus:ring-teal/50">
+          <SelectValue>{dentistas.find((d) => d.id === value)?.nome ?? 'Selecione o dentista...'}</SelectValue>
         </SelectTrigger>
         <SelectContent className="bg-surface border border-border">
           {dentistas.map(d => <SelectItem key={d.id} value={d.id}>{d.nome}</SelectItem>)}

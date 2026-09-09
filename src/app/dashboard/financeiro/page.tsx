@@ -1,5 +1,4 @@
 import { redirect } from 'next/navigation';
-import { format } from 'date-fns';
 import { getDentistaCached } from '@/lib/get-dentista';
 import { createClient } from '@/lib/supabase/server';
 import { listarDespesas, listarReceitas, calcularSaldoMes, listarUltimosMeses, calcularHoraClinica, listarPagamentosPagos, listarPagamentosPendentes } from './actions';
@@ -7,6 +6,8 @@ import { FinanceiroClient } from './_components/financeiro-client';
 import { PageTransition } from '@/components/layout/page-transition';
 import { UpsellPage } from '@/components/upsell-page';
 import { temFeature } from '@/lib/planos';
+import { mesValido } from '@/lib/financeiro/calculos';
+import { hojeBRT } from '@/lib/hora-brt';
 import { Wallet } from 'lucide-react';
 
 interface PageProps {
@@ -45,10 +46,11 @@ export default async function FinanceiroPage({ searchParams }: PageProps) {
   }
 
   const { mes, dentista: dentistaParam } = await searchParams;
-  const mesAtual = mes && /^\d{4}-\d{2}$/.test(mes) ? mes : format(new Date(), 'yyyy-MM');
+  const mesAtual = mes && mesValido(mes) ? mes : hojeBRT().slice(0, 7);
 
   // Busca dentistas da clínica para o seletor da secretária
   let dentistasClinica: { id: string; nome: string }[] = [];
+  let dentistaFiltro = '';
   if (dentista.role === 'secretaria') {
     const supabase = await createClient();
     const { data } = await supabase
@@ -61,16 +63,17 @@ export default async function FinanceiroPage({ searchParams }: PageProps) {
       .eq('ativo', true)
       .order('nome', { ascending: true });
     dentistasClinica = data ?? [];
+    dentistaFiltro = dentistasClinica.some((d) => d.id === dentistaParam) ? dentistaParam ?? '' : '';
   }
 
   const [despesas, receitas, saldo, chartData, horaClinica, pagamentosPagos, pagamentosPendentes] = await Promise.all([
-    listarDespesas(mesAtual),
-    listarReceitas(mesAtual),
-    calcularSaldoMes(mesAtual),
-    listarUltimosMeses(6),
-    calcularHoraClinica(mesAtual),
-    listarPagamentosPagos(mesAtual),
-    listarPagamentosPendentes(),
+    listarDespesas(mesAtual, dentistaFiltro || undefined),
+    listarReceitas(mesAtual, dentistaFiltro || undefined),
+    calcularSaldoMes(mesAtual, dentistaFiltro || undefined),
+    listarUltimosMeses(6, mesAtual, dentistaFiltro || undefined),
+    calcularHoraClinica(mesAtual, dentistaFiltro || undefined),
+    listarPagamentosPagos(mesAtual, dentistaFiltro || undefined),
+    listarPagamentosPendentes(dentistaFiltro || undefined),
   ]);
 
   return (
@@ -86,8 +89,9 @@ export default async function FinanceiroPage({ searchParams }: PageProps) {
         role={dentista.role}
         plano={planoEfetivo}
         dentistaId={dentista.id}
+        clinicaId={dentista.clinica_id}
         dentistasClinica={dentistasClinica}
-        initialDentistaFiltro={dentistaParam ?? ''}
+        initialDentistaFiltro={dentistaFiltro}
         pagamentosPagosIniciais={pagamentosPagos}
         pagamentosPendentesIniciais={pagamentosPendentes}
       />
