@@ -424,9 +424,9 @@ export function DayView({
                     const canCancel   = isSecretaria && !isTerminal;
                     const statusLabel = STATUS_CONFIG[apt.status as AgendamentoStatus]?.label ?? apt.status;
 
-                    // Card largo (coluna única) mostra botões COM RÓTULO — claros pra quem não é
-                    // da tecnologia. Card estreito (agendamentos sobrepostos, ou coluna de
-                    // dentista) volta pro ícone, e o clique abre o modal de detalhe.
+                    // A coluna única preserva os atalhos existentes. Em multi-coluna, a largura
+                    // recuperada é reservada para horário, status e nome; as mesmas ações seguem
+                    // no detalhe aberto pelo card (R-164).
                     const isWide = widthPct > 65 && !multiColuna;
                     const actions = [
                       {
@@ -464,7 +464,7 @@ export function DayView({
                     return (
                       <div
                         key={apt.id}
-                        className="absolute rounded-xl overflow-hidden"
+                        className={`absolute overflow-hidden ${multiColuna ? 'rounded-[9px]' : 'rounded-xl'}`}
                         style={{
                           top: `${top}px`,
                           height: `${height}px`,
@@ -482,48 +482,71 @@ export function DayView({
                         <div className="flex h-full">
                           {/* Main clickable area */}
                           <button
+                            type="button"
                             onClick={() => onAppointmentClick(apt)}
-                            className="flex-1 text-left px-3 py-1 flex flex-col justify-center min-w-0 hover:brightness-[0.97] transition-all"
+                            aria-label={`Abrir detalhes de ${apt.paciente?.nome ?? 'paciente sem nome'}, ${format(parseISO(apt.data_hora), 'HH:mm')} — ${statusLabel}`}
+                            className={`flex flex-1 min-w-0 flex-col justify-center text-left hover:brightness-[0.97] transition-all ${multiColuna ? 'px-[7px] py-[6px]' : 'px-3 py-1'}`}
                           >
-                            <div className="flex items-center gap-2 mb-0.5">
-                              <span className="font-mono text-[11px] font-bold" style={{ color: text }}>
-                                {format(parseISO(apt.data_hora), 'HH:mm')}
-                              </span>
-                              <span
-                                className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md"
-                                style={{ background: `${text}20`, color: text }}
-                              >
-                                {statusLabel}
-                              </span>
-                              <span className="text-[10px] font-mono ml-auto" style={{ color: text, opacity: 0.5 }}>
-                                {apt.duracao_minutos}min
-                              </span>
-                              {apt.paciente?.observacoes && (
-                                <span
-                                  title="Paciente com alertas clínicos"
-                                  className="text-[10px] font-bold text-amber-400 leading-none shrink-0"
-                                >
-                                  ◆
-                                </span>
-                              )}
-                            </div>
-                            <p className="font-semibold text-sm truncate leading-tight" style={{ color: text }}>
-                              {apt.paciente?.nome ?? '—'}
-                            </p>
-                            {height > 56 && apt.observacoes && (
-                              <p className="text-[11px] truncate mt-0.5 opacity-70" style={{ color: text }}>
-                                {apt.observacoes}
-                              </p>
-                            )}
-                            {height > 70 && isSecretaria && !multiColuna && apt.dentista && (
-                              <p className="text-[10px] mt-0.5 opacity-55" style={{ color: text }}>
-                                Dr. {apt.dentista.nome.split(' ')[0]}
-                              </p>
+                            {multiColuna ? (
+                              <>
+                                <div className="mb-1 flex min-w-0 items-center gap-1">
+                                  <span className="shrink-0 font-mono text-[10px] font-extrabold leading-none" style={{ color: text }}>
+                                    {format(parseISO(apt.data_hora), 'HH:mm')}
+                                  </span>
+                                  <span
+                                    className="min-w-0 truncate rounded-[4px] px-[4px] py-[2px] text-[9px] font-extrabold uppercase leading-none tracking-[0.04em]"
+                                    style={{ background: `${text}20`, color: text }}
+                                  >
+                                    {statusLabel}
+                                  </span>
+                                </div>
+                                <p className="truncate text-[12px] font-[750] leading-[13.8px]" style={{ color: text }}>
+                                  {apt.paciente?.nome ?? '—'}
+                                </p>
+                              </>
+                            ) : (
+                              <>
+                                <div className="flex items-center gap-2 mb-0.5">
+                                  <span className="font-mono text-[11px] font-bold" style={{ color: text }}>
+                                    {format(parseISO(apt.data_hora), 'HH:mm')}
+                                  </span>
+                                  <span
+                                    className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md"
+                                    style={{ background: `${text}20`, color: text }}
+                                  >
+                                    {statusLabel}
+                                  </span>
+                                  <span className="text-[10px] font-mono ml-auto" style={{ color: text, opacity: 0.5 }}>
+                                    {apt.duracao_minutos}min
+                                  </span>
+                                  {apt.paciente?.observacoes && (
+                                    <span
+                                      title="Paciente com alertas clínicos"
+                                      className="text-[10px] font-bold text-amber-400 leading-none shrink-0"
+                                    >
+                                      ◆
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="font-semibold text-sm truncate leading-tight" style={{ color: text }}>
+                                  {apt.paciente?.nome ?? '—'}
+                                </p>
+                                {height > 56 && apt.observacoes && (
+                                  <p className="text-[11px] truncate mt-0.5 opacity-70" style={{ color: text }}>
+                                    {apt.observacoes}
+                                  </p>
+                                )}
+                                {height > 70 && isSecretaria && apt.dentista && (
+                                  <p className="text-[10px] mt-0.5 opacity-55" style={{ color: text }}>
+                                    Dr. {apt.dentista.nome.split(' ')[0]}
+                                  </p>
+                                )}
+                              </>
                             )}
                           </button>
 
-                          {/* Ações rápidas — botões rotulados (card largo) ou ícones (estreito) */}
-                          {actions.length > 0 && (
+                          {/* Ações rápidas permanecem apenas na coluna única. */}
+                          {!multiColuna && actions.length > 0 && (
                             <div
                               className={`flex gap-1.5 justify-center px-2 shrink-0 border-l ${isWide ? 'flex-row items-center' : 'flex-col'}`}
                               style={{ borderColor: border }}
