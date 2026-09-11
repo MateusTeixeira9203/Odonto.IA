@@ -386,6 +386,7 @@ export async function criarDespesa(
 
   revalidatePath('/dashboard');
   revalidatePath('/dashboard/financeiro');
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
   return { ok: true, id: (data as { id: string }).id };
 }
 
@@ -410,6 +411,7 @@ export async function excluirDespesa(
 
   revalidatePath('/dashboard');
   revalidatePath('/dashboard/financeiro');
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
   return { ok: true };
 }
 
@@ -489,6 +491,7 @@ export async function criarReceita(
 
   revalidatePath('/dashboard');
   revalidatePath('/dashboard/financeiro');
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
   return { ok: true, id: (data as { id: string }).id };
 }
 
@@ -513,6 +516,7 @@ export async function excluirReceita(
 
   revalidatePath('/dashboard');
   revalidatePath('/dashboard/financeiro');
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
   return { ok: true };
 }
 
@@ -878,7 +882,7 @@ export async function registrarRecebimento(dados: {
   const formaPagamento: FormaPagamento = dados.formaPagamento === 'transferencia'
     ? 'outro'
     : dados.formaPagamento;
-  return registrarPagamento({
+  const result = await registrarPagamento({
     orcamentoId: dados.orcamentoId,
     pacienteId: dados.pacienteId,
     valor: dados.valor,
@@ -886,4 +890,6 @@ export async function registrarRecebimento(dados: {
     data: dados.data,
     dentistaId: dados.dentistaId,
   });
+  if (!result.error) revalidatePath('/dashboard/meu-consultorio/financeiro');
+  return result;
 }

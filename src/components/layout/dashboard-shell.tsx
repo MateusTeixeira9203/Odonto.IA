@@ -25,9 +25,10 @@ interface DashboardShellProps {
   plano?: PlanoId;
   dentistaId: string;
   bloqueioPagamento?: boolean;
+  consultorioPessoalEnabled?: boolean;
 }
 
-export function DashboardShell({ children, nome, clinicaNome, activeClinicId, role, avatarUrl, plano, bloqueioPagamento = false }: DashboardShellProps) {
+export function DashboardShell({ children, nome, clinicaNome, activeClinicId, role, avatarUrl, plano, bloqueioPagamento = false, consultorioPessoalEnabled = false }: DashboardShellProps) {
   const router = useRouter();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -89,6 +90,7 @@ export function DashboardShell({ children, nome, clinicaNome, activeClinicId, ro
         role={role}
         avatarUrl={avatarUrl}
         plano={plano}
+        consultorioPessoalEnabled={consultorioPessoalEnabled}
       />
 
       <MobileDrawer
@@ -99,6 +101,7 @@ export function DashboardShell({ children, nome, clinicaNome, activeClinicId, ro
         role={role}
         avatarUrl={avatarUrl}
         plano={plano}
+        consultorioPessoalEnabled={consultorioPessoalEnabled}
       />
 
       {/* FASE 1: guia desativado — ver roadmap-3-fases A2 */}

@@ -227,6 +227,7 @@ export async function alternarAprovacaoItem(
   revalidatePath(`/dashboard/pacientes/${orc.paciente_id}`);
   revalidatePath('/dashboard/orcamentos');
   revalidatePath('/dashboard/financeiro');
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
   return { estado: depois.estado, valorDevido: depois.valorDevido };
 }
 
@@ -283,6 +284,7 @@ export async function aprovarTodosItens(
   revalidatePath(`/dashboard/pacientes/${orc.paciente_id}`);
   revalidatePath('/dashboard/orcamentos');
   revalidatePath('/dashboard/financeiro');
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
   return { itensAprovados: atualizados.length, estado: depois.estado };
 }
 
@@ -481,6 +483,7 @@ export async function reorganizarParcelas(dados: {
   revalidatePath(`/dashboard/pacientes/${orcamento.paciente_id}`);
   revalidatePath('/dashboard/orcamentos');
   revalidatePath('/dashboard/financeiro');
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
   return { parcelas: (data ?? []) as ParcelaGerada[] };
 }
 
@@ -566,6 +569,7 @@ export async function gerarParcelas(dados: {
 
   revalidatePath("/dashboard/orcamentos");
   revalidatePath("/dashboard/financeiro");
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
   return { parcelas: linhas };
 }
 
@@ -622,6 +626,7 @@ export async function definirPlanoAvista(dados: {
 
   revalidatePath("/dashboard/orcamentos");
   revalidatePath("/dashboard/financeiro");
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
   return {};
 }
 
@@ -650,6 +655,7 @@ export async function marcarPagamentoPago(
 
   revalidatePath('/dashboard/orcamentos');
   revalidatePath('/dashboard/financeiro');
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
   return {};
 }
 
@@ -798,6 +804,7 @@ export async function registrarPagamento(dados: {
   revalidatePath(`/dashboard/pacientes/${parsed.data.pacienteId}`);
   revalidatePath('/dashboard/orcamentos');
   revalidatePath('/dashboard/financeiro');
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
   return { id: pagamento?.id };
 }
 
@@ -833,6 +840,7 @@ export async function criarCobrancaEtapa(dados: {
   revalidatePath(`/dashboard/pacientes/${parsed.data.pacienteId}`);
   revalidatePath('/dashboard/orcamentos');
   revalidatePath('/dashboard/financeiro');
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
   return { id: cobranca?.id };
 }
 
@@ -861,6 +869,7 @@ export async function registrarRecebimentoCobranca(dados: {
   revalidatePath(`/dashboard/pacientes/${parsed.data.pacienteId}`);
   revalidatePath('/dashboard/orcamentos');
   revalidatePath('/dashboard/financeiro');
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
   return { id: pagamento?.id };
 }
 
@@ -884,6 +893,7 @@ export async function cancelarCobrancaEtapa(dados: {
   revalidatePath(`/dashboard/pacientes/${parsed.data.pacienteId}`);
   revalidatePath('/dashboard/orcamentos');
   revalidatePath('/dashboard/financeiro');
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
   return {};
 }
 
@@ -919,6 +929,7 @@ export async function editarPagamento(
 
   revalidatePath('/dashboard/orcamentos');
   revalidatePath('/dashboard/financeiro');
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
   revalidatePath(`/dashboard/pacientes/${atual.paciente_id}`);
   return {};
 }
@@ -976,6 +987,7 @@ export async function excluirPagamento(
 
   revalidatePath("/dashboard/orcamentos");
   revalidatePath("/dashboard/financeiro");
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
   revalidatePath(`/dashboard/pacientes/${pagAtual.paciente_id}`);
   return {};
 }
@@ -1008,6 +1020,7 @@ export async function estornarPagamento(
 
   revalidatePath('/dashboard/orcamentos');
   revalidatePath('/dashboard/financeiro');
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
   revalidatePath(`/dashboard/pacientes/${atual.paciente_id}`);
   return {};
 }
@@ -1354,6 +1367,7 @@ export async function excluirOrcamento(
   revalidatePath("/dashboard/orcamentos");
   // Pagamento pago agora pode sair junto — o financeiro precisa refletir isso na hora.
   revalidatePath('/dashboard/financeiro');
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
   return {};
 }
 

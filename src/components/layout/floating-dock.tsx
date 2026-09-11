@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
 import {
-  LayoutDashboard, Users, Calendar, CalendarClock, Wallet, Settings,
+  LayoutDashboard, Users, Calendar, CalendarClock, Wallet, Building2, Settings,
   Sun, Moon, User, LogOut, Bot, Check, ChevronsUpDown, Loader2,
 } from 'lucide-react';
 import { OdontoIALogo } from '@/components/ui/dent-ia-logo';
@@ -26,6 +26,7 @@ interface FloatingDockProps {
   role: DentistaRole;
   avatarUrl?: string | null;
   plano?: PlanoId;
+  consultorioPessoalEnabled?: boolean;
 }
 
 const ROLE_PT: Record<string, string> = {
@@ -45,9 +46,17 @@ const NAV_ITEMS = [
   { href: '/dashboard/configuracoes',icon: Settings,        label: 'Config',     id: 'config',     hideFromSecretaria: true },
 ] as const;
 
+const CONSULTORIO_PESSOAL_NAV_ITEM = {
+  href: '/dashboard/meu-consultorio',
+  icon: Building2,
+  label: 'Meu Consultório',
+  requiresFeature: 'financeiro' as const,
+  id: 'meu-consultorio',
+} as const;
+
 const subscribeMounted = () => () => {};
 
-export function FloatingDock({ nome, clinicaNome, activeClinicId, role, avatarUrl, plano }: FloatingDockProps) {
+export function FloatingDock({ nome, clinicaNome, activeClinicId, role, avatarUrl, plano, consultorioPessoalEnabled = false }: FloatingDockProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
@@ -72,7 +81,10 @@ export function FloatingDock({ nome, clinicaNome, activeClinicId, role, avatarUr
 
   // R-94 — protético só acessa /dashboard/protetico (gate em dashboard/layout.tsx);
   // nenhum destino da nav faz sentido pra ele.
-  const visibleItems = role === 'protetico' ? [] : NAV_ITEMS.filter(item => {
+  const navItems = consultorioPessoalEnabled
+    ? NAV_ITEMS.map(item => item.id === 'financeiro' ? CONSULTORIO_PESSOAL_NAV_ITEM : item)
+    : NAV_ITEMS;
+  const visibleItems = role === 'protetico' ? [] : navItems.filter(item => {
     if ('hideFromSecretaria' in item && item.hideFromSecretaria && role === 'secretaria') return false;
     return true;
   });

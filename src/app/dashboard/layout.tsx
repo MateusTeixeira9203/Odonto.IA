@@ -8,6 +8,7 @@ import { createServiceClient } from '@/lib/supabase/service';
 import { clinicaIsentaDeCobranca } from '@/lib/billing/exemptions';
 import { estadoComercialBloqueiaOperacao, resolverEstadoComercial } from '@/lib/billing/estado-comercial';
 import { obterAcessoFormacaoClinica } from '@/server/services/formacao-clinica';
+import { isTeamWorkspaceEnabled } from '@/server/auth/team-workspace-pilot';
 
 const ROTA_PROTETICO = "/dashboard/protetico";
 
@@ -20,6 +21,8 @@ export default async function DashboardLayout({
   const pathname = (await headers()).get('x-pathname') ?? '/dashboard';
 
   const dentista = await getDentistaCached();
+  const consultorioPessoalEnabled = isTeamWorkspaceEnabled()
+    && (dentista?.role === 'admin' || dentista?.role === 'dentista');
   let bloqueioPagamento = false;
 
   if (!dentista) {
@@ -119,6 +122,7 @@ export default async function DashboardLayout({
       plano={dentista.plano}
       dentistaId={dentista.id}
       bloqueioPagamento={bloqueioPagamento}
+      consultorioPessoalEnabled={consultorioPessoalEnabled}
     >
       {children}
       <WelcomeModal clinicaNome={dentista.clinica} />

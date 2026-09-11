@@ -105,6 +105,7 @@ function fmt(v: number) {
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface Props {
+  basePath:              '/dashboard/financeiro' | '/dashboard/meu-consultorio/financeiro';
   mesAtual:             string;
   despesasIniciais:     Despesa[];
   receitasIniciais:     ReceitaManual[];
@@ -127,6 +128,7 @@ type SheetMode = 'saida' | 'entrada' | null;
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 export function FinanceiroClient({
+  basePath,
   mesAtual, despesasIniciais, receitasIniciais, saldoInicial,
   chartData, horaClinica, role, plano, dentistaId, clinicaId, dentistasClinica,
   pagamentosPagosIniciais, pagamentosPendentesIniciais,
@@ -300,7 +302,7 @@ export function FinanceiroClient({
 
   function navMes(delta: number) {
     const prox = delta > 0 ? addMonths(mesDate, 1) : subMonths(mesDate, 1);
-    const base = `/dashboard/financeiro?mes=${format(prox, 'yyyy-MM')}`;
+    const base = `${basePath}?mes=${format(prox, 'yyyy-MM')}`;
     router.push(role === 'secretaria' && selectedDentistaId
       ? `${base}&dentista=${selectedDentistaId}`
       : base
@@ -316,7 +318,7 @@ export function FinanceiroClient({
     }
     const params = new URLSearchParams({ mes: mesAtual });
     if (filtro) params.set('dentista', filtro);
-    router.push(`/dashboard/financeiro?${params.toString()}`);
+    router.push(`${basePath}?${params.toString()}`);
   }
 
   function lancamentoEstaNoFiltro(dentistaLancamento: string | undefined): boolean {

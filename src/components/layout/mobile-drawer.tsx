@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  LayoutDashboard, Users, Calendar, CalendarClock, Wallet, Settings,
+  LayoutDashboard, Users, Calendar, CalendarClock, Wallet, Building2, Settings,
   X, LogOut, Sun, Moon, Lock, Loader2,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
@@ -24,6 +24,7 @@ interface MobileDrawerProps {
   role: DentistaRole;
   avatarUrl?: string | null;
   plano?: PlanoId;
+  consultorioPessoalEnabled?: boolean;
 }
 
 const NAV_ITEMS = [
@@ -37,7 +38,14 @@ const NAV_ITEMS = [
   { href: '/dashboard/configuracoes',icon: Settings,        label: 'Configurações', hideFromSecretaria: true },
 ] as const;
 
-export function MobileDrawer({ open, onClose, nome, clinicaNome, role, avatarUrl, plano }: MobileDrawerProps) {
+const CONSULTORIO_PESSOAL_NAV_ITEM = {
+  href: '/dashboard/meu-consultorio',
+  icon: Building2,
+  label: 'Meu Consultório',
+  requiresFeature: 'financeiro' as const,
+} as const;
+
+export function MobileDrawer({ open, onClose, nome, clinicaNome, role, avatarUrl, plano, consultorioPessoalEnabled = false }: MobileDrawerProps) {
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -50,9 +58,12 @@ export function MobileDrawer({ open, onClose, nome, clinicaNome, role, avatarUrl
 
   // R-94 — protético só acessa /dashboard/protetico (gate em dashboard/layout.tsx);
   // nenhum destino da nav faz sentido pra ele.
+  const navItems = consultorioPessoalEnabled
+    ? NAV_ITEMS.map(item => item.href === '/dashboard/financeiro' ? CONSULTORIO_PESSOAL_NAV_ITEM : item)
+    : NAV_ITEMS;
   const visibleItems = role === 'protetico'
     ? []
-    : NAV_ITEMS.filter(item => !('hideFromSecretaria' in item && item.hideFromSecretaria && role === 'secretaria'));
+    : navItems.filter(item => !('hideFromSecretaria' in item && item.hideFromSecretaria && role === 'secretaria'));
 
   return (
     <AnimatePresence>
