@@ -2,39 +2,23 @@
 
 import { useState, useTransition, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Building2, Clock, Stethoscope, Check, Plus, Loader2, Pencil, X, UserCircle, LogOut, AlertTriangle, ImageIcon, FileUp, CreditCard, Gift, ArrowUpRight, Sparkles, MessageCircle, RotateCcw, Trash2 } from 'lucide-react';
+import { Building2, Clock, Stethoscope, Check, Loader2, UserCircle, LogOut, AlertTriangle, ImageIcon, CreditCard, Gift, ArrowUpRight, Sparkles, MessageCircle } from 'lucide-react';
 import Link from 'next/link';
-import { ImportarProcedimentosModal } from './importar-procedimentos-modal';
 import { MigrarClinicaModal } from './migrar-clinica-modal';
 import { createClient } from '@/lib/supabase/client';
-import { parseValorBR, formatValorBR } from '@/lib/valor-br';
 import { getLabelContexto, getPlano } from '@/lib/planos';
 import type { PlanoId } from '@/lib/planos';
 import type { EstadoComercial } from '@/lib/billing/estado-comercial';
 import { motion } from 'motion/react';
 import { PageContainer } from '@/components/layout/page-container';
 import type { ConfiguracaoClinica, HorarioDisponivel, Procedimento, DentistaRole } from '@/types/database';
-import { HelpTooltip } from '@/components/ui/help-tooltip';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { ProcedimentosCatalogo } from './procedimentos-catalogo';
 import { UsuariosClient } from '../usuarios/_components/usuarios-client';
 import {
   salvarClinica,
   salvarHorarios,
   salvarPerfil,
   salvarLogoUrl,
-  atualizarProcedimento,
-  removerProcedimentoDoCatalogo,
-  restaurarProcedimentoNoCatalogo,
-  criarProcedimento,
   sairDaClinicaAction,
   type HorarioDia,
 } from '../actions';
@@ -296,135 +280,6 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
       }
     });
   };
-
-  // --- Aba Procedimentos ---
-  const [procedimentos, setProcedimentos] = useState(procedimentosIniciais);
-  const [editandoId, setEditandoId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ nome: '', preco_padrao: '', duracao_minutos: 0 });
-  const [showNovoProcedimento, setShowNovoProcedimento] = useState(false);
-  const [showImportar, setShowImportar] = useState(false);
-  const [mostrarRemovidos, setMostrarRemovidos] = useState(false);
-  const [procedimentoParaRemover, setProcedimentoParaRemover] = useState<Procedimento | null>(null);
-  const [novoProc, setNovoProc] = useState({
-    nome: '',
-    descricao: '',
-    categoria: '',
-    preco_padrao: '',
-    duracao_minutos: '30',
-  });
-
-  const handleEditarProcedimento = (proc: Procedimento) => {
-    setEditandoId(proc.id);
-    setEditForm({
-      nome: proc.nome,
-      preco_padrao: formatValorBR(proc.preco_padrao ?? 0),
-      duracao_minutos: proc.duracao_minutos ?? 30,
-    });
-  };
-
-  const handleSalvarProcedimento = (id: string) => {
-    const precoNum = parseValorBR(editForm.preco_padrao);
-    startTransition(async () => {
-      const result = await atualizarProcedimento(id, {
-        nome: editForm.nome.trim() || 'Procedimento',
-        preco_padrao: precoNum,
-        duracao_minutos: editForm.duracao_minutos,
-      });
-      if (!result.error) {
-        setProcedimentos((prev) =>
-          prev.map((p) =>
-            p.id === id
-              ? { ...p, nome: editForm.nome.trim() || p.nome, preco_padrao: precoNum, duracao_minutos: editForm.duracao_minutos }
-              : p
-          )
-        );
-        setEditandoId(null);
-      }
-    });
-  };
-
-  const handleRemoverProcedimento = () => {
-    const procedimento = procedimentoParaRemover;
-    if (!procedimento) return;
-
-    startTransition(async () => {
-      setErrorMsg(null);
-      const result = await removerProcedimentoDoCatalogo(procedimento.id);
-      if (!result.ok) {
-        setErrorMsg(result.erro);
-        return;
-      }
-
-      setProcedimentos((prev) => prev.map((p) => (
-        p.id === result.id ? { ...p, ativo: false } : p
-      )));
-      setProcedimentoParaRemover(null);
-      setSuccessMsg(`"${procedimento.nome}" foi removido do catálogo.`);
-    });
-  };
-
-  const handleRestaurarProcedimento = (id: string) => {
-    startTransition(async () => {
-      setErrorMsg(null);
-      const result = await restaurarProcedimentoNoCatalogo(id);
-      if (!result.ok) {
-        setErrorMsg(result.erro);
-        return;
-      }
-
-      setProcedimentos((prev) => prev.map((p) => (
-        p.id === result.id ? { ...p, ativo: true } : p
-      )));
-      setSuccessMsg('Procedimento restaurado no catálogo.');
-    });
-  };
-
-  const handleCriarProcedimento = () => {
-    if (!novoProc.nome.trim()) return;
-    startTransition(async () => {
-      const result = await criarProcedimento({
-        nome: novoProc.nome.trim(),
-        descricao: novoProc.descricao.trim(),
-        categoria: novoProc.categoria.trim() || 'Geral',
-        preco_padrao: parseValorBR(novoProc.preco_padrao),
-        duracao_minutos: parseInt(novoProc.duracao_minutos, 10) || 30,
-      });
-      if (!result.ok) {
-        setErrorMsg(result.erro);
-        return;
-      }
-
-      const agora = new Date().toISOString();
-      const procedimentoCriado: Procedimento = {
-        id: result.id,
-        clinica_id: clinicId ?? '',
-        dentista_id: dentista.id,
-        nome: novoProc.nome.trim(),
-        descricao: novoProc.descricao.trim() || null,
-        codigo_tuss: null,
-        categoria: novoProc.categoria.trim() || 'Geral',
-        preco_padrao: parseValorBR(novoProc.preco_padrao),
-        duracao_minutos: parseInt(novoProc.duracao_minutos, 10) || 30,
-        ativo: true,
-        created_at: agora,
-        updated_at: agora,
-      };
-      setProcedimentos((prev) => {
-        const jaExiste = prev.some((procedimento) => procedimento.id === result.id);
-        return jaExiste
-          ? prev.map((procedimento) => (procedimento.id === result.id ? procedimentoCriado : procedimento))
-          : [...prev, procedimentoCriado];
-      });
-      setShowNovoProcedimento(false);
-      setNovoProc({ nome: '', descricao: '', categoria: '', preco_padrao: '', duracao_minutos: '30' });
-      setSuccessMsg(result.restaurado ? 'Procedimento restaurado no catálogo.' : 'Procedimento criado!');
-    });
-  };
-
-  // Agrupa procedimentos por categoria
-  const procedimentosAtivos = procedimentos.filter((procedimento) => procedimento.ativo);
-  const procedimentosRemovidos = procedimentos.filter((procedimento) => !procedimento.ativo);
-  const categorias = Array.from(new Set(procedimentosAtivos.map((procedimento) => procedimento.categoria)));
 
   return (
     <>
@@ -918,274 +773,13 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
 
           {/* === ABA: PROCEDIMENTOS === */}
           {abaAtiva === 'procedimentos' && (
-            <div className="space-y-4">
-              <div className="bg-surface p-6 rounded-3xl border border-border shadow-sm">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="font-heading font-bold text-2xl text-text-primary flex items-center">
-                    Catálogo de Procedimentos
-                    <HelpTooltip content="Cadastre seus procedimentos e valores para uso nos orçamentos." />
-                  </h2>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setShowImportar(true)}
-                      className="border border-border text-text-secondary px-4 py-2 rounded-xl font-semibold text-sm flex items-center gap-2 transition-all hover:border-teal/40 hover:text-teal hover:bg-teal/5"
-                    >
-                      <FileUp className="w-4 h-4" /> Importar
-                    </button>
-                    <button
-                      onClick={() => setShowNovoProcedimento(true)}
-                      className="bg-gradient-to-r from-teal to-teal-lt text-white px-4 py-2 rounded-xl font-semibold text-sm flex items-center gap-2 transition-all shadow-[0_4px_14px_rgba(47,156,133,0.3)] hover:-translate-y-0.5"
-                    >
-                      <Plus className="w-4 h-4" /> Novo
-                    </button>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setMostrarRemovidos((visivel) => !visivel)}
-                  className="mb-5 text-xs font-semibold text-text-secondary underline-offset-4 hover:text-text-primary hover:underline"
-                >
-                  {mostrarRemovidos
-                    ? 'Ocultar removidos'
-                    : `Ver removidos (${procedimentosRemovidos.length})`}
-                </button>
-
-                {/* Formulário novo procedimento */}
-                {showNovoProcedimento && (
-                  <div className="mb-6 p-4 border border-teal/20 bg-teal/5 rounded-xl space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-bold text-teal">Novo Procedimento</span>
-                      <button onClick={() => setShowNovoProcedimento(false)}>
-                        <X className="w-4 h-4 text-text-secondary" />
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <input
-                        placeholder="Nome do procedimento *"
-                        value={novoProc.nome}
-                        onChange={(e) => setNovoProc((f) => ({ ...f, nome: e.target.value }))}
-                        className="col-span-2 border border-border rounded-lg px-3 py-2 text-sm bg-surface-alt text-text-primary outline-none focus:border-teal"
-                      />
-                      <input
-                        placeholder="Categoria (ex: Ortodontia)"
-                        value={novoProc.categoria}
-                        onChange={(e) => setNovoProc((f) => ({ ...f, categoria: e.target.value }))}
-                        className="border border-border rounded-lg px-3 py-2 text-sm bg-surface-alt text-text-primary outline-none focus:border-teal"
-                      />
-                      <input
-                        placeholder="Preço (R$)"
-                        type="text" inputMode="decimal"
-                        value={novoProc.preco_padrao}
-                        onChange={(e) => setNovoProc((f) => ({ ...f, preco_padrao: e.target.value }))}
-                        className="border border-border rounded-lg px-3 py-2 text-sm bg-surface-alt text-text-primary outline-none focus:border-teal font-mono"
-                      />
-                      <input
-                        placeholder="Descrição"
-                        value={novoProc.descricao}
-                        onChange={(e) => setNovoProc((f) => ({ ...f, descricao: e.target.value }))}
-                        className="border border-border rounded-lg px-3 py-2 text-sm bg-surface-alt text-text-primary outline-none focus:border-teal"
-                      />
-                      <select
-                        value={novoProc.duracao_minutos}
-                        onChange={(e) => setNovoProc((f) => ({ ...f, duracao_minutos: e.target.value }))}
-                        className="border border-border rounded-lg px-3 py-2 text-sm bg-surface-alt text-text-primary outline-none focus:border-teal font-mono"
-                      >
-                        <option value="15">15 min</option>
-                        <option value="30">30 min</option>
-                        <option value="45">45 min</option>
-                        <option value="60">60 min</option>
-                        <option value="90">90 min</option>
-                        <option value="120">120 min</option>
-                      </select>
-                    </div>
-                    <div className="flex justify-end">
-                      <button
-                        onClick={handleCriarProcedimento}
-                        disabled={isPending || !novoProc.nome.trim()}
-                        className="bg-teal text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50 flex items-center gap-2"
-                      >
-                        {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                        Criar Procedimento
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Lista por categoria */}
-                {categorias.length === 0 && (
-                  <p className="text-sm text-text-secondary text-center py-8">
-                    Nenhum procedimento ativo. Crie um novo ou restaure um item removido.
-                  </p>
-                )}
-
-                {categorias.map((categoria) => (
-                  <div key={categoria} className="mb-6">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="h-px flex-1 bg-border" />
-                      <span className="text-[10px] font-bold text-text-secondary uppercase tracking-widest px-2">
-                        {categoria}
-                      </span>
-                      <div className="h-px flex-1 bg-border" />
-                    </div>
-
-                    <div className="space-y-2">
-                      {procedimentos
-                        .filter((p) => p.ativo && p.categoria === categoria)
-                        .map((proc) => (
-                          <div
-                            key={proc.id}
-                            className="p-4 rounded-xl border border-border bg-surface transition-colors"
-                          >
-                            {editandoId === proc.id ? (
-                              // Modo edição
-                              <div className="flex flex-col gap-3">
-                                <input
-                                  type="text"
-                                  value={editForm.nome}
-                                  onChange={(e) => setEditForm((f) => ({ ...f, nome: e.target.value }))}
-                                  placeholder="Nome do procedimento"
-                                  className="w-full border border-teal/40 rounded-lg px-3 py-1.5 text-sm font-medium bg-surface-alt text-text-primary outline-none focus:border-teal transition-colors"
-                                />
-                                <div className="flex items-center gap-4 flex-wrap">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs text-text-secondary">R$</span>
-                                    <input
-                                      type="text" inputMode="decimal"
-                                      value={editForm.preco_padrao}
-                                      onChange={(e) =>
-                                        setEditForm((f) => ({
-                                          ...f,
-                                          preco_padrao: e.target.value,
-                                        }))
-                                      }
-                                      className="w-24 border border-border rounded-lg px-2 py-1 text-xs font-mono bg-surface-alt text-text-primary outline-none focus:border-teal"
-                                    />
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <select
-                                      value={editForm.duracao_minutos}
-                                      onChange={(e) =>
-                                        setEditForm((f) => ({
-                                          ...f,
-                                          duracao_minutos: parseInt(e.target.value, 10),
-                                        }))
-                                      }
-                                      className="border border-border rounded-lg px-2 py-1 text-xs font-mono bg-surface-alt text-text-primary outline-none focus:border-teal"
-                                    >
-                                      <option value={15}>15 min</option>
-                                      <option value={30}>30 min</option>
-                                      <option value={45}>45 min</option>
-                                      <option value={60}>60 min</option>
-                                      <option value={90}>90 min</option>
-                                    </select>
-                                  </div>
-                                  <div className="flex gap-2 ml-auto">
-                                    <button
-                                      onClick={() => handleSalvarProcedimento(proc.id)}
-                                      disabled={isPending}
-                                      className="p-1.5 bg-teal text-white rounded-lg hover:bg-teal-lt transition-colors"
-                                    >
-                                      <Check className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button
-                                      onClick={() => setEditandoId(null)}
-                                      className="p-1.5 bg-surface-alt text-text-secondary rounded-lg hover:bg-surface-alt transition-colors"
-                                    >
-                                      <X className="w-3.5 h-3.5" />
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            ) : (
-                              // Modo visualização
-                              <div className="flex items-center gap-4 flex-wrap">
-                                <span className="font-medium text-sm text-text-primary flex-1">
-                                  {proc.nome}
-                                </span>
-                                {proc.preco_padrao !== null && (
-                                  <span className="font-mono text-sm font-semibold text-text-primary">
-                                    {proc.preco_padrao.toLocaleString('pt-BR', {
-                                      style: 'currency',
-                                      currency: 'BRL',
-                                    })}
-                                  </span>
-                                )}
-                                {proc.duracao_minutos && (
-                                  <span className="text-xs text-text-secondary font-medium">
-                                    {proc.duracao_minutos} min
-                                  </span>
-                                )}
-                                <div className="flex gap-2 ml-auto">
-                                  <button
-                                    onClick={() => handleEditarProcedimento(proc)}
-                                    className="p-1.5 text-text-secondary hover:text-text-primary rounded-lg hover:bg-surface-alt transition-colors"
-                                  >
-                                    <Pencil className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setProcedimentoParaRemover(proc)}
-                                    disabled={isPending}
-                                    aria-label={`Remover ${proc.nome} do catálogo`}
-                                    title="Remover do catálogo"
-                                    className="rounded-lg p-1.5 text-coral transition-colors hover:bg-coral/10 disabled:opacity-50"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                ))}
-
-                {mostrarRemovidos && (
-                  <section className="mt-8 border-t border-border pt-6" aria-labelledby="procedimentos-removidos-titulo">
-                    <div className="mb-3 flex items-start justify-between gap-4">
-                      <div>
-                        <h3 id="procedimentos-removidos-titulo" className="font-heading text-base font-bold text-text-primary">
-                          Removidos ({procedimentosRemovidos.length})
-                        </h3>
-                        <p className="mt-1 text-xs text-text-secondary">
-                          Fora das novas escolhas. O histórico clínico continua preservado.
-                        </p>
-                      </div>
-                    </div>
-
-                    {procedimentosRemovidos.length === 0 ? (
-                      <p className="rounded-xl border border-dashed border-border px-4 py-5 text-center text-sm text-text-secondary">
-                        Nenhum procedimento removido.
-                      </p>
-                    ) : (
-                      <div className="space-y-2">
-                        {procedimentosRemovidos.map((procedimento) => (
-                          <div key={procedimento.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface-alt/50 p-4">
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-medium text-text-primary">{procedimento.nome}</p>
-                              <p className="mt-0.5 text-xs text-text-secondary">{procedimento.categoria}</p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => handleRestaurarProcedimento(procedimento.id)}
-                              disabled={isPending}
-                              className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-teal/30 bg-teal/10 px-3 text-xs font-bold text-teal transition-colors hover:bg-teal/15 disabled:opacity-50"
-                            >
-                              {isPending ? <Loader2 className="size-3.5 animate-spin" /> : <RotateCcw className="size-3.5" />}
-                              Restaurar
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </section>
-                )}
-              </div>
-            </div>
+            <ProcedimentosCatalogo
+              key={`${clinicId}:${dentista.id}:${JSON.stringify(procedimentosIniciais)}`}
+              procedimentosIniciais={procedimentosIniciais}
+              dentistaId={dentista.id}
+              clinicaId={clinicId ?? ''}
+            />
           )}
-
           {/* === ABA: PLANO === */}
           {abaAtiva === 'plano' && (
             <div className="space-y-6">
@@ -1387,41 +981,6 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
 
         </motion.div>
       </div>
-
-      <ImportarProcedimentosModal
-        open={showImportar}
-        onOpenChange={setShowImportar}
-        onSaved={() => router.refresh()}
-      />
-
-      <AlertDialog
-        open={procedimentoParaRemover !== null}
-        onOpenChange={(aberto) => {
-          if (!aberto) setProcedimentoParaRemover(null);
-        }}
-      >
-        <AlertDialogContent size="sm">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remover do catálogo?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {procedimentoParaRemover
-                ? `“${procedimentoParaRemover.nome}” deixará de aparecer nas novas escolhas. O histórico clínico e os orçamentos anteriores serão preservados.`
-                : 'O procedimento deixará de aparecer nas novas escolhas.'}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isPending}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={isPending}
-              onClick={() => handleRemoverProcedimento()}
-              className="bg-coral text-white hover:bg-coral/90"
-            >
-              {isPending && <Loader2 className="size-4 animate-spin" />}
-              Remover
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* Dialog de confirmação — sair da clínica */}
       {showSairDialog && (
