@@ -55,6 +55,8 @@ export type OrcamentoExport = {
   total: number | null;
   /** R-114 — quando definido (RPCs do R-34), é o devido; nunca escrito por aprovação de item. */
   valor_acordado: number | null;
+  cobrancas: { desconto: number; situacao: string }[];
+  desconto: number | null;
   created_at: string;
   condicoes_pagamento: string | null;
   orcamento_itens: Array<{ descricao: string | null; preco_total: number | null; quantidade: number; aprovado: boolean }> | null;
@@ -279,6 +281,8 @@ function renderOrcamentoCard(o: OrcamentoExport): string {
   const pagamentos = o.pagamentos ?? [];
   const derivado = deriveEstadoOrcamento({
     valorAcordado: o.valor_acordado,
+    desconto: o.desconto,
+    cobrancas: o.cobrancas,
     itens: (o.orcamento_itens ?? []).map((i) => ({ precoTotal: i.preco_total, aprovado: i.aprovado })),
     pagamentos: pagamentos.map((p) => ({ valor: p.valor, status: p.status })),
   });
@@ -332,6 +336,7 @@ export type OrcamentoHtmlData = {
   total: number | null;
   /** R-114 — quando definido (RPCs do R-34), é o devido; nunca escrito por aprovação de item. */
   valor_acordado: number | null;
+  cobrancas: { desconto: number; situacao: string }[];
   desconto: number;
   validade_dias: number;
   condicoes_pagamento: string | null;
@@ -574,14 +579,18 @@ export function buildOrcamentoHTML(o: OrcamentoHtmlData): string {
 
   const derivado = deriveEstadoOrcamento({
     valorAcordado: o.valor_acordado,
+    desconto: o.desconto,
+    cobrancas: o.cobrancas,
     itens: o.itens.map((i) => ({ precoTotal: i.preco_total, aprovado: i.aprovado })),
     pagamentos: o.pagamentos.map((p) => ({ valor: p.valor, status: p.status })),
   });
 
   const subtotal     = itensAprovados.reduce((s, i) => s + (i.preco_total ?? 0), 0);
-  const temDesconto  = o.desconto > 0;
+  const desconto = Math.max(0, Math.round((derivado.valorAprovado - derivado.valorDevido) * 100) / 100);
+  const temDesconto  = desconto > 0;
   const totalPago    = derivado.valorPago;
-  const totalPendente= o.pagamentos.filter(p => p.status === 'pendente').reduce((s, p) => s + p.valor, 0);
+  const pagamentosAtivos = o.pagamentos.filter(p => p.status !== 'cancelado');
+  const totalPendente= pagamentosAtivos.filter(p => p.status === 'pendente').reduce((s, p) => s + p.valor, 0);
   const total        = derivado.valorDevido;
   const pctPago      = total > 0 ? Math.min(100, Math.round((totalPago / total) * 100)) : 0;
 
@@ -613,7 +622,7 @@ export function buildOrcamentoHTML(o: OrcamentoHtmlData): string {
       <div class="orc-totals-box">
         ${mostrarValor && temDesconto ? `<div class="orc-totals-row"><span>Subtotal</span><span class="val">${fmtMoney(subtotal)}</span></div>` : ''}
         ${temDesconto ? `
-          <div class="orc-totals-row"><span>Desconto</span><span class="val" style="color:#ef4444">− ${fmtMoney(o.desconto)}</span></div>
+          <div class="orc-totals-row"><span>Desconto</span><span class="val" style="color:#ef4444">− ${fmtMoney(desconto)}</span></div>
           <hr class="orc-divider">
         ` : ''}
         <div class="orc-grand-total">
@@ -623,17 +632,17 @@ export function buildOrcamentoHTML(o: OrcamentoHtmlData): string {
       </div>
     </div>`;
 
-  const pagamentosHtml = o.pagamentos.length > 0 ? `
+  const pagamentosHtml = pagamentosAtivos.length > 0 ? `
     <div class="orc-section">
       <div class="orc-section-title">Pagamentos</div>
-      ${o.pagamentos.length > 0 && total > 0 ? `
+      ${pagamentosAtivos.length > 0 && total > 0 ? `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
           <span style="font-size:11px;color:#999">${pctPago}% recebido</span>
           <span style="font-size:11px;color:#999;font-family:ui-monospace,monospace">${fmtMoney(totalPago)} de ${fmtMoney(total)}</span>
         </div>
         <div class="orc-progress"><div class="orc-progress-bar" style="width:${pctPago}%"></div></div>
       ` : ''}
-      ${o.pagamentos.map(pg => {
+      ${pagamentosAtivos.map(pg => {
         const isPago  = pg.status === 'pago';
         const formaLbl = FORMA_LABEL_MAP[pg.forma_pagamento ?? 'outro'] ?? 'Pagamento';
         const formaIco = FORMA_ICON_MAP[pg.forma_pagamento ?? 'outro'] ?? '💰';

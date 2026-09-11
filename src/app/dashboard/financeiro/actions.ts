@@ -689,32 +689,27 @@ export async function buscarOrcamentosPendentesPorPaciente(
     .maybeSingle();
 
   const { data: orcamentosRaw } = await supabase
-    .from('orcamentos')
-    .select('id, total, valor_acordado, itens:orcamento_itens(descricao), pagamentos(id, valor, status)')
+    .from('orcamentos_com_estado')
+    .select('id, valor_devido, valor_pago, itens:orcamento_itens(descricao)')
     .eq('clinica_id', clinicId)
     .eq('paciente_id', pacienteId)
-    .eq('status', 'aprovado');
+    .eq('estado', 'aceito');
 
   const orcamentos: OrcamentoPendente[] = ((orcamentosRaw ?? []) as unknown as Array<{
     id: string;
-    total: number | null;
-    valor_acordado: number | null;
+    valor_devido: number;
+    valor_pago: number;
     itens: { descricao: string | null }[];
-    pagamentos: { valor: number; status: string }[];
   }>)
     .map((o) => {
-      const totalPago = o.pagamentos
-        .filter((p) => p.status === 'pago')
-        .reduce((s, p) => s + p.valor, 0);
-      const valorDevido = o.valor_acordado ?? o.total ?? 0; // I1
-      const valorPendente = Math.max(0, valorDevido - totalPago);
+      const valorPendente = Math.max(0, Math.round((o.valor_devido - o.valor_pago) * 100) / 100);
       const descricao =
         o.itens
           .map((i) => i.descricao)
           .filter(Boolean)
           .slice(0, 2)
           .join(', ') || 'Orçamento aprovado';
-      return { id: o.id, total: o.total, descricao_resumo: descricao, valor_pendente: valorPendente };
+      return { id: o.id, total: o.valor_devido, descricao_resumo: descricao, valor_pendente: valorPendente };
     })
     .filter((o) => o.valor_pendente > 0);
 

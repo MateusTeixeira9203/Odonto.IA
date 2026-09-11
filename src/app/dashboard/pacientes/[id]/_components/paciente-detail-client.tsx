@@ -433,6 +433,8 @@ export function PacienteDetailClient({
   const estadoPorOrc = useMemo(
     () => new Map(orcamentosState.map((o) => [o.id, deriveEstadoOrcamento({
       valorAcordado: o.valor_acordado,
+      desconto: o.desconto,
+      cobrancas: o.cobrancas,
       itens: o.itens.map((i) => ({ precoTotal: i.preco_total, aprovado: i.aprovado })),
       pagamentos: o.pagamentos.map((p) => ({ valor: p.valor, status: p.status })),
     })])),
@@ -828,6 +830,8 @@ export function PacienteDetailClient({
     const derivado = detalheOrc
       ? deriveEstadoOrcamento({
           valorAcordado: detalheOrc.valor_acordado,
+          desconto: detalheOrc.desconto,
+          cobrancas: detalheOrc.cobrancas,
           itens: detalheOrc.itens.map((item) => ({ precoTotal: item.preco_total, aprovado: item.aprovado })),
           pagamentos: detalheOrc.pagamentos.map((pagamento) => ({ valor: pagamento.valor, status: pagamento.status })),
         })
@@ -1015,6 +1019,8 @@ export function PacienteDetailClient({
       .sort((a, b) => (a.parcela_numero ?? 0) - (b.parcela_numero ?? 0));
     const resultadoDerivado = deriveEstadoOrcamento({
       valorAcordado: detalheOrc.valor_acordado,
+      desconto: detalheOrc.desconto,
+      cobrancas: detalheOrc.cobrancas,
       itens: detalheOrc.itens.map((item) => ({ precoTotal: item.preco_total, aprovado: item.aprovado })),
       pagamentos: detalheOrc.pagamentos.map((pagamento) => ({ valor: pagamento.valor, status: pagamento.status })),
     });
@@ -1534,6 +1540,8 @@ export function PacienteDetailClient({
                     orcamentosState.map((orc) => {
                       const derivado = estadoPorOrc.get(orc.id) ?? deriveEstadoOrcamento({
                         valorAcordado: orc.valor_acordado,
+                        desconto: orc.desconto,
+                        cobrancas: orc.cobrancas,
                         itens: orc.itens.map((i) => ({ precoTotal: i.preco_total, aprovado: i.aprovado })),
                         pagamentos: orc.pagamentos.map((p) => ({ valor: p.valor, status: p.status })),
                       });

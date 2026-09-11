@@ -24,6 +24,7 @@ export async function GET(
       paciente:pacientes(nome, telefone),
       dentista:dentistas!orcamentos_dentista_id_fkey(nome),
       itens:orcamento_itens(descricao, quantidade, preco_unitario, preco_total, aprovado),
+      cobrancas:orcamento_cobrancas(desconto, situacao),
       pagamentos(valor, status, forma_pagamento, data_pagamento)
     `)
     .eq('id', id)

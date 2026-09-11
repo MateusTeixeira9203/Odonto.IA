@@ -42,7 +42,7 @@ export async function GET(
       .order('data_atendimento', { ascending: false }),
     supabase
       .from('orcamentos')
-      .select('id, status, total, valor_acordado, created_at, condicoes_pagamento, orcamento_itens(descricao, preco_total, quantidade, aprovado), pagamentos(valor, status, forma_pagamento)')
+      .select('id, status, total, valor_acordado, desconto, cobrancas:orcamento_cobrancas(desconto, situacao), created_at, condicoes_pagamento, orcamento_itens(descricao, preco_total, quantidade, aprovado), pagamentos(valor, status, forma_pagamento)')
       .eq('paciente_id', id)
       .eq('clinica_id', dentista.clinica_id)
       .order('created_at', { ascending: false }),

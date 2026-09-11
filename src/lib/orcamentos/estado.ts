@@ -1,8 +1,8 @@
 /**
  * R-114 — Estado do orçamento, derivado dos fatos.
  *
- * O orçamento deixou de declarar `status`. O que a tela mostra vem de duas coisas que já são
- * verdade no banco: **o que o paciente aprovou** (itens) e **o que ele pagou** (pagamentos).
+ * O orçamento deixou de declarar `status`. O que a tela mostra vem dos fatos
+ * registrados no banco: itens aprovados, descontos/acordo e pagamentos confirmados.
  * Isso existe porque o status declarado era contradito pelo dinheiro — 14 de 35 `rascunho` da
  * ClinDent tinham pagamento recebido, e o filtro do R-65 escondia R$ 33.203,34 de receita real.
  *
@@ -28,12 +28,18 @@ export interface PagamentoParaEstado {
   status: string;
 }
 
+export interface CobrancaParaEstado {
+  desconto: number;
+  situacao: string;
+}
+
 export interface EstadoDerivado {
   /** Soma dos itens aprovados — o que o paciente de fato fechou. */
   valorAprovado: number;
   /**
    * O que ele deve. `valor_acordado` (escrito SÓ pelas RPCs do R-34, plano de pagamento) tem
-   * precedência: quando existe, houve negociação formal e ela vence a soma dos itens (I1).
+   * precedência: quando existe, já inclui a negociação. Sem acordo, abate os descontos
+   * das cobranças abertas (ou o global, quando não há etapas) da soma aprovada.
    */
   valorDevido: number;
   valorPago: number;
@@ -42,26 +48,41 @@ export interface EstadoDerivado {
 
 export function deriveEstadoOrcamento(input: {
   valorAcordado: number | null;
+  desconto: number | null;
+  cobrancas: CobrancaParaEstado[];
   itens: ItemParaEstado[];
   pagamentos: PagamentoParaEstado[];
 }): EstadoDerivado {
-  const valorAprovado = input.itens
+  const aprovadoCentavos = input.itens
     .filter((i) => i.aprovado)
-    .reduce((soma, i) => soma + (i.precoTotal ?? 0), 0);
+    .reduce((soma, i) => soma + Math.round((i.precoTotal ?? 0) * 100), 0);
 
-  const valorDevido = input.valorAcordado ?? valorAprovado;
+  const cobrancasAbertas = input.cobrancas.filter((c) => c.situacao === 'aberta');
+  // Etapas são obrigações próprias: não acumular o desconto global da proposta.
+  const descontoCentavos = cobrancasAbertas.length > 0
+    ? cobrancasAbertas.reduce((soma, c) => soma + Math.round(c.desconto * 100), 0)
+    : Math.round((input.desconto ?? 0) * 100);
+  // O acordo explícito já inclui a negociação. Sem ele, abate os descontos registrados.
+  const devidoCentavos = input.valorAcordado !== null
+    ? Math.round(input.valorAcordado * 100)
+    : Math.max(0, aprovadoCentavos - descontoCentavos);
 
-  const valorPago = input.pagamentos
+  const pagoCentavos = input.pagamentos
     .filter((p) => p.status === 'pago')
-    .reduce((soma, p) => soma + p.valor, 0);
+    .reduce((soma, p) => soma + Math.round(p.valor * 100), 0);
 
   // A ordem importa: "nenhum item aprovado" vence tudo. Sem isso um orçamento sem nada aprovado
   // e sem nada pago cairia em `quitado` (0 >= 0), dizendo que está fechado sem nunca ter sido
   // aceito. `proposto` é o que hoje se chama `rascunho`.
   const estado: EstadoOrcamento =
-    valorAprovado === 0 ? 'proposto' : valorPago >= valorDevido ? 'quitado' : 'aceito';
+    aprovadoCentavos === 0 ? 'proposto' : pagoCentavos >= devidoCentavos ? 'quitado' : 'aceito';
 
-  return { valorAprovado, valorDevido, valorPago, estado };
+  return {
+    valorAprovado: aprovadoCentavos / 100,
+    valorDevido: devidoCentavos / 100,
+    valorPago: pagoCentavos / 100,
+    estado,
+  };
 }
 
 /**

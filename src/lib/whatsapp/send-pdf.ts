@@ -22,6 +22,7 @@ interface OrcamentoRow {
   /** R-114 — quando definido (RPCs do R-34), é o devido; nunca escrito por aprovação de item. */
   valor_acordado: number | null;
   desconto: number | null;
+  cobrancas: { desconto: number; situacao: string }[];
   paciente: { nome: string; cpf: string | null; telefone: string | null } | null;
   clinica: { nome: string; endereco: string | null; telefone: string | null } | null;
   dentista: { nome: string; cro: string | null } | null;
@@ -66,6 +67,8 @@ function montarOrcamentoData(row: OrcamentoRow): OrcamentoData {
 
   const derivado = deriveEstadoOrcamento({
     valorAcordado: row.valor_acordado,
+    desconto: row.desconto,
+    cobrancas: row.cobrancas,
     itens: (row.itens ?? []).map((i) => ({ precoTotal: i.preco_total, aprovado: i.aprovado })),
     pagamentos: row.pagamentos ?? [],
   });
@@ -99,7 +102,7 @@ function montarOrcamentoData(row: OrcamentoRow): OrcamentoData {
       quantidade: i.quantidade,
     })),
     subtotal,
-    desconto: row.desconto ?? 0,
+    desconto: Math.max(0, Math.round((derivado.valorAprovado - derivado.valorDevido) * 100) / 100),
     total:    derivado.valorDevido,
     totalPago:      temPagamento ? derivado.valorPago : undefined,
     totalPendente:  temPagamento
@@ -161,6 +164,7 @@ export async function sendOrcamentoWhatsApp(
       clinica:clinicas (nome, endereco, telefone),
       dentista:dentistas (nome, cro),
       itens:orcamento_itens (id, descricao, dente, preco_unitario, preco_total, quantidade, aprovado),
+      cobrancas:orcamento_cobrancas (desconto, situacao),
       pagamentos (valor, status)
     `)
     .eq('paciente_id', resolvedPacienteId)

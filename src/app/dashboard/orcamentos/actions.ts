@@ -72,6 +72,7 @@ type RpcResult = { data: unknown; error: { message: string } | null };
 type RpcCall = (fn: string, args: Record<string, unknown>) => Promise<RpcResult>;
 
 function erroFinanceiro(message: string): string {
+  if (message.includes('orcamento_acordo_global')) return 'Este orçamento tem desconto ou valor combinado geral. Use o recebimento do orçamento.';
   if (message.includes('orcamento_sem_aprovacao')) return ERRO_ORCAMENTO_SEM_APROVACAO;
   if (message.includes('valor_acima_do_saldo')) return 'O recebimento não pode ultrapassar o saldo do orçamento.';
   if (message.includes('valor_menor_que_recebido')) return 'O valor combinado não pode ser menor que o total já recebido.';
@@ -102,7 +103,7 @@ const fmtReal = (v: number): string =>
 
 /** Embed usado por toda action que precisa derivar o estado (R-114). Uma query, não três. */
 const SELECT_ORC_PARA_ESTADO =
-  'id, paciente_id, dentista_id, valor_acordado, enviado_em, ' +
+  'id, paciente_id, dentista_id, valor_acordado, desconto, cobrancas:orcamento_cobrancas(desconto, situacao), enviado_em, ' +
   'orcamento_itens(id, preco_total, aprovado), pagamentos(valor, status), paciente:pacientes(nome)';
 
 type OrcParaEstado = {
@@ -110,6 +111,8 @@ type OrcParaEstado = {
   paciente_id: string;
   dentista_id: string;
   valor_acordado: number | null;
+  desconto: number | null;
+  cobrancas: { desconto: number; situacao: string }[];
   enviado_em: string | null;
   orcamento_itens: { id: string; preco_total: number | null; aprovado: boolean }[] | null;
   pagamentos: { valor: number; status: string }[] | null;
@@ -119,6 +122,8 @@ type OrcParaEstado = {
 const derivarDoOrc = (orc: OrcParaEstado, itensOverride?: { preco_total: number | null; aprovado: boolean }[]) =>
   deriveEstadoOrcamento({
     valorAcordado: orc.valor_acordado,
+    desconto: orc.desconto,
+    cobrancas: orc.cobrancas,
     itens: (itensOverride ?? orc.orcamento_itens ?? []).map((i) => ({
       precoTotal: i.preco_total,
       aprovado: i.aprovado,

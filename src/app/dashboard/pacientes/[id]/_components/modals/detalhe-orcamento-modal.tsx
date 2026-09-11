@@ -135,7 +135,9 @@ interface Props {
   onToggleMostrarValorPorItem: (id: string, mostrar: boolean) => void;
 }
 
-function CobrancasPorEtapa({ orcamento, pacienteId }: { orcamento: OrcamentoComItens; pacienteId: string }) {
+function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
+  orcamento: OrcamentoComItens; pacienteId: string; permitirNovaEtapa: boolean;
+}) {
   const router = useRouter();
   const hoje = new Date().toISOString().split('T')[0];
   const [formAberto, setFormAberto] = useState(false);
@@ -395,7 +397,7 @@ function CobrancasPorEtapa({ orcamento, pacienteId }: { orcamento: OrcamentoComI
         );
       })}
 
-      {itensElegiveis.length > 0 && (
+      {permitirNovaEtapa && itensElegiveis.length > 0 && (
         formAberto ? (
           <div className="rounded-2xl border border-teal/30 bg-teal/5 p-3 space-y-3">
             <div><p className="text-sm font-semibold text-text-primary">Nova cobrança</p><p className="text-xs text-text-secondary mt-1">Selecione itens aprovados. O desconto vale somente para esta etapa.</p></div>
@@ -492,6 +494,8 @@ export function DetalheOrcamentoModal({
     }
     const derivado = deriveEstadoOrcamento({
       valorAcordado: detalheOrc.valor_acordado,
+      desconto: detalheOrc.desconto,
+      cobrancas: detalheOrc.cobrancas,
       itens: detalheOrc.itens.map((i) => ({ precoTotal: i.preco_total, aprovado: i.aprovado })),
       pagamentos: detalheOrc.pagamentos.map((p) => ({ valor: p.valor, status: p.status })),
     });
@@ -521,8 +525,11 @@ export function DetalheOrcamentoModal({
   const podeConfigurarRecebimento = temItensAprovados && !quitado && !closingPagamentoId;
   // Orçamentos já em negociação legada seguem na superfície anterior. Assim que não há dinheiro
   // nem previsão legados, a primeira cobrança nasce por etapa e não por `valor_acordado` global.
-  const usarCobrancasPorEtapa = (detalheOrc?.cobrancas.length ?? 0) > 0
-    || ((detalheOrc?.pagamentos.length ?? 0) === 0 && temItensAprovados);
+  const temAcordoGlobal = detalheOrc !== null
+    && ((detalheOrc.desconto ?? 0) > 0 || detalheOrc.valor_acordado !== null);
+  const usarCobrancasPorEtapa = detalheOrc?.cobrancas.some((c) => c.situacao === 'aberta')
+    || (!temAcordoGlobal && ((detalheOrc?.cobrancas.length ?? 0) > 0
+      || ((detalheOrc?.pagamentos.length ?? 0) === 0 && temItensAprovados)));
 
   /**
    * R-27a: quantidade de pagamentos recebidos e formas distintas usadas — é o que a
@@ -846,7 +853,7 @@ export function DetalheOrcamentoModal({
               >
                 <div className="flex-1 min-h-0 overflow-y-auto p-5">
                   {!orcEditMode && usarCobrancasPorEtapa ? (
-                    <CobrancasPorEtapa orcamento={detalheOrc} pacienteId={pacienteId} />
+                    <CobrancasPorEtapa orcamento={detalheOrc} pacienteId={pacienteId} permitirNovaEtapa={!temAcordoGlobal} />
                   ) : (
                     <>
                   {orcEditMode ? (
