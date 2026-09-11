@@ -2,13 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Wallet, Tags } from 'lucide-react';
+import { Wallet, Stethoscope } from 'lucide-react';
 import { PageContainer } from '@/components/layout/page-container';
 import { cn } from '@/lib/utils';
 
 const SECOES = [
   { href: '/dashboard/meu-consultorio/financeiro', label: 'Financeiro', icon: Wallet },
-  { href: '/dashboard/meu-consultorio/precos', label: 'Preços', icon: Tags },
+  { href: '/dashboard/meu-consultorio/precos', label: 'Procedimentos', icon: Stethoscope },
 ] as const;
 
 export function ConsultorioNavigation() {
@@ -16,13 +16,17 @@ export function ConsultorioNavigation() {
 
   return (
     <PageContainer variant="wide" className="!pb-0">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Consultório</p>
+      <header className="mb-6">
+        <h1 className="font-heading font-bold text-3xl md:text-4xl text-foreground mb-1">Consultório</h1>
+        <p className="text-muted-foreground text-sm font-medium">Organize seu financeiro e seus procedimentos.</p>
+      </header>
       <nav aria-label="Seções do consultório" className="flex gap-2 border-b border-border">
         {SECOES.map(({ href, label, icon: Icon }) => {
           const active = pathname === href;
           return (
             <Link
               key={href}
+              id={label === 'Procedimentos' ? 'dex-tour-procedimentos' : undefined}
               href={href}
               aria-current={active ? 'page' : undefined}
               className={cn(

@@ -68,10 +68,11 @@ interface Props {
   elegibilidade?: { status: string; prazoEquipe: string | null };
   abrirFormacaoInicial?: boolean;
   procedimentosPendente?: boolean;
+  catalogoNoConsultorio?: boolean;
   clinicId?: string;
 }
 
-export function ConfiguracoesClient({ plano, dentista, config, horarios, procedimentos: procedimentosIniciais, abaInicial, equipe, estadoComercial, formacao, elegibilidade, abrirFormacaoInicial = false, procedimentosPendente = false, clinicId }: Props) {
+export function ConfiguracoesClient({ plano, dentista, config, horarios, procedimentos: procedimentosIniciais, abaInicial, equipe, estadoComercial, formacao, elegibilidade, abrirFormacaoInicial = false, procedimentosPendente = false, catalogoNoConsultorio = false, clinicId }: Props) {
   const labelContexto = getLabelContexto(plano); // "Consultório" (SOLO) ou "Clínica" (CLINICA)
   const isSolo = !plano || plano === 'SOLO' || (plano as string) === 'BASICO';
   const planoConfig = getPlano(plano);
@@ -86,9 +87,10 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
     { id: 'plano'         as const, label: 'Plano',            icon: CreditCard  },
   ];
   const podeGerirClinica = dentista.role === 'admin' || dentista.role === 'dentista';
-  const ABAS = podeGerirClinica
-    ? ABAS_TODAS
-    : ABAS_TODAS.filter((aba) => aba.id !== 'clinica');
+  const ABAS = ABAS_TODAS.filter((aba) =>
+    (podeGerirClinica || aba.id !== 'clinica')
+    && (!catalogoNoConsultorio || aba.id !== 'procedimentos')
+  );
   const abaPadrao: Aba = ABAS[0]?.id ?? 'perfil';
   const router = useRouter();
   const [abaAtiva, setAbaAtiva] = useState<Aba>((ABAS.some(a => a.id === abaInicial) ? abaInicial : abaPadrao) as Aba);
@@ -296,7 +298,7 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
         )}
         <h1 className="font-heading font-bold text-3xl md:text-4xl text-text-primary mb-1">Configurações</h1>
         <p className="text-text-secondary text-sm font-medium">
-          Gerencie {labelContexto.toLowerCase()}, horários, equipe e catálogo de procedimentos.
+          Gerencie {labelContexto.toLowerCase()}, horários e equipe{catalogoNoConsultorio ? '.' : ', além do catálogo de procedimentos.'}
         </p>
       </motion.header>
 
@@ -308,7 +310,7 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
           transition={{ delay: 0.1 }}
           className="md:col-span-1"
         >
-          <div id="dex-tour-procedimentos" className="bg-surface rounded-3xl border border-border shadow-sm p-2 space-y-1">
+          <div id={catalogoNoConsultorio ? undefined : "dex-tour-procedimentos"} className="bg-surface rounded-3xl border border-border shadow-sm p-2 space-y-1">
             {ABAS.map(({ id, label, icon: Icon }) => {
               const showBadge = (id === 'perfil' && !dentista.cro) || (id === 'procedimentos' && procedimentosPendente);
               const isActive = abaAtiva === id;
@@ -772,7 +774,7 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
           )}
 
           {/* === ABA: PROCEDIMENTOS === */}
-          {abaAtiva === 'procedimentos' && (
+          {!catalogoNoConsultorio && abaAtiva === 'procedimentos' && (
             <ProcedimentosCatalogo
               key={`${clinicId}:${dentista.id}`}
               procedimentosIniciais={procedimentosIniciais}
