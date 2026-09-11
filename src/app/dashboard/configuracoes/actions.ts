@@ -182,6 +182,8 @@ export async function atualizarProcedimento(
   // Configurou procedimentos → limpa a pendência (some o alerta âmbar)
   await contexto.supabase.from("clinicas").update({ procedimentos_pendente: false }).eq("id", contexto.clinicId);
 
+  revalidatePath('/dashboard/configuracoes');
+  revalidatePath('/dashboard/meu-consultorio/precos');
   return {};
 }
 
@@ -217,6 +219,7 @@ async function alterarVisibilidadeProcedimento(
   }
 
   revalidatePath('/dashboard/configuracoes');
+  revalidatePath('/dashboard/meu-consultorio/precos');
   return { ok: true, id: data.id, ativo: data.ativo };
 }
 
@@ -279,6 +282,7 @@ export async function criarProcedimento(
     }
     await contexto.supabase.from('clinicas').update({ procedimentos_pendente: false }).eq('id', contexto.clinicId);
     revalidatePath('/dashboard/configuracoes');
+    revalidatePath('/dashboard/meu-consultorio/precos');
     return { ok: true, id: existente.id, restaurado: true };
   }
 
@@ -296,6 +300,7 @@ export async function criarProcedimento(
   // Configurou procedimentos → limpa a pendência (some o alerta âmbar)
   await contexto.supabase.from('clinicas').update({ procedimentos_pendente: false }).eq('id', contexto.clinicId);
   revalidatePath('/dashboard/configuracoes');
+  revalidatePath('/dashboard/meu-consultorio/precos');
   return { ok: true, id: criado.id, restaurado: false };
 }
 

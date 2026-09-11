@@ -49,8 +49,7 @@ const NAV_ITEMS = [
 const CONSULTORIO_PESSOAL_NAV_ITEM = {
   href: '/dashboard/meu-consultorio',
   icon: Building2,
-  label: 'Meu Consultório',
-  requiresFeature: 'financeiro' as const,
+  label: 'Consultório',
   id: 'meu-consultorio',
 } as const;
 
