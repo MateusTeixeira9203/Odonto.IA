@@ -37,6 +37,12 @@
 | [**R-139a**](specs/R-139a-remover-procedimento-catalogo.md), [**R-139b**](specs/R-139b-face-incisal-i.md), [**R-139d**](specs/R-139d-visualizador-clinico-arquivos.md) e [**R-139e**](specs/R-139e-visualizador-apresentacao-anotacoes.md) | Catálogo, face incisal e visualizador clínico | 🟡 no ar; aguardam auditoria completa. |
 | **R-92 / R-105** | Cobrança Stripe e onboarding do primeiro valor | 🟡 fluxo no ar; faltam ciclos reais controlados. |
 
+## Correção de desconto
+
+| ID | Item | Estado |
+|---|---|---|
+| [R-166](specs/R-166-desconto-saldo-orcamento.md) | Desconto no saldo do orçamento | ⏳ correção revisada e validada no Free; entrega na branch R-166, produção pendente. |
+
 ## Correções críticas antes de nova escrita clínica
 
 | ID | Item | Estado |
