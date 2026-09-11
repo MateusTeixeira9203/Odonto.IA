@@ -66,9 +66,9 @@ async function defaultDependencies(): Promise<PrepareMemberAccessDependencies> {
 }
 
 /**
- * Persiste somente configuração em preparação. Não concede acesso a recursos do produto.
+ * Persiste configuração em preparação. O R-159c usa equipe.ler na consulta protegida da equipe.
  * A RPC autentica e revalida responsável, clínica, alvo e versão dentro da transação.
- * Não usar como guard nem adicionar consumidores antes do lote de enforcement.
+ * Não usar como guard; outros módulos só podem consumir após seu próprio enforcement.
  */
 export async function prepareMemberAccess(
   input: unknown,

@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 
-const CLINIC_ROLES = ['dentista', 'secretaria', 'admin', 'protetico'] as const;
+const CLINIC_ROLES = ['dentista', 'secretaria', 'admin', 'protetico', 'gestor'] as const;
 
 export type ClinicMembershipRole = (typeof CLINIC_ROLES)[number];
 export type ClinicalProfile = { tipo: 'dentista'; dentistaId: string } | null;

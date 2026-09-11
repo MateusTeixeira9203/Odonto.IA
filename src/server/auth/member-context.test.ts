@@ -118,6 +118,20 @@ test('secretaria com linha legada em dentistas não recebe perfil clínico', asy
   }
 });
 
+test('gestor resolve a unidade sem consultar ou inferir perfil clínico', async () => {
+  const dependencies = fakeDependencies({
+    rows: activeRows('gestor'),
+    throws: { getClinicalProfile: true },
+  });
+  const result = await getMemberContext({ dependencies });
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.data.role, 'gestor');
+    assert.equal(result.data.perfilClinico, null);
+    assert.equal(result.data.clinicaId, clinicId);
+  }
+});
+
 test('perfil legado com role não clínico não promove membership admin a profissional', async () => {
   const rows = activeRows('admin');
   rows.dentist = { id: dentistId, role: 'secretaria' };
