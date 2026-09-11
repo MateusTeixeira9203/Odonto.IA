@@ -3,6 +3,7 @@ import { requireUser } from "@/server/auth/user";
 import { LogoMark } from "@/components/dentai/Logo";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { NeuralBackground } from "@/components/layout/NeuralBackground";
+import { getPilotEntryMembership, isTeamWorkspaceEnabled } from '@/server/auth/team-workspace-pilot';
 
 export default async function OnboardingLayout({
   children,
@@ -21,6 +22,10 @@ export default async function OnboardingLayout({
     .maybeSingle();
 
   if (u?.active_clinica_id) {
+    if (isTeamWorkspaceEnabled()) {
+      const membership = await getPilotEntryMembership(supabase, user.id, u.active_clinica_id);
+      if (membership?.role === 'gestor') redirect('/equipe');
+    }
     const { data: clinica } = await supabase
       .from("clinicas")
       .select("onboarding_completo")

@@ -6,6 +6,7 @@ import { createServiceClient } from '@/lib/supabase/service';
 import { clinicaIsentaDeCobranca } from '@/lib/billing/exemptions';
 import { estadoComercialBloqueiaOperacao, resolverEstadoComercial } from '@/lib/billing/estado-comercial';
 import { obterAcessoFormacaoClinica } from '@/server/services/formacao-clinica';
+import { getPilotEntryMembership, isTeamWorkspaceEnabled } from './team-workspace-pilot';
 
 export type ClinicRole = "dentista" | "secretaria" | "admin" | "protetico";
 
@@ -92,7 +93,9 @@ export const requireClinicContext = cache(async (options: ClinicContextOptions =
 
   // ── 2. Membership + perfil clínico em paralelo ───────────────────────────────
   const [{ data: membership }, { data: dentista }] = await Promise.all([
-    supabase
+    isTeamWorkspaceEnabled()
+      ? getPilotEntryMembership(supabase, user.id, clinicId).then((data) => ({ data }))
+      : supabase
       .from("clinica_usuarios")
       .select("role, status")
       .eq("usuario_id", user.id)
@@ -107,6 +110,9 @@ export const requireClinicContext = cache(async (options: ClinicContextOptions =
   ]);
 
   if (!membership) redirect("/onboarding");
+  // Vínculo não clínico, inclusive suspenso, não entra no onboarding de dentista.
+  // A área de equipe revalida vínculo ativo e concessão antes de mostrar qualquer dado.
+  if (isTeamWorkspaceEnabled() && membership.role === 'gestor') redirect('/equipe');
   if (membership.status !== 'ativo') {
     if (membership.role === 'dentista' && (membership.status === 'pendente' || membership.status === 'suspenso')) {
       redirect('/bem-vindo-agregado');
