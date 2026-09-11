@@ -258,6 +258,7 @@ export function DayView({
         <div className="flex min-w-0 items-center gap-1 md:gap-2">
           <button
             onClick={() => onDateChange(diaAnteriorDeAgenda(selectedDate))}
+            aria-label="Dia anterior"
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border transition-colors hover:bg-surface md:h-11 md:w-11"
           >
             <ChevronLeft className="w-4 h-4 text-text-secondary" />
@@ -274,6 +275,7 @@ export function DayView({
           </div>
           <button
             onClick={() => onDateChange(proximoDiaDeAgenda(selectedDate))}
+            aria-label="Próximo dia"
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border transition-colors hover:bg-surface md:h-11 md:w-11"
           >
             <ChevronRight className="w-4 h-4 text-text-secondary" />
@@ -485,22 +487,22 @@ export function DayView({
                             type="button"
                             onClick={() => onAppointmentClick(apt)}
                             aria-label={`Abrir detalhes de ${apt.paciente?.nome ?? 'paciente sem nome'}, ${format(parseISO(apt.data_hora), 'HH:mm')} — ${statusLabel}`}
-                            className={`flex flex-1 min-w-0 flex-col justify-center text-left hover:brightness-[0.97] transition-all ${multiColuna ? 'px-[7px] py-[6px]' : 'px-3 py-1'}`}
+                            className={`flex flex-1 min-w-0 flex-col justify-center text-left hover:brightness-[0.97] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground ${multiColuna ? 'px-[7px] py-[6px]' : 'px-3 py-1'}`}
                           >
                             {multiColuna ? (
                               <>
                                 <div className="mb-1 flex min-w-0 items-center gap-1">
-                                  <span className="shrink-0 font-mono text-[10px] font-extrabold leading-none" style={{ color: text }}>
+                                  <span className="shrink-0 font-mono text-[10px] font-extrabold leading-none text-foreground">
                                     {format(parseISO(apt.data_hora), 'HH:mm')}
                                   </span>
                                   <span
-                                    className="min-w-0 truncate rounded-[4px] px-[4px] py-[2px] text-[9px] font-extrabold uppercase leading-none tracking-[0.04em]"
-                                    style={{ background: `${text}20`, color: text }}
+                                    className="min-w-0 truncate rounded-[4px] px-[4px] py-[2px] text-[9px] font-extrabold uppercase leading-none tracking-[0.04em] text-foreground"
+                                    style={{ background: `color-mix(in srgb, ${text} 12.5%, transparent)` }}
                                   >
                                     {statusLabel}
                                   </span>
                                 </div>
-                                <p className="truncate text-[12px] font-[750] leading-[13.8px]" style={{ color: text }}>
+                                <p className="truncate text-[12px] font-[750] leading-[13.8px] text-foreground">
                                   {apt.paciente?.nome ?? '—'}
                                 </p>
                               </>

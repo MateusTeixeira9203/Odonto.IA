@@ -52,6 +52,11 @@ test('multi-coluna prioriza o nome e não renderiza ações rápidas', () => {
 
   assert.match(html, /Maria Aparecida de Oliveira/);
   assert.match(html, /Abrir detalhes de Maria Aparecida de Oliveira, \d{2}:\d{2} — Agendado/);
+  assert.match(html, /aria-label="Dia anterior"/);
+  assert.match(html, /aria-label="Próximo dia"/);
+  assert.match(html, /text-foreground/);
+  assert.match(html, /color-mix\(in srgb, #d97706 12\.5%, transparent\)/);
+  assert.match(html, /focus-visible:ring-inset/);
   assert.doesNotMatch(html, /Confirmar consulta/);
   assert.doesNotMatch(html, /Paciente chegou \(check-in\)/);
   assert.doesNotMatch(html, /Paciente faltou/);
