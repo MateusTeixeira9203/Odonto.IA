@@ -50,8 +50,13 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(destination, 308);
   }
 
-  const { response, session } = await updateSession(request);
+  const { response, session, managementEntry } = await updateSession(request);
   const { pathname } = request.nextUrl;
+
+  // Resolver antes de renderizar layouts clínicos evita redirects de streaming presos no loading.
+  if (session && managementEntry) {
+    return createRedirectResponse(response, new URL('/equipe', request.url));
+  }
 
   if (isPublicRoute(pathname) || isAlwaysAllowedAuthRoute(pathname)) {
     return response;

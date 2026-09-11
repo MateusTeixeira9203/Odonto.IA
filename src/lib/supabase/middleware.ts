@@ -1,5 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
+import { getPilotEntryMembership } from '@/lib/auth/entry-membership';
+import { isTeamWorkspaceEnabled } from '@/server/auth/team-workspace-pilot';
 
 export type MiddlewareSession = {
   id: string;
@@ -9,6 +11,7 @@ export type MiddlewareSession = {
 export interface UpdateSessionResult {
   response: NextResponse;
   session: MiddlewareSession;
+  managementEntry?: boolean;
 }
 
 function isInvalidRefreshToken(message: string): boolean {
@@ -97,5 +100,19 @@ export async function updateSession(
     ? { id: user.id, email: user.email ?? undefined }
     : null;
 
-  return { response, session };
+  let managementEntry = false;
+  const pathname = request.nextUrl.pathname;
+  const needsEntry = pathname.startsWith('/dashboard') || pathname.startsWith('/onboarding')
+    || ['/login', '/cadastro', '/esqueci-senha'].includes(pathname);
+  if (user && needsEntry && isTeamWorkspaceEnabled()) {
+    const { data: active, error: activeError } = await supabase.from('users')
+      .select('active_clinica_id').eq('id', user.id)
+      .maybeSingle<{ active_clinica_id: string | null }>();
+    if (activeError) throw new Error('Não foi possível validar a clínica ativa.');
+    if (active?.active_clinica_id) {
+      const membership = await getPilotEntryMembership(supabase, user.id, active.active_clinica_id);
+      managementEntry = membership?.role === 'gestor';
+    }
+  }
+  return { response, session, managementEntry };
 }
