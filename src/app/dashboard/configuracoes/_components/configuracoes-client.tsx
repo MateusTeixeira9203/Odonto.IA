@@ -774,10 +774,8 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
           {/* === ABA: PROCEDIMENTOS === */}
           {abaAtiva === 'procedimentos' && (
             <ProcedimentosCatalogo
-              key={`${clinicId}:${dentista.id}:${JSON.stringify(procedimentosIniciais)}`}
+              key={`${clinicId}:${dentista.id}`}
               procedimentosIniciais={procedimentosIniciais}
-              dentistaId={dentista.id}
-              clinicaId={clinicId ?? ''}
             />
           )}
           {/* === ABA: PLANO === */}

@@ -24,10 +24,8 @@ export default async function ConsultorioPrecosPage() {
           <p className="mt-1 text-sm text-muted-foreground">Seu catálogo de procedimentos e valores para novos orçamentos.</p>
         </header>
         <ProcedimentosCatalogo
-          key={`${clinicId}:${dentistaId}:${JSON.stringify(procedimentos)}`}
+          key={`${clinicId}:${dentistaId}`}
           procedimentosIniciais={procedimentos}
-          dentistaId={dentistaId}
-          clinicaId={clinicId}
         />
       </PageContainer>
     </PageTransition>

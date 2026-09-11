@@ -26,20 +26,16 @@ import {
 
 interface ProcedimentosCatalogoProps {
   procedimentosIniciais: Procedimento[];
-  dentistaId: string;
-  clinicaId: string;
 }
 
 export function ProcedimentosCatalogo({
   procedimentosIniciais,
-  dentistaId,
-  clinicaId,
 }: ProcedimentosCatalogoProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [procedimentos, setProcedimentos] = useState(procedimentosIniciais);
+  const procedimentos = procedimentosIniciais;
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ nome: '', preco_padrao: '', duracao_minutos: 0 });
   const [showNovoProcedimento, setShowNovoProcedimento] = useState(false);
@@ -78,13 +74,6 @@ export function ProcedimentosCatalogo({
         return;
       }
 
-      setProcedimentos((prev) =>
-        prev.map((p) =>
-          p.id === id
-            ? { ...p, nome: editForm.nome.trim() || p.nome, preco_padrao: precoNum, duracao_minutos: editForm.duracao_minutos }
-            : p
-        )
-      );
       setEditandoId(null);
       setSuccessMsg('Procedimento atualizado com sucesso!');
     });
@@ -103,9 +92,6 @@ export function ProcedimentosCatalogo({
         return;
       }
 
-      setProcedimentos((prev) => prev.map((p) => (
-        p.id === result.id ? { ...p, ativo: false } : p
-      )));
       setProcedimentoParaRemover(null);
       setSuccessMsg(`"${procedimento.nome}" foi removido do catálogo.`);
     });
@@ -121,9 +107,6 @@ export function ProcedimentosCatalogo({
         return;
       }
 
-      setProcedimentos((prev) => prev.map((p) => (
-        p.id === result.id ? { ...p, ativo: true } : p
-      )));
       setSuccessMsg('Procedimento restaurado no catálogo.');
     });
   };
@@ -145,27 +128,6 @@ export function ProcedimentosCatalogo({
         return;
       }
 
-      const agora = new Date().toISOString();
-      const procedimentoCriado: Procedimento = {
-        id: result.id,
-        clinica_id: clinicaId,
-        dentista_id: dentistaId,
-        nome: novoProc.nome.trim(),
-        descricao: novoProc.descricao.trim() || null,
-        codigo_tuss: null,
-        categoria: novoProc.categoria.trim() || 'Geral',
-        preco_padrao: parseValorBR(novoProc.preco_padrao),
-        duracao_minutos: parseInt(novoProc.duracao_minutos, 10) || 30,
-        ativo: true,
-        created_at: agora,
-        updated_at: agora,
-      };
-      setProcedimentos((prev) => {
-        const jaExiste = prev.some((procedimento) => procedimento.id === result.id);
-        return jaExiste
-          ? prev.map((procedimento) => (procedimento.id === result.id ? procedimentoCriado : procedimento))
-          : [...prev, procedimentoCriado];
-      });
       setShowNovoProcedimento(false);
       setNovoProc({ nome: '', descricao: '', categoria: '', preco_padrao: '', duracao_minutos: '30' });
       setSuccessMsg(result.restaurado ? 'Procedimento restaurado no catálogo.' : 'Procedimento criado!');
