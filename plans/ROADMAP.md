@@ -41,8 +41,8 @@
 
 | ID | Item | Estado |
 |---|---|---|
-| [R-166](specs/R-166-desconto-saldo-orcamento.md) | Desconto no saldo do orçamento | ⏳ correção revisada e validada no Free; entrega na branch R-166, produção pendente. |
-| [R-167](specs/R-167-editar-etapa-orcamento.md) | Editar procedimentos e valor final da etapa; excluir orçamento com recebimento | 🟡 migration aplicada em produção; interface na branch R-167 aguarda deploy e teste real. |
+| [R-166](specs/R-166-desconto-saldo-orcamento.md) | Desconto no saldo do orçamento | 🟡 em produção; teste funcional confirmado pelo usuário em 12/09, auditoria completa pendente. |
+| [R-167](specs/R-167-editar-etapa-orcamento.md) | Editar procedimentos e valor final da etapa; excluir orçamento com recebimento | 🟡 em produção; teste funcional confirmado pelo usuário em 12/09, auditoria completa pendente. |
 
 ## Correções críticas antes de nova escrita clínica
 

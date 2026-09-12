@@ -167,3 +167,4 @@ Editar no cartão da etapa
 - A assinatura e a permissão de execução por `authenticated` foram consultadas após a aplicação.
 - A interface e a server action estão publicadas na branch `codex/editar-etapa-orcamento` e
   aguardam deploy para o teste real do dentista.
+- Em 12/09/2026, o usuário confirmou o teste real do fluxo como 100% funcional em produção.

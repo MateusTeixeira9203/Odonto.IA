@@ -53,6 +53,11 @@ Migration altera cálculo, não dados. Aplicar e verificar no Free antes da prod
 Guardar definições anteriores do catálogo para reversão; reverter aplicação por commit.
 Este gate não promove o item a ✅ (auditoria completa é independente).
 
+## Validação em produção
+
+- Em 12/09/2026, o usuário confirmou que o fluxo de desconto e o ajuste da etapa estão 100%
+  funcionais em produção. Nenhum dado clínico específico foi alterado nesta confirmação.
+
 ## Evidência — 11/09
 
 - Migration aplicada exclusivamente no Free; objetos anteriores guardados para reversão
