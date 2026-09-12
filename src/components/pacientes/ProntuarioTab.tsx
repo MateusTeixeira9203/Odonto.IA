@@ -42,7 +42,6 @@ import {
   type ContextoTimeline,
   type SuperficieProntuario,
 } from '@/lib/prontuario/superficie';
-import { destinosDoDente as resolverDestinosDoDente } from '@/lib/prontuario/destinos-do-dente';
 import {
   deletarFicha,
   prepararExclusaoFicha,
@@ -165,7 +164,6 @@ export function ProntuarioTab({
   const [retornoAberto, setRetornoAberto] = useState(false);
   const [retornoAtendimentoId, setRetornoAtendimentoId] = useState<string | null>(null);
   const [odontogramaCompletoAberto, setOdontogramaCompletoAberto] = useState(false);
-  const [mostrarConcluidos, setMostrarConcluidos] = useState(false);
   const [filtroClinico, setFiltroClinico] = useState<'tudo' | 'indicado' | 'realizado'>('tudo');
   const [eventosDraft, setEventosDraft] = useState<OdontogramaEventoDraft[]>([]);
   const [textoVisita, setTextoVisita] = useState('');
@@ -173,7 +171,6 @@ export function ProntuarioTab({
   const [denteAberto, setDenteAberto] = useState<number | null>(null);
   const [detalheEspecialidadeAberto, setDetalheEspecialidadeAberto] = useState(false);
   const [resumoAberto, setResumoAberto] = useState<ResumoAberto | null>(null);
-  const [resumoDenteSelecionado, setResumoDenteSelecionado] = useState<number | null>(null);
   const [destinoNovoRegistroId, setDestinoNovoRegistroId] = useState<string | null>(null);
   const [atendimentoDeOrigemId, setAtendimentoDeOrigemId] = useState<string | null>(null);
   const [complementoPendente, setComplementoPendente] = useState<{
@@ -202,8 +199,8 @@ export function ProntuarioTab({
   function contextoAtual(): ContextoTimeline {
     return {
       filtro: filtroClinico,
-      dente: resumoDenteSelecionado,
-      concluidos: mostrarConcluidos,
+      dente: null,
+      concluidos: false,
       scrollY: window.scrollY,
     };
   }
@@ -223,8 +220,6 @@ export function ProntuarioTab({
   function voltarAoContextoAnterior(): void {
     const contexto = contextoDaSuperficie(superficie);
     setFiltroClinico(contexto.filtro);
-    setResumoDenteSelecionado(contexto.dente);
-    setMostrarConcluidos(contexto.concluidos);
     setSuperficie(voltarParaTimeline(superficie));
     requestAnimationFrame(() => window.scrollTo({ top: contexto.scrollY }));
   }
@@ -303,7 +298,6 @@ export function ProntuarioTab({
     && (ficha.totalProcedimentos === 0 || ficha.procedimentosPendentes > 0)
   ));
   const todasFichas = dados.fichas;
-  const fichaConhecidaPorId = new Map(todasFichas.map((ficha) => [ficha.id, ficha] as const));
   const eventosClinicosUnicos = Array.from(new Map(
     dados.atendimentos.flatMap((atendimento) => atendimento.eventos).map((evento) => [evento.id, evento] as const),
   ).values());
@@ -321,37 +315,8 @@ export function ProntuarioTab({
       procedimentos,
     };
   });
-  const destinosDoDente = resumoDenteSelecionado == null ? [] : resolverDestinosDoDente({
-    dente: resumoDenteSelecionado,
-    eventos: eventosClinicosUnicos.map((evento) => ({
-      id: evento.id,
-      fichaId: evento.fichaId,
-      dente: evento.ancora.dente ?? null,
-    })),
-    atendimentos: atendimentos.map((atendimento) => ({
-      id: atendimento.id,
-      eventoIds: atendimento.eventos.map((evento) => evento.id),
-    })),
-  }).map((destino) => {
-    const eventos = destino.eventoIds.flatMap((id) => {
-      const evento = eventosClinicosUnicos.find((item) => item.id === id);
-      return evento ? [evento] : [];
-    });
-    return {
-      ...destino,
-      atendimento: destino.atendimentoId
-        ? atendimentos.find((atendimento) => atendimento.id === destino.atendimentoId) ?? null
-        : null,
-      ficha: destino.fichaId ? fichaConhecidaPorId.get(destino.fichaId) ?? null : null,
-      procedimentos: [...new Set(eventos.map((evento) => evento.procedimentoNome?.trim() || TIPO_LABEL[evento.tipo]))],
-      pendentes: eventos.filter((evento) => evento.status === 'indicado').length,
-    };
-  });
   const eventosPendentes = eventosClinicosUnicos.filter((evento) => evento.status === 'indicado');
   const pendencias = eventosPendentes.length;
-  const eventosOdontogramaGeral = mostrarConcluidos
-    ? dados.boca
-    : dados.boca.filter((evento) => evento.status !== 'realizado');
 
   function abrirNovoRegistro(params?: {
     fichaId?: string | null;
@@ -658,12 +623,19 @@ export function ProntuarioTab({
               )}
             </div>
             {fichaAberta && (
-              <div className="mt-3 flex max-w-md items-center gap-3">
-                <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-border">
+              <div className="mt-3 grid max-w-md gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-3">
+                <span
+                  role="progressbar"
+                  aria-label="Progresso da Ficha"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={progressoDaFicha}
+                  className="h-1.5 w-full overflow-hidden rounded-full bg-border"
+                >
                   <span className="block h-full rounded-full bg-teal" style={{ width: `${progressoDaFicha}%` }} />
                 </span>
-                <span className="text-xs font-bold text-text-secondary">
-                  {fichaAberta.procedimentosRealizados} de {fichaAberta.totalProcedimentos} realizados
+                <span className="whitespace-nowrap text-xs font-bold tabular-nums text-text-secondary">
+                  {progressoDaFicha}% · {fichaAberta.procedimentosRealizados} de {fichaAberta.totalProcedimentos} procedimentos
                 </span>
               </div>
             )}
@@ -962,7 +934,7 @@ export function ProntuarioTab({
                 </p>
               )}
               {podeMarcarRetornoDaVisita && !atendimentoAberto.retorno && (
-                <Button className="mt-3 w-full" variant="outline" onClick={() => {
+                <Button className="mt-3 min-h-11 w-full" variant="outline" onClick={() => {
                   setRetornoAtendimentoId(atendimentoAberto.atendimentoId);
                   setRetornoAberto(true);
                 }}>
@@ -1093,10 +1065,12 @@ export function ProntuarioTab({
                   selectedTeeth={[]}
                   eventos={atendimentoAberto.eventos}
                   onToothToggle={(dente) => {
+                    const temProcedimento = atendimentoAberto.eventos.some((evento) => evento.ancora.dente === dente);
+                    if (!temProcedimento) return;
                     setOdontogramaCompletoAberto(false);
                     abrirProcedimentoDoDente(atendimentoAberto, dente);
                   }}
-                  presentationMode={!podeComplementar}
+                  presentationMode
                 />
               </div>
             </div>
@@ -1280,9 +1254,8 @@ export function ProntuarioTab({
         )}
       </div>
 
-      <div className="grid gap-4 rounded-2xl border border-border bg-surface p-4 xl:grid-cols-[minmax(280px,0.58fr)_minmax(680px,1.42fr)]">
-        <div className="flex flex-col justify-between gap-4">
-          <div>
+      <div className="space-y-4 rounded-2xl border border-border bg-surface p-4">
+        <div>
             <p className="text-xs font-bold uppercase tracking-[0.14em] text-text-secondary">Fichas em curso</p>
             <div className="mt-2 divide-y divide-border">
               {resumosTratamento.slice(0, 3).map(({ ficha, realizados, total, progresso, procedimentos }) => (
@@ -1290,7 +1263,7 @@ export function ProntuarioTab({
                   key={ficha.id}
                   type="button"
                   onClick={() => abrirFicha(ficha.id)}
-                  className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 py-2.5 text-left transition-colors hover:text-teal-ink"
+                  className="grid w-full grid-cols-1 gap-2 py-3 text-left transition-colors hover:text-teal-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal/40 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-x-3"
                 >
                   <span className="min-w-0">
                     <span className="block truncate text-xs font-bold text-text-primary">{ficha.nome}</span>
@@ -1298,9 +1271,14 @@ export function ProntuarioTab({
                       {procedimentos.length > 0 ? procedimentos.slice(0, 3).join(' · ') : 'Sem procedimentos estruturados'}
                     </span>
                   </span>
-                  <span className="text-[11px] font-bold text-text-secondary">{realizados} de {total}</span>
-                  <span className="col-span-2 h-1 overflow-hidden rounded-full bg-border" aria-label={`${progresso}% realizado`}>
-                    <span className="block h-full rounded-full bg-teal transition-[width]" style={{ width: `${progresso}%` }} />
+                  <span className="whitespace-nowrap text-[11px] font-bold tabular-nums text-text-secondary sm:text-right">
+                    {progresso}% · {realizados} de {total} procedimentos
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    className="h-1 w-full overflow-hidden rounded-full bg-border sm:col-span-2"
+                  >
+                    <span className="block h-full rounded-full bg-teal transition-[width] motion-reduce:transition-none" style={{ width: `${progresso}%` }} />
                   </span>
                 </button>
               ))}
@@ -1309,7 +1287,7 @@ export function ProntuarioTab({
               )}
             </div>
           </div>
-          <div>
+        <div className="border-t border-border pt-4">
             <div className="flex flex-wrap gap-2">
               {([
                 ['atendimentos', `${atendimentos.length} atendimento${atendimentos.length === 1 ? '' : 's'}`],
@@ -1394,69 +1372,6 @@ export function ProntuarioTab({
               </div>
             )}
           </div>
-        </div>
-        <section className="overflow-hidden rounded-xl border border-border bg-surface-alt/50 px-3 py-2">
-          <div className="mb-1 flex items-center justify-between gap-2">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-text-secondary">Boca</p>
-            <div className="flex items-center gap-1">
-              <Button variant="ghost" size="sm" className="min-h-11" onClick={() => setMostrarConcluidos((atual) => !atual)}>
-                {mostrarConcluidos ? 'Ocultar concluídos' : 'Ver concluídos'}
-              </Button>
-              <Button variant="ghost" size="sm" className="min-h-11" onClick={() => setOdontogramaCompletoAberto(true)}>Expandir</Button>
-            </div>
-          </div>
-          <div className="min-h-[330px] overflow-hidden">
-            <div className={ODONTOGRAMA_RESPONSIVO}>
-              <Odontograma
-                selectedTeeth={resumoDenteSelecionado == null ? [] : [resumoDenteSelecionado]}
-                eventos={eventosOdontogramaGeral}
-                onToothToggle={(dente) => setResumoDenteSelecionado((atual) => atual === dente ? null : dente)}
-                presentationMode
-              />
-            </div>
-            {resumoDenteSelecionado != null && (
-              <div className="mt-2 border-t border-border pt-2" aria-live="polite">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs font-bold text-text-primary">Dente {resumoDenteSelecionado}</p>
-                  <button type="button" onClick={() => setResumoDenteSelecionado(null)} className="text-[11px] font-bold text-text-secondary hover:text-text-primary">
-                    Fechar
-                  </button>
-                </div>
-                {destinosDoDente.length > 0 ? (
-                  <div className="mt-1 grid gap-1 sm:grid-cols-2">
-                    {destinosDoDente.map(({ atendimento, ficha, procedimentos, pendentes }, index) => (
-                      <div
-                        key={`${atendimento?.id ?? 'sem-visita'}:${ficha?.id ?? index}`}
-                        className="flex min-h-11 items-center justify-between gap-3 rounded-lg border border-border px-2.5 py-1.5"
-                      >
-                        <span className="min-w-0">
-                          <span className="block truncate text-[11px] font-bold text-text-primary">{procedimentos.join(' · ')}</span>
-                          <span className="block truncate text-[10px] text-text-secondary">
-                            {ficha?.nome ?? 'Registro legado sem Ficha vinculada'}{atendimento ? ` · ${formatarData(atendimento.dataAtendimento)}` : ''}{pendentes > 0 ? ` · ${pendentes} pendente${pendentes === 1 ? '' : 's'}` : ''}
-                          </span>
-                        </span>
-                        <span className="flex shrink-0 gap-1">
-                          {ficha && (
-                            <button type="button" onClick={() => abrirFicha(ficha.id, atendimento?.id ?? null)} className="rounded-md px-2 py-1 text-[10px] font-bold text-teal-ink hover:bg-teal/10">
-                              Abrir ficha
-                            </button>
-                          )}
-                          {!ficha && atendimento && (
-                            <button type="button" onClick={() => abrirLegado(atendimento.id)} className="rounded-md px-2 py-1 text-[10px] font-bold text-text-secondary hover:bg-surface-alt hover:text-text-primary">
-                              Abrir legado
-                            </button>
-                          )}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="mt-1 text-[11px] text-text-secondary">Nenhum procedimento registrado neste dente.</p>
-                )}
-              </div>
-            )}
-          </div>
-        </section>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 border-b border-border pb-3">
@@ -1571,7 +1486,7 @@ export function ProntuarioTab({
                     <button
                       type="button"
                       onClick={() => router.push(`/dashboard/agendamentos?v=dia&d=${atendimento.retorno!.dataHora.slice(0, 10)}`)}
-                      className="ml-auto inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-bold text-text-secondary transition-colors hover:border-teal/40 hover:text-teal-ink"
+                      className="ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-bold text-text-secondary transition-colors hover:border-teal/40 hover:text-teal-ink"
                     >
                       Ver retorno
                     </button>
@@ -1584,7 +1499,7 @@ export function ProntuarioTab({
                         setRetornoAtendimentoId(atendimento.atendimentoId);
                         setRetornoAberto(true);
                       }}
-                      className="ml-auto inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-bold text-text-secondary transition-colors hover:border-teal/40 hover:text-teal-ink"
+                      className="ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-bold text-text-secondary transition-colors hover:border-teal/40 hover:text-teal-ink"
                     >
                       <CalendarPlus className="h-3.5 w-3.5" /> Marcar retorno
                     </button>
@@ -1615,19 +1530,6 @@ export function ProntuarioTab({
         onMarcarRetorno={() => void retorno.marcarRetorno(dentistaId)}
         onTentarEnviarPedido={() => void retorno.tentarEnviarPedido(dentistaId)}
       />
-
-      <Dialog open={odontogramaCompletoAberto} onOpenChange={setOdontogramaCompletoAberto}>
-        <DialogContent className="w-[calc(100vw-1rem)] max-w-[1180px] overflow-hidden p-3 sm:w-[calc(100vw-2rem)] sm:max-w-[1180px] sm:p-6">
-          <DialogHeader>
-            <DialogTitle>Odontograma completo</DialogTitle>
-          </DialogHeader>
-          <div className="overflow-hidden">
-            <div className={ODONTOGRAMA_RESPONSIVO}>
-              <Odontograma selectedTeeth={[]} eventos={eventosOdontogramaGeral} onToothToggle={() => undefined} presentationMode />
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <ColarDoWordDialog
         pacienteId={patientId}
