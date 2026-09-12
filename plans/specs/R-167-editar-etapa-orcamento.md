@@ -158,3 +158,12 @@ Editar no cartão da etapa
 - Editar etapa cancelada ou recuperar orçamento já excluído.
 - Mudar procedimentos clínicos ou preços dos itens do orçamento.
 - Corrigir automaticamente registros reais existentes.
+
+## 10. Entrega
+
+- Migration `r167_editar_cobranca_etapa` aplicada no banco principal em 12/09/2026. Ela criou
+  somente a RPC `editar_cobranca_orcamento`; nenhum orçamento, pagamento ou paciente existente
+  foi modificado.
+- A assinatura e a permissão de execução por `authenticated` foram consultadas após a aplicação.
+- A interface e a server action estão publicadas na branch `codex/editar-etapa-orcamento` e
+  aguardam deploy para o teste real do dentista.
