@@ -42,6 +42,7 @@
 | ID | Item | Estado |
 |---|---|---|
 | [R-166](specs/R-166-desconto-saldo-orcamento.md) | Desconto no saldo do orçamento | ⏳ correção revisada e validada no Free; entrega na branch R-166, produção pendente. |
+| [R-167](specs/R-167-editar-etapa-orcamento.md) | Editar procedimentos e valor final da etapa; excluir orçamento com recebimento | ⏳ validada no Free; entrega na branch R-167, produção pendente. |
 
 ## Correções críticas antes de nova escrita clínica
 
