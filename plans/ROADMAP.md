@@ -28,6 +28,7 @@
 
 | ID | Item | Estado |
 |---|---|---|
+| [**R-168**](specs/R-168-retorno-mapa-ficha.md) | **Retorno confiável e Ficha sem mapa geral** — restaura semana, ocupados e autoria; concentra percentual, contagem e odontograma no atendimento | 🟡 em produção; aguarda validação renderizada completa e auditoria completa. |
 | **R-145** | **Orçamento financeiro flexível** — recebimento livre, previsão de cobrança reorganizável, à vista como conta a receber e orçamento estritamente por responsável | ✅ em produção e verificado pelo usuário em 03/09; spec e artefato arquivados. |
 | [**R-152**](specs/R-152-paridade-ficha-unificada.md) + [**R-152a**](specs/R-152a-cabecalho-ficha-redesign.md) | **Ficha unificada e cabeçalho** — ações clínicas na superfície nova, legado somente leitura e cabeçalho organizado | 🟡 publicado; falta gate consolidado de paridade antes de remover código legado. |
 | [**R-149**](specs/R-149-revisao-meu-dia-legivel.md) | **Revisão legível no Meu Dia** — cartões clínicos priorizam procedimento e status, sem esconder nenhuma ação | 🟡 publicada; aguarda conferência visual completa. |
