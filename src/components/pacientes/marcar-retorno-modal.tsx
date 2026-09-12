@@ -108,7 +108,7 @@ export function MarcarRetornoModal({
 
         <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border px-4 py-3 md:px-5">
           <DialogTitle className="font-heading text-lg font-semibold leading-tight text-text-primary md:text-xl">Marcar retorno</DialogTitle>
-          <button onClick={() => alterarAberto(false)} aria-label="Fechar" className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-surface-alt hover:text-text-primary"><X className="h-4 w-4" /></button>
+          <button onClick={() => alterarAberto(false)} aria-label="Fechar" className="flex h-11 w-11 items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-surface-alt hover:text-text-primary"><X className="h-4 w-4" /></button>
         </div>
 
         <div className="grid shrink-0 grid-cols-2 gap-px border-b border-border bg-border md:grid-cols-[minmax(0,1fr)_150px_100px]">
@@ -158,7 +158,7 @@ export function MarcarRetornoModal({
           </div>
         </div>
         <div className="shrink-0 space-y-2.5 border-t border-border bg-surface p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:ml-auto md:w-[250px] md:border-l md:p-4">
-          {error && <p className="rounded-lg bg-coral-pale p-2 text-xs text-coral-ink">{error}</p>}
+          {error && <p role="alert" className="rounded-lg bg-coral-pale p-2 text-xs text-coral-ink">{error}</p>}
           {etapa === 'retorno' ? <>
             {!error && !podeConfirmar && <p className="text-xs text-text-secondary">{dentistaAlvoId == null ? 'Escolha o dentista para ver a agenda.' : 'Escolha um horário livre para habilitar.'}</p>}
             {proteticos?.length ? <Button type="button" variant="outline" onClick={incluirProtetico} disabled={saving || !podeConfirmar} className="min-h-11 w-full rounded-xl border-teal/40 text-teal-ink hover:bg-teal/5"><Stethoscope className="mr-2 h-4 w-4" />Incluir protético</Button> : null}

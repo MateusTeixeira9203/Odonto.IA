@@ -94,6 +94,10 @@ export function RetornoMobileAgenda({
       return opcoes;
     });
   }, [diaAtivo, duracaoMin]);
+  const ocupados = useMemo(
+    () => [...(diaAtivo?.ocupados ?? [])].sort((a, b) => a.inicioMin - b.inicioMin),
+    [diaAtivo?.ocupados],
+  );
 
   useEffect(() => {
     if (!selecionado || selecionado.data !== diaAtivo?.data) return;
@@ -112,7 +116,7 @@ export function RetornoMobileAgenda({
           type="button"
           aria-label="Semana anterior"
           onClick={() => setSemanaInicio(startOfWeek(subWeeks(semanaInicio, 1), { weekStartsOn: 0 }))}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border text-text-secondary hover:bg-surface-alt"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border text-text-secondary transition-colors hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal/40"
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
@@ -123,16 +127,19 @@ export function RetornoMobileAgenda({
           type="button"
           aria-label="Próxima semana"
           onClick={() => setSemanaInicio(startOfWeek(addWeeks(semanaInicio, 1), { weekStartsOn: 0 }))}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border text-text-secondary hover:bg-surface-alt"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border text-text-secondary transition-colors hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal/40"
         >
           <ChevronRight className="h-4 w-4" />
         </button>
       </div>
 
       {erro ? (
-        <p className="rounded-xl bg-coral-pale px-3 py-2 text-sm text-coral-ink">{erro}</p>
+        <p role="alert" className="rounded-xl bg-coral-pale px-3 py-2 text-sm text-coral-ink">{erro}</p>
       ) : !dias ? (
-        <div className="flex h-20 items-center justify-center rounded-xl border border-border bg-surface-alt/40"><Loader2 className="h-5 w-5 animate-spin text-text-secondary" /></div>
+        <div role="status" aria-live="polite" className="flex h-20 items-center justify-center rounded-xl border border-border bg-surface-alt/40">
+          <Loader2 aria-hidden="true" className="h-5 w-5 animate-spin text-text-secondary" />
+          <span className="sr-only">Carregando agenda.</span>
+        </div>
       ) : diasSemana.length === 0 ? (
         <p className="rounded-xl border border-border bg-surface-alt/50 px-3 py-4 text-center text-sm text-text-secondary">Sem expediente de segunda a sábado.</p>
       ) : (
@@ -147,7 +154,7 @@ export function RetornoMobileAgenda({
                   type="button"
                   onClick={() => setDiaAberto(dia.data)}
                   aria-pressed={ativo}
-                  className={`min-h-[52px] min-w-0 rounded-xl border px-1 py-1.5 text-center transition-colors ${
+                  className={`min-h-[52px] min-w-0 rounded-xl border px-1 py-1.5 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal/40 ${
                     ativo ? 'border-teal bg-teal/10 text-teal-ink' : agendaLivre ? 'border-teal/30 bg-teal/5 text-teal-ink' : 'border-border bg-surface-alt/50 text-text-secondary hover:border-teal/40'
                   }`}
                 >
@@ -158,7 +165,30 @@ export function RetornoMobileAgenda({
             })}
           </div>
           <div>
-            <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-teal-ink">{diaAtivo?.temGrade === false ? 'Agenda livre' : 'Horários livres'}</p>
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-teal-ink">Agenda do dia</p>
+            {ocupados.length > 0 && (
+              <details
+                key={diaAtivo?.data}
+                className="group mb-3 rounded-xl border border-border bg-surface-alt/50"
+              >
+                <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-3 py-2 text-xs font-semibold text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal/40 [&::-webkit-details-marker]:hidden">
+                  <span>{ocupados.length} {ocupados.length === 1 ? 'horário já agendado' : 'horários já agendados'}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-teal-ink group-open:hidden">Ver</span>
+                  <span className="hidden text-[10px] font-bold uppercase tracking-widest text-teal-ink group-open:inline">Ocultar</span>
+                </summary>
+                <ul className="max-h-40 space-y-1.5 overflow-y-auto border-t border-border p-3" aria-label="Horários já agendados">
+                  {ocupados.map((ocupado) => (
+                    <li key={ocupado.id} className="flex items-center justify-between gap-3 rounded-lg border border-border/70 bg-surface px-2.5 py-2">
+                      <span className="font-mono text-xs font-semibold text-text-primary">{formatHora(ocupado.inicioMin)}</span>
+                      <span className="min-w-0 truncate text-xs text-text-secondary">{ocupado.bloqueio ? 'Horário bloqueado' : ocupado.pacienteNome ?? 'Paciente agendado'}</span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-teal-ink">
+              {diaAtivo?.temGrade === false ? 'Horário' : 'Horários livres'}
+            </p>
             {diaAtivo?.temGrade === false ? (
               <div className="rounded-xl border border-teal/25 bg-teal/5 p-3">
                 <p className="text-sm font-semibold text-teal-ink">Agenda livre neste dia.</p>
@@ -187,7 +217,7 @@ export function RetornoMobileAgenda({
                       key={minuto}
                       type="button"
                       onClick={() => onSelecionar(diaAtivo!.data, minuto, false)}
-                      className={`min-h-11 rounded-xl border font-mono text-sm font-semibold transition-colors ${
+                      className={`min-h-11 rounded-xl border font-mono text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal/40 ${
                         ativo ? 'border-teal bg-teal-dark text-white' : 'border-border bg-surface-alt/50 text-text-primary hover:border-teal/40 hover:text-teal-ink'
                       }`}
                     >

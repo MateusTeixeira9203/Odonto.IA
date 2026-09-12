@@ -634,6 +634,9 @@ export function ProntuarioTab({
     ));
     const podeEscreverFicha = podeEditarProcedimentosDaSuperficie(superficie, canWrite);
     const podeComplementar = podeEscreverFicha;
+    const podeMarcarRetornoDaVisita = podeEscreverFicha
+      && atendimentoAberto.atendimentoId != null
+      && atendimentoAberto.profissional.id === dentistaId;
 
     return (
       <section className="space-y-4" aria-label="Ficha aberta no prontuário">
@@ -958,7 +961,7 @@ export function ProntuarioTab({
                   {atendimentoAberto.atendimentoId ? 'Nenhum retorno vinculado a esta visita.' : 'Próximo agendamento ainda não registrado.'}
                 </p>
               )}
-              {podeEscreverFicha && !atendimentoAberto.retorno && (
+              {podeMarcarRetornoDaVisita && !atendimentoAberto.retorno && (
                 <Button className="mt-3 w-full" variant="outline" onClick={() => {
                   setRetornoAtendimentoId(atendimentoAberto.atendimentoId);
                   setRetornoAberto(true);
@@ -1572,7 +1575,9 @@ export function ProntuarioTab({
                     >
                       Ver retorno
                     </button>
-                  ) : canWrite && (
+                  ) : canWrite
+                    && atendimento.atendimentoId != null
+                    && atendimento.profissional.id === dentistaId && (
                     <button
                       type="button"
                       onClick={() => {

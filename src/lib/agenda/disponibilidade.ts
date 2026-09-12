@@ -19,6 +19,7 @@ export interface BlocoHorario {
 }
 
 export interface OcupadoDia {
+  id: string;
   inicioMin: number;
   duracaoMin: number;
   pacienteNome: string | null;
@@ -51,12 +52,14 @@ type GradeRow = {
 };
 
 type AgendadoRow = {
+  id: string;
   data_hora: string;
   duracao_minutos: number;
   paciente: { nome: string } | null;
 };
 
 type BloqueioRow = {
+  id: string;
   data_hora: string;
   duracao_minutos: number;
 };
@@ -64,6 +67,21 @@ type BloqueioRow = {
 function horaParaMin(hhmmss: string): number {
   const [h, m] = hhmmss.split(':').map(Number);
   return h * 60 + m;
+}
+
+/** A grade de retorno sempre começa no domingo para conseguir indexar domingo–sábado, mas
+ * a agenda operacional é segunda–sábado. `janelaDaVisao('semana')` interpreta um domingo
+ * como encerramento da semana anterior; por isso a consulta precisa usar a segunda seguinte
+ * como âncora, enquanto o array de dias continua começando no domingo. */
+export function janelaDaSemanaDisponibilidade(semanaInicioISO: string): { de: string; ate: string } {
+  const [ano, mes, dia] = semanaInicioISO.split('-').map(Number);
+  const segunda = new Date(Date.UTC(ano, mes - 1, dia + 1, 12));
+  const ancora = [
+    segunda.getUTCFullYear(),
+    String(segunda.getUTCMonth() + 1).padStart(2, '0'),
+    String(segunda.getUTCDate()).padStart(2, '0'),
+  ].join('-');
+  return janelaDaVisao('semana', ancora);
 }
 
 /** Minuto do dia → "HH:mm". Usado pelo `RetornoSemanaGrid` (resumo/render) e pelo
@@ -114,7 +132,7 @@ export async function getDisponibilidadeSemana(params: {
 }): Promise<DisponibilidadeDia[]> {
   const { dentistaId, clinicaId, semanaInicioISO } = params;
   const db = createServiceClient();
-  const { de, ate } = janelaDaVisao('semana', semanaInicioISO);
+  const { de, ate } = janelaDaSemanaDisponibilidade(semanaInicioISO);
 
   const [
     { data: gradeRaw, error: gradeError },
@@ -127,7 +145,7 @@ export async function getDisponibilidadeSemana(params: {
         .eq('clinica_id', clinicaId)
         .eq('ativo', true),
       db.from('agendamentos')
-        .select('data_hora, duracao_minutos, paciente:pacientes(nome)')
+        .select('id, data_hora, duracao_minutos, paciente:pacientes(nome)')
         .eq('dentista_id', dentistaId)
         .eq('clinica_id', clinicaId)
         .neq('status', 'cancelled')
@@ -135,7 +153,7 @@ export async function getDisponibilidadeSemana(params: {
         .lt('data_hora', ate),
       // R-102 — compromisso pessoal ocupa a agenda igual consulta, sem paciente.
       db.from('agenda_bloqueios')
-        .select('data_hora, duracao_minutos')
+        .select('id, data_hora, duracao_minutos')
         .eq('dentista_id', dentistaId)
         .eq('clinica_id', clinicaId)
         .gte('data_hora', de)
@@ -174,6 +192,7 @@ export async function getDisponibilidadeSemana(params: {
   for (const a of (agendadosRaw ?? []) as unknown as AgendadoRow[]) {
     const { data, minutoDoDia } = partesBRT(new Date(a.data_hora));
     diaPorData.get(data)?.ocupados.push({
+      id: a.id,
       inicioMin: minutoDoDia,
       duracaoMin: a.duracao_minutos,
       pacienteNome: a.paciente?.nome ?? null,
@@ -182,6 +201,7 @@ export async function getDisponibilidadeSemana(params: {
   for (const bl of (bloqueiosRaw ?? []) as BloqueioRow[]) {
     const { data, minutoDoDia } = partesBRT(new Date(bl.data_hora));
     diaPorData.get(data)?.ocupados.push({
+      id: bl.id,
       inicioMin: minutoDoDia,
       duracaoMin: bl.duracao_minutos,
       pacienteNome: null,
