@@ -27,6 +27,7 @@ import { ptBR } from 'date-fns/locale';
 import {
   cancelarCobrancaEtapa,
   criarCobrancaEtapa,
+  editarCobrancaEtapa,
   editarPagamento,
   estornarPagamento,
   registrarRecebimentoCobranca,
@@ -156,6 +157,9 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
   const [pagamentoEditado, setPagamentoEditado] = useState({ valor: '', forma: 'pix' as FormaPagamento, data: hoje });
   const [pagamentoEstornandoId, setPagamentoEstornandoId] = useState<string | null>(null);
   const [motivoEstorno, setMotivoEstorno] = useState('');
+  const [cobrancaEditandoId, setCobrancaEditandoId] = useState<string | null>(null);
+  const [itensEtapaEditados, setItensEtapaEditados] = useState<string[]>([]);
+  const [valorFinalEtapaEditado, setValorFinalEtapaEditado] = useState('');
 
   const idsCobrados = useMemo(() => new Set(
     orcamento.cobrancas
@@ -175,6 +179,21 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
 
   const toggleItem = (itemId: string) => {
     setItemIds((current) => current.includes(itemId)
+      ? current.filter((id) => id !== itemId)
+      : [...current, itemId]);
+  };
+
+  const iniciarEdicaoEtapa = (cobranca: OrcamentoComItens['cobrancas'][number]) => {
+    setCobrancaRecebendoId(null);
+    setCancelandoId(null);
+    setCobrancaEditandoId(cobranca.id);
+    setItensEtapaEditados(cobranca.itens.map((item) => item.orcamento_item_id));
+    setValorFinalEtapaEditado(formatValorBR(cobranca.valor_final));
+    setErro(null);
+  };
+
+  const toggleItemEtapaEditada = (itemId: string) => {
+    setItensEtapaEditados((current) => current.includes(itemId)
       ? current.filter((id) => id !== itemId)
       : [...current, itemId]);
   };
@@ -309,6 +328,41 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
     router.refresh();
   };
 
+  const salvarEtapaEditada = async (cobranca: OrcamentoComItens['cobrancas'][number], valorRecebido: number) => {
+    const valorFinal = parseValorBR(valorFinalEtapaEditado);
+    const subtotal = itensEtapaEditados.reduce((soma, itemId) => soma + (itemPorId.get(itemId)?.preco_total ?? 0), 0);
+    if (itensEtapaEditados.length === 0) {
+      setErro('Selecione ao menos um procedimento para esta etapa.');
+      return;
+    }
+    if (!valorFinalEtapaEditado.trim() || valorFinal > subtotal) {
+      setErro('O valor final precisa estar entre zero e o subtotal dos procedimentos selecionados.');
+      return;
+    }
+    if (valorFinal < valorRecebido) {
+      setErro('O valor final não pode ser menor que o total já recebido nesta etapa.');
+      return;
+    }
+    setSaving(true);
+    setErro(null);
+    const result = await editarCobrancaEtapa({
+      cobrancaId: cobranca.id,
+      pacienteId,
+      itemIds: itensEtapaEditados,
+      valorFinal,
+    });
+    setSaving(false);
+    if (result.error) {
+      setErro(result.error);
+      return;
+    }
+    setCobrancaEditandoId(null);
+    setItensEtapaEditados([]);
+    setValorFinalEtapaEditado('');
+    toast.success('Etapa atualizada. Os recebimentos foram preservados.');
+    router.refresh();
+  };
+
   return (
     <div className="space-y-4">
       <div>
@@ -325,6 +379,16 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
         const podeCancelar = cobranca.situacao === 'aberta' && estado.valorPago === 0;
         const recebendo = cobrancaRecebendoId === cobranca.id;
         const recebimentosConfirmados = cobranca.pagamentos.filter((pagamento) => pagamento.status === 'pago');
+        const editandoEtapa = cobrancaEditandoId === cobranca.id;
+        const idsDestaEtapa = new Set(cobranca.itens.map((item) => item.orcamento_item_id));
+        const itensEditaveis = orcamento.itens.filter((item) => item.aprovado
+          && (idsDestaEtapa.has(item.id) || !idsCobrados.has(item.id)));
+        const subtotalEditado = itensEtapaEditados.reduce(
+          (soma, itemId) => soma + (itemPorId.get(itemId)?.preco_total ?? 0),
+          0,
+        );
+        const valorFinalEditado = parseValorBR(valorFinalEtapaEditado);
+        const descontoEditado = Math.max(0, subtotalEditado - valorFinalEditado);
         const descricao = cobranca.itens
           .map((item) => itemPorId.get(item.orcamento_item_id)?.descricao ?? 'Procedimento')
           .join(', ');
@@ -359,7 +423,54 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
               <div><p className="text-text-secondary">Saldo</p><p className="font-mono font-semibold text-text-primary">R$ {fmt(estado.saldo)}</p></div>
             </div>
 
-            {recebimentosConfirmados.length > 0 && (
+            {editandoEtapa && (
+              <div className="space-y-3 border-t border-border pt-3">
+                <div>
+                  <p className="text-sm font-semibold text-text-primary">Editar etapa</p>
+                  <p className="mt-1 text-xs text-text-secondary">Ajuste os procedimentos e o valor combinado. O que já foi recebido permanece registrado.</p>
+                </div>
+                <div className="space-y-1.5">
+                  {itensEditaveis.map((item) => (
+                    <label key={item.id} className="flex items-center gap-2 rounded-lg bg-surface px-2.5 py-2 text-xs text-text-primary">
+                      <input
+                        type="checkbox"
+                        checked={itensEtapaEditados.includes(item.id)}
+                        onChange={() => toggleItemEtapaEditada(item.id)}
+                        disabled={saving}
+                        className="accent-teal"
+                      />
+                      <span className="min-w-0 flex-1 truncate">{item.descricao ?? 'Procedimento'}</span>
+                      <span className="font-mono">R$ {fmt(item.preco_total ?? 0)}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-[10px] text-text-secondary">Valor final negociado</Label>
+                    <Input
+                      value={valorFinalEtapaEditado}
+                      inputMode="decimal"
+                      placeholder="0,00"
+                      onChange={(event) => setValorFinalEtapaEditado(event.target.value)}
+                      disabled={saving}
+                      className="mt-1 h-9 font-mono"
+                    />
+                  </div>
+                  <div className="rounded-lg border border-border bg-surface px-3 py-2">
+                    <p className="text-[10px] text-text-secondary">Subtotal R$ {fmt(subtotalEditado)}</p>
+                    <p className="mt-1 text-xs text-text-secondary">Desconto calculado: R$ {fmt(descontoEditado)}</p>
+                  </div>
+                </div>
+                {estado.valorPago > 0 && <p className="text-[11px] text-text-secondary">Já recebido: R$ {fmt(estado.valorPago)}. O valor final não pode ser menor.</p>}
+                {erro && <p className="text-xs text-coral-ink">{erro}</p>}
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => { setCobrancaEditandoId(null); setErro(null); }} disabled={saving} className="flex-1">Cancelar</Button>
+                  <Button size="sm" onClick={() => void salvarEtapaEditada(cobranca, estado.valorPago)} disabled={saving || itensEtapaEditados.length === 0} className="flex-1 bg-teal text-white hover:bg-teal-lt">{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Salvar etapa'}</Button>
+                </div>
+              </div>
+            )}
+
+            {!editandoEtapa && recebimentosConfirmados.length > 0 && (
               <div className="space-y-1.5 border-t border-border pt-3">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Recebimentos</p>
                 {recebimentosConfirmados.map((pagamento) => pagamentoEditandoId === pagamento.id ? (
@@ -376,7 +487,7 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
               </div>
             )}
 
-            {recebendo ? (
+            {!editandoEtapa && recebendo ? (
               <div className="space-y-2 border-t border-border pt-3">
                 <div className="flex items-end gap-2">
                   <div className="min-w-0 flex-1 space-y-1"><Label className="text-[10px] text-text-secondary">Valor recebido</Label><Input value={recebimento.valor} inputMode="decimal" onChange={(event) => setRecebimento((current) => ({ ...current, valor: event.target.value }))} className="h-9 font-mono" placeholder="0,00" /></div>
@@ -388,10 +499,14 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
                 </div>
                 <div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => setCobrancaRecebendoId(null)} disabled={saving} className="flex-1">Cancelar</Button><Button size="sm" onClick={() => void registrar(cobranca.id)} disabled={saving} className="flex-1 bg-teal text-white hover:bg-teal-lt">{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Registrar'}</Button></div>
               </div>
-            ) : cancelandoId === cobranca.id ? (
+            ) : !editandoEtapa && cancelandoId === cobranca.id ? (
               <div className="space-y-2 border-t border-border pt-3"><Input value={motivoCancelamento} onChange={(event) => setMotivoCancelamento(event.target.value)} placeholder="Motivo do cancelamento" maxLength={500} className="h-9" /><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => setCancelandoId(null)} disabled={saving} className="flex-1">Voltar</Button><Button size="sm" onClick={() => void cancelar(cobranca.id)} disabled={saving} className="flex-1 bg-coral-pale text-coral-ink hover:bg-coral/20">Cancelar etapa</Button></div></div>
-            ) : estado.estado !== 'paga' && estado.estado !== 'cancelada' ? (
-              <div className="flex gap-2 border-t border-border pt-3"><Button size="sm" onClick={() => setCobrancaRecebendoId(cobranca.id)} className="flex-1 bg-teal text-white hover:bg-teal-lt">Registrar recebimento</Button>{podeCancelar && <Button size="sm" variant="outline" onClick={() => setCancelandoId(cobranca.id)} className="text-coral-ink">Cancelar</Button>}</div>
+            ) : !editandoEtapa && cobranca.situacao === 'aberta' ? (
+              <div className="flex gap-2 border-t border-border pt-3">
+                {estado.estado !== 'paga' && <Button size="sm" onClick={() => setCobrancaRecebendoId(cobranca.id)} className="flex-1 bg-teal text-white hover:bg-teal-lt">Registrar recebimento</Button>}
+                <Button size="sm" variant="outline" onClick={() => iniciarEdicaoEtapa(cobranca)} disabled={saving} className={estado.estado === 'paga' ? 'flex-1' : ''}><Edit2 className="mr-1 h-3.5 w-3.5" />Editar etapa</Button>
+                {podeCancelar && <Button size="sm" variant="outline" onClick={() => setCancelandoId(cobranca.id)} className="text-coral-ink">Cancelar</Button>}
+              </div>
             ) : null}
           </div>
         );
@@ -414,7 +529,7 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
           </div>
         ) : <Button variant="outline" onClick={() => setFormAberto(true)} className="w-full border-teal/35 text-teal-ink hover:bg-teal/10"><Plus className="mr-1.5 h-4 w-4" />Cobrar nesta etapa</Button>
       )}
-      {erro && !formAberto && <p className="text-xs text-coral-ink">{erro}</p>}
+      {erro && !formAberto && !cobrancaEditandoId && <p className="text-xs text-coral-ink">{erro}</p>}
     </div>
   );
 }
@@ -479,6 +594,7 @@ export function DetalheOrcamentoModal({
     'pagamento.estornado': 'Recebimento estornado',
     'pagamento.previsao_reorganizada': 'Cobrança reorganizada',
     'cobranca.etapa_criada': 'Cobrança por etapa criada',
+    'cobranca.etapa_editada': 'Cobrança por etapa editada',
     'cobranca.etapa_cancelada': 'Cobrança por etapa cancelada',
     status_alterado: 'Status alterado',
   };

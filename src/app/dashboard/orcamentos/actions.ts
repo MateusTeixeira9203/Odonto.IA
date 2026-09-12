@@ -55,6 +55,15 @@ const criarCobrancaEtapaSchema = z.object({
   numeroParcelas: z.number().int().min(1).max(24),
   primeiroVencimento: z.string().date(),
 });
+const editarCobrancaEtapaSchema = z.object({
+  cobrancaId: z.string().uuid(),
+  pacienteId: z.string().uuid(),
+  itemIds: z.array(z.string().uuid()).min(1).max(100).refine(
+    (ids) => new Set(ids).size === ids.length,
+    'Não repita procedimentos na etapa.',
+  ),
+  valorFinal: z.number().finite().min(0).multipleOf(0.01),
+});
 const recebimentoCobrancaSchema = z.object({
   cobrancaId: z.string().uuid(),
   pacienteId: z.string().uuid(),
@@ -87,6 +96,9 @@ function erroFinanceiro(message: string): string {
   if (message.includes('item_ja_cobrado')) return 'Um dos procedimentos já pertence a outra cobrança ativa.';
   if (message.includes('desconto_acima_subtotal')) return 'O desconto não pode ser maior que os procedimentos selecionados.';
   if (message.includes('desconto_invalido')) return 'Informe um desconto válido.';
+  if (message.includes('valor_final_abaixo_recebido')) return 'O valor final não pode ser menor que o total já recebido nesta etapa.';
+  if (message.includes('valor_final_invalido')) return 'O valor final precisa estar entre zero e o subtotal dos procedimentos selecionados.';
+  if (message.includes('subtotal_invalido')) return 'Os procedimentos selecionados precisam ter um valor válido.';
   if (message.includes('cobranca_indisponivel')) return 'Esta cobrança não está mais disponível. Recarregue a página.';
   if (message.includes('cobranca_com_recebimento')) return 'Uma cobrança com recebimento não pode ser cancelada.';
   if (message.includes('sem_permissao')) return 'Você não tem permissão para alterar este orçamento.';
@@ -829,6 +841,31 @@ export async function criarCobrancaEtapa(dados: {
   revalidatePath('/dashboard/orcamentos');
   revalidatePath('/dashboard/financeiro');
   return { id: cobranca?.id };
+}
+
+/** Corrige os procedimentos e o valor final de uma etapa sem reescrever recebimentos pagos. */
+export async function editarCobrancaEtapa(dados: {
+  cobrancaId: string;
+  pacienteId: string;
+  itemIds: string[];
+  valorFinal: number;
+}): Promise<{ error?: string }> {
+  const parsed = editarCobrancaEtapaSchema.safeParse(dados);
+  if (!parsed.success) return { error: 'Revise os procedimentos e o valor final negociado.' };
+
+  const { supabase } = await requireClinicContext();
+  const rpc = supabase.rpc.bind(supabase) as unknown as RpcCall;
+  const { error } = await rpc('editar_cobranca_orcamento', {
+    p_cobranca_id: parsed.data.cobrancaId,
+    p_item_ids: parsed.data.itemIds,
+    p_valor_final: parsed.data.valorFinal,
+  });
+  if (error) return { error: erroFinanceiro(error.message) };
+
+  revalidatePath(`/dashboard/pacientes/${parsed.data.pacienteId}`);
+  revalidatePath('/dashboard/orcamentos');
+  revalidatePath('/dashboard/financeiro');
+  return {};
 }
 
 /** Registra dinheiro contra a etapa escolhida; a RPC recompõe apenas o saldo dela. */
