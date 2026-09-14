@@ -67,6 +67,8 @@ function palavrasDoProcedimento(texto: string): string[] {
 function nomeCobreProcedimento(nome: string, procedimento: string): boolean {
   const palavras = new Set(palavrasDoProcedimento(nome));
   const alvo = palavrasDoProcedimento(procedimento);
+  const remocoes = ['remocao', 'retirada', 'explantacao'];
+  if (remocoes.some((acao) => palavras.has(acao)) !== remocoes.some((acao) => alvo.includes(acao))) return false;
   return alvo.length > 0 && alvo.every((palavra) => palavras.has(palavra));
 }
 

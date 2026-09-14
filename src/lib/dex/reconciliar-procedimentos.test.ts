@@ -119,3 +119,15 @@ test('recupera somente a região omitida, sem duplicar a intervenção já cober
   assert.equal(resultado.adicionadosComoOutro, 1);
   assert.deepEqual(resultado.eventos[1].ancora, { nivel: 'arcada', arcada: 'inferior' });
 });
+
+
+test('remoção existente não cobre a instalação no mesmo local', () => {
+  const resultado = reconciliarProcedimentosDex({
+    procedimentos: ['Remoção de implante', 'Instalação de implante'],
+    eventos: [{ ...evento('outro'), procedimentoNome: 'Remoção de implante' }],
+    dentesObservacoes: { '26': 'Remoção de implante\nInstalação de implante' },
+    modo: 'consulta',
+  });
+  assert.equal(resultado.eventos.length, 2);
+  assert.equal(resultado.eventos[1].procedimentoNome, 'Instalação de implante');
+});
