@@ -24,9 +24,10 @@ export async function GET(
     // o quê, onde, situação e a data clínica da execução).
     supabase
       .from('odontograma_eventos')
-      .select('tipo, status, origem, nivel, quadrante, dente, faces, observacao, realizado_em, registrado_em')
+      .select('tipo, procedimento_nome, status, origem, nivel, arcada, quadrante, dente, faces, observacao, realizado_em, registrado_em')
       .eq('ficha_id', id)
       .eq('clinica_id', dentista.clinica_id)
+    .is('retirado_em', null)
       .order('dente', { ascending: true })
       .order('registrado_em', { ascending: true }),
   ]);

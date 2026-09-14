@@ -1,4 +1,5 @@
 import { Buffer } from 'buffer';
+import { TIPO_LABEL } from '@/types/odontograma';
 import { gerarPDFDocumento } from '@/lib/pdf/documento';
 import { createServiceClient } from '@/lib/supabase/service';
 import {
@@ -13,6 +14,7 @@ import type { ClinicContext } from '@/server/auth/clinic';
 type EventoClinico = {
   id: string;
   tipo: string;
+  procedimento_nome?: string | null;
   status: string;
   dente: number | null;
   observacao: string | null;
@@ -64,8 +66,13 @@ function isSnapshotOrcamento(value: unknown): value is SnapshotOrcamento {
 
 function descricaoEvento(evento: EventoClinico): string {
   const dente = evento.dente ? ` — dente ${evento.dente}` : '';
-  const observacao = evento.observacao?.trim() ? ` (${evento.observacao.trim()})` : '';
-  return `${evento.tipo}${dente}${observacao}`;
+  const nome = evento.procedimento_nome?.trim()
+    || (evento.tipo === 'outro' ? evento.observacao?.trim() : null)
+    || Object.entries(TIPO_LABEL).find(([tipo]) => tipo === evento.tipo)?.[1]
+    || evento.tipo;
+  const nota = evento.observacao?.trim();
+  const observacao = nota && nota !== nome ? ` (${nota})` : '';
+  return `${nome}${dente}${observacao}`;
 }
 
 function dataUrlParaBuffer(dataUrl: string): Buffer | null {
@@ -317,7 +324,7 @@ export async function criarDocumentoConclusaoAssinatura(input: {
   const [{ data: eventosRaw }, { data: paciente }, { data: dentista }, { data: clinica }] = await Promise.all([
     service
       .from('odontograma_eventos')
-      .select('id, tipo, status, dente, observacao, realizado_em')
+      .select('id, tipo, procedimento_nome, status, dente, observacao, realizado_em')
       .eq('assinatura_id', assinatura.id)
       .eq('ficha_id', assinatura.ficha_id)
       .eq('paciente_id', assinatura.paciente_id)
@@ -408,10 +415,11 @@ export async function criarDocumentoAceiteClinico(input: {
 
   const { data: eventosRaw } = await input.context.supabase
     .from('odontograma_eventos')
-    .select('id, tipo, status, dente, observacao, realizado_em')
+    .select('id, tipo, procedimento_nome, status, dente, observacao, realizado_em')
     .eq('ficha_id', input.fichaId)
     .eq('paciente_id', input.pacienteId)
     .eq('clinica_id', input.context.clinicId)
+    .is('retirado_em', null)
     .in('id', input.eventoIds);
   const eventos = (eventosRaw as unknown as EventoClinico[] | null) ?? [];
   if (eventos.length !== input.eventoIds.length) return { ok: false, error: 'Um dos procedimentos não pertence a esta ficha.' };

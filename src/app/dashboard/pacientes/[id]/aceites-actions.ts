@@ -1,6 +1,7 @@
 'use server';
 
 import { z } from 'zod';
+import { TIPO_LABEL } from '@/types/odontograma';
 import { requireClinicContext } from '@/server/auth/clinic';
 import { criarDocumentoAceiteClinico } from '@/server/legal/documentos-aceite';
 
@@ -48,7 +49,7 @@ export type ContextoAceite = {
 };
 
 type FichaContextoRaw = { id: string; data_atendimento: string };
-type EventoContextoRaw = { id: string; ficha_id: string; tipo: string; status: string; dente: number | null; observacao: string | null };
+type EventoContextoRaw = { id: string; ficha_id: string; tipo: string; procedimento_nome: string | null; status: string; dente: number | null; observacao: string | null };
 
 export async function listarContextoAceite(pacienteId: string): Promise<ContextoAceite | { error: string }> {
   const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
@@ -68,9 +69,10 @@ export async function listarContextoAceite(pacienteId: string): Promise<Contexto
 
   const { data: eventosRaw, error: eventosError } = await supabase
     .from('odontograma_eventos')
-    .select('id, ficha_id, tipo, status, dente, observacao')
+    .select('id, ficha_id, tipo, procedimento_nome, status, dente, observacao')
     .eq('paciente_id', pacienteId)
     .eq('clinica_id', clinicId)
+    .is('retirado_em', null)
     .in('ficha_id', fichas.map((ficha) => ficha.id));
   if (eventosError) return { error: 'Não foi possível carregar os procedimentos.' };
   const eventos = (eventosRaw as unknown as EventoContextoRaw[] | null) ?? [];
@@ -83,7 +85,10 @@ export async function listarContextoAceite(pacienteId: string): Promise<Contexto
         .filter((evento) => evento.ficha_id === ficha.id)
         .map((evento) => ({
           id: evento.id,
-          tipo: evento.tipo,
+          tipo: evento.procedimento_nome?.trim()
+            || (evento.tipo === 'outro' ? evento.observacao?.trim() : null)
+            || Object.entries(TIPO_LABEL).find(([tipo]) => tipo === evento.tipo)?.[1]
+            || evento.tipo,
           status: evento.status,
           dente: evento.dente,
           observacao: evento.observacao,

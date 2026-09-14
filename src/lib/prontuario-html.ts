@@ -37,6 +37,8 @@ export type FichaExport = {
 /** v3 §1.10 — evento do odontograma no documento impresso (fiscalização CRO). */
 export type EventoFichaPdf = {
   tipo: string;
+  procedimento_nome?: string | null;
+  arcada?: string | null;
   status: string;
   origem: string;
   /** R-07: 'boca'/'quadrante' não têm dente — o "onde" sai do nível. */
@@ -128,9 +130,10 @@ const TIPO_EVENTO_PDF: Record<string, string> = {
 function renderEventosOdontograma(eventos: EventoFichaPdf[]): string {
   if (eventos.length === 0) return '';
   const rows = eventos.map((ev) => {
-    const label = TIPO_EVENTO_PDF[ev.tipo] ?? ev.tipo;
+    const label = ev.procedimento_nome?.trim() || (ev.tipo === 'outro' ? ev.observacao?.trim() : null) || TIPO_EVENTO_PDF[ev.tipo] || ev.tipo;
     const onde = ev.dente != null
       ? `Dente ${ev.dente}${(ev.faces ?? []).length ? ` · faces ${(ev.faces ?? []).map((face) => faceAbreviacao(face, ev.dente!)).join(', ')}` : ''}`
+      : ev.nivel === 'arcada' && ev.arcada ? `Arcada ${ev.arcada}`
       : ev.nivel === 'boca' ? 'Boca toda'
       : ev.nivel === 'quadrante' && ev.quadrante != null ? `Quadrante ${ev.quadrante}`
       : '—';
