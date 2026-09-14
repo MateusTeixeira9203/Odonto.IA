@@ -28,6 +28,7 @@ export async function buscarGruposAbertos({
     .select('grupo_id, tipo, dente, status, registrado_em')
     .eq('paciente_id', patientId)
     .eq('clinica_id', clinicId)
+    .is('retirado_em', null)
     .not('grupo_id', 'is', null);
 
   if (error || !data) return [];

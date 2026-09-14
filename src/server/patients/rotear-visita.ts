@@ -182,7 +182,8 @@ async function rederivarDaFicha(
     .from('odontograma_eventos')
     .select('tipo, procedimento_nome, observacao, dente, status')
     .eq('ficha_id', fichaId)
-    .eq('clinica_id', clinicId);
+    .eq('clinica_id', clinicId)
+    .is('retirado_em', null);
 
   if (error) {
     console.error('[rederivarDaFicha:leitura]', error.message);
@@ -371,7 +372,8 @@ export async function rotearVisitaMeuDia(input: RotearVisitaInput): Promise<Salv
       .from('odontograma_eventos')
       .select('id, ficha_id, paciente_id')
       .in('id', draft.map((e) => e.id))
-      .eq('clinica_id', clinicId);
+      .eq('clinica_id', clinicId)
+    .is('retirado_em', null);
 
     if (error) {
       console.error('[rotearVisitaMeuDia:particao]', error.message);

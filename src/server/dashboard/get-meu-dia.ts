@@ -498,6 +498,7 @@ export async function getMeuDiaData({
         'id, paciente_id, ficha_id, tipo, procedimento_id, procedimento_nome, status, origem, momento_planejado, nivel, arcada, quadrante, dente, faces, papel_no_grupo, grupo_id, observacao, detalhe, registrado_em, realizado_em, created_at, dentista_id, encaminhado_para, dentista:dentistas!odontograma_eventos_dentista_id_fkey(nome), encaminhado_dentista:dentistas!odontograma_eventos_encaminhado_para_fkey(nome)',
       )
       .eq('clinica_id', clinicId)
+    .is('retirado_em', null)
       .in('paciente_id', pacienteIds)
       .order('registrado_em', { ascending: false })
       .order('created_at', { ascending: false }),

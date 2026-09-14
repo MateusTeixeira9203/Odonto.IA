@@ -183,15 +183,18 @@ export function usePlanejamentoPaciente(patientId: string, clinicaId: string, pa
       const supabase = createClient();
       // Escopa o orçamento à ficha apresentada (quando houver) — senão a apresentação
       // herdaria o orçamento mais recente de OUTRO tratamento do paciente.
-      let budgetQuery = supabase.from('orcamentos').select('*, orcamento_itens(*)').eq('paciente_id', patientId);
+      let budgetQuery = supabase.from('orcamentos').select('*, orcamento_itens(*)')
+        .eq('paciente_id', patientId).eq('clinica_id', clinicaId)
+        .is('orcamento_itens.retirado_em', null);
       if (fichaId) budgetQuery = budgetQuery.eq('ficha_id', fichaId);
       // R-98a — bloco odontograma: mesmo filtro condicional do orçamento, escopado à ficha
       // apresentada quando houver (senão herdaria evento de OUTRO atendimento do paciente).
       let eventosQuery = supabase
         .from('odontograma_eventos')
-        .select('id,tipo,status,origem,momento_planejado,nivel,arcada,quadrante,dente,faces,grupo_id,papel_no_grupo,observacao,realizado_em,registrado_em,created_at')
+        .select('id,tipo,procedimento_nome,procedimento_id,status,origem,momento_planejado,nivel,arcada,quadrante,dente,faces,grupo_id,papel_no_grupo,observacao,realizado_em,registrado_em,created_at')
         .eq('paciente_id', patientId)
-        .eq('clinica_id', clinicaId);
+        .eq('clinica_id', clinicaId)
+    .is('retirado_em', null);
       if (fichaId) eventosQuery = eventosQuery.eq('ficha_id', fichaId);
       const [docsResult, budgetResult, secoesResult, eventosResult] = await Promise.all([
         supabase.from('paciente_documentos').select('*').eq('paciente_id', patientId).in('categoria', ['Radiografias', 'Fotografias']),
@@ -247,7 +250,8 @@ export function usePlanejamentoPaciente(patientId: string, clinicaId: string, pa
         if (e.quadrante != null) ancora.quadrante = e.quadrante as AncoraClinica['quadrante'];
         if ((e.faces as string[] | null)?.length) ancora.faces = e.faces as AncoraClinica['faces'];
         return {
-          id: e.id as string, tipo: e.tipo as OdontogramaEventoDraft['tipo'],
+          id: e.id as string, procedimentoNome: (e.procedimento_nome as string | null) ?? null,
+          procedimentoId: (e.procedimento_id as string | null) ?? null, tipo: e.tipo as OdontogramaEventoDraft['tipo'],
           status: e.status as OdontogramaEventoDraft['status'], origem: e.origem as OdontogramaEventoDraft['origem'],
           momento_planejado: (e.momento_planejado as OdontogramaEventoDraft['momento_planejado']) ?? 'sessao_atual',
           ancora, grupo_id: (e.grupo_id as string | null) ?? null,

@@ -30,7 +30,8 @@ export async function buscarFichaParaAssinar(
       .from('odontograma_eventos')
       .select('ficha_id, status, assinatura_id')
       .eq('paciente_id', pacienteId)
-      .eq('clinica_id', clinicId),
+      .eq('clinica_id', clinicId)
+    .is('retirado_em', null),
   ]);
 
   for (const f of fichas ?? []) {

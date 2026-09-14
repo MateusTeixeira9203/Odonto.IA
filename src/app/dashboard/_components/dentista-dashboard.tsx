@@ -113,6 +113,7 @@ export async function DentistaDashboard({ dentista }: { dentista: DentistaCache 
       .from('odontograma_eventos')
       .select('id, tipo, dente, paciente_id, paciente:pacientes(nome)')
       .eq('clinica_id', dentista.clinica_id)
+    .is('retirado_em', null)
       .eq('encaminhado_para', dentista.id)
       .eq('status', 'indicado')
       .order('registrado_em', { ascending: true })

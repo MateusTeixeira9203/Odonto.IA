@@ -163,7 +163,9 @@ export async function salvarFicha(input: SalvarFichaInput): Promise<SalvarFichaR
     const { count: eventosAntes } = await supabase
       .from('odontograma_eventos')
       .select('id', { count: 'exact', head: true })
-      .eq('ficha_id', data.fichaId as string);
+      .eq('ficha_id', data.fichaId as string)
+      .eq('clinica_id', clinicId)
+      .is('retirado_em', null);
 
     const { data: atualizada, error } = await supabase
       .from('fichas')
@@ -226,7 +228,9 @@ export async function salvarFicha(input: SalvarFichaInput): Promise<SalvarFichaR
       const { count: eventosDepois } = await supabase
         .from('odontograma_eventos')
         .select('id', { count: 'exact', head: true })
-        .eq('ficha_id', data.fichaId as string);
+        .eq('ficha_id', data.fichaId as string)
+      .eq('clinica_id', clinicId)
+      .is('retirado_em', null);
 
       const dentesAntes = new Set((fichaAtual.dentes_afetados ?? []) as number[]);
       const dentesDepois = new Set(data.dentesAfetados);
@@ -304,7 +308,9 @@ export async function salvarFicha(input: SalvarFichaInput): Promise<SalvarFichaR
     const { count: eventosDepois } = await supabase
       .from('odontograma_eventos')
       .select('id', { count: 'exact', head: true })
-      .eq('ficha_id', fichaId);
+      .eq('ficha_id', fichaId)
+      .eq('clinica_id', clinicId)
+      .is('retirado_em', null);
 
     registrarLog(supabase, {
       clinicaId:  clinicId,
