@@ -84,6 +84,7 @@ export async function buildPatientContext(
       .select('total, estado, valor_devido, valor_pago, updated_at, orcamento_itens(descricao)')
       .eq('paciente_id', patientId)
       .eq('clinica_id', clinicId)
+      .is('orcamento_itens.retirado_em', null)
       .neq('estado', 'quitado')
       .order('created_at', { ascending: false })
       .limit(3),

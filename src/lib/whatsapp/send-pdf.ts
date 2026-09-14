@@ -169,6 +169,7 @@ export async function sendOrcamentoWhatsApp(
     `)
     .eq('paciente_id', resolvedPacienteId)
     .eq('clinica_id', clinicaId)
+    .is('itens.retirado_em', null)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();

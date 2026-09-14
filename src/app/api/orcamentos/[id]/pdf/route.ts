@@ -29,6 +29,7 @@ export async function GET(
     `)
     .eq('id', id)
     .eq('clinica_id', dentista.clinica_id)
+    .is('itens.retirado_em', null)
     .maybeSingle();
 
   if (error) return new Response(`Erro ao carregar orçamento: ${error.message}`, { status: 500 });

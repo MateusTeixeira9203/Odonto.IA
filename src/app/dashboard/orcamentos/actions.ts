@@ -190,6 +190,7 @@ export async function alternarAprovacaoItem(
     .select('id, orcamento_id, aprovado')
     .eq('id', itemId)
     .eq('clinica_id', clinicId)
+    .is('retirado_em', null)
     .maybeSingle();
 
   if (!item) return { error: 'Procedimento não encontrado.' };
@@ -199,6 +200,7 @@ export async function alternarAprovacaoItem(
     .select(SELECT_ORC_PARA_ESTADO)
     .eq('id', item.orcamento_id)
     .eq('clinica_id', clinicId)
+    .is('orcamento_itens.retirado_em', null)
     .maybeSingle();
 
   const orc = orcRaw as unknown as OrcParaEstado | null;
@@ -228,6 +230,7 @@ export async function alternarAprovacaoItem(
     .update({ aprovado })
     .eq('id', itemId)
     .eq('clinica_id', clinicId)
+    .is('retirado_em', null)
     .select('id');
 
   if (error) return { error: error.message };
@@ -261,6 +264,7 @@ export async function aprovarTodosItens(
     .select(SELECT_ORC_PARA_ESTADO)
     .eq('id', orcamentoId)
     .eq('clinica_id', clinicId)
+    .is('orcamento_itens.retirado_em', null)
     .maybeSingle();
 
   const orc = orcRaw as unknown as OrcParaEstado | null;
@@ -278,6 +282,7 @@ export async function aprovarTodosItens(
     .update({ aprovado: true })
     .eq('orcamento_id', orcamentoId)
     .eq('clinica_id', clinicId)
+    .is('retirado_em', null)
     .eq('aprovado', false)
     .select('id');
 
@@ -1171,9 +1176,18 @@ export async function editarOrcamento(
   // Provado em produção: 3 orçamentos da ClinDent com item repetido, o último em 15/08.
   const { data: itensAntes } = await supabase
     .from("orcamento_itens")
-    .select("id, aprovado")
+    .select("id, aprovado, retirado_em")
     .eq("orcamento_id", orcamentoId)
     .eq("clinica_id", clinicId);
+
+  // A retirada registra um fato clínico/comercial; a edição antiga abaixo reescreve a lista
+  // inteira e não conhece os vínculos que esse item já teve. Não deixa uma tela desatualizada
+  // apagar esse histórico: os procedimentos ativos seguem pelo fluxo incremental.
+  if ((itensAntes ?? []).some((item) => item.retirado_em !== null)) {
+    return {
+      error: "Este orçamento tem procedimento retirado. Use a alteração incremental na ficha para preservar o histórico.",
+    };
+  }
 
   // R-114 (I5) — editarOrcamento reescreve TUDO (apaga e reinsere); item novo sempre nasce
   // aprovado=false. Se algum item já era aprovado, esta edição apagaria a aprovação do
@@ -1190,6 +1204,7 @@ export async function editarOrcamento(
     .delete()
     .eq("orcamento_id", orcamentoId)
     .eq("clinica_id", clinicId)
+    .is('retirado_em', null)
     .select("id");
 
   if (delError) return { error: delError.message };
@@ -1266,6 +1281,7 @@ export async function registrarPagamentoRapido(dados: {
     .select(SELECT_ORC_PARA_ESTADO)
     .eq("id", dados.orcamentoId)
     .eq("clinica_id", clinicId)
+    .is('orcamento_itens.retirado_em', null)
     .maybeSingle();
 
   const orc = orcRaw as unknown as OrcParaEstado | null;

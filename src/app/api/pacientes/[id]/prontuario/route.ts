@@ -45,6 +45,7 @@ export async function GET(
       .select('id, status, total, valor_acordado, desconto, cobrancas:orcamento_cobrancas(desconto, situacao), created_at, condicoes_pagamento, orcamento_itens(descricao, preco_total, quantidade, aprovado), pagamentos(valor, status, forma_pagamento)')
       .eq('paciente_id', id)
       .eq('clinica_id', dentista.clinica_id)
+      .is('orcamento_itens.retirado_em', null)
       .order('created_at', { ascending: false }),
     supabase
       .from('agendamentos')

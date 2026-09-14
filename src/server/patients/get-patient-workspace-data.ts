@@ -151,6 +151,7 @@ export async function getPatientWorkspaceData({
           )
           .eq('paciente_id', patientId)
           .eq('clinica_id', clinicId)
+          .is('itens.retirado_em', null)
           .order('created_at', { ascending: false }),
 
         // Fichas clínicas: apenas para admin/dentista — secretária não acessa

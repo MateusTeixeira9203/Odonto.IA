@@ -30,6 +30,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     .select('total, desconto, paciente:pacientes(nome), orcamento_itens(descricao, quantidade, preco_unitario, preco_total)')
     .eq('id', body.orcamentoId)
     .eq('clinica_id', dentista.clinica_id)
+    .is('orcamento_itens.retirado_em', null)
     .maybeSingle();
 
   if (!orc) return NextResponse.json({ error: 'Orçamento não encontrado' }, { status: 404 });

@@ -693,6 +693,7 @@ export async function buscarOrcamentosPendentesPorPaciente(
     .select('id, valor_devido, valor_pago, itens:orcamento_itens(descricao)')
     .eq('clinica_id', clinicId)
     .eq('paciente_id', pacienteId)
+    .is('itens.retirado_em', null)
     .eq('estado', 'aceito');
 
   const orcamentos: OrcamentoPendente[] = ((orcamentosRaw ?? []) as unknown as Array<{
