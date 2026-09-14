@@ -221,7 +221,7 @@ type MutacaoFichaResult =
 | Organizando | DexLoader; impedir segundo envio do mesmo lote, preservar texto e rascunhos anteriores |
 | Organização concluída | Revisão com nome, região, situação e detalhes; scroll aos novos itens |
 | Mais uma entrada | Campo reutilizável; segundo lote soma ao primeiro e conserva edições feitas |
-| Adicionar à ficha | Salvar lote confirmado; só remover rascunhos confirmados após sucesso; mostrar na lista |
+| Adicionar à ficha | Ação ao final da revisão, depois de Adicionar mais/Descartar; salvar lote sem apagar rascunhos em erro |
 | Cancelar revisão | Descartar só lote não salvo mediante decisão do dentista; ficha existente não muda |
 | Texto sem intervenção | Aviso claro, sem procedimento inventado; manter texto editável, sem scroll |
 | Erro de validação/rede/IA | Mensagem junto da ação; texto/IDs/rascunho preservados para correção/retry |

@@ -143,7 +143,10 @@ type DiferencasFichaOrcamento = {
   da listagem histórica conserva sua apresentação atual, sem herdar esse estado por compartilhamento.
 - Cor/contador permanecem ao apenas abrir/fechar o modal. Somem quando nenhum faltante elegível
   restar; adicionar seleção parcial mantém o restante. Adiar não resolve a inclusão pendente.
-- Atualizar resumo após salvar/adicionar/retirar, ao reabrir ficha/modal e retornar à aba do browser;
+- Clique no CTA tem feedback/trava imediatos e abre o destino sem repetir descoberta; um modal por vez.
+- Aviso compacto só no orçamento solicitado; cada entrada clínica não reabre nem repete a proposta.
+- Após incluir, retirar IDs confirmados do contador imediatamente e conferir o resumo em background;
+  atualizar também após salvar/retirar, ao reabrir ficha/modal e retornar à aba do browser;
   ignorar resposta de ficha/paciente/ator anterior. Sem polling nem request por procedimento.
 - `paciente-detail-client` integra resumo/abertura com `useOrcamentoModal`. Leitura de resumo e
   detalhe compartilha elegibilidade/IDs; uma única fonte de decisão, sem duas contas divergentes.

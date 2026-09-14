@@ -3,7 +3,9 @@
 14/09/2026. Usuário confirmou o caso Curativo/46 do Dex e autorizou concluir os lotes
 restantes, publicar preview e entregar um roteiro único para teste manual ao voltar.
 Destino: preview `codex/r169-dex-ficha`, banco principal, somente clínica de teste para QA.
-**Implementado; publicação em preparação. Testes manuais ainda pendentes.**
+**Preview Ready; testes manuais pendentes.**
+
+[ABRIR PREVIEW](https://odonto-qhiawak4w-mateusteixeira9203s-projects.vercel.app) · commit `00b3c85`.
 
 ## Roteiro do dentista
 
@@ -80,4 +82,30 @@ os valores do orçamento e o total já recebido para comparar no fim.
   permanecem; RPCs novas autenticadas são intencionais e validam o contexto em cada escrita.
 - Funções antigas preservadas em `supabase/rollbacks/`. Depois de haver histórico de retirada,
   manter as guardas do banco ao voltar o app; não apagar colunas/histórico para fazer rollback.
-- Typecheck e ESLint passaram nos recortes; revisão final/build Vercel registrados na publicação.
+- Revisões TypeScript/UX finais sem HIGH/CRITICAL; typecheck passou e lint sem erros no recorte.
+- Vercel Ready confirmado: `dpl_6ure7U4qhkRkVFXLEU22toWLbpfU`, SHA `00b3c85a33c882b6b5db7bb73105417a0611139b`.
+  Alias da branch atualizado; `target: null` (preview), app em produção não promovido.
+- Usuário fará o QA manual; não houve testes de navegação nem gravação de pacientes por automação.
+
+## Retorno manual após o preview 00b3c85
+
+Usuário: destaque âmbar visível, mas clique parece inativo; avisos de orçamento repetidos ao
+adicionar/organizar outros procedimentos; contador demora a sair após inclusão. Revisar e adicionar
+funcionou. Pediu ação Adicionar à ficha abaixo dos campos e depois de Adicionar mais/Descartar.
+Correção sem SQL novo: CTA reaproveita resumo carregado, indica abertura e bloqueia repetição;
+a revisão fecha o detalhe antes de abrir a inclusão; montagem não repete a lista de pendências.
+IDs confirmados atualizam o contador antes da revalidação. Ação de salvar ficou no rodapé,
+com identificação por revisão quando houver vários rascunhos.
+
+Reteste manual no novo preview:
+1. Clique uma vez no CTA âmbar: deve indicar abertura e abrir o orçamento correspondente.
+2. Revise dois procedimentos faltantes, inclua apenas um: uma janela por vez, sem repetir
+   a lista de avisos; depois de confirmar, o contador deve mostrar apenas o restante.
+3. Volte à ficha e adicione/organize procedimentos em sequência: orçamento não deve abrir
+   sozinho nem sobrepor avisos à captura. Confira também uma ficha com vários orçamentos.
+4. Na revisão clínica, confira campos → Adicionar mais/Descartar rascunhos → Adicionar à ficha.
+   Com várias revisões, cada botão no rodapé deve identificar a revisão que será salva.
+
+Revisão estática UX final passou sem bloqueadores; diff sem erros de whitespace.
+A confirmação visual e os ciclos reais de uso continuam reservados ao usuário no preview.
+TypeScript passou; ESLint sem erros nos cinco arquivos de orçamento (27 avisos anteriores no client).

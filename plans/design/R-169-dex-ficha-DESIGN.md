@@ -17,7 +17,7 @@ Desktop: título **Procedimentos** à esquerda; **Adicionar procedimentos** e **
 Não mover os procedimentos para outra aba nem exigir abrir Meu Dia.
 
 Clique expande o painel imediatamente abaixo desse cabeçalho, antes da lista. Uma coluna:
-campo de texto/voz → Organizar com Dex → revisão dos itens novos → Adicionar à ficha.
+campo de texto/voz → Organizar com Dex → revisão dos itens novos → Adicionar mais/Descartar → Adicionar à ficha.
 O campo continua disponível para a próxima entrada; rascunhos anteriores permanecem visíveis.
 O painel não traz odontograma, seletor de consulta, dados cadastrais ou resumo financeiro completo.
 Metadados de situação/região aparecem na revisão; não adicionar um formulário manual paralelo.
