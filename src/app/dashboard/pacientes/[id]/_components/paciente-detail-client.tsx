@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, useEffect, useCallback, useMemo } from 'react';
+import { useState, useTransition, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
@@ -101,7 +101,7 @@ import { EmitirDocumentoModal } from '@/components/pacientes/EmitirDocumentoModa
 import { EmitirAceiteModal } from '@/components/pacientes/EmitirAceiteModal';
 import { NovoOrcamentoModal } from './modals/novo-orcamento-modal';
 import { useOrcamentoModal } from './use-orcamento-modal';
-import { getDiferencasFichaOrcamento, getResumoOrcamentoDaFicha, type DiferencasFichaOrcamento } from '@/server/orcamentos/ficha-orcamento-actions';
+import { getDiferencasFichaOrcamento, getResumoOrcamentoDaFicha, type DiferencasFichaOrcamento, type ResumoOrcamentoDaFicha } from '@/server/orcamentos/ficha-orcamento-actions';
 import { ApresentarPaciente } from '@/components/pacientes/ApresentarPaciente';
 
 import type { FichaRecente } from '@/server/patients/get-patient-workspace-data';
@@ -259,6 +259,9 @@ export function PacienteDetailClient({
   const [detalheOrcId, setDetalheOrcId] = useState<string | null>(null);
   const [diferencasOrcamentoAberto, setDiferencasOrcamentoAberto] = useState<DiferencasFichaOrcamento | null>(null);
   const [seletorOrcamentoDaFicha, setSeletorOrcamentoDaFicha] = useState<{ fichaId: string; orcamentoIds: string[] } | null>(null);
+  const [revisaoOrcamentoFicha, setRevisaoOrcamentoFicha] = useState(0);
+  const [eventosOrcamentoConfirmados, setEventosOrcamentoConfirmados] = useState<string[]>([]);
+  const aberturaOrcamentoEmCursoRef = useRef(false);
   const [procedimentosClinica, setProcedimentosClinica] = useState<ProcedimentoClinica[]>([]);
   const [erroCatalogoProcedimentos, setErroCatalogoProcedimentos] = useState<string | null>(null);
   const [pagForm, setPagForm] = useState({
@@ -562,15 +565,22 @@ export function PacienteDetailClient({
     });
   };
 
-  const atualizarDiferencasPorOrcamento = useCallback(async (fichaId: string, orcamentoId: string) => {
-    const resultado = await getDiferencasFichaOrcamento({ fichaId, orcamentoId });
-    if (!resultado.ok) {
-      toast.error(resultado.error);
-      return;
+  const atualizarDiferencasPorOrcamento = useCallback(async (fichaId: string, orcamentoId: string, notificarErro = true) => {
+    try {
+      const resultado = await getDiferencasFichaOrcamento({ fichaId, orcamentoId });
+      if (!resultado.ok) {
+        if (notificarErro) toast.error(resultado.error);
+        return;
+      }
+      setDiferencasOrcamentoAberto((atuais) => {
+        if (atuais?.fichaId !== fichaId || atuais.orcamentoId !== orcamentoId) return atuais;
+        return resultado.dados;
+      });
+      // O estado local recebe os dados SSR atualizados pelo efeito de `orcamentos` após a ação.
+      router.refresh();
+    } catch {
+      if (notificarErro) toast.error('Não foi possível atualizar a revisão do orçamento.');
     }
-    setDiferencasOrcamentoAberto(resultado.dados);
-    // O estado local recebe os dados SSR atualizados pelo efeito de `orcamentos` após a ação.
-    router.refresh();
   }, [router]);
 
   // R-46h — extraído pra use-orcamento-modal.ts (compartilhado com o Meu dia). onOrcamentoCriado
@@ -589,13 +599,21 @@ export function PacienteDetailClient({
       setDiferencasOrcamentoAberto(diferencas);
       setDetalheOrcId(diferencas.orcamentoId);
     },
-    onItensAdicionadosAoOrcamento: (orcamentoId) => {
-      const diferencasAtuais = diferencasOrcamentoAberto;
-      if (diferencasAtuais?.orcamentoId === orcamentoId) {
-        void atualizarDiferencasPorOrcamento(diferencasAtuais.fichaId, orcamentoId);
-        return;
+    onItensAdicionadosAoOrcamento: (orcamentoId, eventoIdsConfirmados) => {
+      setDiferencasOrcamentoAberto((atuais) => {
+        if (atuais?.orcamentoId !== orcamentoId) return atuais;
+        return { ...atuais, faltantes: atuais.faltantes.filter((faltante) => !eventoIdsConfirmados.includes(faltante.eventoId)) };
+      });
+      setEventosOrcamentoConfirmados((atuais) => [...new Set([...atuais, ...eventoIdsConfirmados])]);
+      setRevisaoOrcamentoFicha((atual) => atual + 1);
+      const fichaId = diferencasOrcamentoAberto?.orcamentoId === orcamentoId
+        ? diferencasOrcamentoAberto.fichaId
+        : null;
+      if (fichaId) {
+        void atualizarDiferencasPorOrcamento(fichaId, orcamentoId, false);
+      } else {
+        router.refresh();
       }
-      router.refresh();
     },
   });
 
@@ -605,29 +623,33 @@ export function PacienteDetailClient({
     await atualizarDiferencasPorOrcamento(diferencasAtuais.fichaId, diferencasAtuais.orcamentoId);
   }, [atualizarDiferencasPorOrcamento, diferencasOrcamentoAberto]);
 
-  const abrirOrcamentoDaFicha = useCallback(async (fichaId: string) => {
-    const resumo = await getResumoOrcamentoDaFicha({ fichaId });
-    if (!resumo.ok) {
-      toast.error(resumo.error);
-      return;
+  const abrirOrcamentoDaFicha = useCallback(async (fichaId: string, resumoInicial?: ResumoOrcamentoDaFicha) => {
+    if (aberturaOrcamentoEmCursoRef.current) return;
+    aberturaOrcamentoEmCursoRef.current = true;
+    try {
+      let resumo = resumoInicial;
+      if (!resumo) {
+        const resultado = await getResumoOrcamentoDaFicha({ fichaId });
+        if (!resultado.ok) {
+          toast.error(resultado.error);
+          return;
+        }
+        resumo = resultado.dados;
+      }
+      if (resumo.orcamentoIds.length <= 1) {
+        await orcamentoModal.abrirOrcamentoParaFicha(fichaId, resumo.orcamentoIds[0]);
+        return;
+      }
+      setSeletorOrcamentoDaFicha({ fichaId, orcamentoIds: resumo.orcamentoIds });
+    } finally {
+      aberturaOrcamentoEmCursoRef.current = false;
     }
-    if (resumo.dados.orcamentoIds.length <= 1) {
-      void orcamentoModal.abrirOrcamentoParaFicha(fichaId);
-      return;
-    }
-    setSeletorOrcamentoDaFicha({ fichaId, orcamentoIds: resumo.dados.orcamentoIds });
   }, [orcamentoModal]);
 
   const selecionarOrcamentoDaFicha = useCallback(async (fichaId: string, orcamentoId: string) => {
-    const diferencas = await getDiferencasFichaOrcamento({ fichaId, orcamentoId });
-    if (!diferencas.ok) {
-      toast.error(diferencas.error);
-      return;
-    }
-    setDiferencasOrcamentoAberto(diferencas.dados);
-    setDetalheOrcId(orcamentoId);
     setSeletorOrcamentoDaFicha(null);
-  }, []);
+    await orcamentoModal.abrirOrcamentoParaFicha(fichaId, orcamentoId);
+  }, [orcamentoModal]);
 
   // Catálogo de procedimentos é privado por dentista. Pra secretária, o dono relevante
   // é o dentista-alvo selecionado no modal de orçamento, não o perfil dela (ela nunca
@@ -1549,8 +1571,9 @@ export function PacienteDetailClient({
                         patientName={displayNome}
                         canWrite={canWriteClinical}
                         dados={prontuario ?? { atendimentos: [], fichas: [], boca: [], profissionaisClinicos: [], errosParciais: [] }}
-                        onGerarOrcamento={(fichaId) => void abrirOrcamentoDaFicha(fichaId)}
-                        orcamentoRevisao={JSON.stringify(orcamentosState)}
+                        onGerarOrcamento={abrirOrcamentoDaFicha}
+                        orcamentoRevisao={`${revisaoOrcamentoFicha}:${JSON.stringify(orcamentosState)}`}
+                        eventosOrcamentoConfirmados={eventosOrcamentoConfirmados}
                         onAbrirArquivos={() => handleTabChange('arquivos')}
                         // R-107b — catálogo pro match local da busca livre do painel do dente.
                         // `categoria` não vem da query (`ProcedimentoClinica` é o contrato do
@@ -1919,7 +1942,10 @@ export function PacienteDetailClient({
         parcelasError={parcelasError}
         onGerarParcelas={handleGerarParcelas}
         diferencasFicha={diferencasOrcamentoAberto}
-        onRevisarAdicao={() => orcamentoModal.abrirRevisaoDaFicha()}
+        onRevisarAdicao={() => {
+          setDetalheOrcId(null);
+          orcamentoModal.abrirRevisaoDaFicha();
+        }}
         onRecarregarDiferencasFicha={recarregarDiferencasDaFicha}
         orcEditMode={orcEditMode}
         setOrcEditMode={setOrcEditMode}

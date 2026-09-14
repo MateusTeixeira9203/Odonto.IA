@@ -14,6 +14,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { ToothDetailPanel } from '@/components/odontograma/ToothDetailPanel';
 import { Odontograma } from '@/components/odontograma/Odontograma';
 import { OrcamentoDaFicha } from '@/components/pacientes/orcamento-da-ficha';
+import type { ResumoOrcamentoDaFicha } from '@/server/orcamentos/ficha-orcamento-actions';
 import { ProcedimentoDetalheFicha } from '@/components/pacientes/procedimento-detalhe-ficha';
 import { AdicionarProcedimentosFicha } from '@/components/pacientes/adicionar-procedimentos-ficha';
 import { NestaSessaoBloco } from '@/app/dashboard/meu-dia/_components/nesta-sessao-bloco';
@@ -63,8 +64,9 @@ interface ProntuarioTabProps {
   canWrite: boolean;
   catalogoProcedimentos: MeuDiaCatalogoProcedimento[];
   dados: ProntuarioLongitudinalData;
-  onGerarOrcamento?: (fichaId: string) => void;
+  onGerarOrcamento?: (fichaId: string, resumo?: ResumoOrcamentoDaFicha) => Promise<void> | void;
   orcamentoRevisao?: string;
+  eventosOrcamentoConfirmados?: string[];
   onAbrirArquivos: () => void;
 }
 
@@ -154,6 +156,7 @@ export function ProntuarioTab({
   dados,
   onGerarOrcamento,
   orcamentoRevisao,
+  eventosOrcamentoConfirmados,
   onAbrirArquivos,
 }: ProntuarioTabProps) {
   const router = useRouter();
@@ -1036,7 +1039,8 @@ export function ProntuarioTab({
                   dentistaId={dentistaId}
                   fichaId={fichaAtual.id}
                   revisao={`${orcamentoRevisao ?? ''}:${eventosDaFicha.map((item) => `${item.id}:${item.procedimentoNome}:${item.retiradoEm ?? ''}`).join('|')}`}
-                  onAbrir={() => onGerarOrcamento(fichaAtual.id)}
+                  eventosConfirmados={eventosOrcamentoConfirmados}
+                  onAbrir={(resumo) => Promise.resolve(onGerarOrcamento(fichaAtual.id, resumo))}
                 />
               </article>
             )}

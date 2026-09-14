@@ -13,7 +13,7 @@
 // (orcamentosState) que precisa do item novo pra atualizar sem esperar um reload. Meu dia não
 // tem essa lista — não passa nada, o callback nunca é chamado.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
@@ -57,7 +57,7 @@ export interface UseOrcamentoModalInput {
   onContinuarConfiguracao?: (orcamentoId: string) => void;
   onAbrirOrcamentoExistente?: (contexto: DiferencasFichaOrcamento) => void;
   /** Inclusão incremental confirma no mesmo orçamento aberto; o dono recarrega seus dados locais. */
-  onItensAdicionadosAoOrcamento?: (orcamentoId: string) => void;
+  onItensAdicionadosAoOrcamento?: (orcamentoId: string, eventoIdsConfirmados: string[]) => void;
   /**
    * No Meu Dia, uma linha escolhida manualmente no catálogo ainda não tem evento clínico.
    * O chamador a transforma em procedimento planejado e persiste a ficha sem encerrar a visita
@@ -144,8 +144,8 @@ export function useOrcamentoModal({
   const [eventoIdsJaOrcados, setEventoIdsJaOrcados] = useState<Set<string>>(() => new Set());
   const [resumoOrigemOrcamento, setResumoOrigemOrcamento] = useState<ResumoOrigemOrcamento | null>(null);
   const [bloqueioFicha, setBloqueioFicha] = useState<string | null>(null);
-  const [diferencasFicha, setDiferencasFicha] = useState<DiferencasFichaOrcamento | null>(null);
   const [contextoClinicoPendente, setContextoClinicoPendente] = useState(false);
+  const aberturaFichaEmCursoRef = useRef(false);
   // Pré-seleciona o 1º dentista da lista assim que ela chega — só quando ainda vazio, nunca
   // sobrescreve uma escolha manual já feita (o pai só popula `dentistasClinica` quando
   // isSecretaria; dentista comum nunca aciona isto, `dentistasClinica` fica sempre []).
@@ -604,6 +604,8 @@ export function useOrcamentoModal({
   // #6 — gerar orçamento a partir de uma ficha é SÓ dela (decisão 07/08): nunca puxa outra
   // ficha nem outro dentista. Quem quer ver várias fichas juntas usa o picker (agrega).
   const abrirOrcamentoParaFicha = async (fichaId: string, orcamentoDestinoId?: string) => {
+    if (aberturaFichaEmCursoRef.current) return;
+    aberturaFichaEmCursoRef.current = true;
     let abriuOrcamentoExistente = false;
     setOrcError(null);
     setContextoClinicoPendente(false);
@@ -631,34 +633,36 @@ export function useOrcamentoModal({
       if (modo.tipo === 'adicionar') {
         const diferencas = await getDiferencasFichaOrcamento({ fichaId, orcamentoId: modo.orcamentoId });
         if (!diferencas.ok) throw new Error(diferencas.error);
-        setDiferencasFicha(diferencas.dados);
         if (onAbrirOrcamentoExistente) {
           onAbrirOrcamentoExistente(diferencas.dados);
           abriuOrcamentoExistente = true;
         }
-      } else {
-        setDiferencasFicha(null);
       }
       const itens = ficha ? fichaParaItens(ficha, alvoAtual(), idsJaOrcados) : [];
       setNovoOrcItens(itens.length > 0 ? itens : [ITEM_VAZIO]);
       setResumoOrigemOrcamento(ficha ? resumoDaFichaParaOrcamento(ficha, alvoAtual(), idsJaOrcados) : null);
       setBloqueioFicha(bloqueioParaFichaSemItens(ficha, itens));
     } catch (error: unknown) {
+      const mensagem = error instanceof Error ? error.message : 'Não foi possível localizar o orçamento desta ficha.';
+      if (orcamentoDestinoId) {
+        toast.error(mensagem);
+        return;
+      }
       setFichaOrcId(fichaId);
       setFichasParaOrc([]);
       // Falha para localizar um orçamento existente nunca pode criar outro como fallback.
       setModoPersistencia({ tipo: 'novo' });
       setNovoOrcItens([ITEM_VAZIO]);
       setResumoOrigemOrcamento(null);
-      setBloqueioFicha(error instanceof Error ? error.message : 'Não foi possível localizar o orçamento desta ficha.');
-      setDiferencasFicha(null);
-      setOrcError(error instanceof Error ? error.message : 'Não foi possível localizar o orçamento desta ficha.');
+      setBloqueioFicha(mensagem);
+      setOrcError(mensagem);
     } finally {
       setEtapaNovoOrc('itens');
       setIsLoadingFichaParaOrc(false);
+      aberturaFichaEmCursoRef.current = false;
     }
     // A proposta existente abre primeiro no detalhe; a montagem só abre pelo CTA explícito.
-    if (!abriuOrcamentoExistente) setIsNovoOrcOpen(true);
+    if (!abriuOrcamentoExistente && !orcamentoDestinoId) setIsNovoOrcOpen(true);
   };
 
   // Cadastra no catálogo um procedimento digitado que não bateu com nenhum item existente.
@@ -821,9 +825,11 @@ export function useOrcamentoModal({
       if (result.error) {
         setOrcError(result.error);
       } else {
+        const eventoIdsConfirmados = [...new Set(itensParaSalvar.flatMap((item) => item.eventoIds))];
+        setEventoIdsJaOrcados((atuais) => new Set([...atuais, ...eventoIdsConfirmados]));
         setIsNovoOrcOpen(false);
         setNovoOrcItens([ITEM_VAZIO]);
-        onItensAdicionadosAoOrcamento?.(modoPersistencia.orcamentoId);
+        onItensAdicionadosAoOrcamento?.(modoPersistencia.orcamentoId, eventoIdsConfirmados);
         toast.success(`${itensValidos.length} procedimento${itensValidos.length === 1 ? '' : 's'} adicionado${itensValidos.length === 1 ? '' : 's'} ao orçamento.`);
         router.refresh();
       }
@@ -941,7 +947,6 @@ export function useOrcamentoModal({
         setModoPersistencia({ tipo: 'novo' });
         setEventoIdsJaOrcados(new Set());
         setResumoOrigemOrcamento(null);
-        setDiferencasFicha(null);
         setBloqueioFicha(null);
         setContextoClinicoPendente(false);
         setNovoOrcPlanoForma(null); setNovoOrcNumParcelas('3'); setNovoOrcPrimeiroVencimento(''); setNovoOrcParcelasForma('');
@@ -972,7 +977,6 @@ export function useOrcamentoModal({
     modoPersistencia: modoPersistencia.tipo,
     contextoClinicoPendente,
     resumoOrigemOrcamento,
-    diferencasFicha,
     onCriarOrcamento: () => void handleCriarOrcamento(),
     onSelecionarFicha: selecionarFichaParaOrc,
     onCadastrarProcedimento: (idx) => void handleCadastrarProcedimento(idx),
