@@ -350,16 +350,6 @@ export function AdicionarProcedimentosFicha({
             <div key={lote.capturaId} className="space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-bold text-text-primary">Revisão {indiceLote + 1}</p>
-                <Button
-                  type="button"
-                  size="sm"
-                  className="min-h-11"
-                  disabled={bloqueado}
-                  onClick={() => void salvarLote(lote)}
-                >
-                  {salvandoCapturaId === lote.capturaId ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  Adicionar à ficha
-                </Button>
               </div>
               {lote.eventos.map((evento) => {
                 const nome = evento.procedimentoNome ?? rotuloProcedimento(evento);
@@ -434,7 +424,7 @@ export function AdicionarProcedimentosFicha({
             </div>
           ))}
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="outline" className="min-h-11" disabled={capturaOcupada} onClick={adicionarMais}>
+            <Button type="button" variant="outline" className="min-h-11" disabled={bloqueado || capturaOcupada} onClick={adicionarMais}>
               <Plus className="h-4 w-4" /> Adicionar mais
             </Button>
             {temRascunho && (
@@ -442,6 +432,20 @@ export function AdicionarProcedimentosFicha({
                 Descartar rascunhos
               </Button>
             )}
+          </div>
+          <div className="flex flex-col gap-2 border-t border-border pt-3 sm:items-end">
+            {lotes.map((lote, indiceLote) => (
+              <Button
+                key={lote.capturaId}
+                type="button"
+                className="min-h-11"
+                disabled={bloqueado || capturaOcupada}
+                onClick={() => void salvarLote(lote)}
+              >
+                {salvandoCapturaId === lote.capturaId ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                {lotes.length === 1 ? 'Adicionar à ficha' : `Adicionar revisão ${indiceLote + 1} à ficha`}
+              </Button>
+            ))}
           </div>
         </div>
       )}
