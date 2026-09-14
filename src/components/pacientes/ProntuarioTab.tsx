@@ -26,7 +26,7 @@ import { useMarcarRetorno } from '@/hooks/use-marcar-retorno';
 import type { MeuDiaCatalogoProcedimento } from '@/server/dashboard/get-meu-dia';
 import type { ProntuarioAtendimento, ProntuarioEvento, ProntuarioLongitudinalData } from '@/server/patients/get-prontuario-longitudinal';
 import type { OdontogramaEventoDraft } from '@/types/odontograma';
-import { TIPO_LABEL } from '@/types/odontograma';
+import { rotuloProcedimento as nomeClinicoProcedimento } from '@/types/odontograma';
 import {
   alternarMomentoRegistro,
   alternarStatusRegistro,
@@ -83,7 +83,7 @@ function rotuloOrigem(atendimento: ProntuarioAtendimento): string {
 function rotuloProcedimento(atendimento: ProntuarioAtendimento, eventoId: string): string {
   const evento = atendimento.eventos.find((item) => item.id === eventoId);
   if (!evento) return 'Procedimento clínico';
-  return evento.procedimentoNome?.trim() || TIPO_LABEL[evento.tipo];
+  return nomeClinicoProcedimento(evento);
 }
 
 function rotuloLocalEvento(evento: ProntuarioAtendimento['eventos'][number]): string {
@@ -305,7 +305,7 @@ export function ProntuarioTab({
     const eventos = eventosClinicosUnicos.filter((evento) => evento.fichaId === ficha.id);
     const realizados = eventos.filter((evento) => evento.status === 'realizado').length;
     const procedimentos = [...new Set(eventos.map((evento) => (
-      evento.procedimentoNome?.trim() || TIPO_LABEL[evento.tipo]
+      nomeClinicoProcedimento(evento)
     )))];
     return {
       ficha,
@@ -975,7 +975,7 @@ export function ProntuarioTab({
                 <div className="mt-3 grid gap-2">
                   {historicoDaFicha.map((visita) => {
                     const procedimentos = visita.eventos
-                      .map((evento) => `${evento.procedimentoNome?.trim() || TIPO_LABEL[evento.tipo]} · ${rotuloLocalEvento(evento)}`)
+                      .map((evento) => `${nomeClinicoProcedimento(evento)} · ${rotuloLocalEvento(evento)}`)
                       .filter((item, indice, itens) => itens.indexOf(item) === indice);
                     const atual = visita.id === atendimentoAberto.id;
                     return (
@@ -1361,7 +1361,7 @@ export function ProntuarioTab({
                           disabled={!atendimento}
                           className="flex min-h-9 items-center justify-between gap-3 rounded-lg px-2 text-left text-xs font-semibold text-text-primary hover:bg-surface-alt disabled:cursor-default disabled:opacity-60"
                         >
-                          <span>{evento.procedimentoNome?.trim() || TIPO_LABEL[evento.tipo]}{evento.ancora.dente ? ` · ${evento.ancora.dente}` : ''}</span>
+                          <span>{nomeClinicoProcedimento(evento)}{evento.ancora.dente ? ` · ${evento.ancora.dente}` : ''}</span>
                           <span className="text-text-secondary">{atendimento ? 'Abrir pendência →' : 'Pendente'}</span>
                         </button>
                       );
@@ -1446,7 +1446,7 @@ export function ProntuarioTab({
                   <div className="mt-3 flex flex-wrap gap-2">
                     {atendimento.eventos.slice(0, 8).map((evento) => (
                       <span key={evento.id} className="rounded-lg border border-border bg-surface-alt px-2.5 py-1 text-xs text-text-secondary">
-                        {evento.procedimentoNome ?? evento.tipo}{evento.ancora.dente ? ` · ${evento.ancora.dente}` : ''}
+                        {nomeClinicoProcedimento(evento)}{evento.ancora.dente ? ` · ${evento.ancora.dente}` : ''}
                       </span>
                     ))}
                     {atendimento.eventos.length > 8 && <span className="px-2 py-1 text-xs text-text-secondary">+{atendimento.eventos.length - 8}</span>}

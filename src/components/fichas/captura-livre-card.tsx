@@ -13,6 +13,7 @@ import { extrairTextoDeArquivo } from '@/lib/dex/extrair-texto-arquivo';
 import { casarProcedimentoLocal, type SugestaoLocal } from '@/lib/odontograma/casar-procedimento-local';
 import { VoiceUX } from './voice-ux';
 import { DexAvatar } from '@/components/ui/dex-avatar';
+import { DexLoader } from '@/components/ui/dex-loader';
 import type { EvolucaoFormatada } from '@/app/api/dex/formatar-evolucao/route';
 import type { MeuDiaCatalogoProcedimento } from '@/server/dashboard/get-meu-dia';
 
@@ -36,6 +37,8 @@ export interface CapturaLivreCardProps {
   pacienteNome: string;
   /** Form já tem conteúdo? Gate de confirmação antes de sobrescrever (§8 fluxo, passo 4). */
   formDirty: boolean;
+  /** Meu Dia soma os lotes; o formulário completo mantém a confirmação de substituição. */
+  aplicacao?: 'substituir' | 'acrescentar';
   onOrganizado: (evolucao: EvolucaoFormatada, relato: string) => void;
   /** R-46d (D8) — "usar este documento de base": `nonce` muda a cada clique, o efeito abaixo
    *  observa a mudança e faz append no texto atual. Opcional — callers existentes (FichasTab)
@@ -58,7 +61,7 @@ export interface CapturaLivreCardProps {
 
 export function CapturaLivreCard({
   pacienteNome, formDirty, onOrganizado, anexarTexto, catalogoProcedimentos, onAplicarSugestao,
-  compact = false, autoFocus = false, onCapturaStateChange,
+  compact = false, autoFocus = false, aplicacao = 'substituir', onCapturaStateChange,
 }: CapturaLivreCardProps) {
   const {
     texto,
@@ -84,8 +87,8 @@ export function CapturaLivreCard({
   );
 
   // 07/08 — true assim que QUALQUER trecho de documento (pdf/docx/doc/txt, nunca áudio)
-  // entrar na caixa — nunca volta a false sozinho (o card inteiro reseta ao trocar de
-  // paciente/agendamento, mesmo padrão dos outros estados desta família). Efeito: o relato
+  // entrar na caixa — volta a false ao consumir o lote ou quando o card reseta ao trocar de
+  // paciente/agendamento, no mesmo padrão dos outros estados desta família. Efeito: o relato
   // INTEIRO desta chamada ao Dex vira `modo:'exame_inicial'` (verbo no passado deixa de
   // provar "feito por esta clínica hoje") — mistura-se com dictado ao vivo do mesmo jeito
   // que uma anamnese mistura achado novo com histórico trazido pelo paciente: mais seguro
@@ -94,15 +97,19 @@ export function CapturaLivreCard({
 
   // R-46d (D8) — append, não substituição: mesmo padrão que `handleArquivo` já usa.
   const anexarNonceRef = useRef(anexarTexto?.nonce);
+  const revisaoAnexoRef = useRef(0);
   useEffect(() => {
     if (anexarTexto == null || anexarTexto.nonce === anexarNonceRef.current) return;
     anexarNonceRef.current = anexarTexto.nonce;
+    revisaoAnexoRef.current += 1;
     const novo = anexarTexto.texto;
     setTexto((prev) => (prev ? `${prev}\n\n${novo}` : novo));
     if (anexarTexto.origem === 'documento') setVeioDeDocumento(true);
   }, [anexarTexto, setTexto]);
 
   const [isOrganizando, setIsOrganizando] = useState(false);
+  const organizarRef = useRef<AbortController | null>(null);
+  useEffect(() => () => organizarRef.current?.abort(), []);
   const [organizarError, setOrganizarError] = useState(false);
   const [processandoArquivo, setProcessandoArquivo] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -131,8 +138,9 @@ export function CapturaLivreCard({
   }, [fase, hasPendingAudio, ocupado, onCapturaStateChange]);
 
   const handleOrganizar = async () => {
-    if (ocupado) return;
+    if (ocupado || organizarRef.current) return;
     const relato = texto.trim();
+    const revisaoAnexoEnviada = revisaoAnexoRef.current;
     if (!relato) return;
     // §8 passo 4 — form já preenchido pede confirmação antes de sobrescrever.
     // R-47 (31/07): eventos do odontograma agora se SOMAM aos existentes (não substituem
@@ -143,17 +151,20 @@ export function CapturaLivreCard({
     // não tinha feito nada (relatado como "não aparece no odontograma" — na verdade nunca
     // chegou a chamar a IA). Fica mais comum depois do R-62: os chips locais já preenchem o
     // draft sem passar por aqui, então `formDirty` chega `true` com mais frequência.
-    if (formDirty && !window.confirm('Isso substitui o texto e os campos do formulário. Os registros já lançados no odontograma são mantidos — os novos se somam a eles.')) {
+    if (aplicacao === 'substituir' && formDirty && !window.confirm('Isso substitui o texto e os campos do formulário. Os registros já lançados no odontograma são mantidos — os novos se somam a eles.')) {
       toast.info('Cancelado — nada foi alterado. O texto continua no campo.');
       return;
     }
 
     setIsOrganizando(true);
     setOrganizarError(false);
+    const controller = new AbortController();
+    organizarRef.current = controller;
 
     try {
       const res = await fetch('/api/dex/formatar-evolucao', {
         method: 'POST',
+        signal: controller.signal,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           texto: relato,
@@ -163,13 +174,22 @@ export function CapturaLivreCard({
       });
       const data = await res.json() as EvolucaoFormatada & { error?: string };
       if (!res.ok || data.error) throw new Error(data.error ?? 'Erro ao formatar');
+      if (controller.signal.aborted) return;
       onOrganizado(data, relato);
+      // Um documento externo pode chegar durante a resposta: preserve a entrada nova e sua origem.
+      if (aplicacao === 'acrescentar' && revisaoAnexoRef.current === revisaoAnexoEnviada
+        && (data.odontograma_eventos.length > 0 || data.orto_manutencao)) {
+        setTexto('');
+        setVeioDeDocumento(false);
+      }
     } catch (err) {
+      if (controller.signal.aborted) return;
       console.error('[captura-livre] formatar-evolucao:', err);
       setOrganizarError(true);
       toast.error('O Dex não conseguiu organizar as anotações. Tente novamente.');
     } finally {
-      setIsOrganizando(false);
+      organizarRef.current = null;
+      if (!controller.signal.aborted) setIsOrganizando(false);
     }
   };
 
@@ -238,6 +258,8 @@ export function CapturaLivreCard({
 
       <textarea
         value={texto}
+        disabled={ocupado}
+        aria-label="Relato para organizar com Dex"
         onChange={(e) => setTexto(e.target.value)}
         onKeyDown={(event) => {
           if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
@@ -310,7 +332,7 @@ export function CapturaLivreCard({
           disabled={!texto.trim() || ocupado}
           className="flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-ink hover:opacity-90 text-surface text-sm font-bold transition-all disabled:opacity-50 shadow-[0_0_15px_rgba(47,156,133,0.3)]"
         >
-          {isOrganizando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
+          {isOrganizando ? <DexLoader size="sm" /> : <Bot className="h-4 w-4" />}
           {isOrganizando ? 'Organizando ficha...' : <>Organizar com Dex{compact && <span className="hidden text-[10px] opacity-70 sm:inline">Ctrl ↵</span>}</>}
         </button>
       </div>

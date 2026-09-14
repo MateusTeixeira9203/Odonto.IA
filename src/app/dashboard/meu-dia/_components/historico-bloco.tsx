@@ -18,7 +18,7 @@ import { corpoEspecialidade } from '@/components/fichas/corpo-especialidade';
 import { OrtoCard } from '@/components/fichas/orto-card';
 import { eventosParaCards, type EventoParaCard } from '@/lib/odontograma/eventos-para-cards';
 import type { MeuDiaVisita, MeuDiaEventoVisita, MeuDiaPendencia } from '@/server/dashboard/get-meu-dia';
-import { TIPO_LABEL } from '@/types/odontograma';
+import { rotuloProcedimento } from '@/types/odontograma';
 import { fmtData } from './meu-dia-format';
 import { ColarDoWordDialog } from '@/components/pacientes/colar-do-word-dialog';
 
@@ -121,7 +121,7 @@ function VisitaEntry({
             : evento.nivel === 'boca'
               ? 'boca toda'
               : 'sem localização';
-      return `${evento.procedimentoNome?.trim() || evento.tipo} · ${local}`;
+      return `${rotuloProcedimento(evento)} · ${local}`;
     })
     .filter((item, indice, itens) => itens.indexOf(item) === indice);
 
@@ -265,7 +265,7 @@ function LinhaDoPlano({
   const propria = pendencia.dentistaId === meuDentistaId;
   const recebida = pendencia.encaminhadoParaId === meuDentistaId && !propria;
   const situacao = pendencia.momentoPlanejado === 'proxima_sessao' ? 'proxima_sessao' : 'sessao_atual';
-  const label = pendencia.procedimentoNome?.trim() || TIPO_LABEL[pendencia.tipo];
+  const label = rotuloProcedimento(pendencia);
 
   return (
     <article className={`rounded-xl border p-3 ${

@@ -71,6 +71,22 @@ export function CampoMagicoMeuDia({
   // edição mais recente do dentista, nunca contra o snapshot que iniciou a requisição.
   const eventosRef = useRef(eventosDraft);
   useEffect(() => { eventosRef.current = eventosDraft; }, [eventosDraft]);
+  const scrollPendenteRef = useRef<string | null>(null);
+  useEffect(() => {
+    const id = scrollPendenteRef.current;
+    if (!id) return;
+    const frame = requestAnimationFrame(() => {
+      const card = document.querySelector<HTMLElement>(`[data-dex-eventos~="${CSS.escape(id)}"]`);
+      if (!card) return;
+      scrollPendenteRef.current = null;
+      card.focus({ preventScroll: true });
+      card.scrollIntoView({
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+        block: 'start',
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [eventosDraft]);
 
   async function complementarEndoComIA(relato: string, dentes: number[]) {
     if (dentes.length === 0) return;
@@ -112,7 +128,9 @@ export function CampoMagicoMeuDia({
   }
 
   function aplicar(data: EvolucaoFormatada, relato: string) {
-    const mesclados = mesclarEventosSemPerda(eventosDraft, data.odontograma_eventos, hojeBRT(), {
+    const atuais = eventosRef.current;
+    const idsAnteriores = new Set(atuais.map((evento) => evento.id));
+    const mesclados = mesclarEventosSemPerda(atuais, data.odontograma_eventos, hojeBRT(), {
       capturaId: crypto.randomUUID(),
     });
     const dentesEndo = mesclados
@@ -133,6 +151,7 @@ export function CampoMagicoMeuDia({
       };
     });
     eventosRef.current = comDetalhe;
+    scrollPendenteRef.current = comDetalhe.find((evento) => !idsAnteriores.has(evento.id))?.id ?? null;
     onEventosDraftChange(comDetalhe);
 
     const primeiroComDetalhe = comDetalhe.find((evento) => evento.tipo === 'endodontia' && evento.ancora.dente != null && evento.detalhe != null);
@@ -198,6 +217,7 @@ export function CampoMagicoMeuDia({
           pacienteNome={pacienteNome}
           formDirty={eventosDraft.length > 0 || textoVisita.trim() !== ''}
           onOrganizado={aplicar}
+          aplicacao="acrescentar"
           anexarTexto={anexarTexto}
           catalogoProcedimentos={catalogoProcedimentos}
           onAplicarSugestao={onAplicarSugestao}

@@ -254,7 +254,7 @@ export function NestaSessaoBloco({
       const selecionavelParaSituacao = modoAlterarVarios && data.origem === 'clinica' && !data.statusMisto;
       const selecionavelParaEncaminhar = modoEncaminhar && cardsEncaminhaveis.some((card) => card.key === key);
       return (
-        <div key={key} className={`flex flex-col gap-0.5 ${cardAberto === key ? 'col-span-full' : ''}`}>
+        <div key={key} data-dex-eventos={ids.join(' ')} tabIndex={-1} className={`flex scroll-mt-6 scroll-mb-28 flex-col gap-0.5 focus-visible:outline-teal ${cardAberto === key ? 'col-span-full' : ''}`}>
           <RegistroCard
             data={data}
             editavel
