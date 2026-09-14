@@ -39,6 +39,16 @@ test('eventosParaCards: preserva o nome-snapshot do procedimento livre', () => {
   assert.equal(r[0].data.procedimentoNome, 'Troca de curativo');
 });
 
+test('intervenções livres distintas na mesma arcada aparecem em cards separados', () => {
+  const r = eventosParaCards([
+    evento({ id: 'provisoria', tipo: 'outro', ancora: { nivel: 'arcada', arcada: 'inferior' }, procedimentoNome: 'Prótese protocolo inferior provisória' }),
+    evento({ id: 'definitiva', tipo: 'outro', ancora: { nivel: 'arcada', arcada: 'inferior' }, procedimentoNome: 'Prótese protocolo inferior definitiva' }),
+    evento({ id: 'total', tipo: 'outro', ancora: { nivel: 'arcada', arcada: 'inferior' }, observacao: 'Prótese total inferior' }),
+  ], 'Dentista de teste', null);
+  assert.equal(r.length, 3);
+  assert.ok(r.every((card) => card.ids.length === 1));
+});
+
 test('eventosParaCards: mesmo grupoId vira 1 card com N âncoras (multi-dente)', () => {
   const r = eventosParaCards(
     [

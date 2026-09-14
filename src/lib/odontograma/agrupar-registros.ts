@@ -8,6 +8,7 @@
  * = Opção A / Decisão 3, spec R-02 §4, 23/07).
  */
 import type { AncoraClinica, MomentoPlanejado, StatusRegistro, TipoRegistroOdontograma } from '@/types/odontograma';
+import { rotuloProcedimento } from '@/types/odontograma';
 
 /** Shape mínimo que a função precisa — cada chamador adapta seu tipo real pra este (ex.:
  *  OdontogramaEventoDraft usa `grupo_id`, snake_case; aqui é sempre `grupoId`). */
@@ -15,6 +16,8 @@ export interface RegistroAgrupavel {
   id: string;
   grupoId: string | null;
   tipo: TipoRegistroOdontograma;
+  procedimentoNome?: string | null;
+  observacao?: string | null;
   status: StatusRegistro;
   /** Indicações de momentos diferentes são decisões clínicas diferentes. Para registros
    * sem grupo explícito, elas não podem se fundir num único card e esconder a prioridade. */
@@ -33,7 +36,7 @@ function chaveDoGrupo(item: RegistroAgrupavel): string {
   const a = item.ancora;
   const momento = item.status === 'indicado' ? item.momentoPlanejado ?? 'sessao_atual' : 'realizado';
   return item.grupoId
-    ?? `m:${a.dente ?? `${a.nivel}:${a.arcada ?? a.quadrante ?? ''}`}|${item.tipo}|${item.status}|${momento}`;
+    ?? `m:${a.dente ?? `${a.nivel}:${a.arcada ?? a.quadrante ?? ''}`}|${item.tipo}|${item.status}|${momento}|${rotuloProcedimento(item).trim().toLocaleLowerCase('pt-BR')}`;
 }
 
 /**

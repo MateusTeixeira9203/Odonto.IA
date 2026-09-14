@@ -116,3 +116,31 @@ test('chaveDedupEvento: faces em ordem diferente geram a MESMA chave (sort inter
   const e2 = draft({ id: 'b', ancora: { nivel: 'face', dente: 15, faces: ['M', 'O'] } });
   assert.equal(chaveDedupEvento(e1), chaveDedupEvento(e2));
 });
+
+test('Dex conserva protocolos provisório e definitivo na mesma arcada e não perde lote anterior', () => {
+  const provisoria = input({ tipo: 'outro', ancora: { nivel: 'arcada', arcada: 'inferior' }, procedimentoNome: 'Prótese protocolo inferior provisória' });
+  const definitiva = { ...provisoria, procedimentoNome: 'Prótese protocolo inferior definitiva' };
+  const primeiroLote = mesclarEventosSemPerda([], [provisoria, definitiva], '2026-09-14', { capturaId: 'captura-1' });
+  assert.equal(primeiroLote.length, 2);
+  assert.equal(new Set(primeiroLote.map((evento) => evento.chaveCaptura)).size, 2);
+  const segundoLote = mesclarEventosSemPerda(primeiroLote, [input({ tipo: 'implante' })], '2026-09-14');
+  assert.equal(segundoLote.length, 3);
+  assert.deepEqual(segundoLote.slice(0, 2), primeiroLote);
+});
+
+test('legado outro usa nome na observação para não fundir intervenções diferentes', () => {
+  const resultado = mesclarEventosSemPerda([], [
+    input({ tipo: 'outro', observacao: 'Osteotomia da maxila' }),
+    input({ tipo: 'outro', observacao: 'Prótese total superior' }),
+  ], '2026-09-14');
+  assert.equal(resultado.length, 2);
+});
+
+test('mesma captura conserva a chave clínica e reaplicação mantém IDs já materializados', () => {
+  const extraido = [input({ tipo: 'outro', procedimentoNome: 'Osteotomia da maxila' })];
+  const contexto = { capturaId: 'captura-estavel' };
+  const primeiro = mesclarEventosSemPerda([], extraido, '2026-09-14', contexto);
+  const repetido = mesclarEventosSemPerda([], extraido, '2026-09-14', contexto);
+  assert.equal(primeiro[0].chaveCaptura, repetido[0].chaveCaptura);
+  assert.deepEqual(mesclarEventosSemPerda(primeiro, extraido, '2026-09-14', contexto), primeiro);
+});

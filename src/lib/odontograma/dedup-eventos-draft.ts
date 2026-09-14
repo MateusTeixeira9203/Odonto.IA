@@ -16,12 +16,15 @@ export interface ContextoMesclaIA {
  * Entrada repetida do Dex (mesmo evento 2x na mesma leitura) recebia `crypto.randomUUID()`
  * distinto e virava duas linhas cobráveis (achado real: ficha do Renato 27/07, dente 15).
  */
-export function chaveDedupEvento(ev: OdontogramaEventoDraft): string {
+export function chaveDedupEvento(ev: OdontogramaEventoInput): string {
   return JSON.stringify([
     ev.tipo, ev.status, ev.origem,
     ev.ancora.nivel, ev.ancora.arcada ?? null, ev.ancora.quadrante ?? null, ev.ancora.dente ?? null,
     [...(ev.ancora.faces ?? [])].sort(),
     ev.papel_no_grupo,
+    ev.procedimentoId ?? null,
+    (ev.procedimentoNome?.trim() || (ev.tipo === 'outro' ? ev.observacao : '') || '')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').replace(/\s+/g, ' ').trim(),
   ]);
 }
 
@@ -79,7 +82,7 @@ export function mesclarEventosSemPerda(
     fonteFluxo: 'novo',
     encaminhadoParaId: contexto?.encaminharParaId,
     chaveCaptura: contexto
-      ? `${contexto.capturaId}:${ev.tipo}|${ev.ancora.nivel}|${ev.ancora.dente ?? ''}|${ev.ancora.faces?.join(',') ?? ''}`
+      ? `${contexto.capturaId}:${chaveDedupEvento(ev)}`
       : undefined,
   }));
   const novosSemColisao = dedupEventosDraft(novos)
