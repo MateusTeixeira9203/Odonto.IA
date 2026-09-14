@@ -35,11 +35,16 @@ export interface CapturaDexState {
 
 export interface CapturaLivreCardProps {
   pacienteNome: string;
+  /** R169 — recuperação opcional do relato local; consumidores atuais continuam vazios. */
+  textoInicial?: string;
+  /** Observa qualquer alteração do relato, inclusive transcrição e limpeza após organizar. */
+  onTextoChange?: (texto: string) => void;
   /** Form já tem conteúdo? Gate de confirmação antes de sobrescrever (§8 fluxo, passo 4). */
   formDirty: boolean;
   /** Meu Dia soma os lotes; o formulário completo mantém a confirmação de substituição. */
   aplicacao?: 'substituir' | 'acrescentar';
-  onOrganizado: (evolucao: EvolucaoFormatada, relato: string) => void;
+  /** `false` mantém o relato para nova tentativa; retorno ausente preserva callers existentes. */
+  onOrganizado: (evolucao: EvolucaoFormatada, relato: string) => void | boolean;
   /** R-46d (D8) — "usar este documento de base": `nonce` muda a cada clique, o efeito abaixo
    *  observa a mudança e faz append no texto atual. Opcional — callers existentes (FichasTab)
    *  não passam, comportamento 100% preservado. `origem` (07/08) decide o `modo` que
@@ -60,7 +65,7 @@ export interface CapturaLivreCardProps {
 }
 
 export function CapturaLivreCard({
-  pacienteNome, formDirty, onOrganizado, anexarTexto, catalogoProcedimentos, onAplicarSugestao,
+  pacienteNome, textoInicial, onTextoChange, formDirty, onOrganizado, anexarTexto, catalogoProcedimentos, onAplicarSugestao,
   compact = false, autoFocus = false, aplicacao = 'substituir', onCapturaStateChange,
 }: CapturaLivreCardProps) {
   const {
@@ -77,7 +82,11 @@ export function CapturaLivreCard({
     transcriptionError,
     silenceWarning,
     continueRecording,
-  } = useCapturaLivre({ pacienteNome });
+  } = useCapturaLivre({ pacienteNome, textoInicial });
+
+  useEffect(() => {
+    onTextoChange?.(texto);
+  }, [onTextoChange, texto]);
 
   // R-62 — puro e síncrono: roda a cada tecla, sem debounce, sem rede (I1/I6). Ausência de
   // `onAplicarSugestao` desliga o cálculo inteiro (I5) — é o que mantém o FichasTab intocado.
@@ -175,9 +184,9 @@ export function CapturaLivreCard({
       const data = await res.json() as EvolucaoFormatada & { error?: string };
       if (!res.ok || data.error) throw new Error(data.error ?? 'Erro ao formatar');
       if (controller.signal.aborted) return;
-      onOrganizado(data, relato);
+      const aplicado = onOrganizado(data, relato);
       // Um documento externo pode chegar durante a resposta: preserve a entrada nova e sua origem.
-      if (aplicacao === 'acrescentar' && revisaoAnexoRef.current === revisaoAnexoEnviada
+      if (aplicado !== false && aplicacao === 'acrescentar' && revisaoAnexoRef.current === revisaoAnexoEnviada
         && (data.odontograma_eventos.length > 0 || data.orto_manutencao)) {
         setTexto('');
         setVeioDeDocumento(false);

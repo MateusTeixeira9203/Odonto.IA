@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useMemo, useRef, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AlertTriangle, ArrowLeft, CalendarPlus, Check, ChevronDown, ChevronRight, ClipboardCheck, Download, Ellipsis, FileText, FolderOpen, Forward, Loader2, PenLine, Plus, Star, Stethoscope, Trash2 } from 'lucide-react';
@@ -13,7 +13,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ToothDetailPanel } from '@/components/odontograma/ToothDetailPanel';
 import { Odontograma } from '@/components/odontograma/Odontograma';
+import { OrcamentoDaFicha } from '@/components/pacientes/orcamento-da-ficha';
 import { ProcedimentoDetalheFicha } from '@/components/pacientes/procedimento-detalhe-ficha';
+import { AdicionarProcedimentosFicha } from '@/components/pacientes/adicionar-procedimentos-ficha';
 import { NestaSessaoBloco } from '@/app/dashboard/meu-dia/_components/nesta-sessao-bloco';
 import {
   useRegistrarPainel,
@@ -56,11 +58,13 @@ const SignaturePad = dynamic(
 interface ProntuarioTabProps {
   patientId: string;
   patientName: string;
+  clinicaId: string;
   dentistaId: string;
   canWrite: boolean;
   catalogoProcedimentos: MeuDiaCatalogoProcedimento[];
   dados: ProntuarioLongitudinalData;
   onGerarOrcamento?: (fichaId: string) => void;
+  orcamentoRevisao?: string;
   onAbrirArquivos: () => void;
 }
 
@@ -78,12 +82,6 @@ function rotuloOrigem(atendimento: ProntuarioAtendimento): string {
   if (atendimento.fonte === 'evolucao_legada') return 'Evolução legada';
   if (atendimento.origem === 'ficha') return 'Atendimento pelo prontuário';
   return 'Atendimento pelo Meu Dia';
-}
-
-function rotuloProcedimento(atendimento: ProntuarioAtendimento, eventoId: string): string {
-  const evento = atendimento.eventos.find((item) => item.id === eventoId);
-  if (!evento) return 'Procedimento clínico';
-  return nomeClinicoProcedimento(evento);
 }
 
 function rotuloLocalEvento(evento: ProntuarioAtendimento['eventos'][number]): string {
@@ -134,10 +132,10 @@ type GrupoProcedimento = {
   eventoPrincipal: ProntuarioAtendimento['eventos'][number];
 };
 
-function agruparProcedimentos(atendimento: ProntuarioAtendimento): GrupoProcedimento[] {
+function agruparProcedimentos(eventos: ProntuarioAtendimento['eventos']): GrupoProcedimento[] {
   // R-152 — agrupamento anatômico não pode virar ação em lote invisível. Cada card é um
   // procedimento/evento, e ações de status, sessão e encaminhamento recebem só o seu id.
-  return atendimento.eventos.map((evento) => ({
+  return eventos.map((evento) => ({
     chave: evento.id,
     eventos: [evento],
     eventoPrincipal: evento,
@@ -149,11 +147,13 @@ const ODONTOGRAMA_RESPONSIVO = 'origin-top-left [zoom:0.46] min-[480px]:[zoom:0.
 export function ProntuarioTab({
   patientId,
   patientName,
+  clinicaId,
   dentistaId,
   canWrite,
   catalogoProcedimentos,
   dados,
   onGerarOrcamento,
+  orcamentoRevisao,
   onAbrirArquivos,
 }: ProntuarioTabProps) {
   const router = useRouter();
@@ -178,6 +178,8 @@ export function ProntuarioTab({
     dente: number | null;
   } | null>(null);
   const [eventoDetalheAbertoId, setEventoDetalheAbertoId] = useState<string | null>(null);
+  const [fichaComAdicaoAbertaId, setFichaComAdicaoAbertaId] = useState<string | null>(null);
+  const painelAdicionarId = useId();
   const [acaoProcedimento, setAcaoProcedimento] = useState<string | null>(null);
   const [encaminhamentoEventoIds, setEncaminhamentoEventoIds] = useState<string[]>([]);
   const [destinoEncaminhamentoId, setDestinoEncaminhamentoId] = useState('');
@@ -299,7 +301,7 @@ export function ProntuarioTab({
   ));
   const todasFichas = dados.fichas;
   const eventosClinicosUnicos = Array.from(new Map(
-    dados.atendimentos.flatMap((atendimento) => atendimento.eventos).map((evento) => [evento.id, evento] as const),
+    dados.fichas.flatMap((ficha) => ficha.eventos).map((evento) => [evento.id, evento] as const),
   ).values());
   const resumosTratamento = tratamentosEmCurso.map((ficha) => {
     const eventos = eventosClinicosUnicos.filter((evento) => evento.fichaId === ficha.id);
@@ -352,8 +354,8 @@ export function ProntuarioTab({
     setEventoDetalheAbertoId((idAtual) => idAtual === evento.id ? null : evento.id);
   }
 
-  function abrirProcedimentoDoDente(atendimento: ProntuarioAtendimento, dente: number): void {
-    const evento = atendimento.eventos.find((item) => item.ancora.dente === dente);
+  function abrirProcedimentoDoDente(eventos: ProntuarioEvento[], dente: number): void {
+    const evento = eventos.find((item) => item.ancora.dente === dente);
     // Um toque no odontograma é navegação, nunca abertura implícita de um novo atendimento.
     if (!evento) return;
     requestAnimationFrame(() => {
@@ -441,7 +443,7 @@ export function ProntuarioTab({
     router.refresh();
   }
 
-  async function salvarAssinaturas(atendimento: ProntuarioAtendimento): Promise<void> {
+  async function salvarAssinaturas(eventos: ProntuarioEvento[]): Promise<void> {
     if (assinaturaSelecionados.length === 0) {
       toast.error('Selecione pelo menos um procedimento realizado.');
       return;
@@ -456,7 +458,7 @@ export function ProntuarioTab({
     }
 
     const assinaturaDataUrl = assinaturaPadRef.current.toDataURL('image/png');
-    const selecionados = atendimento.eventos.filter((evento) => assinaturaSelecionados.includes(evento.id));
+    const selecionados = eventos.filter((evento) => assinaturaSelecionados.includes(evento.id));
     const porFicha = new Map<string, string[]>();
     for (const evento of selecionados) {
       if (!evento.fichaId) continue;
@@ -585,15 +587,17 @@ export function ProntuarioTab({
   }
 
   if (atendimentoAberto) {
-    const gruposProcedimento = agruparProcedimentos(atendimentoAberto);
     const fichaAtual = fichaAberta ?? atendimentoAberto.fichas[0] ?? null;
+    const eventosDaFicha = fichaAberta?.eventos ?? atendimentoAberto.eventos;
+    const gruposProcedimento = agruparProcedimentos(eventosDaFicha);
     const historicoDaFicha = fichaAberta?.atendimentos ?? [atendimentoAberto];
     const progressoDaFicha = fichaAberta && fichaAberta.totalProcedimentos > 0
       ? Math.round((fichaAberta.procedimentosRealizados / fichaAberta.totalProcedimentos) * 100)
       : 0;
-    const elegiveisParaAssinatura = atendimentoAberto.eventos.filter((evento) => (
+    const elegiveisParaAssinatura = eventosDaFicha.filter((evento) => (
       evento.status === 'realizado'
       && evento.assinaturaId == null
+      && evento.retiradoEm == null
       && evento.fichaId != null
       && evento.dentistaId === dentistaId
     ));
@@ -689,7 +693,7 @@ export function ProntuarioTab({
                 </div>
                 {podeComplementar && (
                   <Button className="min-h-11 w-full sm:min-h-8 sm:w-auto" variant="outline" onClick={() => complementarAtendimento(atendimentoAberto)}>
-                    <Plus className="h-4 w-4" /> Complementar consulta
+                    <Plus className="h-4 w-4" /> Complementar evolução
                   </Button>
                 )}
               </div>
@@ -712,8 +716,8 @@ export function ProntuarioTab({
             <article className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-text-secondary">Odontograma do atendimento</p>
-                  <p className="mt-1 text-xs text-text-secondary">Clique em um dente para ir ao procedimento desta consulta. Dentes sem procedimento não abrem formulário.</p>
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-text-secondary">Odontograma da ficha</p>
+                  <p className="mt-1 text-xs text-text-secondary">Clique em um dente para ir ao procedimento desta ficha. Dentes sem procedimento não abrem formulário.</p>
                 </div>
                 <Button variant="outline" size="sm" className="min-h-11" onClick={() => setOdontogramaCompletoAberto(true)}>
                   Ver odontograma completo
@@ -723,8 +727,8 @@ export function ProntuarioTab({
                 <div className={ODONTOGRAMA_RESPONSIVO}>
                   <Odontograma
                     selectedTeeth={[]}
-                    eventos={atendimentoAberto.eventos}
-                    onToothToggle={(dente) => abrirProcedimentoDoDente(atendimentoAberto, dente)}
+                    eventos={eventosDaFicha}
+                    onToothToggle={(dente) => abrirProcedimentoDoDente(eventosDaFicha, dente)}
                     presentationMode={!podeComplementar}
                   />
                 </div>
@@ -737,18 +741,29 @@ export function ProntuarioTab({
                   <p className="text-xs font-bold uppercase tracking-[0.14em] text-text-secondary">Procedimentos</p>
                   <p className="mt-1 text-xs text-text-secondary">Status clínico e organização da próxima sessão são controles separados.</p>
                 </div>
-                {podeEscreverFicha && (
-                  <Button
-                    variant="outline"
-                    disabled={elegiveisParaAssinatura.length === 0}
-                    onClick={() => {
-                      setAssinaturaSelecionados(elegiveisParaAssinatura.map((evento) => evento.id));
-                      setAssinaturaEtapa('selecao');
-                      setAssinaturaAberta(true);
-                    }}
-                  >
-                    <ClipboardCheck className="h-4 w-4" /> Coletar assinatura
-                  </Button>
+                {podeEscreverFicha && fichaAtual && !fichaAtual.assinadoEm && (
+                  <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
+                    <Button
+                      className="min-h-11 flex-1 sm:flex-none"
+                      aria-controls={painelAdicionarId}
+                      aria-expanded={fichaComAdicaoAbertaId === fichaAtual.id}
+                      onClick={() => setFichaComAdicaoAbertaId((idAberto) => idAberto === fichaAtual.id ? null : fichaAtual.id)}
+                    >
+                      <Plus className="h-4 w-4" /> {fichaComAdicaoAbertaId === fichaAtual.id ? 'Fechar adição' : 'Adicionar procedimentos'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="min-h-11 flex-1 sm:flex-none"
+                      disabled={elegiveisParaAssinatura.length === 0}
+                      onClick={() => {
+                        setAssinaturaSelecionados(elegiveisParaAssinatura.map((evento) => evento.id));
+                        setAssinaturaEtapa('selecao');
+                        setAssinaturaAberta(true);
+                      }}
+                    >
+                      <ClipboardCheck className="h-4 w-4" /> Coletar assinatura
+                    </Button>
+                  </div>
                 )}
                 {atendimentoAberto.documentos.length > 0 && (
                   <Button variant="outline" onClick={onAbrirArquivos}>
@@ -756,31 +771,51 @@ export function ProntuarioTab({
                   </Button>
                 )}
               </div>
-              {atendimentoAberto.eventos.length === 0 ? (
-                <p className="mt-3 text-sm text-text-secondary">Nenhum procedimento estruturado nesta visita.</p>
+              {fichaComAdicaoAbertaId === fichaAtual?.id && fichaAtual && (
+                <div id={painelAdicionarId}>
+                  <AdicionarProcedimentosFicha
+                    key={`${clinicaId}:${dentistaId}:${patientId}:${fichaAtual.id}`}
+                    clinicaId={clinicaId}
+                    dentistaId={dentistaId}
+                    fichaId={fichaAtual.id}
+                    pacienteId={patientId}
+                    pacienteNome={patientName}
+                    catalogoProcedimentos={catalogoProcedimentos}
+                    onFechar={() => setFichaComAdicaoAbertaId(null)}
+                    onSalvo={() => router.refresh()}
+                  />
+                </div>
+              )}
+              {eventosDaFicha.length === 0 ? (
+                <p className="mt-3 text-sm text-text-secondary">Nenhum procedimento estruturado nesta ficha.</p>
               ) : (
                 <ul className="mt-3 space-y-2">
                   {gruposProcedimento.map((grupo) => {
                     const evento = grupo.eventoPrincipal;
                     const eventoIds = grupo.eventos.map((item) => item.id);
                     const assinado = grupo.eventos.some((item) => item.assinaturaId != null);
+                    const retirado = grupo.eventos.some((item) => item.retiradoEm != null);
                     const autorAtual = grupo.eventos.every((item) => item.dentistaId === dentistaId);
                     const encaminhadoAoAtual = grupo.eventos.every((item) => item.encaminhadoParaId === dentistaId);
-                    const ficha = evento.fichaId ? atendimentoAberto.fichas.find((item) => item.id === evento.fichaId) : null;
+                    const ficha = evento.fichaId === fichaAtual?.id
+                      ? fichaAtual
+                      : evento.fichaId ? atendimentoAberto.fichas.find((item) => item.id === evento.fichaId) : null;
                     const fichaAssinada = ficha?.assinadoEm != null;
-                    const podeAlterarStatus = podeEscreverFicha && !assinado && !fichaAssinada && (autorAtual || encaminhadoAoAtual);
+                    const podeAlterarStatus = podeEscreverFicha && !retirado && !assinado && !fichaAssinada && (autorAtual || encaminhadoAoAtual);
                     const realizados = grupo.eventos.filter((item) => item.status === 'realizado').length;
                     const todosRealizados = realizados === grupo.eventos.length;
                     const todosAFazer = realizados === 0;
                     const podeOrganizar = podeAlterarStatus && autorAtual && todosAFazer;
                     const emProximaSessao = todosAFazer && grupo.eventos.every((item) => item.momento_planejado === 'proxima_sessao');
-                    const detalheTecnico = evento.tipo === 'endodontia' || evento.tipo === 'implante';
-                    const podeEditarDetalhes = podeEscreverFicha
-                      && !assinado
-                      && !fichaAssinada
-                      && grupo.eventos.length === 1
-                      && (autorAtual || (encaminhadoAoAtual && detalheTecnico));
-                    const detalheAberto = eventoDetalheAbertoId === evento.id;
+                    const integrantesEditaveis = podeEscreverFicha && !fichaAssinada
+                      ? grupo.eventos.filter((item) => !item.retiradoEm && !item.assinaturaId && (
+                        item.dentistaId === dentistaId
+                        || (item.encaminhadoParaId === dentistaId && (item.tipo === 'endodontia' || item.tipo === 'implante'))
+                      ))
+                      : [];
+                    const podeEditarDetalhes = integrantesEditaveis.length > 0;
+                    const eventoEmEdicao = integrantesEditaveis.find((item) => item.id === eventoDetalheAbertoId);
+                    const detalheAberto = eventoEmEdicao != null;
                     const statusClasse = todosRealizados
                       ? 'bg-clinical-done-pale text-clinical-done-ink'
                       : !todosAFazer
@@ -794,7 +829,7 @@ export function ProntuarioTab({
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                         <p className="font-semibold text-text-primary">
-                          {rotuloProcedimento(atendimentoAberto, evento.id)}
+                          {nomeClinicoProcedimento(evento)}
                           {evento.ancora.dente != null ? ` · dente ${evento.ancora.dente}` : ''}
                           {grupo.eventos.length > 1 ? ` · ${grupo.eventos.length} dentes/regiões` : ''}
                         </p>
@@ -808,9 +843,12 @@ export function ProntuarioTab({
                             Última alteração: {evento.ultimaAlteracao.atorNome ?? 'Profissional não identificado'} · {formatarDataHora(evento.ultimaAlteracao.alteradoEm)} · {rotuloUltimaAlteracao(evento.ultimaAlteracao.acao)}
                           </p>
                         )}
+                        {retirado && <p className="mt-1.5 text-xs font-semibold text-text-secondary">Retirado da ficha</p>}
                         </div>
                         <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${statusClasse}`}>
-                          {todosRealizados
+                          {retirado
+                            ? 'Retirado da ficha'
+                            : todosRealizados
                             ? 'Realizado'
                             : !todosAFazer
                               ? `Parcial · ${realizados} de ${grupo.eventos.length}`
@@ -822,24 +860,26 @@ export function ProntuarioTab({
 
                       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
                         {podeAlterarStatus && (
-                          <div className="inline-flex rounded-lg border border-border bg-surface p-0.5" aria-label="Status clínico">
+                          <div role="group" className="inline-flex rounded-lg border border-border bg-surface p-0.5" aria-label="Status clínico">
                             <button
                               type="button"
                               disabled={carregando}
+                              aria-pressed={todosAFazer}
                               onClick={() => void atualizarStatusGrupo(grupo, 'indicado')}
                               className={todosAFazer
-                                ? 'rounded-md bg-coral-pale px-3 py-1.5 text-xs font-bold text-coral-ink'
-                                : 'rounded-md px-3 py-1.5 text-xs font-bold text-text-secondary hover:text-text-primary'}
+                                ? 'min-h-11 rounded-md bg-coral-pale px-3 py-1.5 text-xs font-bold text-coral-ink'
+                                : 'min-h-11 rounded-md px-3 py-1.5 text-xs font-bold text-text-secondary hover:text-text-primary'}
                             >
                               A fazer
                             </button>
                             <button
                               type="button"
                               disabled={carregando}
+                              aria-pressed={todosRealizados}
                               onClick={() => void atualizarStatusGrupo(grupo, 'realizado')}
                               className={todosRealizados
-                                ? 'rounded-md bg-clinical-done-pale px-3 py-1.5 text-xs font-bold text-clinical-done-ink'
-                                : 'rounded-md px-3 py-1.5 text-xs font-bold text-text-secondary hover:text-text-primary'}
+                                ? 'min-h-11 rounded-md bg-clinical-done-pale px-3 py-1.5 text-xs font-bold text-clinical-done-ink'
+                                : 'min-h-11 rounded-md px-3 py-1.5 text-xs font-bold text-text-secondary hover:text-text-primary'}
                             >
                               Realizado
                             </button>
@@ -851,21 +891,21 @@ export function ProntuarioTab({
                             disabled={carregando}
                             onClick={() => void atualizarProximaSessao(grupo)}
                             className={emProximaSessao
-                              ? 'inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-warning-pale px-3 text-xs font-bold text-warning-ink'
-                              : 'inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-bold text-text-secondary hover:border-warning/40 hover:text-warning-ink'}
+                              ? 'inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-warning-pale px-3 text-xs font-bold text-warning-ink'
+                              : 'inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-bold text-text-secondary hover:border-warning/40 hover:text-warning-ink'}
                           >
                             <Star className={`h-3.5 w-3.5 ${emProximaSessao ? 'fill-current' : ''}`} />
                             {emProximaSessao ? 'Planejado para a próxima sessão' : 'Levar para próxima sessão'}
                           </button>
                         )}
-                        {podeEscreverFicha && autorAtual && !assinado && !fichaAssinada && todosAFazer && (
+                        {podeEscreverFicha && autorAtual && !retirado && !assinado && !fichaAssinada && todosAFazer && (
                           <button
                             type="button"
                             onClick={() => {
                               setEncaminhamentoEventoIds(eventoIds);
                               setDestinoEncaminhamentoId(evento.encaminhadoParaId ?? '');
                             }}
-                            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-bold text-text-secondary hover:border-teal/40 hover:text-teal-ink"
+                            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-bold text-text-secondary hover:border-teal/40 hover:text-teal-ink"
                           >
                             <Forward className="h-3.5 w-3.5" /> {evento.encaminhadoParaId ? 'Alterar encaminhamento' : 'Encaminhar'}
                           </button>
@@ -873,17 +913,17 @@ export function ProntuarioTab({
                         {podeEditarDetalhes && (
                           <button
                             type="button"
-                            onClick={() => abrirDetalhesDoEvento(evento)}
-                            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 text-xs font-bold text-text-secondary hover:bg-surface hover:text-text-primary"
+                            onClick={() => detalheAberto ? setEventoDetalheAbertoId(null) : abrirDetalhesDoEvento(integrantesEditaveis[0])}
+                            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-xs font-bold text-text-secondary hover:bg-surface hover:text-text-primary"
                           >
-                            <PenLine className="h-3.5 w-3.5" /> {detalheAberto ? 'Fechar detalhes' : detalheTecnico ? 'Ver/editar detalhes' : 'Editar procedimento'}
+                            <PenLine className="h-3.5 w-3.5" /> {detalheAberto ? 'Fechar detalhes' : grupo.eventos.length > 1 ? 'Editar integrantes' : autorAtual ? 'Editar procedimento' : 'Ver/editar detalhes'}
                           </button>
                         )}
                         {ficha && podeEscreverFicha && autorAtual && (assinado || fichaAssinada) && (
                           <button
                             type="button"
                             onClick={() => complementarAtendimento(atendimentoAberto, evento.ancora.dente ?? null)}
-                            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 text-xs font-bold text-text-secondary hover:bg-surface hover:text-text-primary"
+                            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-xs font-bold text-text-secondary hover:bg-surface hover:text-text-primary"
                           >
                             <PenLine className="h-3.5 w-3.5" /> Adicionar retificação
                           </button>
@@ -891,13 +931,30 @@ export function ProntuarioTab({
                         {assinado && <span className="text-xs font-semibold text-text-secondary">Assinado · registro bloqueado</span>}
                         {carregando && <Loader2 className="h-4 w-4 animate-spin text-teal" aria-label="Salvando" />}
                       </div>
-                      {detalheAberto && (
+                      {eventoEmEdicao && (
+                        <div>
+                        {grupo.eventos.length > 1 && (
+                          <label className="mt-3 grid gap-1.5 text-xs font-semibold text-foreground">
+                            Integrante que deseja editar
+                            <select
+                              className="min-h-11 rounded-lg border border-border bg-card px-3 text-sm"
+                              value={eventoEmEdicao.id}
+                              onChange={(event) => setEventoDetalheAbertoId(event.target.value)}
+                            >
+                              {integrantesEditaveis.map((item) => (
+                                <option key={item.id} value={item.id}>{rotuloLocalEvento(item)} · {nomeClinicoProcedimento(item)}</option>
+                              ))}
+                            </select>
+                            <span className="font-normal text-muted-foreground">A alteração vale somente para o integrante selecionado.</span>
+                          </label>
+                        )}
                         <ProcedimentoDetalheFicha
-                          key={evento.id}
-                          evento={evento}
-                          permitirObservacao={autorAtual}
-                          permitirDetalhe={detalheTecnico}
-                          permitirExclusao={podeEscreverFicha && autorAtual && !assinado && !fichaAssinada}
+                          key={eventoEmEdicao.id}
+                          evento={eventoEmEdicao}
+                          permitirNome={eventoEmEdicao.dentistaId === dentistaId}
+                          permitirObservacao={eventoEmEdicao.dentistaId === dentistaId}
+                          permitirDetalhe={eventoEmEdicao.tipo === 'endodontia' || eventoEmEdicao.tipo === 'implante'}
+                          permitirExclusao={eventoEmEdicao.dentistaId === dentistaId}
                           onFechar={() => setEventoDetalheAbertoId(null)}
                           onSalvo={() => {
                             setEventoDetalheAbertoId(null);
@@ -907,7 +964,11 @@ export function ProntuarioTab({
                             setEventoDetalheAbertoId(null);
                             router.refresh();
                           }}
+                          onRevisarOrcamento={onGerarOrcamento && fichaAtual
+                            ? () => onGerarOrcamento(fichaAtual.id)
+                            : undefined}
                         />
+                        </div>
                       )}
                     </li>
                     );
@@ -966,6 +1027,20 @@ export function ProntuarioTab({
               </div>
             </article>
 
+            {superficie.tipo === 'ficha' && fichaAtual && onGerarOrcamento && (
+              <article className="rounded-2xl border border-border bg-surface p-4">
+                <p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-text-secondary">Orçamento da ficha</p>
+                <OrcamentoDaFicha
+                  key={`${clinicaId}:${dentistaId}:${fichaAtual.id}`}
+                  clinicaId={clinicaId}
+                  dentistaId={dentistaId}
+                  fichaId={fichaAtual.id}
+                  revisao={`${orcamentoRevisao ?? ''}:${eventosDaFicha.map((item) => `${item.id}:${item.procedimentoNome}:${item.retiradoEm ?? ''}`).join('|')}`}
+                  onAbrir={() => onGerarOrcamento(fichaAtual.id)}
+                />
+              </article>
+            )}
+
             {fichaAtual && (
               <article className="rounded-2xl border border-border bg-surface p-4">
                 <div className="flex items-center justify-between gap-2">
@@ -1012,11 +1087,7 @@ export function ProntuarioTab({
                       </button>
                     );
                   })}
-                  {onGerarOrcamento && (
-                    <Button variant="outline" onClick={() => onGerarOrcamento(fichaAtual.id)}>
-                      Gerar orçamento
-                    </Button>
-                  )}
+
                 </div>
               </article>
             )}
@@ -1063,12 +1134,12 @@ export function ProntuarioTab({
               <div className={ODONTOGRAMA_RESPONSIVO}>
                 <Odontograma
                   selectedTeeth={[]}
-                  eventos={atendimentoAberto.eventos}
+                  eventos={eventosDaFicha}
                   onToothToggle={(dente) => {
-                    const temProcedimento = atendimentoAberto.eventos.some((evento) => evento.ancora.dente === dente);
+                    const temProcedimento = eventosDaFicha.some((evento) => evento.ancora.dente === dente);
                     if (!temProcedimento) return;
                     setOdontogramaCompletoAberto(false);
-                    abrirProcedimentoDoDente(atendimentoAberto, dente);
+                    abrirProcedimentoDoDente(eventosDaFicha, dente);
                   }}
                   presentationMode
                 />
@@ -1155,7 +1226,7 @@ export function ProntuarioTab({
             {assinaturaEtapa === 'selecao' ? (
               <>
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-text-secondary">Procedimentos deste atendimento</p>
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-text-secondary">Procedimentos desta ficha</p>
                   <button
                     type="button"
                     onClick={() => setAssinaturaSelecionados(elegiveisParaAssinatura.map((evento) => evento.id))}
@@ -1169,6 +1240,7 @@ export function ProntuarioTab({
                     const elegiveis = grupo.eventos.filter((evento) => (
                       evento.status === 'realizado'
                       && evento.assinaturaId == null
+                      && evento.retiradoEm == null
                       && evento.fichaId != null
                       && evento.dentistaId === dentistaId
                     ));
@@ -1193,7 +1265,7 @@ export function ProntuarioTab({
                           {marcado && <Check className="h-3.5 w-3.5" />}
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block font-semibold text-text-primary">{rotuloProcedimento(atendimentoAberto, grupo.eventoPrincipal.id)}</span>
+                          <span className="block font-semibold text-text-primary">{nomeClinicoProcedimento(grupo.eventoPrincipal)}</span>
                           <span className="block text-xs text-text-secondary">
                             {habilitado ? 'Realizado · disponível para assinatura' : grupo.eventoPrincipal.status !== 'realizado' ? 'A fazer · conclua antes de assinar' : 'Já assinado ou sem ficha vinculada'}
                           </span>
@@ -1222,7 +1294,7 @@ export function ProntuarioTab({
                 </div>
                 <DialogFooter>
                   <Button variant="ghost" disabled={salvandoAssinatura} onClick={() => setAssinaturaEtapa('selecao')}>Voltar</Button>
-                  <Button disabled={salvandoAssinatura} onClick={() => void salvarAssinaturas(atendimentoAberto)}>
+                  <Button disabled={salvandoAssinatura} onClick={() => void salvarAssinaturas(eventosDaFicha)}>
                     {salvandoAssinatura && <Loader2 className="h-4 w-4 animate-spin" />}
                     Assinar e salvar documento
                   </Button>

@@ -28,6 +28,10 @@ export type ProntuarioEvolucao = {
 
 export type ProntuarioEvento = OdontogramaEventoDraft & {
   fichaId: string | null;
+  /** Captura que acrescentou o evento depois da visita original, quando houver. */
+  capturaId?: string | null;
+  /** Retirada preserva o histórico; a ficha ativa a exclui. */
+  retiradoEm?: string | null;
   dentistaId: string;
   autorOriginal: ProntuarioProfissional;
   atualizadoEm: string;
@@ -130,6 +134,8 @@ type EvolucaoRaw = {
 type EventoRaw = {
   id: string;
   ficha_id: string | null;
+  captura_id: string | null;
+  retirado_em: string | null;
   dentista_id: string;
   tipo: OdontogramaEventoDraft['tipo'];
   procedimento_id: string | null;
@@ -219,6 +225,8 @@ function paraEvento(
   return {
     id: raw.id,
     fichaId: raw.ficha_id,
+    capturaId: raw.captura_id,
+    retiradoEm: raw.retirado_em,
     dentistaId: raw.dentista_id,
     autorOriginal,
     tipo: raw.tipo,
@@ -295,7 +303,7 @@ export async function getProntuarioLongitudinal({
       .order('created_at', { ascending: false }),
     supabase
       .from('odontograma_eventos')
-      .select('id, ficha_id, dentista_id, tipo, procedimento_id, procedimento_nome, status, origem, momento_planejado, nivel, arcada, quadrante, dente, faces, grupo_id, papel_no_grupo, observacao, detalhe, realizado_em, registrado_em, created_at, assinatura_id, encaminhado_para')
+      .select('id, ficha_id, captura_id, retirado_em, dentista_id, tipo, procedimento_id, procedimento_nome, status, origem, momento_planejado, nivel, arcada, quadrante, dente, faces, grupo_id, papel_no_grupo, observacao, detalhe, realizado_em, registrado_em, created_at, assinatura_id, encaminhado_para')
       .eq('clinica_id', clinicId)
       .eq('paciente_id', patientId)
       .order('registrado_em', { ascending: false }),
@@ -375,6 +383,7 @@ export async function getProntuarioLongitudinal({
     ultimaAlteracaoPorEvento.get(evento.id) ?? null,
     profissionais.get(evento.dentista_id) ?? profissionalDesconhecido,
   ));
+  const eventosAtivos = eventos.filter((evento) => evento.retiradoEm == null);
   const eventosPorAssinatura = mapaDeListas(eventos, (evento) => evento.assinaturaId ?? null);
   const documentos = ((documentosResult.data as DocumentoRaw[] | null) ?? [])
     .flatMap((documento): ProntuarioDocumento[] => documento.ficha_id ? [{
@@ -392,7 +401,14 @@ export async function getProntuarioLongitudinal({
   const fichaPorId = new Map(fichas.map((ficha) => [ficha.id, ficha]));
   const evolucoesPorAtendimento = mapaDeListas(evolucoes, (evolucao) => evolucao.atendimento_id);
   const evolucoesPorFicha = mapaDeListas(evolucoes, (evolucao) => evolucao.ficha_id);
-  const eventosPorFicha = mapaDeListas(eventos, (evento) => evento.fichaId);
+  const eventosAtivosPorFicha = mapaDeListas(eventosAtivos, (evento) => evento.fichaId);
+  // A visita é um recorte histórico: inclusões posteriores por captura pertencem à Ficha,
+  // não à visita legada que por acaso a originou. Eventos retirados continuam aqui para
+  // preservar esse histórico, e continuam disponíveis por vínculo explícito acima.
+  const eventosHistoricosPorFicha = mapaDeListas(
+    eventos.filter((evento) => evento.capturaId == null),
+    (evento) => evento.fichaId,
+  );
   const documentosPorFicha = mapaDeListas(documentos, (documento) => documento.fichaId);
 
   const idsAtendimento = atendimentos.map((atendimento) => atendimento.id);
@@ -443,7 +459,7 @@ export async function getProntuarioLongitudinal({
   const fichasUsadasPorAtendimento = new Set<string>();
   const fichasComFallbackConsumido = new Set<string>();
   const nomeDaFicha = (ficha: FichaRaw): string => (
-    ficha.nome ?? nomeTratamentoDerivado(eventosPorFicha.get(ficha.id) ?? [])
+    ficha.nome ?? nomeTratamentoDerivado(eventosAtivosPorFicha.get(ficha.id) ?? [])
   );
   const modernos = atendimentos.map<ProntuarioAtendimento>((atendimento) => {
     const evolucoesDaVisita = evolucoesPorAtendimento.get(atendimento.id) ?? [];
@@ -457,7 +473,7 @@ export async function getProntuarioLongitudinal({
       eventosPorId: eventoPorId,
       fichaIds: fichaIdsDasEvolucoes,
       fichasComFallbackConsumido,
-      eventosPorFicha,
+      eventosPorFicha: eventosHistoricosPorFicha,
     });
     const fichaIds = [...new Set([
       ...fichaIdsDasEvolucoes,
@@ -552,7 +568,7 @@ export async function getProntuarioLongitudinal({
           data: evolucao.data,
           profissional: profissionais.get(evolucao.dentista_id) ?? profissionalDesconhecido,
         })),
-        eventos: eventosPorFicha.get(ficha.id) ?? [],
+        eventos: eventosHistoricosPorFicha.get(ficha.id) ?? [],
         retorno: null,
         documentos: documentosPorFicha.get(ficha.id) ?? [],
       };
@@ -565,8 +581,8 @@ export async function getProntuarioLongitudinal({
 
   return {
     atendimentos: atendimentosOrdenados,
-    fichas: projetarFichasProntuario(atendimentosOrdenados),
-    boca: eventos,
+    fichas: projetarFichasProntuario(atendimentosOrdenados, eventosAtivos),
+    boca: eventosAtivos,
     profissionaisClinicos: ((dentistasResult.data as DentistaRaw[] | null) ?? [])
       .filter((profissional) => profissional.ativo && ['admin', 'dentista'].includes(profissional.role))
       .map(({ id, nome, cro }) => ({ id, nome, cro })),

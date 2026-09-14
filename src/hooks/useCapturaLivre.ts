@@ -22,6 +22,8 @@ export interface UseCapturaLivreOptions {
   /** Nome do paciente — reservado pelo contrato da spec; nenhuma rota consumida
    *  pelo hook hoje (transcrever/detectar-consulta) aceita esse campo. */
   pacienteNome?: string;
+  /** R169 — recupera um relato local antes de montar a captura. */
+  textoInicial?: string;
 }
 
 export interface UseCapturaLivreReturn {
@@ -42,9 +44,7 @@ export interface UseCapturaLivreReturn {
 }
 
 export function useCapturaLivre(options: UseCapturaLivreOptions = {}): UseCapturaLivreReturn {
-  void options;
-
-  const [texto, setTexto] = useState('');
+  const [texto, setTexto] = useState(() => options.textoInicial ?? '');
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [liveTranscript, setLiveTranscript] = useState('');
