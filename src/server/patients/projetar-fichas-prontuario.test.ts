@@ -129,3 +129,26 @@ test('o histórico mantém consultas em ordem decrescente e soma o progresso da 
   assert.equal(fichas[0]?.procedimentosRealizados, 1);
   assert.equal(fichas[0]?.procedimentosPendentes, 1);
 });
+
+test('a ficha recebe adição posterior ativa sem anexá-la ao recorte da visita', () => {
+  const visita = atendimento({
+    id: 'atendimento-original',
+    data: '2026-09-01',
+    fichas: [{ id: 'ficha-a', nome: 'Canal 16' }],
+    eventos: [{ id: 'evento-original', fichaId: 'ficha-a', status: 'realizado' }],
+  });
+  const adicionado = {
+    ...visita.eventos[0],
+    id: 'evento-adicionado',
+    status: 'indicado' as const,
+    capturaId: 'captura-posterior',
+  };
+
+  const [ficha] = projetarFichasProntuario([visita], [...visita.eventos, adicionado]);
+
+  assert.deepEqual(ficha?.atendimentos[0]?.eventos.map((evento) => evento.id), ['evento-original']);
+  assert.deepEqual(ficha?.eventos.map((evento) => evento.id), ['evento-original', 'evento-adicionado']);
+  assert.equal(ficha?.totalProcedimentos, 2);
+  assert.equal(ficha?.procedimentosRealizados, 1);
+  assert.equal(ficha?.procedimentosPendentes, 1);
+});
