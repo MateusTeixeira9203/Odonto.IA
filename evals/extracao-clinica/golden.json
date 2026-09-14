@@ -286,6 +286,38 @@
           { "tipo": "coroa", "status": "realizado", "nivel": "geral", "nomeInclui": ["ceramica"] }
         ]
       }
+    },
+    {
+      "id": "r169-negacao-canal-curativo",
+      "cat": "r169",
+      "repetir": 3,
+      "relato": "Não fiz o canal no 46; fiz apenas um curativo.",
+      "modo": "consulta",
+      "esperado": {
+        "exato": true,
+        "eventos": [
+          { "tipo": "outro", "status": "realizado", "dente": 46, "nomeInclui": ["curativo"] }
+        ],
+        "proibido": [
+          { "tipo": "endodontia", "dente": 46 }
+        ]
+      }
+    },
+    {
+      "id": "r169-negacao-canal-com-indicacao-separada",
+      "cat": "r169",
+      "relato": "Não fiz o canal no 46 hoje; fiz um curativo e indiquei o canal para a próxima sessão.",
+      "modo": "consulta",
+      "esperado": {
+        "exato": true,
+        "eventos": [
+          { "tipo": "outro", "status": "realizado", "dente": 46, "nomeInclui": ["curativo"] },
+          { "tipo": "endodontia", "status": "indicado", "evidencia_status": "indicacao_explicita", "dente": 46 }
+        ],
+        "proibido": [
+          { "tipo": "endodontia", "status": "realizado", "dente": 46 }
+        ]
+      }
     }
   ]
 }

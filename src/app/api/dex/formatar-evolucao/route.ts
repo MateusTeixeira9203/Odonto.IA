@@ -39,7 +39,7 @@ export interface EvolucaoFormatada {
   orto_manutencao:     OrtoManutencaoInfo | null;
 }
 
-const DEX_PROMPT_VERSION = 'r169-2026-09-14';
+const DEX_PROMPT_VERSION = 'r169-curativo-2026-09-14';
 
 function contarPor<T extends object, K extends keyof T>(itens: readonly T[], campo: K): Record<string, number> {
   return itens.reduce<Record<string, number>>((contagens, item) => {
@@ -361,7 +361,8 @@ ${modo === 'exame_inicial' ? '- Origem do texto: HISTÓRICO/REFERÊNCIA — docu
 
 CLASSIFICAÇÃO CLÍNICA DO STATUS — aplique antes de montar o JSON:
 - Em relato de consulta, "realizado" só existe quando o dentista declarou que EXECUTOU aquele procedimento. "Fiz profilaxia" → realizado + execucao_explicita.
-- Em relato de consulta, indicação, necessidade, plano, negação, histórico ou procedimento citado sem verbo de execução nunca viram "realizado": "precisa de canal", "vou extrair", "não fiz o canal", "já fez há anos" e "canal no 46" → indicado, com evidencia_status correspondente.
+- Em relato de consulta, indicação, necessidade, plano, histórico ou procedimento citado sem verbo de execução nunca viram "realizado": "precisa de canal", "vou extrair", "já fez há anos" e "canal no 46" → indicado, com evidencia_status correspondente.
+- NEGAÇÃO NÃO É INDICAÇÃO: "não fiz o canal" sozinho não autoriza criar canal a fazer. Registre a negação somente em anotacoes; não inclua esse procedimento em odontograma_eventos, procedimentos ou dentes_observacoes. Só registre o canal indicado se houver indicação/planejamento explícito adicional, com evidencia_status="indicacao_explicita".
 - Nunca use o verbo no passado de outro profissional ou de outra data como prova de execução nesta sessão. No modo histórico, conclusão expressamente documentada tem a regra própria abaixo; o evento será preexistente, não uma execução de hoje.
 - Se houver dúvida entre indicado e realizado, escolha indicado. O dentista poderá confirmar na revisão.
 
@@ -406,7 +407,7 @@ Para CADA achado/procedimento que você registrou em dentes_observacoes, emita T
 - Exemplo de cobertura: osteotomia da maxila e mandíbula = dois eventos; implantes 14, 24, 34, 32, 44 e 42 = seis eventos; próteses totais superior e inferior = dois eventos; protocolo inferior provisório e definitivo = dois eventos. Total: 12 eventos distintos, mantendo os qualificadores de cada um.
 - Se o relato mencionar implante, pilar protético e coroa como intervenções, preserve cada um. Não copie a localização de outro procedimento sem vínculo explícito na frase. Uma peça/material apenas descritivo não gera intervenção extra.
 - evidencia_status é OBRIGATÓRIA e explica a frase: "execucao_explicita" (só quando o dentista declarou que executou o procedimento), "indicacao_explicita" (indicou/precisa/vai fazer), "negacao" (declarou que NÃO fez), "historico" (feito em outro momento/por outro profissional) ou "ambiguo" (nome do procedimento sem verbo de execução).
-- status: em relato de consulta, use "realizado" APENAS com evidencia_status="execucao_explicita". Nos demais casos use "indicado". Exemplos: "fiz profilaxia" → realizado + execucao_explicita; "paciente precisa de profilaxia" → indicado + indicacao_explicita; "canal no 46" → indicado + ambiguo; "não fiz o canal" → nunca realizado + negacao; "já fez canal há anos" → indicado + historico.
+- status: em relato de consulta, use "realizado" APENAS com evidencia_status="execucao_explicita". Indicação, histórico ou menção ambígua usam "indicado". Um procedimento APENAS negado não gera evento nem item a fazer. Exemplos: "fiz profilaxia" → realizado + execucao_explicita; "paciente precisa de profilaxia" → indicado + indicacao_explicita; "canal no 46" → indicado + ambiguo; "não fiz o canal" → somente anotacoes, sem evento de canal; "já fez canal há anos" → indicado + historico.
 ${modo === 'exame_inicial' ? `- ⛔⛔ MODO HISTÓRICO/REFERÊNCIA — a regra de status ACIMA NÃO VALE aqui, esta a substitui: o texto é
   documento trazido de fora (prontuário anterior, histórico importado), não o dentista relatando o
   que fez agora. Verbo no passado sozinho ("fez o canal", "extraiu o dente", "restaurou o 26") NÃO
@@ -418,7 +419,8 @@ ${modo === 'exame_inicial' ? `- ⛔⛔ MODO HISTÓRICO/REFERÊNCIA — a regra d
   ("fez tratamento há uns anos", "já tratou esse dente antes") fica "indicado" — o dentista confirma
   na tela antes de qualquer coisa virar prontuário definitivo. Perder um "indicado" que devia ser
   "realizado" o dentista corrige com 1 clique; um "realizado" fantasma pode passar despercebido.` : ''}
-- ⛔ NEGAÇÃO NO EVENTO (erro comum — leia com atenção): se o dentista NEGOU ter feito um procedimento, NÃO emita evento "realizado" pra ele, mesmo que o nome do procedimento apareça no relato. Exemplo obrigatório: "não fiz o canal, só o curativo no 46" → o evento do 46 é NO MÁXIMO {tipo:endodontia, status:"indicado"} (ou nenhum) — JAMAIS {tipo:endodontia, status:"realizado"}. O curativo explicitamente executado gera outro evento: tipo:"outro", procedimento_nome:"Curativo", status:"realizado", evidencia_status:"execucao_explicita" no local citado. Regra geral: um tipo de evento só recebe status:"realizado" se AQUELE procedimento foi de fato executado; procedimento citado-e-negado nunca é realizado.
+- NEGAÇÃO E PROCEDIMENTO EXECUTADO: "Não fiz o canal no 46; fiz apenas um curativo" → exatamente UM evento: {tipo:"outro", procedimento_nome:"Curativo", status:"realizado", evidencia_status:"execucao_explicita", nivel:"dente", dente:46, faces:[], grupo_id:null, papel_no_grupo:null, observacao:""}. procedimentos:["Curativo"], dentes_afetados:[46], dentes_observacoes:[{dente:"46",observacao:"Curativo"}]. A negação do canal fica somente em anotacoes. NÃO criar canal indicado, NÃO classificar o curativo como endodontia e NÃO omitir o curativo por faltar tipo próprio no catálogo. Se o dentista disser "curativo de demora", preserve esse nome; não invente medicação/material.
+- INDICAÇÃO SEPARADA: "Não fiz o canal no 46 hoje; fiz um curativo e indiquei o canal para a próxima sessão" → curativo realizado + canal indicado por indicacao_explicita. A indicação vem dessa segunda afirmação, nunca da negação sozinha. Mantenha os dois procedimentos separados, sem compartilhar grupo_id.
 - nivel decide os campos da âncora:
   · "face": preencha dente (FDI) e faces (array de "O"/"M"/"D"/"V"/"L"). Use para cárie/restauração/selante.
   · "dente": preencha dente, deixe faces []. Use para endodontia/exodontia/coroa/ponte/implante/lesao_periapical/inclusao/fratura/pino_nucleo/esfoliacao.
