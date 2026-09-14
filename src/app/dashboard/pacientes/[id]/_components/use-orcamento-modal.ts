@@ -32,7 +32,9 @@ import {
   QUAD_SUP_DIREITO, QUAD_SUP_ESQUERDO, QUAD_INF_DIREITO, QUAD_INF_ESQUERDO,
 } from '@/lib/arcadas';
 import { TIPO_LABEL } from '@/types/odontograma';
+import type { TermosSnapshot } from '@/types/orcamento';
 import { eventosVisiveis, FILTRO_MEUS } from '@/lib/fichas/filtro-responsavel';
+import { getDiferencasFichaOrcamento, type DiferencasFichaOrcamento } from '@/server/orcamentos/ficha-orcamento-actions';
 import type { NovoOrcamentoModalProps } from './modals/novo-orcamento-modal';
 import type {
   FichaParaOrc, EventoOdontogramaParaOrc, ProcedimentoClinica, NovoOrcItem, OrcamentoComItens,
@@ -53,6 +55,9 @@ export interface UseOrcamentoModalInput {
   onOrcamentoCriado?: (orcamento: OrcamentoComItens) => void;
   /** O perfil abre o detalhe persistido assim que a proposta nasce, sem exigir aba/card. */
   onContinuarConfiguracao?: (orcamentoId: string) => void;
+  onAbrirOrcamentoExistente?: (contexto: DiferencasFichaOrcamento) => void;
+  /** Inclusão incremental confirma no mesmo orçamento aberto; o dono recarrega seus dados locais. */
+  onItensAdicionadosAoOrcamento?: (orcamentoId: string) => void;
   /**
    * No Meu Dia, uma linha escolhida manualmente no catálogo ainda não tem evento clínico.
    * O chamador a transforma em procedimento planejado e persiste a ficha sem encerrar a visita
@@ -74,7 +79,8 @@ export type PrepararItensClinicosResult =
 
 export interface UseOrcamentoModalResult {
   abrirNovoOrcamento: () => Promise<void>;
-  abrirOrcamentoParaFicha: (fichaId: string) => Promise<void>;
+  abrirOrcamentoParaFicha: (fichaId: string, orcamentoDestinoId?: string) => Promise<void>;
+  abrirRevisaoDaFicha: () => void;
   /** NOVO (R-46h) — só o Meu dia usa: abre direto no passo 'selecionar', pulando o "geral vs.
    *  por-ficha" que a tela do paciente precisa porque lá não há paciente já óbvio de antemão.
    *  R-83 (08/08) — `eventosRascunho`: itens indicados no rascunho ainda não salvo desta
@@ -119,7 +125,7 @@ const SELECT_FICHA_PARA_ORC_AGREGADO = `${CAMPOS_FICHA_ORC}, odontograma_eventos
 
 export function useOrcamentoModal({
   pacienteId, clinicaId, meuDentistaId, procedimentosClinica, erroCatalogo = null, isSecretaria, dentistasClinica,
-  onOrcamentoCriado, onContinuarConfiguracao, prepararItensClinicos,
+  onOrcamentoCriado, onContinuarConfiguracao, onAbrirOrcamentoExistente, onItensAdicionadosAoOrcamento, prepararItensClinicos,
 }: UseOrcamentoModalInput): UseOrcamentoModalResult {
   const router = useRouter();
 
@@ -138,6 +144,7 @@ export function useOrcamentoModal({
   const [eventoIdsJaOrcados, setEventoIdsJaOrcados] = useState<Set<string>>(() => new Set());
   const [resumoOrigemOrcamento, setResumoOrigemOrcamento] = useState<ResumoOrigemOrcamento | null>(null);
   const [bloqueioFicha, setBloqueioFicha] = useState<string | null>(null);
+  const [diferencasFicha, setDiferencasFicha] = useState<DiferencasFichaOrcamento | null>(null);
   const [contextoClinicoPendente, setContextoClinicoPendente] = useState(false);
   // Pré-seleciona o 1º dentista da lista assim que ela chega — só quando ainda vazio, nunca
   // sobrescreve uma escolha manual já feita (o pai só popula `dentistasClinica` quando
@@ -214,7 +221,9 @@ export function useOrcamentoModal({
   const eventoPodeEntrarNoOrcamento = (
     evento: EventoOdontogramaParaOrc,
     idsJaOrcados: ReadonlySet<string>,
-  ) => evento.origem === 'clinica' && !idsJaOrcados.has(evento.id);
+  ) => evento.origem === 'clinica'
+    && (evento.status === 'indicado' || evento.status === 'realizado')
+    && !idsJaOrcados.has(evento.id);
 
   const eventosParaItens = (
     eventos: EventoOdontogramaParaOrc[],
@@ -408,7 +417,9 @@ export function useOrcamentoModal({
         .then(setModoPersistencia)
         .catch((error: unknown) => {
           setModoPersistencia({ tipo: 'novo' });
-          setOrcError(error instanceof Error ? error.message : 'Não foi possível localizar o orçamento desta ficha.');
+          const mensagem = error instanceof Error ? error.message : 'Não foi possível localizar o orçamento desta ficha.';
+          setBloqueioFicha(mensagem);
+          setOrcError(mensagem);
         });
     }
   };
@@ -420,6 +431,7 @@ export function useOrcamentoModal({
     const query = supabase
       .from('fichas')
       .select(SELECT_FICHA_PARA_ORC_AGREGADO)
+      .is('odontograma_eventos.retirado_em', null)
       .eq('paciente_id', pacienteId)
       .eq('clinica_id', clinicaId)
       .eq('odontograma_eventos.origem', 'clinica');
@@ -464,6 +476,7 @@ export function useOrcamentoModal({
         const { data, error } = await supabase
           .from('fichas')
           .select(SELECT_FICHA_PARA_ORC)
+        .is('odontograma_eventos.retirado_em', null)
           .eq('paciente_id', pacienteId)
           .eq('clinica_id', clinicaId)
           .order('data_atendimento', { ascending: false })
@@ -575,7 +588,9 @@ export function useOrcamentoModal({
         setModoPersistencia(await carregarModoDaFicha(fichaId, alvoAtual()));
       } catch (error: unknown) {
         setModoPersistencia({ tipo: 'novo' });
-        setOrcError(error instanceof Error ? error.message : 'Não foi possível localizar o orçamento desta ficha.');
+        const mensagem = error instanceof Error ? error.message : 'Não foi possível localizar o orçamento desta ficha.';
+        setBloqueioFicha(mensagem);
+        setOrcError(mensagem);
         return;
       }
       const itens = ficha ? fichaParaItens(ficha, alvoAtual(), eventoIdsJaOrcados) : [];
@@ -588,7 +603,8 @@ export function useOrcamentoModal({
 
   // #6 — gerar orçamento a partir de uma ficha é SÓ dela (decisão 07/08): nunca puxa outra
   // ficha nem outro dentista. Quem quer ver várias fichas juntas usa o picker (agrega).
-  const abrirOrcamentoParaFicha = async (fichaId: string) => {
+  const abrirOrcamentoParaFicha = async (fichaId: string, orcamentoDestinoId?: string) => {
+    let abriuOrcamentoExistente = false;
     setOrcError(null);
     setContextoClinicoPendente(false);
     setIsLoadingFichaParaOrc(true);
@@ -597,6 +613,7 @@ export function useOrcamentoModal({
       const query = supabase
         .from('fichas')
         .select(SELECT_FICHA_PARA_ORC)
+        .is('odontograma_eventos.retirado_em', null)
         .eq('id', fichaId)
         .eq('clinica_id', clinicaId)
         .eq('paciente_id', pacienteId);
@@ -607,7 +624,21 @@ export function useOrcamentoModal({
       setEventoIdsJaOrcados(idsJaOrcados);
       setFichaOrcId(fichaId);
       setFichasParaOrc(ficha ? [ficha] : []);
-      setModoPersistencia(await carregarModoDaFicha(fichaId, alvoAtual()));
+      const modo: ModoPersistenciaOrcamento = orcamentoDestinoId
+        ? { tipo: 'adicionar', orcamentoId: orcamentoDestinoId }
+        : await carregarModoDaFicha(fichaId, alvoAtual());
+      setModoPersistencia(modo);
+      if (modo.tipo === 'adicionar') {
+        const diferencas = await getDiferencasFichaOrcamento({ fichaId, orcamentoId: modo.orcamentoId });
+        if (!diferencas.ok) throw new Error(diferencas.error);
+        setDiferencasFicha(diferencas.dados);
+        if (onAbrirOrcamentoExistente) {
+          onAbrirOrcamentoExistente(diferencas.dados);
+          abriuOrcamentoExistente = true;
+        }
+      } else {
+        setDiferencasFicha(null);
+      }
       const itens = ficha ? fichaParaItens(ficha, alvoAtual(), idsJaOrcados) : [];
       setNovoOrcItens(itens.length > 0 ? itens : [ITEM_VAZIO]);
       setResumoOrigemOrcamento(ficha ? resumoDaFichaParaOrcamento(ficha, alvoAtual(), idsJaOrcados) : null);
@@ -615,16 +646,19 @@ export function useOrcamentoModal({
     } catch (error: unknown) {
       setFichaOrcId(fichaId);
       setFichasParaOrc([]);
+      // Falha para localizar um orçamento existente nunca pode criar outro como fallback.
       setModoPersistencia({ tipo: 'novo' });
       setNovoOrcItens([ITEM_VAZIO]);
       setResumoOrigemOrcamento(null);
-      setBloqueioFicha(null);
+      setBloqueioFicha(error instanceof Error ? error.message : 'Não foi possível localizar o orçamento desta ficha.');
+      setDiferencasFicha(null);
       setOrcError(error instanceof Error ? error.message : 'Não foi possível localizar o orçamento desta ficha.');
     } finally {
       setEtapaNovoOrc('itens');
       setIsLoadingFichaParaOrc(false);
     }
-    setIsNovoOrcOpen(true);
+    // A proposta existente abre primeiro no detalhe; a montagem só abre pelo CTA explícito.
+    if (!abriuOrcamentoExistente) setIsNovoOrcOpen(true);
   };
 
   // Cadastra no catálogo um procedimento digitado que não bateu com nenhum item existente.
@@ -662,24 +696,22 @@ export function useOrcamentoModal({
     const supabase = createClient();
     const { data, error } = await supabase
       .from('orcamentos')
-      .select('id, status, total, valor_acordado, plano_forma, desconto, created_at, validade_dias, condicoes_pagamento, mostrar_valor_por_item, dentista_id, orcamento_itens(id, descricao, preco_total, quantidade, aprovado)')
+      .select('id, status, total, valor_acordado, plano_forma, desconto, created_at, validade_dias, condicoes_pagamento, mostrar_valor_por_item, dentista_id, aprovado_em, aprovado_por:dentistas!orcamentos_aprovado_por_id_fkey(nome), itens:orcamento_itens(id, descricao, preco_total, quantidade, aprovado), pagamentos(id, cobranca_id, valor, status, forma_pagamento, data_pagamento, data_vencimento, parcela_numero, total_parcelas, marcado_por:dentistas!pagamentos_marcado_por_id_fkey(nome)), aceite:assinaturas!assinaturas_orcamento_id_fkey(id, assinado_por, cro_no_ato, assinatura_ref, assinado_em, termos_snapshot), cobrancas:orcamento_cobrancas(id, subtotal, desconto, valor_final, numero_parcelas, primeiro_vencimento, situacao, created_at, itens:orcamento_cobranca_itens!orcamento_cobranca_itens_cobranca_id_fkey(orcamento_item_id, preco_total_snapshot), pagamentos:pagamentos!pagamentos_cobranca_id_fkey(id, cobranca_id, valor, status, forma_pagamento, data_pagamento, data_vencimento, parcela_numero, total_parcelas, marcado_por:dentistas!pagamentos_marcado_por_id_fkey(nome)))')
+      .is('itens.retirado_em', null)
       .eq('id', orcamentoId)
       .eq('paciente_id', pacienteId)
       .eq('clinica_id', clinicaId)
       .single();
     if (error || !data) throw new Error(error?.message ?? 'Orçamento não localizado após salvar.');
 
-    const orcamento = data as unknown as Omit<OrcamentoComItens, 'itens' | 'pagamentos' | 'cobrancas' | 'aprovado_por' | 'aprovado_em' | 'aceite'> & {
-      orcamento_itens: OrcamentoComItens['itens'] | null;
+    const orcamento = data as unknown as Omit<OrcamentoComItens, 'aceite'> & {
+      aceite: Array<{ id: string; assinado_por: string; cro_no_ato: string | null; assinatura_ref: string; assinado_em: string; termos_snapshot: TermosSnapshot | null }> | null;
     };
+    const raw = orcamento.aceite?.[0];
     return {
       ...orcamento,
-      itens: orcamento.orcamento_itens ?? [],
-      pagamentos: [],
-      cobrancas: [],
-      aprovado_por: null,
-      aprovado_em: null,
-      aceite: null,
+      aceite: raw?.termos_snapshot ? { id: raw.id, assinadoPor: raw.assinado_por,
+        croNoAto: raw.cro_no_ato, assinaturaRef: raw.assinatura_ref, assinadoEm: raw.assinado_em, termos: raw.termos_snapshot } : null,
     };
   };
 
@@ -791,6 +823,7 @@ export function useOrcamentoModal({
       } else {
         setIsNovoOrcOpen(false);
         setNovoOrcItens([ITEM_VAZIO]);
+        onItensAdicionadosAoOrcamento?.(modoPersistencia.orcamentoId);
         toast.success(`${itensValidos.length} procedimento${itensValidos.length === 1 ? '' : 's'} adicionado${itensValidos.length === 1 ? '' : 's'} ao orçamento.`);
         router.refresh();
       }
@@ -908,6 +941,7 @@ export function useOrcamentoModal({
         setModoPersistencia({ tipo: 'novo' });
         setEventoIdsJaOrcados(new Set());
         setResumoOrigemOrcamento(null);
+        setDiferencasFicha(null);
         setBloqueioFicha(null);
         setContextoClinicoPendente(false);
         setNovoOrcPlanoForma(null); setNovoOrcNumParcelas('3'); setNovoOrcPrimeiroVencimento(''); setNovoOrcParcelasForma('');
@@ -938,6 +972,7 @@ export function useOrcamentoModal({
     modoPersistencia: modoPersistencia.tipo,
     contextoClinicoPendente,
     resumoOrigemOrcamento,
+    diferencasFicha,
     onCriarOrcamento: () => void handleCriarOrcamento(),
     onSelecionarFicha: selecionarFichaParaOrc,
     onCadastrarProcedimento: (idx) => void handleCadastrarProcedimento(idx),
@@ -959,6 +994,7 @@ export function useOrcamentoModal({
   return {
     abrirNovoOrcamento,
     abrirOrcamentoParaFicha,
+    abrirRevisaoDaFicha: () => setIsNovoOrcOpen(true),
     abrirPickerFichasAbertas,
     abrirMontagemManualMeuDia,
     isLoadingFichaParaOrc,

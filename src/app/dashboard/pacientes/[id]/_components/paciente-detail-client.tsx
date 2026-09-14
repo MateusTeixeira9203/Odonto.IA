@@ -101,6 +101,7 @@ import { EmitirDocumentoModal } from '@/components/pacientes/EmitirDocumentoModa
 import { EmitirAceiteModal } from '@/components/pacientes/EmitirAceiteModal';
 import { NovoOrcamentoModal } from './modals/novo-orcamento-modal';
 import { useOrcamentoModal } from './use-orcamento-modal';
+import { getDiferencasFichaOrcamento, getResumoOrcamentoDaFicha, type DiferencasFichaOrcamento } from '@/server/orcamentos/ficha-orcamento-actions';
 import { ApresentarPaciente } from '@/components/pacientes/ApresentarPaciente';
 
 import type { FichaRecente } from '@/server/patients/get-patient-workspace-data';
@@ -256,6 +257,8 @@ export function PacienteDetailClient({
   const [loadingAgendamentos, setLoadingAgendamentos] = useState(false);
 
   const [detalheOrcId, setDetalheOrcId] = useState<string | null>(null);
+  const [diferencasOrcamentoAberto, setDiferencasOrcamentoAberto] = useState<DiferencasFichaOrcamento | null>(null);
+  const [seletorOrcamentoDaFicha, setSeletorOrcamentoDaFicha] = useState<{ fichaId: string; orcamentoIds: string[] } | null>(null);
   const [procedimentosClinica, setProcedimentosClinica] = useState<ProcedimentoClinica[]>([]);
   const [erroCatalogoProcedimentos, setErroCatalogoProcedimentos] = useState<string | null>(null);
   const [pagForm, setPagForm] = useState({
@@ -559,6 +562,17 @@ export function PacienteDetailClient({
     });
   };
 
+  const atualizarDiferencasPorOrcamento = useCallback(async (fichaId: string, orcamentoId: string) => {
+    const resultado = await getDiferencasFichaOrcamento({ fichaId, orcamentoId });
+    if (!resultado.ok) {
+      toast.error(resultado.error);
+      return;
+    }
+    setDiferencasOrcamentoAberto(resultado.dados);
+    // O estado local recebe os dados SSR atualizados pelo efeito de `orcamentos` após a ação.
+    router.refresh();
+  }, [router]);
+
   // R-46h — extraído pra use-orcamento-modal.ts (compartilhado com o Meu dia). onOrcamentoCriado
   // é o único acoplamento de volta: só esta tela mantém uma lista local de orçamentos.
   const orcamentoModal = useOrcamentoModal({
@@ -571,7 +585,49 @@ export function PacienteDetailClient({
     dentistasClinica,
     onOrcamentoCriado: (novoOrc) => setOrcamentosState((prev) => [novoOrc, ...prev]),
     onContinuarConfiguracao: (orcamentoId) => setDetalheOrcId(orcamentoId),
+    onAbrirOrcamentoExistente: (diferencas) => {
+      setDiferencasOrcamentoAberto(diferencas);
+      setDetalheOrcId(diferencas.orcamentoId);
+    },
+    onItensAdicionadosAoOrcamento: (orcamentoId) => {
+      const diferencasAtuais = diferencasOrcamentoAberto;
+      if (diferencasAtuais?.orcamentoId === orcamentoId) {
+        void atualizarDiferencasPorOrcamento(diferencasAtuais.fichaId, orcamentoId);
+        return;
+      }
+      router.refresh();
+    },
   });
+
+  const recarregarDiferencasDaFicha = useCallback(async () => {
+    const diferencasAtuais = diferencasOrcamentoAberto;
+    if (!diferencasAtuais) return;
+    await atualizarDiferencasPorOrcamento(diferencasAtuais.fichaId, diferencasAtuais.orcamentoId);
+  }, [atualizarDiferencasPorOrcamento, diferencasOrcamentoAberto]);
+
+  const abrirOrcamentoDaFicha = useCallback(async (fichaId: string) => {
+    const resumo = await getResumoOrcamentoDaFicha({ fichaId });
+    if (!resumo.ok) {
+      toast.error(resumo.error);
+      return;
+    }
+    if (resumo.dados.orcamentoIds.length <= 1) {
+      void orcamentoModal.abrirOrcamentoParaFicha(fichaId);
+      return;
+    }
+    setSeletorOrcamentoDaFicha({ fichaId, orcamentoIds: resumo.dados.orcamentoIds });
+  }, [orcamentoModal]);
+
+  const selecionarOrcamentoDaFicha = useCallback(async (fichaId: string, orcamentoId: string) => {
+    const diferencas = await getDiferencasFichaOrcamento({ fichaId, orcamentoId });
+    if (!diferencas.ok) {
+      toast.error(diferencas.error);
+      return;
+    }
+    setDiferencasOrcamentoAberto(diferencas.dados);
+    setDetalheOrcId(orcamentoId);
+    setSeletorOrcamentoDaFicha(null);
+  }, []);
 
   // Catálogo de procedimentos é privado por dentista. Pra secretária, o dono relevante
   // é o dentista-alvo selecionado no modal de orçamento, não o perfil dela (ela nunca
@@ -1488,11 +1544,13 @@ export function PacienteDetailClient({
                     {mountedTabs.has('ficha-clinica') && (
                       <ProntuarioTab
                         patientId={paciente.id}
+                        clinicaId={clinicaId}
                         dentistaId={dentistaId}
                         patientName={displayNome}
                         canWrite={canWriteClinical}
                         dados={prontuario ?? { atendimentos: [], fichas: [], boca: [], profissionaisClinicos: [], errosParciais: [] }}
-                        onGerarOrcamento={(fichaId) => void orcamentoModal.abrirOrcamentoParaFicha(fichaId)}
+                        onGerarOrcamento={(fichaId) => void abrirOrcamentoDaFicha(fichaId)}
+                        orcamentoRevisao={JSON.stringify(orcamentosState)}
                         onAbrirArquivos={() => handleTabChange('arquivos')}
                         // R-107b — catálogo pro match local da busca livre do painel do dente.
                         // `categoria` não vem da query (`ProcedimentoClinica` é o contrato do
@@ -1800,6 +1858,32 @@ export function PacienteDetailClient({
         dentistasClinica={role === 'secretaria' ? dentistasClinica : null}
       />
 
+      <Dialog open={seletorOrcamentoDaFicha !== null} onOpenChange={(aberto) => { if (!aberto) setSeletorOrcamentoDaFicha(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Escolha o orçamento da ficha</DialogTitle>
+            <DialogDescription>Esta ficha tem mais de um orçamento. Escolha qual deseja revisar; nenhum será criado automaticamente.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2">
+            {seletorOrcamentoDaFicha?.orcamentoIds.map((orcamentoId) => {
+              const orcamento = orcamentosState.find((item) => item.id === orcamentoId);
+              return (
+                <Button
+                  key={orcamentoId}
+                  type="button"
+                  variant="outline"
+                  className="min-h-11 h-auto justify-between whitespace-normal px-3 py-2 text-left"
+                  onClick={() => void selecionarOrcamentoDaFicha(seletorOrcamentoDaFicha.fichaId, orcamentoId)}
+                >
+                  <span>Orçamento de {orcamento ? format(parseISO(orcamento.created_at), 'dd/MM/yyyy') : 'data indisponível'}</span>
+                  <span className="font-mono text-xs">{orcamento ? `R$ ${formatValorBR(orcamento.total ?? 0)}` : 'Abrir'}</span>
+                </Button>
+              );
+            })}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <DetalheOrcamentoModal
         detalheOrc={detalheOrc}
         detalheOrcId={detalheOrcId}
@@ -1808,6 +1892,7 @@ export function PacienteDetailClient({
         pacienteId={paciente.id}
         onClose={() => {
           setDetalheOrcId(null);
+          setDiferencasOrcamentoAberto(null);
           setPagError(null);
           setOrcEditMode(false);
           setOrcEditError(null);
@@ -1833,6 +1918,9 @@ export function PacienteDetailClient({
         parcelasSaving={parcelasSaving}
         parcelasError={parcelasError}
         onGerarParcelas={handleGerarParcelas}
+        diferencasFicha={diferencasOrcamentoAberto}
+        onRevisarAdicao={() => orcamentoModal.abrirRevisaoDaFicha()}
+        onRecarregarDiferencasFicha={recarregarDiferencasDaFicha}
         orcEditMode={orcEditMode}
         setOrcEditMode={setOrcEditMode}
         orcEditItens={orcEditItens}

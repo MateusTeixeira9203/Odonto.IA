@@ -12,6 +12,8 @@ import { AceiteOrcamentoModal } from '@/components/orcamentos/aceite-orcamento-m
 import { BotaoDownloadPDF } from '@/components/orcamentos/botao-download-pdf';
 import { BotaoEnviarWhatsApp } from '@/components/orcamentos/botao-enviar-whatsapp';
 import { ToggleSwitch } from '@/components/ui/toggle-switch';
+import type { DiferencasFichaOrcamento } from '@/server/orcamentos/ficha-orcamento-actions';
+import { RevisaoDiferencasFichaOrcamento } from './revisao-diferencas-ficha-orcamento';
 import {
   Dialog, DialogContent, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
@@ -134,6 +136,9 @@ interface Props {
   onAceiteRegistrado: () => void;
   /** R-38 — liga/desliga o valor por procedimento no PDF deste orçamento. */
   onToggleMostrarValorPorItem: (id: string, mostrar: boolean) => void;
+  diferencasFicha: DiferencasFichaOrcamento | null;
+  onRevisarAdicao: () => void;
+  onRecarregarDiferencasFicha: () => Promise<void>;
 }
 
 function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
@@ -556,6 +561,9 @@ export function DetalheOrcamentoModal({
   onIniciarEdicaoValorAcordado, onCancelarEdicaoValorAcordado, onSalvarValorAcordado,
   onAceiteRegistrado,
   onToggleMostrarValorPorItem,
+  diferencasFicha,
+  onRevisarAdicao,
+  onRecarregarDiferencasFicha,
 }: Props) {
   const hoje = new Date().toISOString().split('T')[0];
   /** R-39a: só Procedimentos e Atividade — Pagamentos virou a coluna do dinheiro. */
@@ -763,6 +771,18 @@ export function DetalheOrcamentoModal({
 
                   {/* ── Aba: procedimentos ─────────────────────────────────── */}
                   <TabsContent value="procedimentos" className="mt-0 flex-1 min-h-0 overflow-y-auto p-6 space-y-6">
+                    {diferencasFicha && (
+                      <RevisaoDiferencasFichaOrcamento
+                        diferencas={diferencasFicha}
+                        itens={detalheOrc.itens}
+                        onAtualizado={onRecarregarDiferencasFicha}
+                        onAjustarAcordo={() => {
+                          onIniciarEdicaoValorAcordado();
+                          requestAnimationFrame(() => document.getElementById('ajustes-financeiros-orcamento')?.scrollIntoView({ block: 'nearest' }));
+                        }}
+                        onRevisarAdicao={onRevisarAdicao}
+                      />
+                    )}
                     <div className="space-y-2">
                       {orcEditMode ? (
                         <div className="space-y-2">
@@ -965,6 +985,7 @@ export function DetalheOrcamentoModal({
                   diálogo aninhado de "Registrar pagamento" (R-34 §7.0) deixa de existir:
                   é gesto de balcão, não cabe atrás de um segundo clique. */}
               <div
+                id="ajustes-financeiros-orcamento"
                 className="w-full sm:w-[416px] sm:shrink-0 border-t sm:border-t-0 sm:border-l border-border flex flex-col min-h-0 bg-teal/[0.04]"
               >
                 <div className="flex-1 min-h-0 overflow-y-auto p-5">

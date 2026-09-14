@@ -24,6 +24,7 @@ import { parseValorBR, formatValorBR } from '@/lib/valor-br';
 import { stripDenteDoNome } from '@/lib/arcadas';
 import type { FichaParaOrc, ProcedimentoClinica, NovoOrcItem } from '../types';
 import type { FormaPagamento } from '@/app/dashboard/orcamentos/actions';
+import type { DiferencasFichaOrcamento } from '@/server/orcamentos/ficha-orcamento-actions';
 
 const FORMA_LABEL: Record<FormaPagamento, string> = {
   dinheiro: 'Dinheiro', pix: 'PIX', cartao_credito: 'Cartão de Crédito',
@@ -58,6 +59,7 @@ export interface NovoOrcamentoModalProps {
     deOutrosResponsaveis: number;
     responsaveis: string[];
   } | null;
+  diferencasFicha: DiferencasFichaOrcamento | null;
   onCriarOrcamento: () => void;
   onSelecionarFicha: (fichaId: string | null) => void;
   onCadastrarProcedimento: (idx: number) => void;
@@ -96,6 +98,7 @@ export function NovoOrcamentoModal({
   modoPersistencia,
   contextoClinicoPendente,
   resumoOrigemOrcamento,
+  diferencasFicha,
   onCriarOrcamento,
   onSelecionarFicha,
   onCadastrarProcedimento,
@@ -271,6 +274,17 @@ export function NovoOrcamentoModal({
                       {resumoOrigemOrcamento.deOutrosResponsaveis} pertence{resumoOrigemOrcamento.deOutrosResponsaveis === 1 ? '' : 'm'} a {resumoOrigemOrcamento.responsaveis.join(', ')} e só pode ser orçado pelo responsável.
                     </p>
                   )}
+                </div>
+              )}
+
+              {modoPersistencia === 'adicionar' && diferencasFicha && diferencasFicha.faltantes.length > 0 && (
+                <div className="rounded-xl border border-warning bg-warning-pale px-3 py-3 text-sm text-warning-ink" role="status">
+                  <p className="font-semibold">Há {diferencasFicha.faltantes.length} procedimento{diferencasFicha.faltantes.length === 1 ? '' : 's'} nesta ficha que ainda não está neste orçamento.</p>
+                  <ul className="mt-2 space-y-1 text-xs">
+                    {diferencasFicha.faltantes.map((faltante) => (
+                      <li key={faltante.eventoId}>{faltante.nome} · {faltante.local} · adicionado em {format(parseISO(faltante.adicionadoEm), 'dd/MM', { locale: ptBR })}</li>
+                    ))}
+                  </ul>
                 </div>
               )}
 
