@@ -69,3 +69,53 @@ test('não duplica procedimento repetido com variação de caixa ou acento', () 
 
   assert.equal(resultado.adicionadosComoOutro, 1);
 });
+
+test('fallback regional conserva as arcadas e nunca cria dentes 97, 98 ou 99', () => {
+  const resultado = reconciliarProcedimentosDex({
+    procedimentos: ['Prótese total', 'Procedimento de boca toda'],
+    eventos: [],
+    dentesObservacoes: { '97': 'Prótese total', '98': 'Prótese total', '99': 'Procedimento de boca toda' },
+    modo: 'consulta',
+  });
+  assert.deepEqual(resultado.eventos.map((item) => item.ancora), [
+    { nivel: 'arcada', arcada: 'superior' },
+    { nivel: 'arcada', arcada: 'inferior' },
+    { nivel: 'boca' },
+  ]);
+  assert.ok(resultado.eventos.every((item) => item.revisar_status));
+});
+
+
+test('título explícito preserva a etapa definitiva quando só a provisória foi extraída', () => {
+  const resultado = reconciliarProcedimentosDex({
+    procedimentos: ['Coroa provisória', 'Coroa definitiva'],
+    eventos: [{ ...evento('coroa'), procedimentoNome: 'Coroa provisória' }],
+    dentesObservacoes: { '26': 'Coroa provisória\nCoroa definitiva' },
+    modo: 'consulta',
+  });
+  assert.equal(resultado.eventos.length, 2);
+  assert.equal(resultado.eventos[1].procedimentoNome, 'Coroa definitiva');
+  assert.equal(resultado.eventos[1].revisar_status, true);
+});
+
+test('prefixo de instalação não duplica o pilar e remoção continua sendo outra intervenção', () => {
+  const resultado = reconciliarProcedimentosDex({
+    procedimentos: ['Instalação de pilar protético', 'Remoção de pilar protético'],
+    eventos: [{ ...evento('outro'), procedimentoNome: 'Pilar protético' }],
+    dentesObservacoes: { '26': 'Instalação de pilar protético\nRemoção de pilar protético' },
+    modo: 'consulta',
+  });
+  assert.equal(resultado.eventos.length, 2);
+  assert.equal(resultado.eventos[1].procedimentoNome, 'Remoção de pilar protético');
+});
+
+test('recupera somente a região omitida, sem duplicar a intervenção já coberta', () => {
+  const resultado = reconciliarProcedimentosDex({
+    procedimentos: ['Prótese total'],
+    eventos: [{ ...evento('outro'), procedimentoNome: 'Prótese total', ancora: { nivel: 'arcada', arcada: 'superior' } }],
+    dentesObservacoes: { '97': 'Confecção de prótese total', '98': 'Prótese total' },
+    modo: 'consulta',
+  });
+  assert.equal(resultado.adicionadosComoOutro, 1);
+  assert.deepEqual(resultado.eventos[1].ancora, { nivel: 'arcada', arcada: 'inferior' });
+});

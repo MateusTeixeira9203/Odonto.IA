@@ -1,7 +1,9 @@
 import type {
+  AncoraClinica,
   OdontogramaEventoInput,
   TipoRegistroOdontograma,
 } from '@/types/odontograma';
+import { ARCH_SUPERIOR, ARCH_INFERIOR, ARCH_COMPLETA, isQuadrante } from '@/lib/arcadas';
 import type { ModoFormatacaoDex } from './classificar-status';
 
 export interface ResultadoReconciliacaoDex {
@@ -50,14 +52,30 @@ function contemFrase(texto: string, frase: string): boolean {
     || normalizado.includes(` ${alvo} `);
 }
 
-function procedimentoEstaCoberto(procedimento: string, eventos: readonly OdontogramaEventoInput[]): boolean {
-  return eventos.some((evento) => {
-    if (evento.tipo === 'outro') {
-      const nome = evento.procedimentoNome?.trim() || evento.observacao.trim();
-      if (nome) return contemFrase(nome, procedimento);
-    }
-    return ALIASES_POR_TIPO[evento.tipo].some((alias) => contemFrase(procedimento, alias));
-  });
+/** Remove apenas variações de redação; remoção, material e etapa continuam significativos. */
+function palavrasDoProcedimento(texto: string): string[] {
+  return normalizar(texto)
+    .replace(/^(?:instalacao|confeccao|realizacao) (?:de |do |da |dos |das )?/, '')
+    .replace(/\b(?:tratamento de canal|tratamento endodontico|canal)\b/g, 'endodontia')
+    .replace(/\bextracao\b/g, 'exodontia')
+    .replace(/\bimplantes\b/g, 'implante')
+    .replace(/\bproteses\b/g, 'protese')
+    .split(' ')
+    .filter((palavra) => palavra && !['de', 'do', 'da', 'dos', 'das', 'em', 'no', 'na', 'nos', 'nas'].includes(palavra));
+}
+
+function nomeCobreProcedimento(nome: string, procedimento: string): boolean {
+  const palavras = new Set(palavrasDoProcedimento(nome));
+  const alvo = palavrasDoProcedimento(procedimento);
+  return alvo.length > 0 && alvo.every((palavra) => palavras.has(palavra));
+}
+
+function eventoCobreProcedimento(procedimento: string, evento: OdontogramaEventoInput): boolean {
+  const nome = evento.procedimentoNome?.trim() || (evento.tipo === 'outro' ? evento.observacao.trim() : '');
+  // Um título explícito tem precedência sobre o enum visual: "coroa" não pode esconder
+  // a falta de uma coroa definitiva quando só a provisória foi extraída.
+  if (nome) return nomeCobreProcedimento(nome, procedimento);
+  return ALIASES_POR_TIPO[evento.tipo].some((alias) => contemFrase(procedimento, alias));
 }
 
 function dentesDoProcedimento(
@@ -65,9 +83,27 @@ function dentesDoProcedimento(
   dentesObservacoes: Readonly<Record<string, string>>,
 ): number[] {
   return Object.entries(dentesObservacoes)
-    .filter(([, observacao]) => contemFrase(observacao, procedimento))
+    .filter(([, observacao]) => observacao.split('\n').some((linha) => nomeCobreProcedimento(linha, procedimento)))
     .map(([dente]) => Number(dente))
     .filter((dente) => Number.isInteger(dente));
+}
+
+function mesmaRegiao(ancora: AncoraClinica, evento: OdontogramaEventoInput): boolean {
+  if (ancora.nivel === 'dente') return ancora.dente === evento.ancora.dente;
+  return ancora.nivel === evento.ancora.nivel
+    && ancora.arcada === evento.ancora.arcada
+    && ancora.quadrante === evento.ancora.quadrante;
+}
+
+function ancoraDoNumero(numero: number): AncoraClinica | null {
+  if (numero === ARCH_SUPERIOR) return { nivel: 'arcada', arcada: 'superior' };
+  if (numero === ARCH_INFERIOR) return { nivel: 'arcada', arcada: 'inferior' };
+  if (numero === ARCH_COMPLETA) return { nivel: 'boca' };
+  if (isQuadrante(numero)) return { nivel: 'quadrante', quadrante: (numero - 90) as 1 | 2 | 3 | 4 };
+  const quadrante = Math.floor(numero / 10);
+  const posicao = numero % 10;
+  const maximo = quadrante >= 1 && quadrante <= 4 ? 8 : quadrante >= 5 && quadrante <= 8 ? 5 : 0;
+  return posicao >= 1 && posicao <= maximo ? { nivel: 'dente', dente: numero } : null;
 }
 
 export function reconciliarProcedimentosDex(input: {
@@ -84,14 +120,18 @@ export function reconciliarProcedimentosDex(input: {
     vistos.add(chave);
     return true;
   });
-  const semCobertura = procedimentos.filter((procedimento) => !procedimentoEstaCoberto(procedimento, eventos));
+  const semCobertura: string[] = [];
 
-  for (const procedimento of semCobertura) {
-    const dentes = dentesDoProcedimento(procedimento, input.dentesObservacoes);
-    const grupoId = dentes.length > 1 ? crypto.randomUUID() : null;
-    const ancoras = dentes.length > 0
-      ? dentes.map((dente) => ({ nivel: 'dente' as const, dente }))
-      : [{ nivel: 'geral' as const }];
+  for (const procedimento of procedimentos) {
+    const cobertura = eventos.filter((evento) => eventoCobreProcedimento(procedimento, evento));
+    const regioes = dentesDoProcedimento(procedimento, input.dentesObservacoes)
+      .map(ancoraDoNumero).filter((ancora): ancora is AncoraClinica => ancora !== null);
+    const ancoras = regioes.length > 0
+      ? regioes.filter((ancora) => !cobertura.some((evento) => mesmaRegiao(ancora, evento)))
+      : cobertura.length === 0 ? [{ nivel: 'geral' } satisfies AncoraClinica] : [];
+    if (ancoras.length === 0) continue;
+    semCobertura.push(procedimento);
+    const grupoId = ancoras.length > 1 ? crypto.randomUUID() : null;
 
     for (const ancora of ancoras) {
       eventos.push({

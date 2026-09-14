@@ -32,6 +32,8 @@ export interface GenerateStructuredGeminiOptions {
   feature: string;
   timeoutMs?: number;
   maxOutputTokens?: number;
+  /** Raciocínio opcional por chamada; demais fluxos mantêm o padrão sem thinking. */
+  thinkingBudget?: number;
 }
 
 export interface AIResult<T> {
@@ -175,7 +177,7 @@ export async function generateStructuredGemini<T>(
           maxOutputTokens: options.maxOutputTokens ?? 16_384,
           responseMimeType: 'application/json',
           responseSchema: options.responseSchema,
-          thinkingConfig: { thinkingBudget: 0 },
+          thinkingConfig: { thinkingBudget: options.thinkingBudget ?? 0 },
         },
       }),
       timeout

@@ -1,5 +1,5 @@
 {
-  "_doc": "Conjunto golden do eval de extração clínica (pass 1 — /api/dex/formatar-evolucao). Cada caso: relato ditado -> eventos esperados. 'cat':'atual' deve passar HOJE e não pode regredir; 'cat':'novo' é esperado AUSENTE hoje (o enum barra) e é o alvo do R-06/R-07 — a diferença atual->novo mede o buraco que esses itens preenchem. O matcher só confere os campos presentes em 'esperado' (match parcial). 'proibido' = eventos que NÃO podem aparecer (ex: realizado sob negação). Relatos são exemplos sintéticos — trocar pelos reais do Mateus quando ele trouxer o material de base por especialidade.",
+  "_doc": "Conjunto golden do eval de extração clínica. Cada caso usa relato sintético, sem identificador de paciente. 'atual' não pode regredir; 'novo' e 'r169' medem cobertura em expansão. O matcher só confere os campos presentes em 'esperado'; 'proibido' nunca pode aparecer. 'repetir' mede estabilidade da mesma extração em chamadas independentes.",
   "casos": [
     {
       "id": "carie-face-oclusal",
@@ -230,6 +230,60 @@
       "esperado": {
         "eventos": [
           { "tipo": "carie_restauracao", "dente": 26, "status": "realizado", "nivel": "face", "faces": ["O"] }
+        ]
+      }
+    },
+    {
+      "id": "r169-reabilitacao-multi-regiao",
+      "cat": "r169",
+      "repetir": 3,
+      "relato": "Realizada osteotomia da maxila e da mandíbula. Instalados implantes nas regiões dos dentes 14, 24, 34, 32, 44 e 42. Confeccionadas próteses totais superior e inferior, e prótese protocolo inferior provisória e definitiva.",
+      "modo": "consulta",
+      "esperado": {
+        "exato": true,
+        "eventos": [
+          { "tipo": "outro", "status": "realizado", "arcada": "superior", "nomeInclui": ["osteotomia", "maxila"] },
+          { "tipo": "outro", "status": "realizado", "arcada": "inferior", "nomeInclui": ["osteotomia", "mandibula"] },
+          { "tipo": "implante", "status": "realizado", "dente": 14 },
+          { "tipo": "implante", "status": "realizado", "dente": 24 },
+          { "tipo": "implante", "status": "realizado", "dente": 34 },
+          { "tipo": "implante", "status": "realizado", "dente": 32 },
+          { "tipo": "implante", "status": "realizado", "dente": 44 },
+          { "tipo": "implante", "status": "realizado", "dente": 42 },
+          { "tipo": "outro", "status": "realizado", "arcada": "superior", "nomeInclui": ["protese total"] },
+          { "tipo": "outro", "status": "realizado", "arcada": "inferior", "nomeInclui": ["protese total"] },
+          { "tipo": "outro", "status": "realizado", "arcada": "inferior", "nomeInclui": ["protocolo", "provisoria"] },
+          { "tipo": "outro", "status": "realizado", "arcada": "inferior", "nomeInclui": ["protocolo", "definitiva"] }
+        ]
+      }
+    },
+    {
+      "id": "r169-remocoes-e-reabilitacao-22",
+      "cat": "r169",
+      "relato": "Realizada remoção dos implantes preexistentes 46 e 47. Realizada extração do dente 22. Instalado implante na região 22 com pilar e coroa cerâmica.",
+      "modo": "consulta",
+      "esperado": {
+        "exato": true,
+        "eventos": [
+          { "tipo": "outro", "status": "realizado", "dente": 46, "nomeInclui": ["remocao", "implante"] },
+          { "tipo": "outro", "status": "realizado", "dente": 47, "nomeInclui": ["remocao", "implante"] },
+          { "tipo": "exodontia", "status": "realizado", "dente": 22 },
+          { "tipo": "implante", "status": "realizado", "dente": 22 },
+          { "tipo": "coroa", "status": "realizado", "dente": 22, "nomeInclui": ["ceramica"] },
+          { "tipo": "outro", "status": "realizado", "dente": 22, "nomeInclui": ["pilar"] }
+        ]
+      }
+    },
+    {
+      "id": "r169-pilar-coroa-sem-localizacao",
+      "cat": "r169",
+      "relato": "Confeccionados pilar e coroa cerâmica; sem região dentária informada.",
+      "modo": "consulta",
+      "esperado": {
+        "exato": true,
+        "eventos": [
+          { "tipo": "outro", "status": "realizado", "nivel": "geral", "nomeInclui": ["pilar"] },
+          { "tipo": "coroa", "status": "realizado", "nivel": "geral", "nomeInclui": ["ceramica"] }
         ]
       }
     }

@@ -39,7 +39,7 @@ export interface EvolucaoFormatada {
   orto_manutencao:     OrtoManutencaoInfo | null;
 }
 
-const DEX_PROMPT_VERSION = 'r142-2026-08-31';
+const DEX_PROMPT_VERSION = 'r169-2026-09-14';
 
 function contarPor<T extends object, K extends keyof T>(itens: readonly T[], campo: K): Record<string, number> {
   return itens.reduce<Record<string, number>>((contagens, item) => {
@@ -67,6 +67,7 @@ interface EvolucaoWire {
 /** Evento como o modelo emite: origem NÃO vem do modelo (a rota decide pelo modo).
  *  papel_no_grupo vem do modelo SÓ pra ponte (R-06) — validado no parse, null nos demais. */
 interface OdontogramaEventoWire {
+  procedimento_nome?: string | null;
   tipo:       string;
   status:     string;
   evidencia_status: string;
@@ -101,7 +102,7 @@ interface OrtoManutencaoWire {
 // Mudança gated por eval (evals/extracao-clinica): baseline ATUAL 16/16 não pode regredir.
 const ODONTOGRAMA_EVENTO_SCHEMA: Schema = {
   type: Type.OBJECT,
-  required: ['tipo', 'status', 'evidencia_status', 'nivel', 'faces', 'observacao'],
+  required: ['tipo', 'procedimento_nome', 'status', 'evidencia_status', 'nivel', 'faces', 'observacao'],
   properties: {
     tipo: {
       type: Type.STRING,
@@ -110,9 +111,10 @@ const ODONTOGRAMA_EVENTO_SCHEMA: Schema = {
              'ponte', 'esfoliacao', 'profilaxia', 'raspagem', 'clareamento', 'fluor',
              'exame_periodontal', 'outro'],
     },
+    procedimento_nome: { type: Type.STRING, nullable: true, description: 'Nome clínico fiel ao relato, até 500 caracteres; obrigatório e não genérico para intervenções do tipo outro.' },
     status:    { type: Type.STRING, enum: ['indicado', 'realizado'] },
     evidencia_status: { type: Type.STRING, enum: ['execucao_explicita', 'indicacao_explicita', 'negacao', 'historico', 'ambiguo'] },
-    nivel:     { type: Type.STRING, enum: ['boca', 'arcada', 'quadrante', 'dente', 'face'] },
+    nivel:     { type: Type.STRING, enum: ['geral', 'boca', 'arcada', 'quadrante', 'dente', 'face'] },
     arcada:    { type: Type.STRING, enum: ['superior', 'inferior'], nullable: true },
     quadrante: { type: Type.INTEGER, nullable: true },
     dente:     { type: Type.INTEGER, nullable: true },
@@ -203,16 +205,22 @@ function parseEventos(wire: unknown, modo: 'consulta' | 'exame_inicial'): Odonto
     if (!TIPOS_ACEITOS.has(w.tipo as TipoRegistroOdontograma)) continue;
     if (w.status !== 'indicado' && w.status !== 'realizado') continue;
     if (!['execucao_explicita', 'indicacao_explicita', 'negacao', 'historico', 'ambiguo'].includes(w.evidencia_status)) continue;
-    if (!['boca', 'arcada', 'quadrante', 'dente', 'face'].includes(w.nivel)) continue;
+    if (!['geral', 'boca', 'arcada', 'quadrante', 'dente', 'face'].includes(w.nivel)) continue;
 
     const nivel = w.nivel as NivelAncora;
-    if (w.tipo === 'outro' && (typeof w.observacao !== 'string' || !w.observacao.trim())) continue;
+    let nome = typeof w.procedimento_nome === 'string' ? w.procedimento_nome.trim() : '';
+    const observacao = typeof w.observacao === 'string' ? w.observacao.trim() : '';
+    // A etapa isolada pode vir no detalhe: conserve-a no título antes do merge, sem inferir
+    // fase a partir de uma frase que poderia descrever outro procedimento ou plano futuro.
+    if (nome && /^(?:provisóri[ao]|definitiv[ao])$/iu.test(observacao)
+      && !/\b(?:provisóri[ao]|definitiv[ao])\b/iu.test(nome)) nome = `${nome} ${observacao}`;
+    if (w.tipo === 'outro' && !nome && !observacao) continue;
     const dente = w.dente != null ? Number(w.dente) : undefined;
     const faces = (Array.isArray(w.faces) ? w.faces : []).filter((f): f is FaceDental => FACES_VALIDAS.has(f as FaceDental));
 
     // Coerência de âncora — espelha odontograma_eventos_ancora_valida (constraint SQL).
     const ancora: AncoraClinica = { nivel };
-    if (nivel === 'boca') {
+    if (nivel === 'boca' || nivel === 'geral') {
       // R-07: boca toda — nenhum campo de âncora (constraint exige tudo null).
     } else if (nivel === 'arcada') {
       if (w.arcada !== 'superior' && w.arcada !== 'inferior') continue;
@@ -257,6 +265,7 @@ function parseEventos(wire: unknown, modo: 'consulta' | 'exame_inicial'): Odonto
 
     out.push({
       tipo:             w.tipo as TipoRegistroOdontograma,
+      procedimentoNome: nome || (w.tipo === 'outro' ? observacao : undefined),
       status,
       origem,
       // R-101 — a IA nunca decide isso (mesma classe de invariante de realizado_em, §1.10).
@@ -265,7 +274,7 @@ function parseEventos(wire: unknown, modo: 'consulta' | 'exame_inicial'): Odonto
       ancora,
       grupo_id,
       papel_no_grupo:   papel,
-      observacao:       typeof w.observacao === 'string' ? w.observacao.trim() : '',
+      observacao,
       evidencia_status: evidencia,
       revisar_status:   revisarStatus,
     });
@@ -352,8 +361,8 @@ ${modo === 'exame_inicial' ? '- Origem do texto: HISTÓRICO/REFERÊNCIA — docu
 
 CLASSIFICAÇÃO CLÍNICA DO STATUS — aplique antes de montar o JSON:
 - Em relato de consulta, "realizado" só existe quando o dentista declarou que EXECUTOU aquele procedimento. "Fiz profilaxia" → realizado + execucao_explicita.
-- Indicação, necessidade, plano, negação, histórico ou procedimento citado sem verbo de execução nunca viram "realizado": "precisa de canal", "vou extrair", "não fiz o canal", "já fez há anos" e "canal no 46" → indicado, com evidencia_status correspondente.
-- Nunca use o verbo no passado de outro profissional ou de outra data como prova de execução nesta sessão.
+- Em relato de consulta, indicação, necessidade, plano, negação, histórico ou procedimento citado sem verbo de execução nunca viram "realizado": "precisa de canal", "vou extrair", "não fiz o canal", "já fez há anos" e "canal no 46" → indicado, com evidencia_status correspondente.
+- Nunca use o verbo no passado de outro profissional ou de outra data como prova de execução nesta sessão. No modo histórico, conclusão expressamente documentada tem a regra própria abaixo; o evento será preexistente, não uma execução de hoje.
 - Se houver dúvida entre indicado e realizado, escolha indicado. O dentista poderá confirmar na revisão.
 
 Retorne SOMENTE um JSON válido, sem markdown, com exatamente esta estrutura:
@@ -362,10 +371,10 @@ Retorne SOMENTE um JSON válido, sem markdown, com exatamente esta estrutura:
   "anotacoes": "evolução clínica em linguagem técnica — fatos relatados, técnica usada se executada, indicações e intercorrências relevantes. 2-3 frases (caso extenso: até 6), sem repetição.",
   "dentes_afetados": [26, 36],
   "dentes_observacoes": [{"dente": "13", "observacao": "Tratamento de canal\\nPino\\nProvisório\\nCoroa de porcelana"}, {"dente": "98", "observacao": "PPR (prótese parcial removível)"}],
-  "procedimentos": ["lista resumida dos procedimentos executados ou indicados — ex: Tratamento endodôntico, Radiografia periapical"],
+  "procedimentos": ["nomes das intervenções executadas ou indicadas, copiados literalmente de procedimento_nome dos eventos correspondentes"],
   "conduta": "orientações ao paciente, cuidados pós-procedimento, prescrições mencionadas. String vazia se não mencionado.",
   "alerta_novo": "se o dentista mencionar nova alergia ou medicamento novo do paciente, registrar aqui. null se nenhum",
-  "odontograma_eventos": [{"tipo": "carie_restauracao", "status": "realizado", "evidencia_status": "execucao_explicita", "nivel": "face", "dente": 14, "faces": ["O"], "grupo_id": null, "papel_no_grupo": null, "observacao": "resina composta"}, {"tipo": "endodontia", "status": "indicado", "evidencia_status": "indicacao_explicita", "nivel": "dente", "dente": 26, "faces": [], "grupo_id": null, "papel_no_grupo": null, "observacao": "canal indicado"}],
+  "odontograma_eventos": [{"tipo": "carie_restauracao", "procedimento_nome": "Restauração", "status": "realizado", "evidencia_status": "execucao_explicita", "nivel": "face", "dente": 14, "faces": ["O"], "grupo_id": null, "papel_no_grupo": null, "observacao": "resina composta"}, {"tipo": "endodontia", "procedimento_nome": "Tratamento endodôntico", "status": "indicado", "evidencia_status": "indicacao_explicita", "nivel": "dente", "dente": 26, "faces": [], "grupo_id": null, "papel_no_grupo": null, "observacao": "canal indicado"}],
   "orto_manutencao": null
 }
 
@@ -379,8 +388,8 @@ Regras críticas:
 - NOTA DE PLANEJAMENTO/COORDENAÇÃO ≠ procedimento: fala de preparo, encaminhamento ou avaliação futura SEM intervenção executável definida (ex: "preparar o dente pra passar pro Dr. Fulano", "planejar um implante ali mais pra frente", "avaliar na próxima consulta") vira observação do dente prefixada com "Planejamento: " (ex: "Planejamento: preparo para prótese — encaminhar ao Dr. Fulano") e NUNCA entra no array procedimentos — não é item orçável. Distinção: "vou extrair o 28 na próxima" é intervenção concreta indicada (entra como "Exodontia — planejado"); "preparar pro protesista" é coordenação (vira "Planejamento: ...").
 - Se nenhum dente mencionado: [] e []
 - observacao: se mais de um procedimento no mesmo dente, separar por \\n — cada linha vira um item independente marcável pelo dentista
-- procedimentos: array de strings resumidas, mínimo 1 item baseado no relato
-- procedimentos = INTERVENÇÕES (o que foi feito ou será feito: restauração, endodontia, exodontia, profilaxia…), NUNCA achados/diagnósticos. Cárie, pulpite, necrose, fratura, mobilidade, retração gengival são ACHADOS — descrevem o problema, vão em anotacoes/queixa_principal, jamais em procedimentos. Ex: relato "cárie oclusal no 14" → procedimento = "Restauração com resina composta", não "Cárie oclusal".
+- procedimentos: espelho dos nomes das intervenções em odontograma_eventos, sem repetir nomes idênticos; [] quando não houver intervenção relatada. Copie literalmente procedimento_nome, sem resumir por uma cirurgia mais ampla, trocar por sinônimo ou acrescentar intervenção. Exemplo: osteotomia relatada permanece osteotomia; não transforme em "cirurgia ortognática". Preserve todos os qualificadores e etapas. Achados visuais não entram nesta lista.
+- procedimentos = INTERVENÇÕES (o que foi feito ou será feito: restauração, endodontia, exodontia, profilaxia…), NUNCA achados/diagnósticos. Cárie, pulpite, necrose, fratura, mobilidade, retração gengival são ACHADOS — descrevem o problema, vão em anotacoes/queixa_principal, jamais em procedimentos. Não acrescente material, técnica ou tratamento que não foi relatado. Um achado isolado pode ter evento visual, mas não autoriza inventar uma intervenção na lista procedimentos.
 - O diagnóstico e o raciocínio clínico (ex: "pulpite irreversível confirmada por teste de vitalidade") entram em anotacoes — registrar, não descartar.
 - GENERALIZAÇÃO: termo clínico fora do glossário → use o nome clínico padrão brasileiro do procedimento; o glossário ancora nomenclatura, não limita cobertura.
 - conduta: string vazia "" se não houver orientações mencionadas
@@ -391,7 +400,11 @@ Regras críticas:
 ODONTOGRAMA (camada visual — além dos campos acima):
 Para CADA achado/procedimento que você registrou em dentes_observacoes, emita TAMBÉM o(s) evento(s) visual(is) correspondente(s) em "odontograma_eventos". Um evento descreve o estado clínico de um dente ou face.
 - tipo (escolha o mais específico): "carie_restauracao" (cárie a restaurar OU restauração feita — ancora em FACE), "endodontia" (canal), "exodontia" (extração), "coroa" (coroa total protética UNITÁRIA), "ponte" (prótese fixa multi-dente — ver regra PONTE), "implante", "selante" (sempre face O), "lesao_periapical" (achado radiográfico no ápice), "inclusao" (dente incluso/impactado), "fratura" (trauma dentário), "pino_nucleo" (pino/núcleo intrarradicular), "esfoliacao" (decíduo que caiu naturalmente — SÓ dentes 51-85, sempre "realizado"), "profilaxia" (limpeza — nível boca), "raspagem" (raspagem/alisamento periodontal — nível quadrante; sem quadrante citado, boca), "clareamento" (nível boca), "fluor" (aplicação de flúor — nível boca), "exame_periodontal" (nível boca, distinto de raspagem) e "outro".
-- Use "outro" para uma INTERVENÇÃO explícita sem tipo específico acima. A observacao deve conter obrigatoriamente o nome clínico real (ex.: "gengivoplastia", "mantenedor de espaço"); nunca escreva apenas "outro". Não use "outro" para achado, diagnóstico, material isolado, conversa ou procedimento negado.
+- procedimento_nome é o título clínico de CADA evento, inclusive dos tipos conhecidos. Preserve a intervenção, região e qualificadores narrados; nunca use "Outro procedimento". O glossário não pode apagar qualificadores: "protocolo provisório" → procedimento_nome:"Prótese protocolo provisória"; "protocolo definitivo" → procedimento_nome:"Prótese protocolo definitiva". Provisória/definitiva ficam no nome, nunca apenas na observacao. observacao guarda detalhes adicionais, sem substituir o nome.
+- Use "outro" para uma INTERVENÇÃO explícita sem tipo específico acima e escreva seu nome real em procedimento_nome: osteotomia, prótese total, prótese protocolo, remoção de implante, instalação de pilar protético, curativo etc. O catálogo não limita a extração. Não force um tipo parecido que altere o significado; pilar sobre implante não é pino intrarradicular, remoção de implante não é instalação nem extração de dente. Não use "outro" para achado, material isolado, conversa ou procedimento negado.
+- COBERTURA: cada intervenção em cada local explícito gera um evento. Preserve separadamente maxila/superior e mandíbula/inferior, todos os dentes listados e etapas provisória/definitiva. Não fundir duas próteses ou duas etapas porque compartilham tipo/região. Use grupo_id null por padrão; compartilhe somente entre dentes da MESMA intervenção, nunca entre intervenções diferentes.
+- Exemplo de cobertura: osteotomia da maxila e mandíbula = dois eventos; implantes 14, 24, 34, 32, 44 e 42 = seis eventos; próteses totais superior e inferior = dois eventos; protocolo inferior provisório e definitivo = dois eventos. Total: 12 eventos distintos, mantendo os qualificadores de cada um.
+- Se o relato mencionar implante, pilar protético e coroa como intervenções, preserve cada um. Não copie a localização de outro procedimento sem vínculo explícito na frase. Uma peça/material apenas descritivo não gera intervenção extra.
 - evidencia_status é OBRIGATÓRIA e explica a frase: "execucao_explicita" (só quando o dentista declarou que executou o procedimento), "indicacao_explicita" (indicou/precisa/vai fazer), "negacao" (declarou que NÃO fez), "historico" (feito em outro momento/por outro profissional) ou "ambiguo" (nome do procedimento sem verbo de execução).
 - status: em relato de consulta, use "realizado" APENAS com evidencia_status="execucao_explicita". Nos demais casos use "indicado". Exemplos: "fiz profilaxia" → realizado + execucao_explicita; "paciente precisa de profilaxia" → indicado + indicacao_explicita; "canal no 46" → indicado + ambiguo; "não fiz o canal" → nunca realizado + negacao; "já fez canal há anos" → indicado + historico.
 ${modo === 'exame_inicial' ? `- ⛔⛔ MODO HISTÓRICO/REFERÊNCIA — a regra de status ACIMA NÃO VALE aqui, esta a substitui: o texto é
@@ -399,23 +412,26 @@ ${modo === 'exame_inicial' ? `- ⛔⛔ MODO HISTÓRICO/REFERÊNCIA — a regra d
   que fez agora. Verbo no passado sozinho ("fez o canal", "extraiu o dente", "restaurou o 26") NÃO
   prova que ESTA clínica concluiu o procedimento hoje — vira "indicado" por padrão, mesmo narrado no
   passado. Só use "realizado" quando o texto afirma conclusão de forma explícita e inequívoca:
-  data de realização, ou palavras como "concluído"/"finalizado"/"realizado em [data]". Menção vaga
+  data de realização, ou palavras como "concluído"/"finalizado"/"realizado em [data]". Nesse caso,
+  emita status:"realizado" com evidencia_status:"historico"; a origem preexistente será aplicada
+  pelo sistema. Exemplo: "restauração oclusal 26 em resina, concluída em 12/01/2024" → realizado. Menção vaga
   ("fez tratamento há uns anos", "já tratou esse dente antes") fica "indicado" — o dentista confirma
   na tela antes de qualquer coisa virar prontuário definitivo. Perder um "indicado" que devia ser
   "realizado" o dentista corrige com 1 clique; um "realizado" fantasma pode passar despercebido.` : ''}
-- ⛔ NEGAÇÃO NO EVENTO (erro comum — leia com atenção): se o dentista NEGOU ter feito um procedimento, NÃO emita evento "realizado" pra ele, mesmo que o nome do procedimento apareça no relato. Exemplo obrigatório: "não fiz o canal, só o curativo no 46" → o evento do 46 é NO MÁXIMO {tipo:endodontia, status:"indicado"} (ou nenhum) — JAMAIS {tipo:endodontia, status:"realizado"}. O curativo não vira evento de odontograma (não há tipo pra ele). Regra geral: um tipo de evento só recebe status:"realizado" se AQUELE procedimento foi de fato executado; procedimento citado-e-negado nunca é realizado.
+- ⛔ NEGAÇÃO NO EVENTO (erro comum — leia com atenção): se o dentista NEGOU ter feito um procedimento, NÃO emita evento "realizado" pra ele, mesmo que o nome do procedimento apareça no relato. Exemplo obrigatório: "não fiz o canal, só o curativo no 46" → o evento do 46 é NO MÁXIMO {tipo:endodontia, status:"indicado"} (ou nenhum) — JAMAIS {tipo:endodontia, status:"realizado"}. O curativo explicitamente executado gera outro evento: tipo:"outro", procedimento_nome:"Curativo", status:"realizado", evidencia_status:"execucao_explicita" no local citado. Regra geral: um tipo de evento só recebe status:"realizado" se AQUELE procedimento foi de fato executado; procedimento citado-e-negado nunca é realizado.
 - nivel decide os campos da âncora:
   · "face": preencha dente (FDI) e faces (array de "O"/"M"/"D"/"V"/"L"). Use para cárie/restauração/selante.
   · "dente": preencha dente, deixe faces []. Use para endodontia/exodontia/coroa/ponte/implante/lesao_periapical/inclusao/fratura/pino_nucleo/esfoliacao.
   · "arcada": preencha arcada. · "quadrante": preencha quadrante (1=sup dir, 2=sup esq, 3=inf esq, 4=inf dir).
-  · "boca": procedimento de boca toda (profilaxia/clareamento/fluor) — deixe arcada/quadrante/dente null e faces [].
+  · "boca": procedimento explicitamente de boca toda (ou profilaxia/clareamento/fluor) — deixe arcada/quadrante/dente null e faces [].
+  · "geral": intervenção sem localização informada; deixe arcada/quadrante/dente null e faces []. Nunca invente dente, face ou arcada para encaixar um tipo. Restauração sem face citada usa nível dente; sem dente citado, geral.
 - PONTE (prótese fixa): emita UM evento tipo "ponte" PARA CADA dente do vão — pilares E pônticos — todos com a MESMA tag curta em grupo_id (ex: "g1") e papel_no_grupo "pilar" (dente de apoio) ou "pontico" (dente ausente que a ponte substitui). Ex: "ponte de 24 a 26" → 3 eventos: {dente:24, papel_no_grupo:"pilar"}, {dente:25, papel_no_grupo:"pontico"}, {dente:26, papel_no_grupo:"pilar"}. Coroa avulsa NUNCA vira ponte — sem menção a ponte/pôntico/pilar ou a um VÃO, use "coroa". papel_no_grupo: null em qualquer tipo que não seja ponte.
 - MOD e multi-face: uma restauração que cobre várias faces é UM evento com faces:["M","O","D"], NUNCA vários eventos de 1 face.
 - observacao do evento: material/detalhe curto (ex: "resina", "amálgama", "coroa de zircônia", "faceta/lente de contato", "fratura coronária", "pulpotomia"). "" se nada a acrescentar.
 - NÃO invente evento sem base no relato — dente/face/procedimento não citado não vira evento. Se nenhum registro dentário: odontograma_eventos: [].
 
 orto_manutencao (SÓ manutenção de aparelho ortodôntico):
-Se o relato for APENAS manutenção de aparelho (troca de arco, ativação, borrachinhas/ligaduras, elásticos), preencha orto_manutencao e deixe "odontograma_eventos": []. Caso contrário orto_manutencao: null.
+Se o relato for APENAS manutenção de aparelho (troca de arco, ativação, borrachinhas/ligaduras, elásticos), deixe "odontograma_eventos": [] e "procedimentos": []; registre a manutenção em anotacoes e em orto_manutencao quando a arcada for explícita. Essa regra prevalece sobre a generalização de "outro"/"geral", inclusive quando a arcada não foi informada. Caso contrário orto_manutencao: null.
 - arcada: "superior"/"inferior"/"ambas". fio: bitola/tipo do arco (ex: "0.018 NiTi"). ativacao: descrição da ativação (inclui troca de ligadura). elastico_corrente: cadeia elastomérica na MESMA arcada (ex: "corrente de 13 a 23"). elastico_intermaxilar: elástico ENTRE arcadas (ex: "3/16 Classe II").
 - ⛔⛔ ARCADA É OBRIGATÓRIA E NUNCA UM PALPITE — leia com atenção, é o erro mais comum aqui: "ambas" SÓ quando o relato NOMEIA as duas arcadas (ex: "superior… inferior…", "arco de cima e o de baixo", "as duas"). Relato genérico de manutenção SEM nomear nenhuma arcada — mesmo mencionando ativação, troca de ligadura, elástico — NÃO é "ambas": é arcada não dita, e a resposta é "orto_manutencao": null. "Ambas" NÃO é o valor seguro pra quando você não sabe — é o valor pra quando o dentista falou as DUAS explicitamente. Errado: "troquei as ligaduras" → arcada:"ambas" (chute — ligadura sozinha não diz arcada nenhuma). Certo: "troquei as ligaduras" (sem mais nada) → orto_manutencao: null. Certo: "troquei as ligaduras dos dois lados, de cima e de baixo" → arcada:"ambas".
 - DUAS ARCADAS (só depois de confirmar que arcada:"ambas" é legítima pela regra acima): os campos base (fio, ativacao, elastico_corrente, elastico_intermaxilar) descrevem a arcada SUPERIOR, e os campos fio_inferior, ativacao_inferior, elastico_corrente_inferior, elastico_intermaxilar_inferior descrevem a INFERIOR. Preencha os DOIS conjuntos só se o relato disse o que foi feito em CADA arcada separadamente — ex: "superior 0.018 de aço, inferior 0.016 NiTi" → fio:"0.018 aço" E fio_inferior:"0.016 NiTi". NUNCA copie o mesmo valor pros dois conjuntos — se você está prestes a repetir a mesma string em ativacao e ativacao_inferior, isso é sinal de que a arcada não foi dita duas vezes de verdade; reconsidere se não é o caso de "arcada não dita" acima. Em arcada única, deixe os campos _inferior null.`;
@@ -425,6 +441,7 @@ Se o relato for APENAS manutenção de aparelho (troca de arco, ativação, borr
       prompt,
       responseSchema: EVOLUCAO_SCHEMA,
       feature: 'formatar-evolucao',
+      thinkingBudget: 1024,
     });
     const aiFinishedAt = performance.now();
 
