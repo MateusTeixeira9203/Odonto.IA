@@ -4,6 +4,7 @@
 // DESIGN: plans/specs/spec-106-detalhe-especialidade.md §5.2.
 // Campo vazio = null (nunca inferido — invariante I5).
 
+import { useId } from 'react';
 import type { PluginFormProps } from '@/lib/especialidades/plugin';
 import {
   PLATAFORMA_LABEL, CARGA_LABEL,
@@ -19,6 +20,7 @@ const limparTexto = (s: string): string | null => (s.trim() === '' ? null : s);
 const limparNum = (s: string): number | null => (s.trim() === '' ? null : Number(s));
 
 export function ImplanteForm({ valor, onChange, readOnly }: PluginFormProps<ImplanteDetalhe>) {
+  const id = useId();
   const v = valor ?? VAZIO;
   const set = (patch: Partial<ImplanteDetalhe>) => onChange({ ...v, ...patch });
 
@@ -31,28 +33,28 @@ export function ImplanteForm({ valor, onChange, readOnly }: PluginFormProps<Impl
   return (
     <div className="grid grid-cols-2 gap-3">
       <div>
-        <label className={labelCls} htmlFor="impl-marca">Marca</label>
-        <input id="impl-marca" className={inputCls} placeholder="ex: Straumann" disabled={readOnly}
+        <label className={labelCls} htmlFor={`${id}-marca`}>Marca</label>
+        <input id={`${id}-marca`} className={inputCls} placeholder="ex: Straumann" disabled={readOnly}
           value={v.marca ?? ''} onChange={(e) => set({ marca: limparTexto(e.target.value) })} />
       </div>
       <div>
-        <label className={labelCls} htmlFor="impl-linha">Linha</label>
-        <input id="impl-linha" className={inputCls} placeholder="ex: BLT" disabled={readOnly}
+        <label className={labelCls} htmlFor={`${id}-linha`}>Linha</label>
+        <input id={`${id}-linha`} className={inputCls} placeholder="ex: BLT" disabled={readOnly}
           value={v.linha ?? ''} onChange={(e) => set({ linha: limparTexto(e.target.value) })} />
       </div>
       <div>
-        <label className={labelCls} htmlFor="impl-diametro">Diâmetro (mm)</label>
-        <input id="impl-diametro" type="number" step="0.1" className={numCls} placeholder="4.1" disabled={readOnly}
+        <label className={labelCls} htmlFor={`${id}-diametro`}>Diâmetro (mm)</label>
+        <input id={`${id}-diametro`} type="number" step="0.1" className={numCls} placeholder="4.1" disabled={readOnly}
           value={v.diametro ?? ''} onChange={(e) => set({ diametro: limparNum(e.target.value) })} />
       </div>
       <div>
-        <label className={labelCls} htmlFor="impl-comprimento">Comprimento (mm)</label>
-        <input id="impl-comprimento" type="number" step="0.5" className={numCls} placeholder="10" disabled={readOnly}
+        <label className={labelCls} htmlFor={`${id}-comprimento`}>Comprimento (mm)</label>
+        <input id={`${id}-comprimento`} type="number" step="0.5" className={numCls} placeholder="10" disabled={readOnly}
           value={v.comprimento ?? ''} onChange={(e) => set({ comprimento: limparNum(e.target.value) })} />
       </div>
       <div>
-        <label className={labelCls} htmlFor="impl-plataforma">Plataforma</label>
-        <select id="impl-plataforma" className={inputCls} disabled={readOnly}
+        <label className={labelCls} htmlFor={`${id}-plataforma`}>Plataforma</label>
+        <select id={`${id}-plataforma`} className={inputCls} disabled={readOnly}
           value={v.plataforma ?? ''}
           onChange={(e) => set({ plataforma: (e.target.value || null) as ImplanteDetalhe['plataforma'] })}
         >
@@ -63,13 +65,13 @@ export function ImplanteForm({ valor, onChange, readOnly }: PluginFormProps<Impl
         </select>
       </div>
       <div>
-        <label className={labelCls} htmlFor="impl-torque">Torque de inserção (Ncm)</label>
-        <input id="impl-torque" type="number" step="1" className={numCls} placeholder="35" disabled={readOnly}
+        <label className={labelCls} htmlFor={`${id}-torque`}>Torque de inserção (Ncm)</label>
+        <input id={`${id}-torque`} type="number" step="1" className={numCls} placeholder="35" disabled={readOnly}
           value={v.torque ?? ''} onChange={(e) => set({ torque: limparNum(e.target.value) })} />
       </div>
       <div>
-        <label className={labelCls} htmlFor="impl-carga">Protocolo de carga</label>
-        <select id="impl-carga" className={inputCls} disabled={readOnly}
+        <label className={labelCls} htmlFor={`${id}-carga`}>Protocolo de carga</label>
+        <select id={`${id}-carga`} className={inputCls} disabled={readOnly}
           value={v.carga ?? ''}
           onChange={(e) => set({ carga: (e.target.value || null) as ImplanteDetalhe['carga'] })}
         >
@@ -80,8 +82,8 @@ export function ImplanteForm({ valor, onChange, readOnly }: PluginFormProps<Impl
         </select>
       </div>
       <div>
-        <label className={labelCls} htmlFor="impl-lote">Lote</label>
-        <input id="impl-lote" className={inputCls} placeholder="rastreabilidade" disabled={readOnly}
+        <label className={labelCls} htmlFor={`${id}-lote`}>Lote</label>
+        <input id={`${id}-lote`} className={inputCls} placeholder="rastreabilidade" disabled={readOnly}
           value={v.lote ?? ''} onChange={(e) => set({ lote: limparTexto(e.target.value) })} />
       </div>
     </div>

@@ -13,17 +13,7 @@ import { implanteDetalheSchema } from '@/lib/especialidades/implante';
 import { criarDocumentoConclusaoAssinatura } from '@/server/legal/documentos-aceite';
 import { hojeBRT } from '@/lib/hora-brt';
 
-const editarDetalhesEventoSchema = z.object({
-  eventoId: z.string().uuid(),
-  detalhe: z.unknown().nullable(),
-  alterarDetalhe: z.boolean(),
-  observacao: z.string().trim().max(4_000).nullable(),
-  alterarObservacao: z.boolean(),
-}).superRefine((valor, contexto) => {
-  if (!valor.alterarDetalhe && !valor.alterarObservacao) {
-    contexto.addIssue({ code: z.ZodIssueCode.custom, message: 'Informe ao menos uma alteração.' });
-  }
-});
+import { editarDetalhesEventoSchema, type EditarDetalhesEventoInput, type EditarDetalhesEventoResult } from '@/lib/odontograma/edicao-procedimento';
 
 const excluirProcedimentoSchema = z.object({
   eventoId: z.string().uuid(),
@@ -208,6 +198,7 @@ export async function alternarStatusRegistro(params: {
     .select('id, ficha_id, origem')
     .in('id', params.eventoIds)
     .eq('clinica_id', clinicId)
+    .is('retirado_em', null)
     .eq('dentista_id', dentistaPerfil.id);
 
   if (!eventos || eventos.length !== params.eventoIds.length) {
@@ -243,6 +234,7 @@ export async function alternarStatusRegistro(params: {
     })
     .in('id', params.eventoIds)
     .eq('clinica_id', clinicId)
+    .is('retirado_em', null)
     .eq('dentista_id', dentistaPerfil.id);
 
   if (error) {
@@ -285,6 +277,7 @@ export async function alternarMomentoRegistro(params: {
     .select('id, ficha_id')
     .in('id', params.eventoIds)
     .eq('clinica_id', clinicId)
+    .is('retirado_em', null)
     .eq('dentista_id', dentistaPerfil.id);
 
   if (!eventos || eventos.length !== params.eventoIds.length) {
@@ -307,6 +300,7 @@ export async function alternarMomentoRegistro(params: {
     .update({ momento_planejado: params.novoMomento })
     .in('id', params.eventoIds)
     .eq('clinica_id', clinicId)
+    .is('retirado_em', null)
     .eq('dentista_id', dentistaPerfil.id);
 
   if (error) {
@@ -362,6 +356,7 @@ export async function encaminharProcedimento(params: {
     .select('id, ficha_id, status, paciente_id')
     .in('id', params.eventoIds)
     .eq('clinica_id', clinicId)
+    .is('retirado_em', null)
     .eq('dentista_id', dentistaPerfil.id);
 
   const idsIndicados = new Set(
@@ -497,6 +492,8 @@ export async function atualizarStatusEncaminhado(params: {
     const { data: evento } = await supabase
       .from('odontograma_eventos')
       .select('dentista_id, paciente_id')
+      .eq('clinica_id', clinicId)
+    .is('retirado_em', null)
       .in('id', params.eventoIds)
       .limit(1)
       .maybeSingle<{ dentista_id: string; paciente_id: string }>();
@@ -548,6 +545,7 @@ export async function preencherDetalheEncaminhado(params: {
     .select('tipo, paciente_id')
     .eq('id', params.eventoId)
     .eq('clinica_id', clinicId)
+    .is('retirado_em', null)
     .maybeSingle<{ tipo: string; paciente_id: string }>();
 
   if (!evento) return { ok: false, error: 'Registro não encontrado.' };
@@ -586,15 +584,9 @@ export async function preencherDetalheEncaminhado(params: {
  * autorização estreita e grava o log na mesma transação: autor pode atualizar
  * observação e detalhe; destinatário encaminhado só atualiza detalhe técnico.
  */
-export async function editarDetalhesEvento(params: {
-  eventoId: string;
-  detalhe: unknown | null;
-  alterarDetalhe: boolean;
-  observacao: string | null;
-  alterarObservacao: boolean;
-}): Promise<{ ok: boolean; error?: string }> {
+export async function editarDetalhesEvento(params: EditarDetalhesEventoInput): Promise<EditarDetalhesEventoResult> {
   const parsedParams = editarDetalhesEventoSchema.safeParse(params);
-  if (!parsedParams.success) return { ok: false, error: 'Revise os dados antes de salvar.' };
+  if (!parsedParams.success) return { ok: false, error: parsedParams.error.issues[0]?.message ?? 'Revise os dados antes de salvar.' };
 
   const { supabase, clinicId, role } = await requireClinicContext();
   if (role === 'secretaria') return { ok: false, error: 'Sem permissão.' };
@@ -604,6 +596,7 @@ export async function editarDetalhesEvento(params: {
     .select('tipo, paciente_id')
     .eq('id', parsedParams.data.eventoId)
     .eq('clinica_id', clinicId)
+    .is('retirado_em', null)
     .maybeSingle<{ tipo: string; paciente_id: string }>();
 
   if (!evento) return { ok: false, error: 'Registro não encontrado.' };
@@ -627,9 +620,29 @@ export async function editarDetalhesEvento(params: {
     p_alterar_detalhe: parsedParams.data.alterarDetalhe,
     p_observacao: parsedParams.data.observacao,
     p_alterar_observacao: parsedParams.data.alterarObservacao,
+    ...(parsedParams.data.alterarNome !== undefined ? {
+      p_procedimento_nome: parsedParams.data.procedimentoNome ?? null,
+      p_alterar_nome: parsedParams.data.alterarNome,
+    } : {}),
+    ...(parsedParams.data.original ? { p_original: parsedParams.data.original } : {}),
   });
 
   if (error) {
+    if (error.message.includes('conflito_edicao')) {
+      const { data: atual } = await supabase.from('odontograma_eventos')
+        .select('procedimento_nome, observacao, detalhe')
+        .eq('id', parsedParams.data.eventoId).eq('clinica_id', clinicId)
+    .is('retirado_em', null)
+        .maybeSingle<{ procedimento_nome: string | null; observacao: string | null; detalhe: unknown }>();
+      return {
+        ok: false,
+        error: 'Este procedimento foi alterado enquanto você editava. Sua edição foi mantida; confira os dados atuais antes de salvar novamente.',
+        ...(atual ? { atual: { procedimentoNome: atual.procedimento_nome, observacao: atual.observacao, detalhe: atual.detalhe } } : {}),
+      };
+    }
+    if (error.message.includes('nome_invalido')) {
+      return { ok: false, error: 'Informe um nome com até 500 caracteres.' };
+    }
     if (error.message.includes('registro_bloqueado') || error.message.includes('evento_assinado_imutavel')) {
       return { ok: false, error: 'Este registro já foi assinado e não pode mais ser alterado.' };
     }
@@ -644,6 +657,7 @@ export async function editarDetalhesEvento(params: {
   }
 
   revalidatePath(`/dashboard/pacientes/${evento.paciente_id}`);
+  revalidatePath('/dashboard/meu-dia');
   return { ok: true };
 }
 
@@ -662,6 +676,7 @@ export async function excluirProcedimento(params: {
     .select('paciente_id')
     .eq('id', parsedParams.data.eventoId)
     .eq('clinica_id', clinicId)
+    .is('retirado_em', null)
     .maybeSingle<{ paciente_id: string }>();
 
   if (!evento) return { ok: false, error: 'Registro não encontrado.' };
@@ -742,6 +757,7 @@ export async function assinarProcedimentos(
     .select('paciente_id, ficha_id')
     .eq('id', eventoIds[0])
     .eq('clinica_id', clinicId)
+    .is('retirado_em', null)
     .maybeSingle();
 
   if (!eventoRef?.ficha_id) return { ok: false, error: 'Registro não encontrado.' };
@@ -815,6 +831,7 @@ export async function assinarTodosRealizadosDaFicha(params: {
     .eq('ficha_id', params.fichaId)
     .eq('paciente_id', params.pacienteId)
     .eq('clinica_id', clinicId)
+    .is('retirado_em', null)
     .eq('status', 'realizado')
     .is('assinatura_id', null);
 

@@ -14,6 +14,7 @@
 // ("referência na cúspide mésio-vestibular") e precisa de entrada — mas ocupa largura fixa,
 // nunca `w-full` (era o que quebrava o layout).
 
+import { useId } from 'react';
 import { Plus, X } from 'lucide-react';
 import type { PluginFormProps } from '@/lib/especialidades/plugin';
 import type { CanalDetalhe, EndoDetalhe } from '@/lib/especialidades/endo';
@@ -41,6 +42,7 @@ function linhaTemDado(c: CanalDetalhe): boolean {
 }
 
 export function EndoForm({ valor, onChange, readOnly, duvidas = [] }: PluginFormProps<EndoDetalhe> & { duvidas?: DuvidaEndo[] }) {
+  const nomesCanalId = useId();
   const v = valor ?? VAZIO;
 
   const setCanal = (i: number, patch: Partial<CanalDetalhe>) => {
@@ -80,7 +82,7 @@ export function EndoForm({ valor, onChange, readOnly, duvidas = [] }: PluginForm
         </div>
       )}
 
-      <datalist id="nomes-canal">
+      <datalist id={nomesCanalId}>
         {NOMES_CANAL.map((n) => <option key={n} value={n} />)}
       </datalist>
 
@@ -103,7 +105,7 @@ export function EndoForm({ valor, onChange, readOnly, duvidas = [] }: PluginForm
                 <tr key={i} className="border-t border-border">
                   <td className="py-1.5 pr-2">
                     <input
-                      list="nomes-canal"
+                      list={nomesCanalId}
                       className="w-[76px] bg-surface-alt border border-border rounded-md px-2 py-1 text-xs font-semibold text-text-primary outline-none focus:border-teal disabled:opacity-60"
                       disabled={readOnly} value={c.nome}
                       onChange={(e) => setCanal(i, { nome: e.target.value })}
