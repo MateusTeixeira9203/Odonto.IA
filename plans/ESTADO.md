@@ -11,7 +11,7 @@ Branch: `codex/conclusao-atualizacao`.
 
 Mateus autorizou **commits separados e push somente para Preview** nesta branch.
 Não há autorização de promoção/main nem escrita no banco oficial nesta execução.
-Próximo gate: revisão final, commits por módulo, build remoto e QA no Preview integrado.
+Preview publicado; próximo gate: CI completo e QA autenticado no aplicativo integrado.
 
 ## Evidência atual
 
@@ -28,10 +28,12 @@ Detalhes em [integração de 15/09](auditorias/2026-09-15-integracao-atualizacao
 
 ## Revisão antes do Preview
 
-Retirar versão antiga de billing do candidato que reativava vínculo removido e trocava
-clínica ativa; preservar billing publicado até integrar a reconciliação atômica R155.
-Migrations/código/documentação serão commits separados. Nenhum push executado ainda.
-Vercel de teste observado aponta ao Free; deployment atual ainda é main dc6523a.
+Versão antiga de billing excluída; webhook/serviço conservam a versão publicada.
+Branch publicada com commits separados de schema, produto e documentação; produção intacta.
+Preview: https://odonto-ia-teste-git-codex-c-1e4d83-mateusteixeira9203s-projects.vercel.app
+Typecheck remoto passou após ajustes BigInt/env. Runner corrigido: 340/340 testes locais; CI final pendente.
+QA no navegador pendente: Vivaldi não mantém preenchimento; IAB pede login Vercel.
+Rollback de estoque com falha forçada de auditoria passou em PostgreSQL isolado.
 Secrets write-only de integrações externas não foram revelados nem alterados.
 Sem envio real de WhatsApp/e-mail durante os testes.
 

@@ -88,8 +88,8 @@ Logs/manifestos privados, sem segredos no Git:
 
 - Vercel `odonto-ia-teste`: Supabase URL aponta ao Free; APP_URL/SITE_URL ao domínio de teste.
   Valores secretos de integrações externas ainda não conferidos. Nenhuma mensagem real enviada.
-- Deployment observado usa main `dc6523a`; **não contém as mudanças locais desta integração**.
-- Mateus autorizou commits separados e push somente de Preview. Build/QA remoto serão executados na branch de teste.
+- Preview integrado publicado na branch `codex/conclusao-atualizacao`; main/produção não promovidas.
+- Autorização de commits/push limitada ao Preview. Publicação inicial `b4aea32`, correções CI `74988a6`.
 - Complemento Free: 72 checks autenticados passaram (grupo, etapa, outra conta/clínica, item retirado), sem mutação nas recusas.
 - Saúde da sessão integrada; 6/6 testes incluindo rejeição do SDK e URL inválida. Revisão corrigiu três HIGH antes do commit.
 - R155 completo ainda não integrado: mapa privado separa sessão, rascunho e reconciliação comercial.
@@ -98,3 +98,11 @@ Logs/manifestos privados, sem segredos no Git:
 - Build/Next, duas contas logadas no app, QA de personas, visual/mobile e fluxos completos continuam pendentes.
 - Cadastro/cobertura comercial e autonomia de desconto aguardam respostas; kits/ficha e reativação
   pessoal/compartilhamento de orçamento continuam no [plano de conclusão](../PLANO-CONCLUSAO-ATUALIZACAO.md).
+
+## Validação após publicação
+
+- Vercel publicou o Preview; landing e login carregaram. Build ignora TypeScript por configuração existente; o CI separado é obrigatório.
+- Typecheck remoto passou após substituir literais BigInt por construtores e tipar explicitamente o ambiente do piloto. Revisão sem HIGH.
+- Descoberta automática de Node20 só executava seis scripts manuais R169, sem runtime PostgreSQL, e omitia testes TS de src. Runner stdlib corrigido para descobrir src/**/*.test.ts e executar serialmente: 70 arquivos, 340/340 testes locais; CI final pendente.
+- Rollback do estoque: trigger de auditoria falha, zero movimentos/operações/auditorias, saldo zero e versão original; nova entrada posterior passa. Fixture PGlite local, autorização stubada, sem escrita remota.
+- Automação Vivaldi: campos seguem vazios após fill/teclado, cliques e screenshot com timeout. IAB exige login Vercel. Sem evidência de login autenticado neste Preview ainda.
