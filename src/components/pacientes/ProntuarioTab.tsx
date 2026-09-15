@@ -17,6 +17,7 @@ import { OrcamentoDaFicha } from '@/components/pacientes/orcamento-da-ficha';
 import type { ResumoOrcamentoDaFicha } from '@/server/orcamentos/ficha-orcamento-actions';
 import { ProcedimentoDetalheFicha } from '@/components/pacientes/procedimento-detalhe-ficha';
 import { AdicionarProcedimentosFicha } from '@/components/pacientes/adicionar-procedimentos-ficha';
+import { EvolucaoClinicaFicha } from '@/components/pacientes/evolucao-clinica-ficha';
 import { NestaSessaoBloco } from '@/app/dashboard/meu-dia/_components/nesta-sessao-bloco';
 import {
   useRegistrarPainel,
@@ -688,33 +689,9 @@ export function ProntuarioTab({
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,2.05fr)_minmax(300px,0.72fr)]">
           <div className="space-y-4">
-            <article className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-text-secondary">Evolução clínica</p>
-                  <p className="mt-1 text-xs text-text-secondary">Registro da consulta em exibição.</p>
-                </div>
-                {podeComplementar && (
-                  <Button className="min-h-11 w-full sm:min-h-8 sm:w-auto" variant="outline" onClick={() => complementarAtendimento(atendimentoAberto)}>
-                    <Plus className="h-4 w-4" /> Complementar evolução
-                  </Button>
-                )}
-              </div>
-              <div className="mt-3 space-y-3">
-                {atendimentoAberto.evolucoes.length > 0 ? atendimentoAberto.evolucoes.map((evolucao) => (
-                  <div key={evolucao.id} className="border-l-2 border-teal/40 pl-3">
-                    <p className="whitespace-pre-line text-sm leading-relaxed text-text-primary">
-                      {evolucao.texto?.trim() || 'Sem evolução textual registrada.'}
-                    </p>
-                    <p className="mt-1 text-xs text-text-secondary">
-                      {evolucao.automatica ? 'Registro automático do sistema' : evolucao.profissional.nome}
-                    </p>
-                  </div>
-                )) : (
-                  <p className="text-sm italic text-text-secondary">Sem evolução textual registrada.</p>
-                )}
-              </div>
-            </article>
+            <EvolucaoClinicaFicha key={`${clinicaId}:${dentistaId}:${atendimentoAberto.id}`}
+              atendimento={atendimentoAberto} pacienteId={patientId} dentistaId={dentistaId}
+              canWrite={podeEscreverFicha} />
 
             <article className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
