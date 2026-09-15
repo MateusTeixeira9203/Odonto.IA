@@ -22,6 +22,7 @@
 
 import { useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { resolveSessionHealth } from '@/lib/auth/session-health';
 
 type SessionGuardOptions = {
   /** Called when the session is detected as expired or signed out. */
@@ -74,9 +75,19 @@ export function useSessionGuard({
       lastCheckRef.current = now;
 
       supabase.auth.getUser().then(({ data, error }) => {
-        if (error || !data.user) {
+        const health = resolveSessionHealth({ hasUser: Boolean(data.user), error });
+        if (health === 'expired') {
           onExpiredRef.current();
+        } else if (health === 'technical_failure') {
+          console.error('[session_guard] falha técnica ao validar sessão', {
+            errorName: error?.name,
+            status: error?.status,
+          });
         }
+      }).catch((error: unknown) => {
+        console.error('[session_guard] falha técnica ao validar sessão', {
+          errorName: error instanceof Error ? error.name : 'UnknownError',
+        });
       });
     }
 

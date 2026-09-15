@@ -6,6 +6,7 @@ const AUTH_ROUTES = ["/login", "/cadastro", "/esqueci-senha"];
 const ALWAYS_ALLOWED_AUTH_ROUTES = ["/redefinir-senha"];
 const CANONICAL_ORIGIN = 'https://odontoia.app';
 const LEGACY_HOSTS = new Set(['dentia.app.br']);
+const NON_CANONICAL_HOSTS = new Set(['www.odontoia.app', ...LEGACY_HOSTS]);
 
 function isPublicRoute(pathname: string): boolean {
   return PUBLIC_ROUTES.includes(pathname);
@@ -22,6 +23,10 @@ function isAlwaysAllowedAuthRoute(pathname: string): boolean {
 function isProtectedRoute(pathname: string): boolean {
   return (
     pathname.startsWith("/dashboard") || pathname.startsWith("/onboarding")
+    || pathname === '/clinica' || pathname.startsWith('/clinica/')
+    || pathname === '/pendencias' || pathname.startsWith('/pendencias/')
+    || pathname === '/estoque' || pathname.startsWith('/estoque/')
+    || pathname === '/equipe' || pathname.startsWith('/equipe/')
   );
 }
 
@@ -37,19 +42,24 @@ function createRedirectResponse(sourceResponse: NextResponse, url: URL): NextRes
 }
 
 export async function proxy(request: NextRequest) {
-  // R-129c — o host antigo aponta para o domínio atual. A Vercel controla a canonicalização
-  // entre apex e www; redirecionar www aqui criaria um loop se a plataforma apontar apex → www.
+  // O apex recebe o webhook Stripe sem uma cadeia de redirects. A Vercel deve servir o apex
+  // diretamente; www e o host legado só chegam aqui para serem canônicos em uma única resposta.
   // Isso acontece antes de renovar token para não fazer trabalho de autenticação no host errado.
   const host = (request.headers.get('x-forwarded-host') ?? request.headers.get('host') ?? '')
     .toLowerCase()
     .replace(/:\d+$/, '');
-  if (LEGACY_HOSTS.has(host)) {
+  if (NON_CANONICAL_HOSTS.has(host)) {
     const destination = new URL(`${request.nextUrl.pathname}${request.nextUrl.search}`, CANONICAL_ORIGIN);
     return NextResponse.redirect(destination, 308);
   }
 
-  const { response, session } = await updateSession(request);
+  const { response, session, health, managementEntry } = await updateSession(request);
   const { pathname } = request.nextUrl;
+
+  // Resolver antes de renderizar layouts clínicos evita redirects de streaming presos no loading.
+  if (session && managementEntry) {
+    return createRedirectResponse(response, new URL('/clinica', request.url));
+  }
 
   if (isPublicRoute(pathname) || isAlwaysAllowedAuthRoute(pathname)) {
     return response;
@@ -63,7 +73,7 @@ export async function proxy(request: NextRequest) {
   }
 
   if (isProtectedRoute(pathname)) {
-    if (!session) {
+    if (!session && health === 'expired') {
       const redirectUrl = new URL("/login", request.url);
       redirectUrl.searchParams.set("redirectTo", pathname);
       return createRedirectResponse(response, redirectUrl);
