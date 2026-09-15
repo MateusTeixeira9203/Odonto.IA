@@ -187,11 +187,13 @@ export function PacienteDetailClient({
 
   const [activeTab, setActiveTab] = useState('ficha-clinica');
   const [mountedTabs, setMountedTabs] = useState<Set<string>>(() => new Set(['ficha-clinica']));
+  const [fichaInicialId, setFichaInicialId] = useState<string | null>(null);
 
   // Lê ?tab= da URL para navegar direto à aba correta (ex: vindo do AttentionPanel)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tab = params.get('tab');
+    setFichaInicialId(params.get('ficha'));
     if (tab) {
       setActiveTab(tab);
       setMountedTabs(prev => new Set([...prev, tab]));
@@ -271,7 +273,7 @@ export function PacienteDetailClient({
     dataVencimento: '',
   });
   const [parcelasMode, setParcelasMode] = useState(false);
-  const [parcelasForm, setParcelasForm] = useState({ numero: '3', primeiroVencimento: '' });
+  const [parcelasForm, setParcelasForm] = useState<{ numero: string; primeiroVencimento: string; cartaoCredito?: boolean }>({ numero: '3', primeiroVencimento: '' });
   const [parcelasSaving, setParcelasSaving] = useState(false);
   const [parcelasError, setParcelasError] = useState<string | null>(null);
   const [pagSaving, setPagSaving] = useState(false);
@@ -935,6 +937,7 @@ export function PacienteDetailClient({
     const result = temPlanoAtivo
       ? await reorganizarParcelas({
           orcamentoId: detalheOrcId,
+          cartaoCredito: parcelasForm.cartaoCredito,
           valorAcordado: detalheOrc.valor_acordado ?? (derivado?.valorDevido ?? 0),
           parcelas: Array.from({ length: numero }, (_, indice) => {
             const saldoCentavos = Math.round(saldoAproximado * 100);
@@ -951,6 +954,7 @@ export function PacienteDetailClient({
       : await gerarParcelas({
           orcamentoId: detalheOrcId,
           numeroParcelas: numero,
+          parcelasForma: parcelasForm.cartaoCredito ? 'cartao_credito' : undefined,
           primeiroVencimento: parcelasForm.primeiroVencimento,
         });
 
@@ -961,9 +965,9 @@ export function PacienteDetailClient({
         id:              p.id,
         cobranca_id:     null,
         valor:           p.valor,
-        status:          'pendente',
-        forma_pagamento: null,
-        data_pagamento:  null,
+        status:          p.status ?? 'pendente',
+        forma_pagamento: p.forma_pagamento ?? null,
+        data_pagamento:  p.data_pagamento ?? null,
         data_vencimento: p.data_vencimento,
         parcela_numero:  p.parcela_numero,
         total_parcelas:  p.total_parcelas,
@@ -972,13 +976,13 @@ export function PacienteDetailClient({
       setOrcamentosState((prev) =>
         prev.map((o) =>
           o.id === detalheOrcId
-            ? { ...o, plano_forma: 'parcelado', pagamentos: [...o.pagamentos, ...novasPag] }
+            ? { ...o, plano_forma: 'parcelado', pagamentos: [...o.pagamentos.map(p => p.status === 'pendente' ? { ...p, status: 'cancelado' as const } : p), ...novasPag] }
             : o
         )
       );
       setParcelasMode(false);
       setParcelasForm({ numero: '3', primeiroVencimento: '' });
-      toast.success(temPlanoAtivo ? 'Previsão de cobrança reorganizada.' : `${numero} parcelas geradas.`);
+      toast.success(parcelasForm.cartaoCredito ? 'Cartão confirmado. Parcelas distribuídas pelos meses.' : temPlanoAtivo ? 'Previsão de cobrança reorganizada.' : `${numero} parcelas geradas.`);
       router.refresh();
     }
     setParcelasSaving(false);
@@ -1571,6 +1575,7 @@ export function PacienteDetailClient({
                         patientName={displayNome}
                         canWrite={canWriteClinical}
                         dados={prontuario ?? { atendimentos: [], fichas: [], boca: [], profissionaisClinicos: [], errosParciais: [] }}
+                        fichaInicialId={fichaInicialId}
                         onGerarOrcamento={abrirOrcamentoDaFicha}
                         orcamentoRevisao={`${revisaoOrcamentoFicha}:${JSON.stringify(orcamentosState)}`}
                         eventosOrcamentoConfirmados={eventosOrcamentoConfirmados}

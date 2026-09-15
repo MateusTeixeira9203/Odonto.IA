@@ -1,8 +1,11 @@
 "use server";
 
 import { z } from "zod";
+import { composicaoGrupoSchema, observacaoAcordoSchema } from "@/lib/orcamentos/grupos";
 import { requireClinicContext } from "@/server/auth/clinic";
 import { redirect } from "next/navigation";
+import { isTeamWorkspaceEnabled } from '@/server/auth/team-workspace-pilot';
+import { obterContextoClinica } from '@/server/clinica/operations';
 import { revalidatePath } from "next/cache";
 import { inserirNotificacao } from "@/lib/notificacoes";
 import { registrarLog } from "@/lib/activity-log";
@@ -34,6 +37,7 @@ const recebimentoSchema = z.object({
   dentistaId: z.string().uuid().optional(),
 });
 const reorganizarParcelasSchema = z.object({
+  cartaoCredito: z.boolean().optional(),
   orcamentoId: z.string().uuid(),
   valorAcordado: z.number().finite().positive().multipleOf(0.01),
   parcelas: z.array(z.object({
@@ -48,12 +52,14 @@ const planoAvistaSchema = z.object({
   entradaForma: formaPagamentoSchema.optional(),
 });
 const criarCobrancaEtapaSchema = z.object({
+  cartaoCredito: z.boolean().optional(),
   orcamentoId: z.string().uuid(),
   pacienteId: z.string().uuid(),
   itemIds: z.array(z.string().uuid()).min(1).max(100),
   desconto: z.number().finite().min(0).multipleOf(0.01),
   numeroParcelas: z.number().int().min(1).max(24),
   primeiroVencimento: z.string().date(),
+  observacoes: observacaoAcordoSchema,
 });
 const editarCobrancaEtapaSchema = z.object({
   cobrancaId: z.string().uuid(),
@@ -245,6 +251,9 @@ export async function alternarAprovacaoItem(
   revalidatePath(`/dashboard/pacientes/${orc.paciente_id}`);
   revalidatePath('/dashboard/orcamentos');
   revalidatePath('/dashboard/financeiro');
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
+  revalidatePath('/clinica');
+  revalidatePath('/clinica/meus-resultados');
   return { estado: depois.estado, valorDevido: depois.valorDevido };
 }
 
@@ -303,6 +312,9 @@ export async function aprovarTodosItens(
   revalidatePath(`/dashboard/pacientes/${orc.paciente_id}`);
   revalidatePath('/dashboard/orcamentos');
   revalidatePath('/dashboard/financeiro');
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
+  revalidatePath('/clinica');
+  revalidatePath('/clinica/meus-resultados');
   return { itensAprovados: atualizados.length, estado: depois.estado };
 }
 
@@ -463,6 +475,9 @@ export async function atualizarMostrarValorPorItem(
 }
 
 export interface ParcelaGerada {
+  status?: 'pago' | 'pendente' | 'cancelado';
+  forma_pagamento?: FormaPagamento | null;
+  data_pagamento?: string | null;
   id: string;
   valor: number;
   data_vencimento: string;
@@ -470,11 +485,25 @@ export interface ParcelaGerada {
   total_parcelas: number;
 }
 
+async function validarPlanoGlobal(
+  supabase: Awaited<ReturnType<typeof requireClinicContext>>['supabase'],
+  clinicId: string,
+  orcamentoId: string,
+): Promise<string | null> {
+  const { data, error } = await supabase.from('orcamento_itens')
+    .select('id').eq('clinica_id', clinicId).eq('orcamento_id', orcamentoId)
+    .is('retirado_em', null).not('composicao', 'is', null).limit(1);
+  if (error) return 'Não foi possível conferir o orçamento. Nenhuma parcela foi criada.';
+  return data?.length ? 'Orçamentos com grupos são cobrados por etapa. Defina o pagamento na etapa desejada.' : null;
+}
+
 export async function reorganizarParcelas(dados: {
+  cartaoCredito?: boolean;
   orcamentoId: string;
   valorAcordado: number;
   parcelas: { valor: number; dataVencimento: string }[];
 }): Promise<{ error?: string; parcelas?: ParcelaGerada[] }> {
+  if (dados.cartaoCredito && !isTeamWorkspaceEnabled()) return { error: 'Cartão parcelado ainda não está disponível neste ambiente.' };
   const parsed = reorganizarParcelasSchema.safeParse(dados);
   if (!parsed.success) return { error: 'Revise o valor combinado e as parcelas da previsão.' };
 
@@ -487,8 +516,11 @@ export async function reorganizarParcelas(dados: {
     .maybeSingle();
   if (!orcamento) return { error: 'Orçamento não encontrado.' };
 
+  const erroPlano = await validarPlanoGlobal(supabase, clinicId, parsed.data.orcamentoId);
+  if (erroPlano) return { error: erroPlano };
+
   const rpc = supabase.rpc.bind(supabase) as unknown as RpcCall;
-  const { data, error } = await rpc('reorganizar_parcelas_orcamento', {
+  const { data, error } = await rpc(parsed.data.cartaoCredito ? 'reorganizar_parcelas_cartao' : 'reorganizar_parcelas_orcamento', {
     p_orcamento_id: parsed.data.orcamentoId,
     p_valor_acordado: parsed.data.valorAcordado,
     p_parcelas: parsed.data.parcelas.map((parcela) => ({
@@ -501,6 +533,9 @@ export async function reorganizarParcelas(dados: {
   revalidatePath(`/dashboard/pacientes/${orcamento.paciente_id}`);
   revalidatePath('/dashboard/orcamentos');
   revalidatePath('/dashboard/financeiro');
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
+  revalidatePath('/clinica');
+  revalidatePath('/clinica/meus-resultados');
   return { parcelas: (data ?? []) as ParcelaGerada[] };
 }
 
@@ -542,7 +577,11 @@ export async function gerarParcelas(dados: {
 
   if (!dentistaPerfil) redirect("/onboarding");
 
-  const { data: parcelas, error } = await supabase.rpc("gerar_parcelas_orcamento", {
+  const erroPlano = await validarPlanoGlobal(supabase, clinicId, dados.orcamentoId);
+  if (erroPlano) return { error: erroPlano };
+
+  const rpcParcelas = supabase.rpc.bind(supabase) as unknown as RpcCall;
+  const { data: parcelas, error } = await rpcParcelas(isTeamWorkspaceEnabled() && dados.parcelasForma === "cartao_credito" ? "gerar_parcelas_cartao" : "gerar_parcelas_orcamento", {
     p_orcamento_id:        dados.orcamentoId,
     p_numero_parcelas:     dados.numeroParcelas,
     p_primeiro_vencimento: dados.primeiroVencimento,
@@ -586,6 +625,9 @@ export async function gerarParcelas(dados: {
 
   revalidatePath("/dashboard/orcamentos");
   revalidatePath("/dashboard/financeiro");
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
+  revalidatePath('/clinica');
+  revalidatePath('/clinica/meus-resultados');
   return { parcelas: linhas };
 }
 
@@ -613,6 +655,9 @@ export async function definirPlanoAvista(dados: {
     .maybeSingle();
 
   if (!dentistaPerfil) redirect("/onboarding");
+
+  const erroPlano = await validarPlanoGlobal(supabase, clinicId, parsed.data.orcamentoId);
+  if (erroPlano) return { error: erroPlano };
 
   const { error } = await supabase.rpc("definir_plano_avista", {
     p_orcamento_id:   parsed.data.orcamentoId,
@@ -642,6 +687,9 @@ export async function definirPlanoAvista(dados: {
 
   revalidatePath("/dashboard/orcamentos");
   revalidatePath("/dashboard/financeiro");
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
+  revalidatePath('/clinica');
+  revalidatePath('/clinica/meus-resultados');
   return {};
 }
 
@@ -670,10 +718,14 @@ export async function marcarPagamentoPago(
 
   revalidatePath('/dashboard/orcamentos');
   revalidatePath('/dashboard/financeiro');
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
+  revalidatePath('/clinica');
+  revalidatePath('/clinica/meus-resultados');
   return {};
 }
 
 const criarOrcamentoSchema = z.object({
+  titularRecebimento: z.enum(['dentista', 'clinica']).optional(),
   pacienteId: z.string().uuid(),
   desconto: z.number().finite().min(0).optional(),
   itens: z.array(z.object({
@@ -682,6 +734,7 @@ const criarOrcamentoSchema = z.object({
     quantidade: z.number().int().min(1).max(99),
     precoUnitario: z.number().finite().min(0),
     eventoIds: z.array(z.string().uuid()).max(100).default([]),
+    composicao: composicaoGrupoSchema.nullable().optional(),
   })).min(1).max(100),
   dentistaId: z.string().uuid().optional(),
   /** Ficha de origem do orçamento — vincula orçamento↔ficha p/ a apresentação não vazar entre tratamentos. */
@@ -695,6 +748,10 @@ export async function criarOrcamento(dados: z.input<typeof criarOrcamentoSchema>
     return { error: 'Revise os itens e os valores do orçamento antes de salvar.' };
   }
   const entrada = parsed.data;
+  if (entrada.itens.some((item) => item.composicao) && (entrada.desconto ?? 0) > 0) {
+    return { error: 'Ajuste o preço de cada grupo ou conceda o desconto na cobrança da etapa.' };
+  }
+
   if (!entrada.fichaId || entrada.itens.some((item) => item.eventoIds.length === 0)) {
     return { error: 'Crie o orçamento a partir de uma ficha com procedimentos estruturados.' };
   }
@@ -728,7 +785,15 @@ export async function criarOrcamento(dados: z.input<typeof criarOrcamentoSchema>
   }
 
   const dentistaAlvoId = entrada.dentistaId ?? dentistaPerfil.id;
-  const { data: orcamentoId, error } = await supabase.rpc('criar_orcamento_com_eventos', {
+  const piloto = isTeamWorkspaceEnabled();
+  if (piloto) {
+    const contexto = await obterContextoClinica({ clinicaIdEsperada: clinicId });
+    if (!contexto.ok) return { error: contexto.mensagem };
+    if (contexto.data.recebimentoMisto && !entrada.titularRecebimento) return { error: 'Escolha quem recebe por este orçamento: clínica ou dentista responsável.' };
+    if (!contexto.data.recebimentoMisto && entrada.titularRecebimento === 'clinica') return { error: 'Recebimento pela clínica não está disponível neste modelo.' };
+  }
+  const { data: orcamentoId, error } = await supabase.rpc(piloto ? 'criar_orcamento_com_titular' : entrada.itens.some((item) => item.composicao) ? 'criar_orcamento_com_eventos_r157' : 'criar_orcamento_com_eventos', {
+    ...(piloto ? { p_titular: entrada.titularRecebimento ?? 'dentista' } : {}),
     p_paciente_id: entrada.pacienteId,
     p_dentista_id: dentistaAlvoId,
     p_ficha_id: entrada.fichaId ?? null,
@@ -739,6 +804,7 @@ export async function criarOrcamento(dados: z.input<typeof criarOrcamentoSchema>
       quantidade: item.quantidade,
       preco_unitario: item.precoUnitario,
       evento_ids: item.eventoIds,
+      composicao: item.composicao ?? null,
     })),
   });
 
@@ -812,6 +878,9 @@ export async function registrarPagamento(dados: {
   revalidatePath(`/dashboard/pacientes/${parsed.data.pacienteId}`);
   revalidatePath('/dashboard/orcamentos');
   revalidatePath('/dashboard/financeiro');
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
+  revalidatePath('/clinica');
+  revalidatePath('/clinica/meus-resultados');
   return { id: pagamento?.id };
 }
 
@@ -820,24 +889,28 @@ export async function registrarPagamento(dados: {
  * Proposta aprovada não vira dívida automaticamente; a RPC cria a previsão pendente da etapa.
  */
 export async function criarCobrancaEtapa(dados: {
+  cartaoCredito?: boolean;
   orcamentoId: string;
   pacienteId: string;
   itemIds: string[];
   desconto: number;
   numeroParcelas: number;
   primeiroVencimento: string;
+  observacoes?: string;
 }): Promise<{ error?: string; id?: string }> {
+  if (dados.cartaoCredito && !isTeamWorkspaceEnabled()) return { error: 'Cartão parcelado ainda não está disponível neste ambiente.' };
   const parsed = criarCobrancaEtapaSchema.safeParse(dados);
   if (!parsed.success) return { error: 'Revise os procedimentos, o desconto e as parcelas da etapa.' };
 
   const { supabase } = await requireClinicContext();
   const rpc = supabase.rpc.bind(supabase) as unknown as RpcCall;
-  const { data, error } = await rpc('criar_cobranca_orcamento', {
+  const { data, error } = await rpc(parsed.data.cartaoCredito ? 'criar_cobranca_cartao' : 'criar_cobranca_orcamento', {
     p_orcamento_id: parsed.data.orcamentoId,
     p_item_ids: parsed.data.itemIds,
     p_desconto: parsed.data.desconto,
     p_numero_parcelas: parsed.data.numeroParcelas,
     p_primeiro_vencimento: parsed.data.primeiroVencimento,
+    p_observacoes: parsed.data.observacoes || null,
   });
   if (error) return { error: erroFinanceiro(error.message) };
 
@@ -845,6 +918,9 @@ export async function criarCobrancaEtapa(dados: {
   revalidatePath(`/dashboard/pacientes/${parsed.data.pacienteId}`);
   revalidatePath('/dashboard/orcamentos');
   revalidatePath('/dashboard/financeiro');
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
+  revalidatePath('/clinica');
+  revalidatePath('/clinica/meus-resultados');
   return { id: cobranca?.id };
 }
 
@@ -870,6 +946,9 @@ export async function editarCobrancaEtapa(dados: {
   revalidatePath(`/dashboard/pacientes/${parsed.data.pacienteId}`);
   revalidatePath('/dashboard/orcamentos');
   revalidatePath('/dashboard/financeiro');
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
+  revalidatePath('/clinica');
+  revalidatePath('/clinica/meus-resultados');
   return {};
 }
 
@@ -898,6 +977,9 @@ export async function registrarRecebimentoCobranca(dados: {
   revalidatePath(`/dashboard/pacientes/${parsed.data.pacienteId}`);
   revalidatePath('/dashboard/orcamentos');
   revalidatePath('/dashboard/financeiro');
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
+  revalidatePath('/clinica');
+  revalidatePath('/clinica/meus-resultados');
   return { id: pagamento?.id };
 }
 
@@ -921,6 +1003,9 @@ export async function cancelarCobrancaEtapa(dados: {
   revalidatePath(`/dashboard/pacientes/${parsed.data.pacienteId}`);
   revalidatePath('/dashboard/orcamentos');
   revalidatePath('/dashboard/financeiro');
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
+  revalidatePath('/clinica');
+  revalidatePath('/clinica/meus-resultados');
   return {};
 }
 
@@ -956,6 +1041,9 @@ export async function editarPagamento(
 
   revalidatePath('/dashboard/orcamentos');
   revalidatePath('/dashboard/financeiro');
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
+  revalidatePath('/clinica');
+  revalidatePath('/clinica/meus-resultados');
   revalidatePath(`/dashboard/pacientes/${atual.paciente_id}`);
   return {};
 }
@@ -1013,6 +1101,9 @@ export async function excluirPagamento(
 
   revalidatePath("/dashboard/orcamentos");
   revalidatePath("/dashboard/financeiro");
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
+  revalidatePath('/clinica');
+  revalidatePath('/clinica/meus-resultados');
   revalidatePath(`/dashboard/pacientes/${pagAtual.paciente_id}`);
   return {};
 }
@@ -1045,6 +1136,9 @@ export async function estornarPagamento(
 
   revalidatePath('/dashboard/orcamentos');
   revalidatePath('/dashboard/financeiro');
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
+  revalidatePath('/clinica');
+  revalidatePath('/clinica/meus-resultados');
   revalidatePath(`/dashboard/pacientes/${atual.paciente_id}`);
   return {};
 }
@@ -1057,6 +1151,7 @@ const adicionarItensAoOrcamentoSchema = z.object({
     quantidade: z.number().int().min(1).max(99),
     precoUnitario: z.number().finite().min(0),
     eventoIds: z.array(z.string().uuid()).max(100).default([]),
+    composicao: composicaoGrupoSchema.nullable().optional(),
   })).min(1).max(100),
 });
 
@@ -1081,7 +1176,7 @@ export async function adicionarItensAoOrcamento(
     .maybeSingle();
   if (!orcamento) return { error: 'Orçamento não encontrado.' };
 
-  const { data: valorAdicionado, error } = await supabase.rpc('adicionar_itens_orcamento_com_eventos', {
+  const { data: valorAdicionado, error } = await supabase.rpc(entrada.itens.some((item) => item.composicao) ? 'adicionar_itens_orcamento_com_eventos_r157' : 'adicionar_itens_orcamento_com_eventos', {
     p_orcamento_id: entrada.orcamentoId,
     p_itens: entrada.itens.map((item) => ({
       procedimento_id: item.procedimentoId,
@@ -1089,6 +1184,7 @@ export async function adicionarItensAoOrcamento(
       quantidade: item.quantidade,
       preco_unitario: item.precoUnitario,
       evento_ids: item.eventoIds,
+      composicao: item.composicao ?? null,
     })),
   });
 
@@ -1174,11 +1270,13 @@ export async function editarOrcamento(
   // é só-dono. RLS barrada devolve SUCESSO com 0 linhas, não erro — então o insert abaixo
   // rodava por cima dos itens que não saíram e a lista duplicava a cada save.
   // Provado em produção: 3 orçamentos da ClinDent com item repetido, o último em 15/08.
-  const { data: itensAntes } = await supabase
+  const { data: itensAntes, error: erroItensAntes } = await supabase
     .from("orcamento_itens")
-    .select("id, aprovado, retirado_em")
+    .select("id, aprovado, retirado_em, composicao")
     .eq("orcamento_id", orcamentoId)
     .eq("clinica_id", clinicId);
+
+  if (erroItensAntes) return { error: "Não foi possível conferir os itens. O orçamento foi preservado." };
 
   // A retirada registra um fato clínico/comercial; a edição antiga abaixo reescreve a lista
   // inteira e não conhece os vínculos que esse item já teve. Não deixa uma tela desatualizada
@@ -1187,6 +1285,10 @@ export async function editarOrcamento(
     return {
       error: "Este orçamento tem procedimento retirado. Use a alteração incremental na ficha para preservar o histórico.",
     };
+  }
+
+  if ((itensAntes ?? []).some((item) => item.composicao != null)) {
+    return { error: "Este orçamento contém grupos com composição preservada. A edição da lista inteira não está disponível." };
   }
 
   // R-114 (I5) — editarOrcamento reescreve TUDO (apaga e reinsere); item novo sempre nasce
@@ -1394,6 +1496,9 @@ export async function excluirOrcamento(
   revalidatePath("/dashboard/orcamentos");
   // Pagamento pago agora pode sair junto — o financeiro precisa refletir isso na hora.
   revalidatePath('/dashboard/financeiro');
+  revalidatePath('/dashboard/meu-consultorio/financeiro');
+  revalidatePath('/clinica');
+  revalidatePath('/clinica/meus-resultados');
   return {};
 }
 

@@ -1,5 +1,9 @@
 'use client';
 
+import { isTeamWorkspaceEnabled } from '@/server/auth/team-workspace-pilot';
+
+import { Textarea } from '@/components/ui/textarea';
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -38,6 +42,7 @@ import {
 import { deriveEstadoOrcamento, rotuloEstado, type EstadoOrcamento } from '@/lib/orcamentos/estado';
 import { deriveEstadoCobrancaEtapa } from '@/lib/orcamentos/cobranca-etapa';
 import { parseValorBR, formatValorBR } from '@/lib/valor-br';
+import { hojeBRT } from '@/lib/hora-brt';
 import { toast } from 'sonner';
 import type { OrcamentoComItens, OrcEditItem, Pagamento } from '../types';
 
@@ -65,7 +70,8 @@ type PagForm = { valor: string; formaPagamento: FormaPagamento; data: string; da
 // editarPagamento não altera vencimento — edição de um pagamento existente fica
 // restrita a valor/forma/data, sem o campo de agendamento futuro.
 type EditPagForm = { valor: string; formaPagamento: FormaPagamento; data: string };
-type ParcelasForm = { numero: string; primeiroVencimento: string };
+type ParcelasForm = { numero: string; primeiroVencimento: string; cartaoCredito?: boolean };
+const cartaoParceladoHabilitado = isTeamWorkspaceEnabled({ NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL });
 
 interface Props {
   detalheOrc: OrcamentoComItens | null;
@@ -145,10 +151,12 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
   orcamento: OrcamentoComItens; pacienteId: string; permitirNovaEtapa: boolean;
 }) {
   const router = useRouter();
-  const hoje = new Date().toISOString().split('T')[0];
+  const hoje = hojeBRT();
   const [formAberto, setFormAberto] = useState(false);
   const [itemIds, setItemIds] = useState<string[]>([]);
   const [desconto, setDesconto] = useState('');
+  const [observacoes, setObservacoes] = useState('');
+  const [cartaoCredito, setCartaoCredito] = useState(false);
   const [formaCobranca, setFormaCobranca] = useState<'avista' | 'parcelado'>('avista');
   const [numeroParcelas, setNumeroParcelas] = useState('3');
   const [primeiroVencimento, setPrimeiroVencimento] = useState(hoje);
@@ -223,27 +231,36 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
     }
     setSaving(true);
     setErro(null);
-    const result = await criarCobrancaEtapa({
-      orcamentoId: orcamento.id,
-      pacienteId,
-      itemIds,
-      desconto: descontoNumero,
-      numeroParcelas: parcelas,
-      primeiroVencimento,
-    });
-    setSaving(false);
-    if (result.error) {
-      setErro(result.error);
-      return;
+    try {
+      const result = await criarCobrancaEtapa({
+        orcamentoId: orcamento.id,
+        pacienteId,
+        itemIds,
+        desconto: descontoNumero,
+        numeroParcelas: parcelas,
+        primeiroVencimento,
+        observacoes,
+        cartaoCredito: formaCobranca === 'parcelado' && cartaoCredito,
+      });
+      if (result.error) {
+        setErro(result.error);
+        return;
+      }
+      setFormAberto(false);
+      setItemIds([]);
+      setDesconto('');
+      setObservacoes('');
+      setFormaCobranca('avista');
+      setCartaoCredito(false);
+      setNumeroParcelas('3');
+      setPrimeiroVencimento(hoje);
+      toast.success(cartaoCredito && parcelas > 1 ? 'Cartão confirmado. Parcelas distribuídas pelos meses.' : parcelas === 1 ? 'Cobrança criada. O saldo já apareceu no Financeiro.' : 'Parcelas mensais criadas no Financeiro.');
+      router.refresh();
+    } catch {
+      setErro("Não foi possível confirmar a operação. Confira o histórico antes de tentar novamente; seus campos foram preservados.");
+    } finally {
+      setSaving(false);
     }
-    setFormAberto(false);
-    setItemIds([]);
-    setDesconto('');
-    setFormaCobranca('avista');
-    setNumeroParcelas('3');
-    setPrimeiroVencimento(hoje);
-    toast.success(parcelas === 1 ? 'Cobrança criada. O saldo já apareceu no Financeiro.' : 'Parcelas mensais criadas no Financeiro.');
-    router.refresh();
   };
 
   const registrar = async (cobrancaId: string) => {
@@ -254,22 +271,27 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
     }
     setSaving(true);
     setErro(null);
-    const result = await registrarRecebimentoCobranca({
-      cobrancaId,
-      pacienteId,
-      valor,
-      formaPagamento: recebimento.forma,
-      data: recebimento.data,
-    });
-    setSaving(false);
-    if (result.error) {
-      setErro(result.error);
-      return;
+    try {
+      const result = await registrarRecebimentoCobranca({
+        cobrancaId,
+        pacienteId,
+        valor,
+        formaPagamento: recebimento.forma,
+        data: recebimento.data,
+      });
+      if (result.error) {
+        setErro(result.error);
+        return;
+      }
+      setCobrancaRecebendoId(null);
+      setRecebimento({ valor: '', forma: 'pix', data: hoje });
+      toast.success('Recebimento registrado. O status da etapa foi atualizado.');
+      router.refresh();
+    } catch {
+      setErro("Não foi possível confirmar a operação. Confira o histórico antes de tentar novamente; seus campos foram preservados.");
+    } finally {
+      setSaving(false);
     }
-    setCobrancaRecebendoId(null);
-    setRecebimento({ valor: '', forma: 'pix', data: hoje });
-    toast.success('Recebimento registrado. O status da etapa foi atualizado.');
-    router.refresh();
   };
 
   const cancelar = async (cobrancaId: string) => {
@@ -279,16 +301,21 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
     }
     setSaving(true);
     setErro(null);
-    const result = await cancelarCobrancaEtapa({ cobrancaId, pacienteId, motivo: motivoCancelamento });
-    setSaving(false);
-    if (result.error) {
-      setErro(result.error);
-      return;
+    try {
+      const result = await cancelarCobrancaEtapa({ cobrancaId, pacienteId, motivo: motivoCancelamento });
+      if (result.error) {
+        setErro(result.error);
+        return;
+      }
+      setCancelandoId(null);
+      setMotivoCancelamento('');
+      toast.success('Cobrança cancelada; os procedimentos voltaram a ficar disponíveis.');
+      router.refresh();
+    } catch {
+      setErro("Não foi possível confirmar a operação. Confira o histórico antes de tentar novamente; seus campos foram preservados.");
+    } finally {
+      setSaving(false);
     }
-    setCancelandoId(null);
-    setMotivoCancelamento('');
-    toast.success('Cobrança cancelada; os procedimentos voltaram a ficar disponíveis.');
-    router.refresh();
   };
 
   const salvarPagamentoEditado = async (pagamentoId: string) => {
@@ -299,19 +326,24 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
     }
     setSaving(true);
     setErro(null);
-    const result = await editarPagamento(pagamentoId, {
-      valor,
-      formaPagamento: pagamentoEditado.forma,
-      data: pagamentoEditado.data,
-    });
-    setSaving(false);
-    if (result.error) {
-      setErro(result.error);
-      return;
+    try {
+      const result = await editarPagamento(pagamentoId, {
+        valor,
+        formaPagamento: pagamentoEditado.forma,
+        data: pagamentoEditado.data,
+      });
+      if (result.error) {
+        setErro(result.error);
+        return;
+      }
+      setPagamentoEditandoId(null);
+      toast.success('Recebimento corrigido e saldo da etapa recomposto.');
+      router.refresh();
+    } catch {
+      setErro("Não foi possível confirmar a operação. Confira o histórico antes de tentar novamente; seus campos foram preservados.");
+    } finally {
+      setSaving(false);
     }
-    setPagamentoEditandoId(null);
-    toast.success('Recebimento corrigido e saldo da etapa recomposto.');
-    router.refresh();
   };
 
   const estornarPagamentoDaEtapa = async (pagamentoId: string) => {
@@ -321,16 +353,21 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
     }
     setSaving(true);
     setErro(null);
-    const result = await estornarPagamento(pagamentoId, motivoEstorno);
-    setSaving(false);
-    if (result.error) {
-      setErro(result.error);
-      return;
+    try {
+      const result = await estornarPagamento(pagamentoId, motivoEstorno);
+      if (result.error) {
+        setErro(result.error);
+        return;
+      }
+      setPagamentoEstornandoId(null);
+      setMotivoEstorno('');
+      toast.success('Recebimento estornado e saldo da etapa reaberto.');
+      router.refresh();
+    } catch {
+      setErro("Não foi possível confirmar a operação. Confira o histórico antes de tentar novamente; seus campos foram preservados.");
+    } finally {
+      setSaving(false);
     }
-    setPagamentoEstornandoId(null);
-    setMotivoEstorno('');
-    toast.success('Recebimento estornado e saldo da etapa reaberto.');
-    router.refresh();
   };
 
   const salvarEtapaEditada = async (cobranca: OrcamentoComItens['cobrancas'][number], valorRecebido: number) => {
@@ -422,6 +459,7 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
               </div>
               <span className={`shrink-0 rounded-full border px-2 py-1 text-[10px] font-bold ${classeEstado[estado.estado]}`}>{rotuloEstado[estado.estado]}</span>
             </div>
+            {cobranca.observacoes && <div className="rounded-lg border border-border bg-card p-3"><p className="text-xs font-semibold text-foreground">Observação do acordo</p><p className="mt-1 whitespace-pre-wrap break-words text-sm text-muted-foreground">{cobranca.observacoes}</p></div>}
             <div className="grid grid-cols-3 gap-2 text-xs">
               <div><p className="text-text-secondary">Final</p><p className="font-mono font-semibold text-text-primary">R$ {fmt(cobranca.valor_final)}</p></div>
               <div><p className="text-text-secondary">Recebido</p><p className="font-mono font-semibold text-teal-ink">R$ {fmt(estado.valorPago)}</p></div>
@@ -526,10 +564,18 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
             <div className="space-y-2 rounded-lg border border-border bg-surface p-2.5">
               <Label className="text-[10px] text-text-secondary">Forma de cobrança</Label>
               <div className="grid grid-cols-2 gap-1.5"><button type="button" onClick={() => setFormaCobranca('avista')} className={`h-9 rounded-lg border text-xs font-semibold ${formaCobranca === 'avista' ? 'border-teal/40 bg-teal/10 text-teal-ink' : 'border-border text-text-secondary hover:border-teal/30'}`}>À vista</button><button type="button" onClick={() => setFormaCobranca('parcelado')} className={`h-9 rounded-lg border text-xs font-semibold ${formaCobranca === 'parcelado' ? 'border-teal/40 bg-teal/10 text-teal-ink' : 'border-border text-text-secondary hover:border-teal/30'}`}>Parcelado</button></div>
-              <div className={`grid gap-2 ${formaCobranca === 'parcelado' ? 'grid-cols-2' : 'grid-cols-1'}`}><div className={formaCobranca === 'parcelado' ? '' : 'hidden'}><Label className="text-[10px] text-text-secondary">Nº de parcelas</Label><Input type="number" min={2} max={24} value={numeroParcelas} onChange={(event) => setNumeroParcelas(event.target.value)} className="mt-1 h-9 font-mono" /></div><div><Label className="text-[10px] text-text-secondary">1º vencimento</Label><Input type="date" value={primeiroVencimento} onChange={(event) => setPrimeiroVencimento(event.target.value)} className="mt-1 h-9" /></div></div>
+              <div className={`grid gap-2 ${formaCobranca === 'parcelado' ? 'grid-cols-2' : 'grid-cols-1'}`}><div className={formaCobranca === 'parcelado' ? '' : 'hidden'}><Label className="text-[10px] text-text-secondary">Nº de parcelas</Label><Input type="number" min={2} max={24} value={numeroParcelas} onChange={(event) => setNumeroParcelas(event.target.value)} className="mt-1 h-9 font-mono" /></div><div><Label className="text-[10px] text-text-secondary">{cartaoCredito ? '1º lançamento' : '1º vencimento'}</Label><Input type="date" value={primeiroVencimento} onChange={(event) => setPrimeiroVencimento(event.target.value)} className="mt-1 h-9" /></div></div>
+              {formaCobranca === 'parcelado' && cartaoParceladoHabilitado && <label className="block space-y-1 text-sm text-foreground">Pagamento das parcelas
+                <select aria-label="Pagamento das parcelas da etapa" value={cartaoCredito ? 'cartao' : 'acordo'} onChange={e => setCartaoCredito(e.target.value === 'cartao')} disabled={saving} className="min-h-11 w-full rounded-lg border border-border bg-background px-3 text-foreground"><option value="acordo">Acordo com o paciente</option><option value="cartao">Cartão de crédito</option></select>
+                {cartaoCredito && <p className="text-xs text-muted-foreground">Ao salvar, as parcelas ficam confirmadas, cada uma no seu mês. Não será preciso dar baixa todo mês.</p>}
+              </label>}
               {formaCobranca === 'parcelado' && Number(numeroParcelas) >= 2 && valorFinal > 0 && <p className="text-[11px] text-text-secondary">{numeroParcelas}x mensais de aproximadamente R$ {fmt(valorFinal / Number(numeroParcelas))}.</p>}
             </div>
-            {erro && <p className="text-xs text-coral-ink">{erro}</p>}
+            <label className="block space-y-1 text-sm text-foreground">Observação do acordo
+              <Textarea value={observacoes} onChange={(event) => setObservacoes(event.target.value)} maxLength={2000} disabled={saving} placeholder="Ex.: Superior no início do tratamento; inferior quando começar a próxima fase." />
+              <span className="block text-xs text-muted-foreground">Visível para a equipe autorizada. Não registra pagamento nem aparece automaticamente no documento do paciente.</span>
+            </label>
+            {erro && <p role="alert" className="text-xs text-coral-ink">{erro}</p>}
             <div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => { setFormAberto(false); setErro(null); }} disabled={saving} className="flex-1">Cancelar</Button><Button size="sm" onClick={() => void criarEtapa()} disabled={saving || itemIds.length === 0} className="flex-1 bg-teal text-white hover:bg-teal-lt">{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Criar cobrança'}</Button></div>
           </div>
         ) : <Button variant="outline" onClick={() => setFormAberto(true)} className="w-full border-teal/35 text-teal-ink hover:bg-teal/10"><Plus className="mr-1.5 h-4 w-4" />Cobrar nesta etapa</Button>
@@ -565,7 +611,7 @@ export function DetalheOrcamentoModal({
   onRevisarAdicao,
   onRecarregarDiferencasFicha,
 }: Props) {
-  const hoje = new Date().toISOString().split('T')[0];
+  const hoje = hojeBRT();
   /** R-39a: só Procedimentos e Atividade — Pagamentos virou a coluna do dinheiro. */
   const [tab, setTab] = useState<'procedimentos' | 'atividade'>('procedimentos');
   const [showAceiteModal, setShowAceiteModal] = useState(false);
@@ -867,6 +913,7 @@ export function DetalheOrcamentoModal({
                                         </span>
                                       )}
                                     </p>
+                                      {item.composicao?.length ? <ul className="mt-1 space-y-1 text-xs text-muted-foreground">{item.composicao.map((membro, index) => <li key={index}>{membro.quantidade} × {membro.descricao}</li>)}</ul> : null}
                                     {item.quantidade > 1 && (
                                       <p className="text-[11px] text-text-secondary font-mono">
                                         {item.quantidade} unidades × R$ {fmt((item.preco_total ?? 0) / item.quantidade)}
@@ -1362,6 +1409,11 @@ export function DetalheOrcamentoModal({
 
                       {parcelasMode && !closingPagamentoId ? (
                         <div className="space-y-2 transition-all duration-150 motion-reduce:transition-none">
+                          {cartaoParceladoHabilitado && <label className="block space-y-1 text-sm text-foreground">Pagamento das parcelas
+                            <select aria-label="Pagamento das parcelas" value={parcelasForm.cartaoCredito ? 'cartao' : 'acordo'} onChange={e => setParcelasForm(f => ({ ...f, cartaoCredito: e.target.value === 'cartao' }))} disabled={parcelasSaving} className="min-h-11 w-full rounded-xl border border-border bg-background px-3 text-foreground"><option value="acordo">Acordo com o paciente</option><option value="cartao">Cartão de crédito</option></select>
+                            {parcelasForm.cartaoCredito && <p className="text-xs text-muted-foreground">Ao salvar, as parcelas ficam confirmadas, cada uma no seu mês. Não será preciso dar baixa todo mês.</p>}
+                          </label>}
+
                           <div className="grid grid-cols-2 gap-2">
                             <div className="space-y-1.5">
                               <Label className="text-xs text-text-secondary">Nº de parcelas</Label>
@@ -1373,7 +1425,7 @@ export function DetalheOrcamentoModal({
                               />
                             </div>
                             <div className="space-y-1.5">
-                              <Label className="text-xs text-text-secondary">1º vencimento</Label>
+                              <Label className="text-xs text-text-secondary">{parcelasForm.cartaoCredito ? '1º lançamento' : '1º vencimento'}</Label>
                               <Input
                                 type="date" min={hoje}
                                 value={parcelasForm.primeiroVencimento}
@@ -1387,7 +1439,7 @@ export function DetalheOrcamentoModal({
                             if (!n || n < 2 || !restante) return null;
                             return (
                               <p className="text-[11px] text-text-secondary bg-surface rounded-xl px-3 py-2">
-                                Saldo restante: R$ {fmt(restante)} — {n} previsões de R$ {fmt(restante / n)}, vencimentos no mesmo dia, mês a mês.
+                                Saldo restante: R$ {fmt(restante)} — {n} {parcelasForm.cartaoCredito ? 'parcelas confirmadas' : 'previsões'} de R$ {fmt(restante / n)}, vencimentos no mesmo dia, mês a mês.
                               </p>
                             );
                           })()}
@@ -1541,6 +1593,8 @@ export function DetalheOrcamentoModal({
                     <Button
                       variant="outline"
                       onClick={onOpenEditOrc}
+                      disabled={detalheOrc.itens.some((item) => item.composicao?.length)}
+                      title={detalheOrc.itens.some((item) => item.composicao?.length) ? "A composição dos grupos é preservada após salvar." : undefined}
                       className="rounded-xl border-border text-text-primary hover:bg-surface-alt"
                     >
                       <Edit2 className="w-4 h-4 mr-1.5" />

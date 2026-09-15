@@ -1,4 +1,5 @@
 'use client';
+import { isTeamWorkspaceEnabled } from '@/server/auth/team-workspace-pilot';
 
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
@@ -180,7 +181,7 @@ export function OrcamentosClient({
   // R-113 — id da parcela pendente sendo fechada; null = painel em modo "criar pagamento novo".
   // Mesmo discriminador que a ficha do paciente usa (paciente-detail-client.tsx).
   const [closingPagamentoId, setClosingPagamentoId] = useState<string | null>(null);
-  const [parcelasForm, setParcelasForm] = useState({ numero: '3', primeiroVencimento: '' });
+  const [parcelasForm, setParcelasForm] = useState<{ numero: string; primeiroVencimento: string; cartaoCredito?: boolean }>({ numero: '3', primeiroVencimento: '' });
   const [parcelasSaving, setParcelasSaving] = useState(false);
   const [parcelasError, setParcelasError] = useState<string | null>(null);
 
@@ -546,9 +547,10 @@ export function OrcamentosClient({
     const primeiroVencimento = new Date(`${parcelasForm.primeiroVencimento}T12:00:00`);
     const result = await reorganizarParcelas({
       orcamentoId: selected.id,
+      cartaoCredito: parcelasForm.cartaoCredito,
       valorAcordado: selected.valor_acordado ?? selected.total ?? 0,
       parcelas: Array.from({ length: numero }, (_, indice) => ({
-        valor: (parcelaBase + (indice < resto ? 1 : 0)) / 100,
+        valor: (parcelaBase + (parcelasForm.cartaoCredito ? (indice === numero - 1 ? resto : 0) : (indice < resto ? 1 : 0))) / 100,
         dataVencimento: format(addMonths(primeiroVencimento, indice), 'yyyy-MM-dd'),
       })),
     });
@@ -560,21 +562,21 @@ export function OrcamentosClient({
         id: p.id,
         orcamento_id: selected.id,
         valor: p.valor,
-        status: 'pendente',
-        forma_pagamento: null,
-        data_pagamento: null,
+        status: p.status ?? 'pendente',
+        forma_pagamento: p.forma_pagamento ?? null,
+        data_pagamento: p.data_pagamento ?? null,
         data_vencimento: p.data_vencimento,
         parcela_numero: p.parcela_numero,
         total_parcelas: p.total_parcelas,
         marcado_por: null,
       }));
       setOrcamentos((prev) =>
-        prev.map((o) => (o.id === selected.id ? { ...o, pagamentos: [...o.pagamentos, ...novasPag] } : o))
+        prev.map((o) => (o.id === selected.id ? { ...o, pagamentos: [...o.pagamentos.map(p => p.status === 'pendente' ? { ...p, status: 'cancelado' as const } : p), ...novasPag] } : o))
       );
-      setSelected((prev) => (prev ? { ...prev, pagamentos: [...prev.pagamentos, ...novasPag] } : prev));
+      setSelected((prev) => (prev ? { ...prev, pagamentos: [...prev.pagamentos.map(p => p.status === 'pendente' ? { ...p, status: 'cancelado' as const } : p), ...novasPag] } : prev));
       setParcelasMode(false);
       setParcelasForm({ numero: '3', primeiroVencimento: '' });
-      toast.success(`${numero} previsões organizadas.`);
+      toast.success(parcelasForm.cartaoCredito ? 'Cartão confirmado. Parcelas distribuídas pelos meses.' : `${numero} previsões organizadas.`);
       router.refresh();
     }
     setParcelasSaving(false);
@@ -1643,6 +1645,10 @@ export function OrcamentosClient({
 
                   {parcelasMode && !closingPagamentoId ? (
                     <div className="space-y-3">
+                      {isTeamWorkspaceEnabled({ NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL }) && <label className="block space-y-1 text-sm text-foreground">Pagamento das parcelas
+                        <select aria-label="Pagamento das parcelas" value={parcelasForm.cartaoCredito ? 'cartao' : 'acordo'} onChange={e => setParcelasForm(f => ({ ...f, cartaoCredito: e.target.value === 'cartao' }))} disabled={parcelasSaving} className="min-h-11 w-full rounded-xl border border-border bg-background px-3 text-foreground"><option value="acordo">Acordo com o paciente</option><option value="cartao">Cartão de crédito</option></select>
+                        {parcelasForm.cartaoCredito && <p className="text-xs text-muted-foreground">Ao salvar, as parcelas ficam confirmadas, cada uma no seu mês. Não será preciso dar baixa todo mês.</p>}
+                      </label>}
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1.5">
                           <Label className="text-text-primary text-xs">Nº de parcelas</Label>
@@ -1654,7 +1660,7 @@ export function OrcamentosClient({
                           />
                         </div>
                         <div className="space-y-1.5">
-                          <Label className="text-text-primary text-xs">1º vencimento</Label>
+                          <Label className="text-text-primary text-xs">{parcelasForm.cartaoCredito ? '1º lançamento' : '1º vencimento'}</Label>
                           <Input
                             type="date" min={hoje}
                             value={parcelasForm.primeiroVencimento}
@@ -1668,7 +1674,7 @@ export function OrcamentosClient({
                         if (!n || n < 2 || !restante) return null;
                         return (
                           <p className="text-xs text-text-secondary bg-surface rounded-xl px-3 py-2">
-                            Saldo restante: {formatCurrency(restante)} — {n} previsões mensais de {formatCurrency(restante / n)}.
+                            Saldo restante: {formatCurrency(restante)} — {n} {parcelasForm.cartaoCredito ? 'parcelas confirmadas' : 'previsões mensais'} de {formatCurrency(restante / n)}.
                           </p>
                         );
                       })()}

@@ -1,3 +1,4 @@
+import type { ComponenteGrupoOrcamento } from '@/lib/orcamentos/grupos';
 import type { AceiteOrcamento } from '@/types/orcamento';
 import type {
   TipoRegistroOdontograma, StatusRegistro, OrigemRegistro,
@@ -5,6 +6,7 @@ import type {
 } from '@/types/odontograma';
 
 export type OrcamentoItem = {
+  composicao?: ComponenteGrupoOrcamento[] | null;
   id: string;
   descricao: string | null;
   preco_total: number | null;
@@ -28,6 +30,7 @@ export type Pagamento = {
 };
 
 export type CobrancaEtapa = {
+  observacoes?: string | null;
   id: string;
   subtotal: number;
   desconto: number;
@@ -115,6 +118,8 @@ export type ProcedimentoClinica = {
 };
 
 export type NovoOrcItem = {
+  /** Apenas durante a montagem: preserva originais para desfazer sem perder preço ou eventos. */
+  composicao?: NovoOrcItem[];
   procedimentoId: string;
   descricao: string;
   quantidade: number;

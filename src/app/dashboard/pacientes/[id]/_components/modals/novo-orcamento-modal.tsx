@@ -1,5 +1,7 @@
 'use client';
+import { isTeamWorkspaceEnabled } from '@/server/auth/team-workspace-pilot';
 
+import { MontarGrupoOrcamento } from './montar-grupo-orcamento';
 import React, { useEffect, useState } from 'react';
 import { Plus, Trash2, AlertTriangle, X, Loader2, Check, ChevronDown, MapPin } from 'lucide-react';
 import {
@@ -31,6 +33,9 @@ const FORMA_LABEL: Record<FormaPagamento, string> = {
 };
 
 export interface NovoOrcamentoModalProps {
+  titularRecebimento?: 'dentista' | 'clinica' | '';
+  setTitularRecebimento?: (valor: 'dentista' | 'clinica' | '') => void;
+  recebimentoMisto?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   etapaNovoOrc: 'selecionar' | 'itens';
@@ -112,6 +117,7 @@ export function NovoOrcamentoModal({
   setPlanoPrimeiroVencimento,
   planoParcelasForma,
   setPlanoParcelasForma,
+  titularRecebimento, setTitularRecebimento, recebimentoMisto,
 }: NovoOrcamentoModalProps) {
   const [valorFinalTexto, setValorFinalTexto] = useState(
     novoOrcValorFinal !== null ? formatValorBR(novoOrcValorFinal) : ''
@@ -126,6 +132,7 @@ export function NovoOrcamentoModal({
     }, 0);
     return () => window.clearTimeout(timer);
   }, [novoOrcValorFinal]);
+  const temGrupos = novoOrcItens.some((item) => item.composicao?.length);
   const temDesconto = novoOrcValorFinal !== null && novoOrcSubtotal > 0 && novoOrcValorFinal < novoOrcSubtotal;
   const pctDesconto = temDesconto
     ? Math.round(((novoOrcSubtotal - novoOrcValorFinal!) / novoOrcSubtotal) * 100 * 10) / 10
@@ -276,8 +283,23 @@ export function NovoOrcamentoModal({
                 </div>
               )}
 
+              {recebimentoMisto && modoPersistencia === 'novo' && <label className="mb-4 grid gap-2 rounded-xl border border-border bg-card p-4 text-sm text-foreground">Quem recebe por este orçamento?
+                <select aria-label="Quem recebe por este orçamento?" value={titularRecebimento ?? ''} onChange={e => { const value = e.target.value; if (value === 'clinica' || value === 'dentista' || value === '') setTitularRecebimento?.(value); }} disabled={orcSaving} className="min-h-11 rounded-md border border-border bg-background px-3 text-foreground focus-visible:outline-2 focus-visible:outline-ring">
+                  <option value="">Selecione</option><option value="clinica">A clínica</option><option value="dentista">O dentista responsável</option>
+                </select><span className="text-xs text-muted-foreground">Define em qual financeiro os recebimentos entram. O responsável pelo atendimento continua o mesmo.</span>
+              </label>}
+              <MontarGrupoOrcamento itens={novoOrcItens} onChange={(itens) => { setNovoOrcItens(itens); setNovoOrcValorFinal(null); setPlanoForma(null); }} disabled={orcSaving} />
+
               <div className="space-y-2">
                 {novoOrcItens.map((item, idx) => {
+                  if (item.composicao?.length) return (
+                    <fieldset key={idx} disabled={orcSaving} className="space-y-3 rounded-xl border border-border bg-card p-3 text-foreground">
+                      <p className="text-sm font-semibold">{item.descricao}</p>
+                      <ul className="space-y-1 text-sm text-muted-foreground">{item.composicao.map((membro, index) => <li key={index}>{membro.quantidade} × {membro.descricao}</li>)}</ul>
+                      <label className="block space-y-1 text-sm">Valor fechado do grupo (R$)<Input aria-label={`Valor do grupo ${item.descricao}`} inputMode="decimal" value={item.preco} onChange={(e) => setNovoOrcItens((prev) => prev.map((atual, i) => i === idx ? { ...atual, preco: e.target.value } : atual))} className="min-h-11" /></label>
+                      <Button variant="outline" type="button" className="min-h-11" onClick={() => setNovoOrcItens((prev) => prev.flatMap((atual, i) => i === idx ? atual.composicao ?? [atual] : [atual]))}>Desfazer grupo</Button>
+                    </fieldset>
+                  );
                   const { procedimento, local } = separarDescricao(item.descricao);
                   const selecionado = item.selecionado !== false;
                   const manual = item.origem === 'manual' || !item.descricao;
@@ -374,7 +396,9 @@ export function NovoOrcamentoModal({
                   </p>
                 </div>
 
-                {modoPersistencia === 'novo' ? (
+                {temGrupos ? (
+                  <p className="rounded-xl border border-border bg-card p-3 text-sm text-muted-foreground">Ajuste o preço de cada grupo nos campos ao lado. Depois de salvar e aprovar os grupos, defina a cobrança, os vencimentos e a observação do acordo por etapa.</p>
+                ) : modoPersistencia === 'novo' ? (
                   <>
                     <button type="button" onClick={() => setMostrarAjusteFinal((value) => !value)} className="flex min-h-11 w-full items-center justify-between rounded-xl px-1 text-left text-sm font-semibold text-text-primary hover:text-teal-ink">
                       Ajustar valor final <ChevronDown className={`h-4 w-4 transition-transform ${mostrarAjusteFinal ? 'rotate-180' : ''}`} />
@@ -409,7 +433,7 @@ export function NovoOrcamentoModal({
                           />
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-[10px] text-text-secondary">1º vencimento</Label>
+                          <Label className="text-[10px] text-text-secondary">{isTeamWorkspaceEnabled({ NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL }) && planoParcelasForma === 'cartao_credito' ? '1º lançamento' : '1º vencimento'}</Label>
                           <Input
                             type="date"
                             value={planoPrimeiroVencimento}
@@ -431,6 +455,7 @@ export function NovoOrcamentoModal({
                           ))}
                         </SelectContent>
                       </Select>
+                      {planoParcelasForma === 'cartao_credito' && isTeamWorkspaceEnabled({ NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL }) && <p className="text-xs text-muted-foreground">Ao salvar, as parcelas do cartão ficam confirmadas, cada uma no seu mês. Não será preciso dar baixa todo mês.</p>}
                       {(() => {
                         const n = parseInt(planoNumParcelas, 10);
                         if (!n || n < 2 || novoOrcTotal <= 0) return null;

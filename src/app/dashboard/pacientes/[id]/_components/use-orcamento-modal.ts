@@ -14,6 +14,7 @@
 // tem essa lista — não passa nada, o callback nunca é chamado.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { carregarContextoClinica } from '@/app/clinica/actions';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
@@ -25,6 +26,7 @@ import {
   definirPlanoAvista,
   type FormaPagamento,
 } from '@/app/dashboard/orcamentos/actions';
+import { composicaoParaSalvar } from '@/lib/orcamentos/grupos';
 import { parseValorBR, formatValorBR } from '@/lib/valor-br';
 import {
   stripDenteDoNome, denteLabel,
@@ -155,6 +157,24 @@ export function useOrcamentoModal({
     }
   }, [dentistasClinica, novoOrcDentistaAlvoId]);
   // R-34 — forma de pagamento já na criação (reduz a fricção de ter os dois passos).
+  const [titularRecebimento, setTitularRecebimento] = useState<'dentista' | 'clinica' | ''>('');
+  const [recebimentoMisto, setRecebimentoMisto] = useState(false);
+  const [titularContextoPronto, setTitularContextoPronto] = useState(false);
+  const [erroTitular, setErroTitular] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isNovoOrcOpen) return;
+    setTitularRecebimento('');
+    setTitularContextoPronto(false);
+    setErroTitular(null);
+    let ativo = true;
+    void carregarContextoClinica({ clinicaIdEsperada: clinicaId }).then(result => {
+      if (!ativo) return;
+      setTitularContextoPronto(true);
+      setRecebimentoMisto(result.ok && result.data.recebimentoMisto);
+      setErroTitular(!result.ok && result.codigo !== 'SEM_ACESSO' ? result.mensagem : null);
+    }).catch(() => { if (ativo) setErroTitular('Não foi possível verificar quem recebe. Reabra o orçamento.'); });
+    return () => { ativo = false; };
+  }, [isNovoOrcOpen, clinicaId]);
   const [novoOrcPlanoForma, setNovoOrcPlanoForma] = useState<'avista' | 'parcelado' | null>(null);
   const [novoOrcNumParcelas, setNovoOrcNumParcelas] = useState('3');
   const [novoOrcPrimeiroVencimento, setNovoOrcPrimeiroVencimento] = useState('');
@@ -700,7 +720,7 @@ export function useOrcamentoModal({
     const supabase = createClient();
     const { data, error } = await supabase
       .from('orcamentos')
-      .select('id, status, total, valor_acordado, plano_forma, desconto, created_at, validade_dias, condicoes_pagamento, mostrar_valor_por_item, dentista_id, aprovado_em, aprovado_por:dentistas!orcamentos_aprovado_por_id_fkey(nome), itens:orcamento_itens(id, descricao, preco_total, quantidade, aprovado), pagamentos(id, cobranca_id, valor, status, forma_pagamento, data_pagamento, data_vencimento, parcela_numero, total_parcelas, marcado_por:dentistas!pagamentos_marcado_por_id_fkey(nome)), aceite:assinaturas!assinaturas_orcamento_id_fkey(id, assinado_por, cro_no_ato, assinatura_ref, assinado_em, termos_snapshot), cobrancas:orcamento_cobrancas(id, subtotal, desconto, valor_final, numero_parcelas, primeiro_vencimento, situacao, created_at, itens:orcamento_cobranca_itens!orcamento_cobranca_itens_cobranca_id_fkey(orcamento_item_id, preco_total_snapshot), pagamentos:pagamentos!pagamentos_cobranca_id_fkey(id, cobranca_id, valor, status, forma_pagamento, data_pagamento, data_vencimento, parcela_numero, total_parcelas, marcado_por:dentistas!pagamentos_marcado_por_id_fkey(nome)))')
+      .select('id, status, total, valor_acordado, plano_forma, desconto, created_at, validade_dias, condicoes_pagamento, mostrar_valor_por_item, dentista_id, aprovado_em, aprovado_por:dentistas!orcamentos_aprovado_por_id_fkey(nome), itens:orcamento_itens(id, descricao, preco_total, quantidade, aprovado, composicao), pagamentos(id, cobranca_id, valor, status, forma_pagamento, data_pagamento, data_vencimento, parcela_numero, total_parcelas, marcado_por:dentistas!pagamentos_marcado_por_id_fkey(nome)), aceite:assinaturas!assinaturas_orcamento_id_fkey(id, assinado_por, cro_no_ato, assinatura_ref, assinado_em, termos_snapshot), cobrancas:orcamento_cobrancas(id, subtotal, desconto, valor_final, numero_parcelas, primeiro_vencimento, situacao, observacoes, created_at, itens:orcamento_cobranca_itens!orcamento_cobranca_itens_cobranca_id_fkey(orcamento_item_id, preco_total_snapshot), pagamentos:pagamentos!pagamentos_cobranca_id_fkey(id, cobranca_id, valor, status, forma_pagamento, data_pagamento, data_vencimento, parcela_numero, total_parcelas, marcado_por:dentistas!pagamentos_marcado_por_id_fkey(nome)))')
       .is('itens.retirado_em', null)
       .eq('id', orcamentoId)
       .eq('paciente_id', pacienteId)
@@ -720,6 +740,10 @@ export function useOrcamentoModal({
   };
 
   const handleCriarOrcamento = async () => {
+    if (modoPersistencia.tipo === 'novo' && (!titularContextoPronto || erroTitular || (recebimentoMisto && !titularRecebimento))) {
+      setOrcError(erroTitular ?? (!titularContextoPronto ? 'Aguarde a verificação do recebimento.' : 'Escolha quem recebe por este orçamento.'));
+      return;
+    }
     if (erroCatalogo) {
       setOrcError(erroCatalogo);
       return;
@@ -729,6 +753,7 @@ export function useOrcamentoModal({
       return;
     }
     const itensValidos = novoOrcItens.filter((i) => i.selecionado !== false && i.descricao.trim());
+    const temGrupos = itensValidos.some((item) => Boolean(item.composicao?.length));
     if (itensValidos.length === 0) {
       setOrcError('Adicione ao menos um procedimento com descrição.');
       return;
@@ -743,199 +768,210 @@ export function useOrcamentoModal({
       return;
     }
     const numeroParcelas = parseInt(novoOrcNumParcelas, 10);
-    if (modoPersistencia.tipo === 'novo' && novoOrcPlanoForma === 'parcelado' && (!numeroParcelas || numeroParcelas < 2 || numeroParcelas > 24)) {
+    if (modoPersistencia.tipo === 'novo' && !temGrupos && novoOrcPlanoForma === 'parcelado' && (!numeroParcelas || numeroParcelas < 2 || numeroParcelas > 24)) {
       setOrcError('Informe entre 2 e 24 parcelas.');
       return;
     }
-    if (modoPersistencia.tipo === 'novo' && novoOrcPlanoForma === 'parcelado' && !novoOrcPrimeiroVencimento) {
+    if (modoPersistencia.tipo === 'novo' && !temGrupos && novoOrcPlanoForma === 'parcelado' && !novoOrcPrimeiroVencimento) {
       setOrcError('Informe o primeiro vencimento das parcelas.');
       return;
     }
     setOrcError(null);
     setOrcSaving(true);
 
-    const subtotalValido = itensValidos.reduce((s, i) => s + i.quantidade * parseValorBR(i.preco), 0);
-    const finalValido    = novoOrcValorFinal !== null ? Math.max(0, novoOrcValorFinal) : subtotalValido;
-    const descontoValor  = Math.max(0, Math.round((subtotalValido - finalValido) * 100) / 100);
+    try {
+      const subtotalValido = itensValidos.reduce((s, i) => s + i.quantidade * parseValorBR(i.preco), 0);
+      const finalValido    = novoOrcValorFinal !== null ? Math.max(0, novoOrcValorFinal) : subtotalValido;
+      const descontoValor  = Math.max(0, Math.round((subtotalValido - finalValido) * 100) / 100);
 
-    let fichaParaSalvar = fichaOrcId;
-    let itensParaSalvar = itensValidos.map((i) => ({
-      procedimentoId: i.procedimentoId || null,
-      descricao: i.descricao,
-      quantidade: i.quantidade,
-      precoUnitario: parseValorBR(i.preco),
-      eventoIds: i.eventoIds ?? [],
-    }));
-
-    const itensManuais = novoOrcItens.flatMap((item, indice) => (
-      item.selecionado !== false && item.descricao.trim() && (item.eventoIds?.length ?? 0) === 0
-        ? [{ indice, procedimentoId: item.procedimentoId, descricao: item.descricao, quantidade: item.quantidade }]
-        : []
-    ));
-
-    if (prepararItensClinicos && contextoClinicoPendente && itensManuais.length > 0) {
-      if (itensManuais.some((item) => !item.procedimentoId)) {
-        setOrcError('Escolha um procedimento do catálogo ou cadastre-o antes de gerar o orçamento.');
-        setOrcSaving(false);
-        return;
-      }
-
-      const checkpoint = await prepararItensClinicos(itensManuais);
-      if (!checkpoint.ok) {
-        setOrcError(checkpoint.erro);
-        setOrcSaving(false);
-        return;
-      }
-
-      const eventoIdsPorIndice = new Map(
-        checkpoint.eventosPorIndice.map((item) => [item.indice, item.eventoIds]),
-      );
-      fichaParaSalvar = checkpoint.fichaId;
-      setFichaOrcId(checkpoint.fichaId);
-      setContextoClinicoPendente(false);
-      setNovoOrcItens((prev) => prev.map((item, indice) => {
-        const eventoIds = eventoIdsPorIndice.get(indice);
-        return eventoIds ? { ...item, eventoIds, origem: 'evento' } : item;
+      let fichaParaSalvar = fichaOrcId;
+      let itensParaSalvar = itensValidos.map((i) => ({
+        procedimentoId: i.procedimentoId || null,
+        descricao: i.descricao,
+        quantidade: i.quantidade,
+        precoUnitario: parseValorBR(i.preco),
+        eventoIds: i.eventoIds ?? [],
+        composicao: composicaoParaSalvar(i),
       }));
-      itensParaSalvar = novoOrcItens.flatMap((item, indice) => {
-        if (item.selecionado === false || !item.descricao.trim()) return [];
-        return [{
-          procedimentoId: item.procedimentoId || null,
-          descricao: item.descricao,
-          quantidade: item.quantidade,
-          precoUnitario: parseValorBR(item.preco),
-          eventoIds: item.eventoIds?.length
-            ? item.eventoIds
-            : eventoIdsPorIndice.get(indice) ?? [],
-        }];
-      });
-    }
 
-    if (contextoClinicoPendente && !fichaParaSalvar) {
-      setOrcError('Registre ao menos um procedimento clínico antes de criar o orçamento.');
-      setOrcSaving(false);
-      return;
-    }
+      const itensManuais = novoOrcItens.flatMap((item, indice) => (
+        item.selecionado !== false && item.descricao.trim() && (item.eventoIds?.length ?? 0) === 0
+          ? [{ indice, procedimentoId: item.procedimentoId, descricao: item.descricao, quantidade: item.quantidade }]
+          : []
+      ));
 
-    if (modoPersistencia.tipo === 'adicionar') {
-      const result = await adicionarItensAoOrcamento({
-        orcamentoId: modoPersistencia.orcamentoId,
+      if (prepararItensClinicos && contextoClinicoPendente && itensManuais.length > 0) {
+        if (itensManuais.some((item) => !item.procedimentoId)) {
+          setOrcError('Escolha um procedimento do catálogo ou cadastre-o antes de gerar o orçamento.');
+          setOrcSaving(false);
+          return;
+        }
+
+        const checkpoint = await prepararItensClinicos(itensManuais);
+        if (!checkpoint.ok) {
+          setOrcError(checkpoint.erro);
+          setOrcSaving(false);
+          return;
+        }
+
+        const eventoIdsPorIndice = new Map(
+          checkpoint.eventosPorIndice.map((item) => [item.indice, item.eventoIds]),
+        );
+        fichaParaSalvar = checkpoint.fichaId;
+        setFichaOrcId(checkpoint.fichaId);
+        setContextoClinicoPendente(false);
+        setNovoOrcItens((prev) => prev.map((item, indice) => {
+          const eventoIds = eventoIdsPorIndice.get(indice);
+          return eventoIds ? { ...item, eventoIds, origem: 'evento' } : item;
+        }));
+        itensParaSalvar = novoOrcItens.flatMap((item, indice) => {
+          if (item.selecionado === false || !item.descricao.trim()) return [];
+          return [{
+            procedimentoId: item.procedimentoId || null,
+            descricao: item.descricao,
+            quantidade: item.quantidade,
+            precoUnitario: parseValorBR(item.preco),
+            composicao: composicaoParaSalvar(item),
+            eventoIds: item.eventoIds?.length
+              ? item.eventoIds
+              : eventoIdsPorIndice.get(indice) ?? [],
+          }];
+        });
+      }
+
+      if (contextoClinicoPendente && !fichaParaSalvar) {
+        setOrcError('Registre ao menos um procedimento clínico antes de criar o orçamento.');
+        setOrcSaving(false);
+        return;
+      }
+
+      if (modoPersistencia.tipo === 'adicionar') {
+        const result = await adicionarItensAoOrcamento({
+          orcamentoId: modoPersistencia.orcamentoId,
+          itens: itensParaSalvar,
+        });
+        if (result.error) {
+          setOrcError(result.error);
+        } else {
+          const eventoIdsConfirmados = [...new Set(itensParaSalvar.flatMap((item) => item.eventoIds))];
+          setEventoIdsJaOrcados((atuais) => new Set([...atuais, ...eventoIdsConfirmados]));
+          setIsNovoOrcOpen(false);
+          setNovoOrcItens([ITEM_VAZIO]);
+          onItensAdicionadosAoOrcamento?.(modoPersistencia.orcamentoId, eventoIdsConfirmados);
+          toast.success(`${itensValidos.length} procedimento${itensValidos.length === 1 ? '' : 's'} adicionado${itensValidos.length === 1 ? '' : 's'} ao orçamento.`);
+          router.refresh();
+        }
+        setOrcSaving(false);
+        return;
+      }
+
+      const result = await criarOrcamento({
+        titularRecebimento: titularRecebimento || undefined,
+        pacienteId,
+        desconto: descontoValor,
+        fichaId: fichaParaSalvar,
+        dentistaId: isSecretaria ? novoOrcDentistaAlvoId : undefined,
         itens: itensParaSalvar,
       });
+
       if (result.error) {
         setOrcError(result.error);
       } else {
-        const eventoIdsConfirmados = [...new Set(itensParaSalvar.flatMap((item) => item.eventoIds))];
-        setEventoIdsJaOrcados((atuais) => new Set([...atuais, ...eventoIdsConfirmados]));
+        const novoTotal = Math.max(0, subtotalValido - descontoValor);
+        let novoOrc: OrcamentoComItens = {
+          id: result.id ?? crypto.randomUUID(),
+          status: 'rascunho',
+          total: novoTotal,
+          // R-114 — nasce null: sem plano de pagamento (R-34) ainda, o devido é derivado da
+          // soma dos itens aprovados, não deste campo (I1).
+          valor_acordado: null,
+          desconto: descontoValor,
+          created_at: new Date().toISOString(),
+          validade_dias: 30,
+          condicoes_pagamento: null,
+          mostrar_valor_por_item: false,
+          dentista_id: isSecretaria ? novoOrcDentistaAlvoId : meuDentistaId,
+          itens: itensValidos.map((i, idx) => ({
+            id: `temp-${idx}`,
+            descricao: i.descricao,
+            quantidade: i.quantidade,
+            preco_total: i.quantidade * parseValorBR(i.preco),
+            composicao: composicaoParaSalvar(i),
+            // R-114 — orçamento nasce Proposto: nenhum item aprovado ainda (mesmo default da
+            // coluna no banco). É o dentista/secretária que marca o que o paciente aceitou.
+            aprovado: false,
+          })),
+          pagamentos: [],
+          cobrancas: [],
+          aprovado_por: null,
+          aprovado_em: null,
+          aceite: null,
+        };
+        let podeAbrirConfiguracao = false;
+        if (result.id) {
+          try {
+            novoOrc = await carregarOrcamentoPersistido(result.id);
+            podeAbrirConfiguracao = true;
+          } catch {
+            // A proposta já está no banco; não inventamos ids temporários para ações de aceite.
+            // O refresh permite retomá-la pelo perfil sem risco de duplicação.
+            router.refresh();
+            toast.error('Proposta criada, mas não foi possível abrir a configuração agora. Recarregue o perfil para continuar.');
+          }
+        }
         setIsNovoOrcOpen(false);
         setNovoOrcItens([ITEM_VAZIO]);
-        onItensAdicionadosAoOrcamento?.(modoPersistencia.orcamentoId, eventoIdsConfirmados);
-        toast.success(`${itensValidos.length} procedimento${itensValidos.length === 1 ? '' : 's'} adicionado${itensValidos.length === 1 ? '' : 's'} ao orçamento.`);
-        router.refresh();
-      }
-      setOrcSaving(false);
-      return;
-    }
 
-    const result = await criarOrcamento({
-      pacienteId,
-      desconto: descontoValor,
-      fichaId: fichaParaSalvar,
-      dentistaId: isSecretaria ? novoOrcDentistaAlvoId : undefined,
-      itens: itensParaSalvar,
-    });
-
-    if (result.error) {
-      setOrcError(result.error);
-    } else {
-      const novoTotal = Math.max(0, subtotalValido - descontoValor);
-      let novoOrc: OrcamentoComItens = {
-        id: result.id ?? crypto.randomUUID(),
-        status: 'rascunho',
-        total: novoTotal,
-        // R-114 — nasce null: sem plano de pagamento (R-34) ainda, o devido é derivado da
-        // soma dos itens aprovados, não deste campo (I1).
-        valor_acordado: null,
-        desconto: descontoValor,
-        created_at: new Date().toISOString(),
-        validade_dias: 30,
-        condicoes_pagamento: null,
-        mostrar_valor_por_item: false,
-        dentista_id: isSecretaria ? novoOrcDentistaAlvoId : meuDentistaId,
-        itens: itensValidos.map((i, idx) => ({
-          id: `temp-${idx}`,
-          descricao: i.descricao,
-          quantidade: i.quantidade,
-          preco_total: i.quantidade * parseValorBR(i.preco),
-          // R-114 — orçamento nasce Proposto: nenhum item aprovado ainda (mesmo default da
-          // coluna no banco). É o dentista/secretária que marca o que o paciente aceitou.
-          aprovado: false,
-        })),
-        pagamentos: [],
-        cobrancas: [],
-        aprovado_por: null,
-        aprovado_em: null,
-        aceite: null,
-      };
-      let podeAbrirConfiguracao = false;
-      if (result.id) {
-        try {
-          novoOrc = await carregarOrcamentoPersistido(result.id);
-          podeAbrirConfiguracao = true;
-        } catch {
-          // A proposta já está no banco; não inventamos ids temporários para ações de aceite.
-          // O refresh permite retomá-la pelo perfil sem risco de duplicação.
-          router.refresh();
-          toast.error('Proposta criada, mas não foi possível abrir a configuração agora. Recarregue o perfil para continuar.');
+        // R-34 — plano de pagamento definido junto da criação (opcional). Roda depois do
+        // orçamento existir de verdade (precisa do id real, não do temp/otimista acima).
+        let precisaAtualizar = false;
+        if (result.id && !temGrupos && novoOrcPlanoForma === 'parcelado') {
+          const planoResult = await gerarParcelas({
+            orcamentoId: result.id,
+            numeroParcelas,
+            primeiroVencimento: novoOrcPrimeiroVencimento,
+            valorAcordado: novoTotal,
+            parcelasForma: novoOrcParcelasForma || undefined,
+          });
+          if (planoResult.error) {
+            toast.error(`Orçamento criado, mas o parcelamento falhou: ${planoResult.error}`);
+          } else {
+            precisaAtualizar = true;
+          }
+        } else if (result.id && !temGrupos && novoOrcPlanoForma === 'avista') {
+          const planoResult = await definirPlanoAvista({ orcamentoId: result.id, valorAcordado: novoTotal });
+          if (planoResult.error) {
+            toast.error(`Orçamento criado, mas a forma de pagamento falhou: ${planoResult.error}`);
+          } else {
+            precisaAtualizar = true;
+          }
         }
-      }
-      setIsNovoOrcOpen(false);
-      setNovoOrcItens([ITEM_VAZIO]);
+        setNovoOrcPlanoForma(null);
+        setNovoOrcNumParcelas('3');
+        setNovoOrcPrimeiroVencimento('');
+        setNovoOrcParcelasForma('');
+        if (precisaAtualizar && result.id) {
+          try {
+            novoOrc = await carregarOrcamentoPersistido(result.id);
+          } catch {
+            router.refresh();
+          }
+        }
+        onOrcamentoCriado?.(novoOrc);
 
-      // R-34 — plano de pagamento definido junto da criação (opcional). Roda depois do
-      // orçamento existir de verdade (precisa do id real, não do temp/otimista acima).
-      let precisaAtualizar = false;
-      if (result.id && novoOrcPlanoForma === 'parcelado') {
-        const planoResult = await gerarParcelas({
-          orcamentoId: result.id,
-          numeroParcelas,
-          primeiroVencimento: novoOrcPrimeiroVencimento,
-          valorAcordado: novoTotal,
-          parcelasForma: novoOrcParcelasForma || undefined,
+        toast.success('Orçamento criado como rascunho', {
+          description: 'Revise os itens e envie para o paciente quando estiver pronto.',
+          duration: 4000,
         });
-        if (planoResult.error) {
-          toast.error(`Orçamento criado, mas o parcelamento falhou: ${planoResult.error}`);
-        } else {
-          precisaAtualizar = true;
-        }
-      } else if (result.id && novoOrcPlanoForma === 'avista') {
-        const planoResult = await definirPlanoAvista({ orcamentoId: result.id, valorAcordado: novoTotal });
-        if (planoResult.error) {
-          toast.error(`Orçamento criado, mas a forma de pagamento falhou: ${planoResult.error}`);
-        } else {
-          precisaAtualizar = true;
-        }
+        if (result.id && podeAbrirConfiguracao) onContinuarConfiguracao?.(result.id);
       }
-      setNovoOrcPlanoForma(null);
-      setNovoOrcNumParcelas('3');
-      setNovoOrcPrimeiroVencimento('');
-      setNovoOrcParcelasForma('');
-      if (precisaAtualizar && result.id) {
-        try {
-          novoOrc = await carregarOrcamentoPersistido(result.id);
-        } catch {
-          router.refresh();
-        }
-      }
-      onOrcamentoCriado?.(novoOrc);
-
-      toast.success('Orçamento criado como rascunho', {
-        description: 'Revise os itens e envie para o paciente quando estiver pronto.',
-        duration: 4000,
-      });
-      if (result.id && podeAbrirConfiguracao) onContinuarConfiguracao?.(result.id);
+    } catch {
+      setOrcError("Não foi possível confirmar a operação. Confira os orçamentos antes de tentar novamente.");
+      toast.error("Não foi possível concluir a confirmação. Confira o perfil antes de repetir a operação.");
+      router.refresh();
+    } finally {
+      setOrcSaving(false);
     }
-    setOrcSaving(false);
   };
 
   const modalProps: NovoOrcamentoModalProps = {
@@ -985,6 +1021,7 @@ export function useOrcamentoModal({
     dentistasClinica,
     dentistaAlvoId: novoOrcDentistaAlvoId,
     onDentistaAlvoChange: handleDentistaAlvoChange,
+    titularRecebimento, setTitularRecebimento, recebimentoMisto,
     planoForma: novoOrcPlanoForma,
     setPlanoForma: setNovoOrcPlanoForma,
     planoNumParcelas: novoOrcNumParcelas,
