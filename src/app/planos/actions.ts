@@ -98,7 +98,7 @@ export async function createCheckout(
 ): Promise<{ url?: string; error?: string }> {
   if (!isCicloCobranca(ciclo)) return { error: 'Ciclo de cobrança inválido.' };
   try {
-    const { user, clinicId, dentistaId } = await requireClinicContext();
+    const { user, clinicId, dentistaId } = await requireClinicContext({ allowBlockedBilling: true });
     const service = createServiceClient();
     const [{ data: assinaturaAtual }, { data: clinicaAtual }] = await Promise.all([
       service.from('assinaturas_dentista').select('status')

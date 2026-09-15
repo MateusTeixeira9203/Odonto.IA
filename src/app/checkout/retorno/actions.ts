@@ -14,7 +14,7 @@ export type EstadoRetornoCheckout =
  * somente a assinatura do usuário autenticado, já sincronizada pelo webhook.
  */
 export async function conferirRetornoCheckout(): Promise<EstadoRetornoCheckout> {
-  const { user, clinicId } = await requireClinicContext();
+  const { user, clinicId } = await requireClinicContext({ allowBlockedBilling: true });
 
   if (clinicaIsentaDeCobranca(clinicId)) {
     return { estado: 'confirmado', formacao: false, onboardingCompleto: true };

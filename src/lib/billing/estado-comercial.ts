@@ -45,3 +45,8 @@ export function resolverEstadoComercial(input: EstadoComercialInput): EstadoCome
 export function estadoComercialPermiteCobranca(estado: EstadoComercial): boolean {
   return estado !== 'isento';
 }
+
+/** O bloqueio comercial preserva a sessão e os dados; somente a operação fica indisponível. */
+export function estadoComercialBloqueiaOperacao(estado: EstadoComercial): boolean {
+  return !['isento', 'trial', 'ativo'].includes(estado);
+}
