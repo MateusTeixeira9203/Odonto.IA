@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test",
+    "test": "node scripts/run-unit-tests.mjs",
     "test:watch": "tsx --test --watch src/**/*.test.ts"
   },
   "dependencies": {
