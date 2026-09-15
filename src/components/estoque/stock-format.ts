@@ -13,13 +13,15 @@ export function canonicalStockQuantity(value: string): string {
 }
 
 export function compareStockQuantity(a: string, b: string): number {
+  const microUnits = BigInt(1_000_000);
   const micros = (value: string) => {
     const negative = value.startsWith('-');
     const [whole, fraction = ''] = value.replace(/^-/, '').split('.');
-    return (BigInt(whole) * 1_000_000n + BigInt(fraction.padEnd(6, '0'))) * (negative ? -1n : 1n);
+    return (BigInt(whole) * microUnits + BigInt(fraction.padEnd(6, '0')))
+      * (negative ? BigInt(-1) : BigInt(1));
   };
   const difference = micros(a) - micros(b);
-  return difference < 0n ? -1 : difference > 0n ? 1 : 0;
+  return difference < BigInt(0) ? -1 : difference > BigInt(0) ? 1 : 0;
 }
 
 export function formatStockDate(value: string): string {

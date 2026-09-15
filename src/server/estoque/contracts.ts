@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const MICRO_UNITS = 1_000_000n;
+const MICRO_UNITS = BigInt(1_000_000);
 const CANONICAL_DECIMAL_PATTERN = /^(?:0|[1-9]\d{0,11})(?:\.\d{0,5}[1-9])?$/;
 const POSITIVE_CANONICAL_DECIMAL_PATTERN = /^(?:[1-9]\d{0,11})(?:\.\d{0,5}[1-9])?$|^0\.\d{0,5}[1-9]$/;
 const SIGNED_DECIMAL_PATTERN = /^(?:0|[1-9]\d{0,11}(?:\.\d{0,5}[1-9])?|0\.\d{0,5}[1-9]|-(?:[1-9]\d{0,11}(?:\.\d{0,5}[1-9])?|0\.\d{0,5}[1-9]))$/;
@@ -52,7 +52,7 @@ function isEquivalentPackageConversion(
   const product = decimalToMicrounits(quantidadeEmbalagens)
     * decimalToMicrounits(quantidadePorEmbalagem);
 
-  return product % MICRO_UNITS === 0n
+  return product % MICRO_UNITS === BigInt(0)
     && product / MICRO_UNITS === decimalToMicrounits(quantidadeBase);
 }
 
