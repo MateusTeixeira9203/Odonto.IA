@@ -109,3 +109,21 @@ Reteste manual no novo preview:
 Revisão estática UX final passou sem bloqueadores; diff sem erros de whitespace.
 A confirmação visual e os ciclos reais de uso continuam reservados ao usuário no preview.
 TypeScript passou; ESLint sem erros nos cinco arquivos de orçamento (27 avisos anteriores no client).
+
+Preview de correção Ready: [abrir](https://odonto-742kqydnk-mateusteixeira9203s-projects.vercel.app), SHA `25f6fd18e0d83ef703fd7dfeb5887042c611d0fc`,
+deployment `dpl_BXT4m3wVYdeKQLkmEyWvXqQbf5Mq`. Build concluído, target preview.
+
+## Evolução clínica — retorno manual R169c
+
+Usuário determinou que Complementar evolução edite somente a narrativa da consulta exibida.
+Novo botão Editar evolução clínica abre textarea inline com Salvar/Cancelar. Novo atendimento,
+Dex, procedimentos e orçamento não participam desse caminho. Reteste: editar/salvar/reabrir;
+cancelar; texto vazio; duas consultas distintas; autoria e ficha assinada.
+
+- Typecheck e ESLint passaram nos três arquivos TypeScript alterados.
+- Revisões estáticas UX e contrato aprovadas; foco volta ao botão ao fechar o editor.
+- PGlite 9/9: escrita textual isolada, CAS, autoria/clínica/papel, assinaturas, automática,
+  legado/limpeza, moderna já vinculada, contexto/limites e ACL/rollback.
+- RPC `editar_evolucao_clinica` aplicada no principal, security invoker; sem novas tabelas,
+  colunas, policies ou dados clínicos de teste. Teste manual autenticado é do usuário.
+- Limitação preexistente de PATCH direto/RLS registrada na spec R169c.

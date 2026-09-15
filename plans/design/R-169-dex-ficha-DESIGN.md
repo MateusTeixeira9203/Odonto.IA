@@ -91,3 +91,9 @@ validar em artefato antes do componente. Não há aprovação visual presumida p
 Artefato inclui painel/editor, CTA âmbar e aviso do orçamento nos dois temas e em mobile/desktop; sem exploração de quatro
 direções porque a direção existente e a localização já foram escolhidas.
 Critério: parece parte da ficha atual e permite adicionar/editar sem mudança de contexto.
+
+## Evolução clínica — ajuste do teste manual
+
+O bloco conserva posição, cartão e tipografia. Editar evolução clínica substitui Complementar
+evolução; editor inline com textarea, label e Salvar/Cancelar. Sem bancada, captura Dex ou
+procedimentos nesse caminho. Contrato e exceções em R-169c-editar-evolucao.md.
