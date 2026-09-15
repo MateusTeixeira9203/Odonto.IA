@@ -184,9 +184,17 @@ export function AgendamentosClient({
 }: Props) {
   const router = useRouter();
   const isSecretaria = role === 'secretaria';
-  // A lista inicial vem do Server Component, mas a PWA pode ficar aberta enquanto a
-  // equipe muda. Rebusca no cliente para a ação não desaparecer por uma prop defasada.
+  // A lista inicial vem do Server Component; ao abrir um fluxo de pedido, a PWA a atualiza
+  // pelo mesmo Server Action usado em “Marcar retorno”.
   const [proteticosAtivos, setProteticosAtivos] = useState<ProteticoOption[]>(proteticos);
+  const recarregarProteticosAtivos = useCallback(async () => {
+    try {
+      const resultado = await listarProteticosAtivos();
+      if (resultado.ok) setProteticosAtivos(resultado.data);
+    } catch {
+      // Mantém a lista inicial caso a atualização em segundo plano falhe.
+    }
+  }, []);
 
   /**
    * A semana é a visão inicial em qualquer dispositivo. A página já aplica
@@ -288,16 +296,6 @@ export function AgendamentosClient({
   useEffect(() => {
     setBloqueios(bloqueiosIniciais);
   }, [bloqueiosIniciais]);
-
-  useEffect(() => {
-    let cancelado = false;
-    void listarProteticosAtivos().then((resultado) => {
-      if (!cancelado && resultado.ok) setProteticosAtivos(resultado.data);
-    }).catch(() => {
-      // A lista inicial continua disponível caso a atualização em segundo plano falhe.
-    });
-    return () => { cancelado = true; };
-  }, []);
 
   // Multi-user: recarrega os agendamentos do mês.
   //
@@ -588,6 +586,7 @@ export function AgendamentosClient({
    * trocar o filtro e reabrir o drawer traria o dentista da vez anterior.
    */
   const abrirNovoAgendamento = useCallback((pre?: { data?: string; hora?: string; dentistaId?: string }) => {
+    void recarregarProteticosAtivos();
     setSaveError(null);
     setAvisoNovoAgendamento(null);
     setNovoForm((f) => ({
@@ -597,7 +596,7 @@ export function AgendamentosClient({
       dentistaId: pre?.dentistaId ?? dentistaPadraoForm(),
     }));
     setIsNewModalOpen(true);
-  }, [dentistaPadraoForm]);
+  }, [dentistaPadraoForm, recarregarProteticosAtivos]);
 
   // Clique no espaço vazio da grade (Dia ou Semana) — mesmo handler pras duas, o `dentistaId`
   // só chega preenchido quando a coluna clicada tem dono conhecido (spec §3.5).
@@ -898,11 +897,12 @@ export function AgendamentosClient({
   };
 
   const handleOpenDetail = useCallback((apt: AgendamentoRow) => {
+    void recarregarProteticosAtivos();
     setSelectedApt(apt);
     setDetailMode('view');
     setSaveError(null);
     setIsDetailModalOpen(true);
-  }, []);
+  }, [recarregarProteticosAtivos]);
 
   const enterEditMode = () => {
     if (!selectedApt) return;

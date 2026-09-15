@@ -335,6 +335,9 @@ export async function atualizarStatusAgendamento(
 export async function atualizarAgendamento(
   id: string,
   dados: {
+    /** R161d: comparação otimista para não reabrir uma consulta alterada em outra sessão. */
+    dataHoraEsperada?: string;
+    statusEsperado?: 'scheduled';
     pacienteId?: string;
     dataHora?: string;
     duracaoMinutos?: number;
@@ -428,20 +431,24 @@ export async function atualizarAgendamento(
     }
   }
 
-  const { error } = await supabase
+  let update = supabase
     .from("agendamentos")
     .update({
       ...(dados.pacienteId && { paciente_id: dados.pacienteId }),
       ...(dados.dataHora && { data_hora: dados.dataHora }),
       ...(dados.duracaoMinutos && { duracao_minutos: dados.duracaoMinutos }),
-      observacoes: dados.observacoes ?? null,
+      ...(dados.observacoes !== undefined && { observacoes: dados.observacoes }),
       ...(dados.status && { status: dados.status }),
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)
     .eq("clinica_id", clinicId);
 
+  if (dados.dataHoraEsperada) update = update.eq('data_hora', dados.dataHoraEsperada);
+  if (dados.statusEsperado) update = update.eq('status', dados.statusEsperado);
+  const { data: changed, error } = await update.select('id');
   if (error) return { error: error.message };
+  if (!changed?.length) return { error: 'Este agendamento mudou ou não está acessível. Atualize a agenda antes de tentar novamente.' };
 
   try {
     const { data: agendamento } = await supabase
@@ -450,6 +457,7 @@ export async function atualizarAgendamento(
         "google_event_id, dentista_id, data_hora, duracao_minutos, observacoes, paciente:pacientes(nome), dentista:dentistas!agendamentos_dentista_id_fkey(nome)"
       )
       .eq("id", id)
+      .eq("clinica_id", clinicId)
       .maybeSingle<{
         google_event_id: string | null;
         dentista_id: string;
