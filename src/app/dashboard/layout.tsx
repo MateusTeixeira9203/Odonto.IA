@@ -8,6 +8,8 @@ import { createServiceClient } from '@/lib/supabase/service';
 import { clinicaIsentaDeCobranca } from '@/lib/billing/exemptions';
 import { resolverEstadoComercial } from '@/lib/billing/estado-comercial';
 import { obterAcessoFormacaoClinica } from '@/server/services/formacao-clinica';
+import { obterContextoClinica } from '@/server/clinica/operations';
+import { isTeamWorkspaceEnabled } from '@/server/auth/team-workspace-pilot';
 
 const ROTA_PROTETICO = "/dashboard/protetico";
 
@@ -20,6 +22,9 @@ export default async function DashboardLayout({
   const pathname = (await headers()).get('x-pathname') ?? '/dashboard';
 
   const dentista = await getDentistaCached();
+  const consultorioPessoalEnabled = isTeamWorkspaceEnabled()
+    && (dentista?.role === 'admin' || dentista?.role === 'dentista');
+  const ownerContext = consultorioPessoalEnabled ? await obterContextoClinica({ clinicaIdEsperada: clinicId }) : null;
 
   if (!dentista) {
     redirect("/onboarding");
@@ -123,6 +128,9 @@ export default async function DashboardLayout({
       avatarUrl={dentista.avatar_url}
       plano={dentista.plano}
       dentistaId={dentista.id}
+      consultorioPessoalEnabled={consultorioPessoalEnabled}
+      clinicaOwnerEnabled={ownerContext?.ok === true && ownerContext.data.proprietario}
+      pendenciasEnabled={isTeamWorkspaceEnabled()}
     >
       {children}
       <WelcomeModal clinicaNome={dentista.clinica} />

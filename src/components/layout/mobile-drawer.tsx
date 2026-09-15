@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  LayoutDashboard, Users, Calendar, CalendarClock, Wallet, Settings,
+  LayoutDashboard, Users, Calendar, CalendarClock, Wallet, Building2, Settings, ListChecks, Package,
   X, LogOut, Sun, Moon, Lock, Loader2,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
@@ -21,9 +21,13 @@ interface MobileDrawerProps {
   onClose: () => void;
   nome: string;
   clinicaNome: string;
-  role: DentistaRole;
+  role: DentistaRole | 'gestor';
   avatarUrl?: string | null;
   plano?: PlanoId;
+  consultorioPessoalEnabled?: boolean;
+  pendenciasEnabled?: boolean;
+  clinicaOwnerEnabled?: boolean;
+  managementOnly?: boolean;
 }
 
 const NAV_ITEMS = [
@@ -37,7 +41,13 @@ const NAV_ITEMS = [
   { href: '/dashboard/configuracoes',icon: Settings,        label: 'Configurações', hideFromSecretaria: true },
 ] as const;
 
-export function MobileDrawer({ open, onClose, nome, clinicaNome, role, avatarUrl, plano }: MobileDrawerProps) {
+const CONSULTORIO_PESSOAL_NAV_ITEM = {
+  href: '/dashboard/meu-consultorio',
+  icon: Building2,
+  label: 'Consultório',
+} as const;
+
+export function MobileDrawer({ open, onClose, nome, clinicaNome, role, avatarUrl, plano, consultorioPessoalEnabled = false, pendenciasEnabled = false, clinicaOwnerEnabled = false, managementOnly = false }: MobileDrawerProps) {
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -50,9 +60,13 @@ export function MobileDrawer({ open, onClose, nome, clinicaNome, role, avatarUrl
 
   // R-94 — protético só acessa /dashboard/protetico (gate em dashboard/layout.tsx);
   // nenhum destino da nav faz sentido pra ele.
+  const navItems = consultorioPessoalEnabled
+    ? NAV_ITEMS.map(item => item.href === '/dashboard/financeiro' ? (clinicaOwnerEnabled ? { ...CONSULTORIO_PESSOAL_NAV_ITEM, href: '/clinica', label: 'Clínica' } : CONSULTORIO_PESSOAL_NAV_ITEM) : item)
+    : NAV_ITEMS;
+  const navigation = managementOnly ? [{ href: '/clinica', icon: Building2, label: 'Clínica', id: 'clinica' }, { href: '/equipe', icon: Users, label: 'Equipe', id: 'equipe' }, { href: '/estoque', icon: Package, label: 'Estoque', id: 'estoque' }] : pendenciasEnabled ? [...navItems.slice(0, 4), { href: '/pendencias', icon: ListChecks, label: 'Pendências', id: 'pendencias' }, ...navItems.slice(4)] : navItems;
   const visibleItems = role === 'protetico'
     ? []
-    : NAV_ITEMS.filter(item => !('hideFromSecretaria' in item && item.hideFromSecretaria && role === 'secretaria'));
+    : navigation.filter(item => !('hideFromSecretaria' in item && item.hideFromSecretaria && role === 'secretaria'));
 
   return (
     <AnimatePresence>

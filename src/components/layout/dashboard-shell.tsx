@@ -19,13 +19,17 @@ interface DashboardShellProps {
   nome: string;
   clinicaNome: string;
   activeClinicId: string;
-  role: DentistaRole;
+  role: DentistaRole | 'gestor';
   avatarUrl?: string | null;
   plano?: PlanoId;
-  dentistaId: string;
+  dentistaId?: string;
+  consultorioPessoalEnabled?: boolean;
+  pendenciasEnabled?: boolean;
+  clinicaOwnerEnabled?: boolean;
+  managementOnly?: boolean;
 }
 
-export function DashboardShell({ children, nome, clinicaNome, activeClinicId, role, avatarUrl, plano }: DashboardShellProps) {
+export function DashboardShell({ children, nome, clinicaNome, activeClinicId, role, avatarUrl, plano, consultorioPessoalEnabled = false, pendenciasEnabled = false, clinicaOwnerEnabled = false, managementOnly = false }: DashboardShellProps) {
   const router = useRouter();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -57,6 +61,7 @@ export function DashboardShell({ children, nome, clinicaNome, activeClinicId, ro
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (managementOnly) return;
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
         if (isCommandPaletteOpen) {
@@ -68,7 +73,7 @@ export function DashboardShell({ children, nome, clinicaNome, activeClinicId, ro
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [isCommandPaletteOpen, openCommandPalette, closeCommandPalette]);
+  }, [isCommandPaletteOpen, openCommandPalette, closeCommandPalette, managementOnly]);
 
   return (
     <div className="relative min-h-screen overflow-x-hidden">
@@ -87,6 +92,10 @@ export function DashboardShell({ children, nome, clinicaNome, activeClinicId, ro
         role={role}
         avatarUrl={avatarUrl}
         plano={plano}
+        consultorioPessoalEnabled={consultorioPessoalEnabled}
+        pendenciasEnabled={pendenciasEnabled}
+        clinicaOwnerEnabled={clinicaOwnerEnabled}
+        managementOnly={managementOnly}
       />
 
       <MobileDrawer
@@ -97,6 +106,10 @@ export function DashboardShell({ children, nome, clinicaNome, activeClinicId, ro
         role={role}
         avatarUrl={avatarUrl}
         plano={plano}
+        consultorioPessoalEnabled={consultorioPessoalEnabled}
+        pendenciasEnabled={pendenciasEnabled}
+        clinicaOwnerEnabled={clinicaOwnerEnabled}
+        managementOnly={managementOnly}
       />
 
       {/* FASE 1: guia desativado — ver roadmap-3-fases A2 */}
@@ -104,9 +117,9 @@ export function DashboardShell({ children, nome, clinicaNome, activeClinicId, ro
 
       {/* D4 — hub monta também pra secretária: ela tem os 3 alertas computados e é
           quem liga pro paciente; antes o botão dela existia mas nunca abria nada (C2) */}
-      {role !== 'protetico' && <DexWidget nome={nome} />}
+      {!managementOnly && role !== 'protetico' && <DexWidget nome={nome} />}
 
-      {hasMountedPalette && (
+      {!managementOnly && hasMountedPalette && (
         <CommandPalette
           open={isCommandPaletteOpen}
           onClose={closeCommandPalette}

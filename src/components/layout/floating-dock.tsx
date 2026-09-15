@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
 import {
-  LayoutDashboard, Users, Calendar, CalendarClock, Wallet, Settings,
+  LayoutDashboard, Users, Calendar, CalendarClock, Wallet, Building2, Settings, ListChecks, Package,
   Sun, Moon, User, LogOut, Bot, Check, ChevronsUpDown, Loader2,
 } from 'lucide-react';
 import { OdontoIALogo } from '@/components/ui/dent-ia-logo';
@@ -23,9 +23,13 @@ interface FloatingDockProps {
   nome: string;
   clinicaNome: string;
   activeClinicId: string;
-  role: DentistaRole;
+  role: DentistaRole | 'gestor';
   avatarUrl?: string | null;
   plano?: PlanoId;
+  consultorioPessoalEnabled?: boolean;
+  pendenciasEnabled?: boolean;
+  clinicaOwnerEnabled?: boolean;
+  managementOnly?: boolean;
 }
 
 const ROLE_PT: Record<string, string> = {
@@ -45,14 +49,21 @@ const NAV_ITEMS = [
   { href: '/dashboard/configuracoes',icon: Settings,        label: 'Config',     id: 'config',     hideFromSecretaria: true },
 ] as const;
 
+const CONSULTORIO_PESSOAL_NAV_ITEM = {
+  href: '/dashboard/meu-consultorio',
+  icon: Building2,
+  label: 'Consultório',
+  id: 'meu-consultorio',
+} as const;
+
 const subscribeMounted = () => () => {};
 
-export function FloatingDock({ nome, clinicaNome, activeClinicId, role, avatarUrl, plano }: FloatingDockProps) {
+export function FloatingDock({ nome, clinicaNome, activeClinicId, role, avatarUrl, plano, consultorioPessoalEnabled = false, pendenciasEnabled = false, clinicaOwnerEnabled = false, managementOnly = false }: FloatingDockProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const mounted = useSyncExternalStore(subscribeMounted, () => true, () => false);
-  const dexBadge = useDexBadge(role !== 'protetico');
+  const dexBadge = useDexBadge(!managementOnly && role !== 'protetico');
   const { clinicas, loading: clinicasLoading, switching, switchClinic } = useClinicSwitcher();
 
   // R-19 — convenção de zona segura: o dock publica sua presença (body.has-dock) pra que barras
@@ -72,7 +83,11 @@ export function FloatingDock({ nome, clinicaNome, activeClinicId, role, avatarUr
 
   // R-94 — protético só acessa /dashboard/protetico (gate em dashboard/layout.tsx);
   // nenhum destino da nav faz sentido pra ele.
-  const visibleItems = role === 'protetico' ? [] : NAV_ITEMS.filter(item => {
+  const navItems = consultorioPessoalEnabled
+    ? NAV_ITEMS.map(item => item.id === 'financeiro' ? (clinicaOwnerEnabled ? { ...CONSULTORIO_PESSOAL_NAV_ITEM, href: '/clinica', label: 'Clínica' } : CONSULTORIO_PESSOAL_NAV_ITEM) : item)
+    : NAV_ITEMS;
+  const navigation = managementOnly ? [{ href: '/clinica', icon: Building2, label: 'Clínica', id: 'clinica' }, { href: '/equipe', icon: Users, label: 'Equipe', id: 'equipe' }, { href: '/estoque', icon: Package, label: 'Estoque', id: 'estoque' }] : pendenciasEnabled ? [...navItems.slice(0, 4), { href: '/pendencias', icon: ListChecks, label: 'Pendências', id: 'pendencias' }, ...navItems.slice(4)] : navItems;
+  const visibleItems = role === 'protetico' ? [] : navigation.filter(item => {
     if ('hideFromSecretaria' in item && item.hideFromSecretaria && role === 'secretaria') return false;
     return true;
   });
@@ -126,7 +141,7 @@ export function FloatingDock({ nome, clinicaNome, activeClinicId, role, avatarUr
       <div className="w-px h-6 bg-white/[0.07] mx-1 shrink-0" />
 
       {/* ── Dex ball — protético não usa o assistente clínico ── */}
-      {role !== 'protetico' && (
+      {!managementOnly && role !== 'protetico' && (
         <button
           title="Abrir DEX"
           onClick={() => window.dispatchEvent(new Event('dex-toggle'))}
@@ -249,7 +264,7 @@ export function FloatingDock({ nome, clinicaNome, activeClinicId, role, avatarUr
 
             {/* Perfil — protético não tem essa rota (gate em dashboard/layout.tsx bloqueia
                 qualquer coisa fora de /dashboard/protetico); item sumiria num redirect de volta */}
-            {role !== 'protetico' && (
+            {!managementOnly && role !== 'protetico' && (
               <DropdownMenu.Item
                 onSelect={() => router.push('/dashboard/perfil')}
                 className="flex items-center gap-2.5 px-2 py-2 text-sm text-white/55 hover:text-white hover:bg-white/[0.06] rounded-xl outline-none cursor-pointer transition-all group"

@@ -115,7 +115,7 @@ function LoginFormContent(): React.JSX.Element {
 
   return (
     <AuthEntryShell
-      eyebrow="Área do dentista"
+      eyebrow="Área da clínica"
       title="Bem-vindo de volta."
       description="Acesse sua conta e continue de onde parou."
     >
