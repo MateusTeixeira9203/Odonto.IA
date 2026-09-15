@@ -39,9 +39,8 @@
 // Anexos, 1 aberta por vez), depois rodapé. `RegistrarPainel` virou hook
 // (`useRegistrarPainel`) — mesmo estado/lógica, só devolve as peças posicionáveis.
 //
-// Direita é 1 ocupante só, 3 níveis: espelho (default) → `DenteHistoricoCard` (tocar o
-// dente — leitura antes de escrita, F2) → `ToothDetailPanel` (editor de faces/chips,
-// "+ registrar neste dente"). `tabelaContainer`/portal SAÍRAM (achado dele 08/08: a tabela
+// Direita é 1 ocupante por vez: espelho (default) ou `ToothDetailPanel` direto ao tocar o
+// dente. O histórico longitudinal permanece em Plano e histórico. `tabelaContainer`/portal SAÍRAM (achado dele 08/08: a tabela
 // de especialidade full-width abaixo da linha ficava sem fundo, "flutuando" — ele queria
 // DENTRO do card do perfil) — `ToothDetailPanel` sem esse prop já renderiza a seção inline,
 // dentro do próprio card (555px é bem mais que os 312px que motivaram o portal originalmente).
@@ -87,8 +86,6 @@ function rotuloNovo(e: OdontogramaEventoDraft): string {
   }
   return label;
 }
-import { DenteHistoricoCard } from './dente-historico-card';
-import { VisitaLeituraCard } from './visita-leitura-card';
 import { ToothDetailPanel } from '@/components/odontograma/ToothDetailPanel';
 import {
   useOrcamentoModal,
@@ -100,8 +97,9 @@ import { DicaZona } from './dica-zona';
 import { DexOnboardingController } from './dex-onboarding-controller';
 import { hojeBRT } from '@/lib/hora-brt';
 import { criarEventosContextuais } from '@/lib/odontograma/criar-eventos-contextuais';
-import { responsavelPassaFiltro, FILTRO_MEUS } from '@/lib/fichas/filtro-responsavel';
-import type { MeuDiaData, MeuDiaPendencia, MeuDiaVisita } from '@/server/dashboard/get-meu-dia';
+import type { MeuDiaData, MeuDiaPendencia } from '@/server/dashboard/get-meu-dia';
+import { projetarPlanoTratamento } from '@/lib/meu-dia/plano-tratamento';
+import type { MomentoPlanejado } from '@/types/odontograma';
 import { TIPO_LABEL, type OdontogramaEventoDraft } from '@/types/odontograma';
 import type { EventoOdontogramaParaOrc } from '@/app/dashboard/pacientes/[id]/_components/types';
 import type { GrupoAberto } from '@/lib/odontograma/grupos-abertos';
@@ -198,10 +196,6 @@ export function MeuDiaClient({
   const [fichaRascunhoId, setFichaRascunhoId] = useState<string | null>(null);
   const [denteAberto, setDenteAberto] = useState<number | null>(null);
   const [iniciarPonteDente, setIniciarPonteDente] = useState<number | null>(null);
-  /** R-78 F2 — dente aberto mostra o HISTÓRICO por padrão (§3.2 da spec: leitura antes de
-   *  escrita); isto revela o editor de faces/chips (`ToothDetailPanel`, reusado tal qual)
-   *  por cima, via "+ registrar neste dente" ou "continuar aqui" do aviso de grupo aberto. */
-  const [registrandoDenteAberto, setRegistrandoDenteAberto] = useState(false);
   /** R-78 — id do evento cuja tabela de especialidade deve nascer já aberta no editor
    *  (⤢ de um card de "Nesta ficha"). `null` = editor nasce fechado, comportamento normal. */
   const [detalheAlvoId, setDetalheAlvoId] = useState<string | null>(null);
@@ -209,10 +203,6 @@ export function MeuDiaClient({
    *  aberta pro dente atual. É o que o slot central (`RegistrarPainel`) lê pra decidir se
    *  troca o mapa — vem de `onDetalheAbertoChange`, nunca escrito direto por outro caminho. */
   const [detalheEspecialidadeAberto, setDetalheEspecialidadeAberto] = useState(false);
-  /** R-78 F4 — "ler tudo ⤢" do texto de uma visita no Histórico. 4º ocupante do slot direito
-   *  (§3.2: 1 ocupante só) — mutuamente exclusivo com `denteAberto` (ver handleDenteAbertoChange
-   *  e abrirLeituraGrande). */
-  const [leituraGrande, setLeituraGrande] = useState<MeuDiaVisita | null>(null);
   const [textoVisita, setTextoVisita] = useState('');
   const [gruposAbertos, setGruposAbertos] = useState<GrupoAberto[]>([]);
   /** R-46d D8 — "Anexar documentos": preso ao paciente, sem persistência (mesmo reset de
@@ -239,7 +229,10 @@ export function MeuDiaClient({
   const [modoEncaminhar, setModoEncaminhar] = useState(false);
   const [selecionadosEncaminhar, setSelecionadosEncaminhar] = useState<Set<string>>(new Set());
   const [destinoEncaminhar, setDestinoEncaminhar] = useState<string | null>(null);
-  const [acaoPlanoEmAndamentoId, setAcaoPlanoEmAndamentoId] = useState<string | null>(null);
+  const [momentosOtimistas, setMomentosOtimistas] = useState<Map<string, MomentoPlanejado>>(new Map());
+  const [idsConcluidosOtimistas, setIdsConcluidosOtimistas] = useState<Set<string>>(new Set());
+  const [acoesPlanoEmAndamento, setAcoesPlanoEmAndamento] = useState<Set<string>>(new Set());
+  const tokensPlano = useRef(new Map<string, string>());
   const [ultimaAcaoPlano, setUltimaAcaoPlano] = useState<UltimaAcaoPlano | null>(null);
 
   // R-78 F0 — as duas barras de abas morreram: "Hoje"/"Novos" fundiram em "Nesta ficha"
@@ -262,9 +255,7 @@ export function MeuDiaClient({
     setFichaRascunhoId(null); // R-85 — ficha do orçamento antecipado é do paciente anterior
     setDenteAberto(null);
     setDetalheEspecialidadeAberto(false); // R-63 — paciente novo não herda tabela aberta do anterior
-    setRegistrandoDenteAberto(false); // R-78 F2 — idem, nunca herda o editor aberto
     setDetalheAlvoId(null);
-    setLeituraGrande(null); // R-78 F4 — idem, nunca herda a leitura de visita do paciente anterior
     setGavetaAberta(null); // G13 — troca de paciente reseta a gaveta pro default (fechada)
     setTextoVisita('');
     // Trocar de paciente com o modo de encaminhar ligado deixaria a barra selecionando
@@ -272,7 +263,10 @@ export function MeuDiaClient({
     setModoEncaminhar(false);
     setSelecionadosEncaminhar(new Set());
     setDestinoEncaminhar(null);
-    setAcaoPlanoEmAndamentoId(null);
+    setMomentosOtimistas(new Map());
+    setIdsConcluidosOtimistas(new Set());
+    setAcoesPlanoEmAndamento(new Set());
+    tokensPlano.current.clear();
     setUltimaAcaoPlano(null);
     // D8 — documento anexado é do paciente anterior, não sobrevive à troca.
     setDocumentoNome(null);
@@ -486,7 +480,7 @@ export function MeuDiaClient({
       })();
     },
     onAbrirDetalheEndo: abrirDenteGrande,
-    onAbrirDetalheDental: abrirDetalheDental,
+    onOdontogramaInteragido: () => setJaTocouDente(true),
     onIniciarPonte: iniciarPonte,
   });
 
@@ -523,9 +517,7 @@ export function MeuDiaClient({
     setFichaRascunhoId(null);
     setDenteAberto(null);
     setDetalheEspecialidadeAberto(false);
-    setRegistrandoDenteAberto(false);
     setDetalheAlvoId(null);
-    setLeituraGrande(null);
     setTextoVisita('');
     avancarProximo();
     router.refresh();
@@ -557,37 +549,18 @@ export function MeuDiaClient({
     // R-63 — nova seleção (ou fechar via ✕) nunca herda a tabela aberta do dente anterior;
     // o próprio ToothDetailPanel também reseta o índice local pro mesmo efeito (§4.2/I3).
     setDetalheEspecialidadeAberto(false);
-    // R-78 F2 — trocar de dente (ou fechar) sempre volta pro histórico; nunca herda o
-    // editor aberto do dente anterior.
-    setRegistrandoDenteAberto(false);
     setDetalheAlvoId(null);
-    // R-78 F4 — tocar um dente sai do modo "ler visita" (1 ocupante só, §3.2).
-    setLeituraGrande(null);
   }
 
-  /** R-78 F4 — "ler tudo ⤢" de uma visita no Histórico. Fecha o dente se algum estava
-   *  aberto (mesma regra do ocupante único, §3.2) — a gaveta continua aberta, só o slot
-   *  direito troca. */
-  function abrirLeituraGrande(visita: MeuDiaVisita) {
-    setDenteAberto(null);
-    setRegistrandoDenteAberto(false);
-    setDetalheAlvoId(null);
-    setLeituraGrande(visita);
-  }
-
-  /** R-78 — ⤢ de um card de "Nesta ficha": vai direto pro editor do dente (pula o
-   *  histórico, o dentista já sabe o que quer editar) com a tabela já expandida. */
+  /** R-154 — ⤢ da revisão abre a mesma ficha rápida do clique no odontograma. */
   function abrirDenteGrande(dente: number, eventoId: string) {
     handleDenteAbertoChange(dente);
-    setRegistrandoDenteAberto(true);
     setDetalheAlvoId(eventoId);
   }
 
-  /** R-122 — seleção no mapa não abre nada. Este é o gesto explícito que leva às faces,
-   * histórico e tabelas do dente escolhido. */
+  /** Ação auxiliar da faixa multidente: abre a mesma ficha rápida. */
   function abrirDetalheDental(dente: number) {
     handleDenteAbertoChange(dente);
-    setRegistrandoDenteAberto(true);
     setDetalheAlvoId(null);
   }
 
@@ -600,7 +573,7 @@ export function MeuDiaClient({
   // devolve para o odontograma; campos internos que já usam Esc (ex.: busca livre)
   // chamam preventDefault e preservam seu próprio comportamento.
   useEffect(() => {
-    if (denteAberto == null || !registrandoDenteAberto) return;
+    if (denteAberto == null) return;
 
     function voltarAoOdontograma(event: KeyboardEvent) {
       if (event.key !== 'Escape' || event.defaultPrevented) return;
@@ -610,7 +583,7 @@ export function MeuDiaClient({
 
     window.addEventListener('keydown', voltarAoOdontograma);
     return () => window.removeEventListener('keydown', voltarAoOdontograma);
-  }, [denteAberto, handleDenteAbertoChange, registrandoDenteAberto]);
+  }, [denteAberto, handleDenteAbertoChange]);
 
   /** Registro próprio entra na revisão da consulta como rascunho com o MESMO id. Assim o
    * dentista informa detalhe de implante/canal antes do save, sem criar evento fantasma. */
@@ -627,10 +600,40 @@ export function MeuDiaClient({
   /** Encaminhado é exceção deliberada: o destino não pode editar detalhe/autoria do evento
    * alheio, mas pode concluir pelo caminho estreito autorizado pela RPC. */
   async function concluirEncaminhada(pendencia: MeuDiaPendencia): Promise<void> {
-    setAcaoPlanoEmAndamentoId(pendencia.id);
-    const resultado = await atualizarStatusEncaminhado({ eventoIds: [pendencia.id], novoStatus: 'realizado' });
-    setAcaoPlanoEmAndamentoId(null);
+    const token = crypto.randomUUID();
+    tokensPlano.current.set(pendencia.id, token);
+    setIdsConcluidosOtimistas((anteriores) => new Set(anteriores).add(pendencia.id));
+    setAcoesPlanoEmAndamento((anteriores) => new Set(anteriores).add(pendencia.id));
+    let resultado: Awaited<ReturnType<typeof atualizarStatusEncaminhado>>;
+    try {
+      resultado = await atualizarStatusEncaminhado({ eventoIds: [pendencia.id], novoStatus: 'realizado' });
+    } catch {
+      if (tokensPlano.current.get(pendencia.id) !== token) return;
+      setIdsConcluidosOtimistas((anteriores) => {
+        const proximo = new Set(anteriores);
+        proximo.delete(pendencia.id);
+        return proximo;
+      });
+      setAcoesPlanoEmAndamento((anteriores) => {
+        const proximo = new Set(anteriores);
+        proximo.delete(pendencia.id);
+        return proximo;
+      });
+      toast.error('Não foi possível concluir o procedimento encaminhado.');
+      return;
+    }
+    if (tokensPlano.current.get(pendencia.id) !== token) return;
+    setAcoesPlanoEmAndamento((anteriores) => {
+      const proximo = new Set(anteriores);
+      proximo.delete(pendencia.id);
+      return proximo;
+    });
     if (!resultado.ok) {
+      setIdsConcluidosOtimistas((anteriores) => {
+        const proximo = new Set(anteriores);
+        proximo.delete(pendencia.id);
+        return proximo;
+      });
       toast.error(resultado.error ?? 'Não foi possível concluir o procedimento encaminhado.');
       return;
     }
@@ -643,17 +646,47 @@ export function MeuDiaClient({
     pendencia: MeuDiaPendencia,
     situacao: 'sessao_atual' | 'proxima_sessao',
   ): Promise<void> {
-    const propria = pendencia.dentistaId === meuDentistaId;
-    if (!propria) {
+    const responsavelId = pendencia.encaminhadoParaId ?? pendencia.dentistaId;
+    if (pendencia.dentistaId !== meuDentistaId || responsavelId !== meuDentistaId) {
       toast.error('Só o dentista autor pode organizar a próxima sessão.');
       return;
     }
     if (pendencia.momentoPlanejado === situacao) return;
 
-    setAcaoPlanoEmAndamentoId(pendencia.id);
-    const resultado = await alternarMomentoRegistro({ eventoIds: [pendencia.id], novoMomento: situacao });
-    setAcaoPlanoEmAndamentoId(null);
+    const token = crypto.randomUUID();
+    tokensPlano.current.set(pendencia.id, token);
+    setMomentosOtimistas((anteriores) => new Map(anteriores).set(pendencia.id, situacao));
+    setAcoesPlanoEmAndamento((anteriores) => new Set(anteriores).add(pendencia.id));
+    let resultado: Awaited<ReturnType<typeof alternarMomentoRegistro>>;
+    try {
+      resultado = await alternarMomentoRegistro({ eventoIds: [pendencia.id], novoMomento: situacao });
+    } catch {
+      if (tokensPlano.current.get(pendencia.id) !== token) return;
+      setMomentosOtimistas((anteriores) => {
+        const proximo = new Map(anteriores);
+        proximo.delete(pendencia.id);
+        return proximo;
+      });
+      setAcoesPlanoEmAndamento((anteriores) => {
+        const proximo = new Set(anteriores);
+        proximo.delete(pendencia.id);
+        return proximo;
+      });
+      toast.error('Não foi possível atualizar o procedimento.');
+      return;
+    }
+    if (tokensPlano.current.get(pendencia.id) !== token) return;
+    setAcoesPlanoEmAndamento((anteriores) => {
+      const proximo = new Set(anteriores);
+      proximo.delete(pendencia.id);
+      return proximo;
+    });
     if (!resultado.ok) {
+      setMomentosOtimistas((anteriores) => {
+        const proximo = new Map(anteriores);
+        proximo.delete(pendencia.id);
+        return proximo;
+      });
       toast.error(resultado.error ?? 'Não foi possível atualizar o procedimento.');
       return;
     }
@@ -673,15 +706,49 @@ export function MeuDiaClient({
   async function desfazerUltimaAcaoDoPlano(): Promise<void> {
     if (ultimaAcaoPlano == null) return;
     const { pendencia, momentoAnterior } = ultimaAcaoPlano;
-    setAcaoPlanoEmAndamentoId(pendencia.id);
-    const resultado = await alternarMomentoRegistro({ eventoIds: [pendencia.id], novoMomento: momentoAnterior });
+    const token = crypto.randomUUID();
+    tokensPlano.current.set(pendencia.id, token);
+    setMomentosOtimistas((anteriores) => new Map(anteriores).set(pendencia.id, momentoAnterior));
+    setAcoesPlanoEmAndamento((anteriores) => new Set(anteriores).add(pendencia.id));
+    let resultado: Awaited<ReturnType<typeof alternarMomentoRegistro>>;
+    try {
+      resultado = await alternarMomentoRegistro({ eventoIds: [pendencia.id], novoMomento: momentoAnterior });
+    } catch {
+      if (tokensPlano.current.get(pendencia.id) !== token) return;
+      setMomentosOtimistas((anteriores) => {
+        const proximo = new Map(anteriores);
+        proximo.delete(pendencia.id);
+        return proximo;
+      });
+      setAcoesPlanoEmAndamento((anteriores) => {
+        const proximo = new Set(anteriores);
+        proximo.delete(pendencia.id);
+        return proximo;
+      });
+      toast.error('Não foi possível desfazer a ação.');
+      return;
+    }
 
+    if (tokensPlano.current.get(pendencia.id) !== token) return;
     if (!resultado.ok) {
-      setAcaoPlanoEmAndamentoId(null);
+      setMomentosOtimistas((anteriores) => {
+        const proximo = new Map(anteriores);
+        proximo.delete(pendencia.id);
+        return proximo;
+      });
+      setAcoesPlanoEmAndamento((anteriores) => {
+        const proximo = new Set(anteriores);
+        proximo.delete(pendencia.id);
+        return proximo;
+      });
       toast.error(resultado.error ?? 'Não foi possível desfazer a ação.');
       return;
     }
-    setAcaoPlanoEmAndamentoId(null);
+    setAcoesPlanoEmAndamento((anteriores) => {
+      const proximo = new Set(anteriores);
+      proximo.delete(pendencia.id);
+      return proximo;
+    });
     setUltimaAcaoPlano(null);
     toast.success('Última ação desfeita.');
     router.refresh();
@@ -735,29 +802,15 @@ export function MeuDiaClient({
     setDocumentoNonce((n) => n + 1);
   }
 
-  // R-52 — "A fazer" é o TRABALHO QUE EU VOU FAZER (decisão dele, 03/08, com o número de
-  // impacto medido no banco antes de fechar). Dois casos entram, dois ficam de fora:
-  //
-  //   ✅ minha e não encaminhada   → é minha, eu faço
-  //   ✅ encaminhada PRA mim       → é trabalho meu, mesmo que o autor seja outro
-  //   ❌ minha, mas eu encaminhei  → saiu da minha mesa
-  //   ❌ de colega, não encaminhada→ não é minha; o panorama do paciente vive na ficha
-  //
-  // X1 (MAPA-MEU-DIA.md) — "responsável = encaminhadoParaId ?? dentistaId" é a MESMA regra
-  // que `filtro-responsavel.ts` já usa na ficha (R-16). Reimplementar à mão seria o débito
-  // que a decisão do X1 condenou: duas leituras da mesma regra podem divergir em silêncio.
-  //
-  // R-63 F2 — subiu de dentro de `a-fazer-bloco.tsx` pra cá: o MESMO array agora alimenta a
-  // lista renderizada E o contador da gaveta (`FaixaGavetas`), nunca duas leituras da regra.
-  const minhasPendencias = (contexto?.pendencias ?? []).filter((p) =>
-    responsavelPassaFiltro(p.encaminhadoParaId ?? p.dentistaId, FILTRO_MEUS, meuDentistaId),
-  );
+  const planoTratamento = useMemo(() => projetarPlanoTratamento({
+    pendencias: contexto?.pendencias ?? [],
+    meuDentistaId,
+    idsEmRevisao: new Set(eventosDraft.map((evento) => evento.id)),
+    momentosOtimistas,
+    idsConcluidosOtimistas,
+  }), [contexto?.pendencias, eventosDraft, idsConcluidosOtimistas, momentosOtimistas, meuDentistaId]);
 
-  // R-52 — mesmo critério de "encaminhavel" de a-fazer-bloco.tsx: autoria + não rascunhada
-  // ainda. Recalculado aqui só pra alimentar `totalEncaminhavel` da EncaminharBar.
-  const pendenciasEncaminhaveis = (contexto?.pendencias ?? []).filter(
-    (p) => p.dentistaId === meuDentistaId && !eventosDraft.some((e) => e.id === p.id),
-  );
+  const pendenciasEncaminhaveis = planoTratamento.minhaFila.map((item) => item.pendencia);
 
   return (
     <div className="flex flex-col gap-3">
@@ -827,10 +880,10 @@ export function MeuDiaClient({
               ))}
               {/* D2 (R-78) — "A fazer" virou gaveta; o contador migra pra cá, mesmo padrão
                   visual dos alertas de cadastro acima, pra não sumir da vista permanente. */}
-              {minhasPendencias.length > 0 && (
+              {planoTratamento.total > 0 && (
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-alt px-3 py-1.5 text-xs font-semibold text-text-secondary">
                   <Hourglass className="h-3 w-3 shrink-0" />
-                  {minhasPendencias.length} pendente{minhasPendencias.length === 1 ? '' : 's'}
+                  {planoTratamento.total} pendente{planoTratamento.total === 1 ? '' : 's'}
                 </span>
               )}
             </div>
@@ -864,13 +917,14 @@ export function MeuDiaClient({
             {registrarPainel.campoMagico}
           </div>
 
-          {/* R-140b — a bancada acompanha a largura da régua do dia. Revisão e contexto
-              preservam a mesma altura; a aba Boca inteira cabe sem rolagem interna. */}
+          {/* R-154 — a Revisão tem altura fixa para que muitos procedimentos não empurrem o
+              rodapé da consulta. Só sua lista rola; o contexto clínico continua livre para
+              exibir odontograma e controles completos. */}
           <div className="grid w-full grid-cols-1 items-stretch gap-3 xl:grid-cols-[minmax(0,1.05fr)_minmax(720px,0.95fr)]">
             <motion.div
               layout="size"
               transition={{ layout: { duration: 0.18, ease: 'easeOut' } }}
-              className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border bg-surface p-4 xl:h-[760px]"
+              className="flex h-[620px] min-w-0 self-start flex-col overflow-hidden rounded-2xl border border-border bg-surface p-4 xl:h-[720px]"
             >
               {dicas.nestaFicha && (
                 <DicaZona titulo="Revisão da consulta">
@@ -959,21 +1013,17 @@ export function MeuDiaClient({
               </div>
             </motion.div>
 
-            {/* R-140b — contexto clínico lateral. Boca não rola; gavetas e formulários longos
-                podem rolar dentro da altura fixa sem deslocar o restante da página. */}
+            {/* Contexto clínico: nunca corta odontograma, região ou atalho rápido. Conteúdo
+                longo segue pela página; só a Revisão tem scroll interno. */}
             <motion.div
               layout="size"
               transition={{ layout: { duration: 0.18, ease: 'easeOut' } }}
-              className={`h-full rounded-2xl border border-border bg-surface p-4 xl:h-[760px] xl:sticky xl:top-4 ${
-                gavetaAberta !== null || (denteAberto == null && leituraGrande == null)
-                  ? 'overflow-hidden'
-                  : 'overflow-y-auto'
-              }`}
+              className="flex min-h-[620px] min-w-0 self-stretch flex-col rounded-2xl border border-border bg-surface p-4 xl:min-h-[720px]"
             >
               <FaixaGavetas
                 aberta={gavetaAberta}
                 onAbertaChange={setGavetaAberta}
-                planoHistoricoCount={minhasPendencias.length}
+                planoHistoricoCount={planoTratamento.total}
                 pacienteId={slotSelecionado.pacienteId}
                 contextual
                 onOdontograma={() => setGavetaAberta(null)}
@@ -985,18 +1035,20 @@ export function MeuDiaClient({
                     onImportado={() => router.refresh()}
                     onGerarOrcamento={(fichaId) => void orcamentoModal.abrirOrcamentoParaFicha(fichaId)}
                     meuDentistaId={meuDentistaId}
-                    pendencias={minhasPendencias}
+                    plano={planoTratamento}
                     onSituacaoChange={(pendencia, situacao) => void alterarSituacaoDoPlano(pendencia, situacao)}
                     onRegistrarHoje={registrarHoje}
                     onConcluirEncaminhada={(pendencia) => void concluirEncaminhada(pendencia)}
                     ultimaAcao={ultimaAcaoPlano}
                     onDesfazerUltimaAcao={() => void desfazerUltimaAcaoDoPlano()}
-                    acaoEmAndamentoId={acaoPlanoEmAndamentoId}
+                    acoesEmAndamento={acoesPlanoEmAndamento}
                     modoEncaminhar={modoEncaminhar}
                     selecionadosEncaminhar={selecionadosEncaminhar}
                     onToggleModoEncaminhar={toggleModoEncaminhar}
                     onToggleSelecaoEncaminhar={toggleSelecaoEncaminhar}
-                    onLerGrande={abrirLeituraGrande}
+                    onAbrirFicha={(fichaId) => {
+                      router.push(`/dashboard/pacientes/${slotSelecionado.pacienteId}?tab=ficha-clinica&ficha=${encodeURIComponent(fichaId)}`);
+                    }}
                   />
                 }
                 anexosBody={
@@ -1008,14 +1060,16 @@ export function MeuDiaClient({
                   />
                 }
               />
-              {gavetaAberta === null && !denteAberto && !leituraGrande && (
-                <div className="mb-3 mt-3 flex items-center justify-between gap-3">
-                  <span className="text-[11px] text-text-secondary">Selecione sem abrir o histórico</span>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Registrar</span>
-                </div>
-              )}
-              {gavetaAberta === null && <AnimatePresence mode="wait" initial={false}>
-                {denteAberto != null && registrandoDenteAberto ? (
+              {gavetaAberta === null && (
+                <div className="flex-1">
+                  {denteAberto == null && (
+                    <div className="mb-3 mt-3 flex items-center justify-between gap-3">
+                      <span className="text-[11px] text-text-secondary">Selecione um ou mais dentes para usar o atalho rápido</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Registrar</span>
+                    </div>
+                  )}
+                  <AnimatePresence mode="wait" initial={false}>
+                    {denteAberto != null && (detalheAlvoId != null || iniciarPonteDente === denteAberto) ? (
                   <motion.div
                     key="editor-dente"
                     initial={{ opacity: 0, y: -8 }}
@@ -1027,8 +1081,7 @@ export function MeuDiaClient({
                       dente={denteAberto}
                       eventos={eventosDraft}
                       onChange={setEventosDraft}
-                      // R-123 — fechar o editor de faces volta ao mapa; o histórico
-                      // continua acessível pelo gesto explícito "Ver histórico".
+                      // Fechar o editor volta ao mapa e aos controles regionais.
                       onClose={() => handleDenteAbertoChange(null)}
                       dataPadrao={hojeBRT()}
                       iniciarPonte={iniciarPonteDente === denteAberto}
@@ -1041,34 +1094,7 @@ export function MeuDiaClient({
                       className="border-0 p-0"
                     />
                   </motion.div>
-                ) : denteAberto != null ? (
-                  <motion.div
-                    key="historico-dente"
-                    initial={{ opacity: 0, y: -8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.2, ease: 'easeOut' }}
-                  >
-                    <DenteHistoricoCard
-                      dente={denteAberto}
-                      eventosDraft={eventosDraft}
-                      visitas={contexto.visitas}
-                      gruposAbertos={gruposAbertos}
-                      onFechar={() => handleDenteAbertoChange(null)}
-                      onRegistrar={() => setRegistrandoDenteAberto(true)}
-                    />
-                  </motion.div>
-                ) : leituraGrande != null ? (
-                  <motion.div
-                    key="leitura-visita"
-                    initial={{ opacity: 0, y: -8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.2, ease: 'easeOut' }}
-                  >
-                    <VisitaLeituraCard visita={leituraGrande} onFechar={() => setLeituraGrande(null)} />
-                  </motion.div>
-                ) : (
+                    ) : (
                   <motion.div
                     key="espelho"
                     initial={{ opacity: 0 }}
@@ -1076,11 +1102,11 @@ export function MeuDiaClient({
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.15, ease: 'easeOut' }}
                   >
-                    {/* Só no espelho: quando há dente aberto a dica já foi dispensada
-                        (`jaTocouDente`), então nunca aparece sobre o perfil do dente. */}
+                    {/* No atalho rápido o mapa continua sempre visível; o perfil só abre por
+                        gesto explícito da revisão ou pelo fluxo de ponte. */}
                     {dicas.odontograma && (
                       <DicaZona titulo="O odontograma">
-                        A boca do paciente. Toque um dente pra ver o histórico dele.
+                        A boca do paciente. Selecione um ou mais dentes para registrar.
                       </DicaZona>
                     )}
                     {registrarPainel.slotCentral}
@@ -1088,8 +1114,10 @@ export function MeuDiaClient({
                       {registrarPainel.controlesOdontograma}
                     </div>
                   </motion.div>
-                )}
-              </AnimatePresence>}
+                    )}
+                  </AnimatePresence>
+                </div>
+              )}
             </motion.div>
           </div>
 

@@ -354,17 +354,6 @@ type EventoRow = {
   encaminhado_dentista: { nome: string } | null;
 };
 
-/** Chave de âncora SEM status — o objetivo aqui é achar o evento mais recente por
- *  âncora (indiferente de status) pra então checar se ELE está indicado. Mesma ideia
- *  de identidade semântica que `chaveDedupEvento` usa em FichasTab.tsx, sem o status. */
-function chaveAncora(e: EventoRow): string {
-  return JSON.stringify([
-    e.tipo, e.procedimento_id, e.procedimento_nome, e.origem, e.nivel,
-    e.arcada, e.quadrante, e.dente, [...(e.faces ?? [])].sort(),
-    e.papel_no_grupo,
-  ]);
-}
-
 export async function getMeuDiaData({
   clinicId,
   dentistaId,
@@ -552,38 +541,6 @@ export async function getMeuDiaData({
     fichasPorPaciente.set(f.paciente_id, arr);
   }
 
-  // G2 — "indicado sem realizado posterior": nenhuma implementação disto existia no
-  // código (achado no mapeamento) — o vencedor por âncora é o de `registrado_em` mais
-  // recente (a query já veio ordenada desc, então o 1º visto por chave é o vencedor).
-  //
-  // R-55 — este Map serve SÓ à pendência (trava emendada em R-46-cockpit.md/contrato).
-  // Aplicado ao histórico ele colapsava ocorrência repetida da mesma âncora (achado real
-  // em produção: profilaxia/flúor/clareamento são SEMPRE a mesma chave, pra sempre — e
-  // duas fichas de datas diferentes com o mesmo procedimento perdiam uma das duas).
-  //
-  // R-51 — o vencedor por âncora agora serve SÓ a evento SEM `grupo_id`. Motivo medido: o
-  // caminho de escrita já cria uma 2ª linha com o mesmo `grupo_id` ao continuar um trabalho
-  // aberto (ToothDetailPanel "Continuar o trabalho aberto?" → `criarDenteTipo(tipo, modos,
-  // grupoId)`), e o upsert da RPC é escopado por `ficha_id` — então a sessão 2 (ficha nova)
-  // grava a linha `realizado` sem tocar o `indicado` da ficha 1. Com ambos na mesma âncora,
-  // o vencedor (mais recente = o `realizado`) escondia o `indicado` ainda aberto: o canal
-  // sumia de "A fazer" no meio do tratamento e nunca voltava pra ser fechado de verdade.
-  //
-  // Duas divisões ORTOGONAIS convivem nesta função, não se confundem:
-  //   R-55: pendência × histórico   ·   R-51: com grupo × sem grupo
-  //
-  // ⚠️ Borda conhecida, medida como INEXISTENTE hoje (0 colisões em 231 eventos, 03/08):
-  // se um dia um evento COM grupo dividir âncora com um SEM grupo, tirar o de grupo do mapa
-  // pode fazer um `indicado` sem grupo — antes suprimido pelo vencedor — voltar a aparecer.
-  // Escolha deliberada: numa dúvida entre mostrar pendência a mais e esconder pendência a
-  // menos, mostrar a mais é o erro seguro (esconder é exatamente o que o R-55 corrigiu).
-  const vencedorPorAncora = new Map<string, EventoRow>();
-  for (const e of (eventosRaw ?? []) as unknown as EventoRow[]) {
-    if (e.grupo_id != null) continue; // R-51 — grupo tem caminho próprio, abaixo
-    const chave = `${e.paciente_id}::${chaveAncora(e)}`;
-    if (!vencedorPorAncora.has(chave)) vencedorPorAncora.set(chave, e);
-  }
-
   // R-51 — grupos que já têm ao menos uma sessão feita. É isto (e só isto) que "em
   // andamento" significa: existe irmão `realizado` no mesmo grupo.
   const gruposComSessaoFeita = new Set<string>();
@@ -620,17 +577,13 @@ export async function getMeuDiaData({
     pendenciasPorPaciente.set(e.paciente_id, arr);
   }
 
-  // Sem grupo: comportamento idêntico ao de antes do R-51 (gate G2).
-  for (const e of vencedorPorAncora.values()) {
-    if (e.status !== 'indicado') continue;
-    pushPendencia(e, false);
-  }
-
-  // Com grupo: todo `indicado` é pendência direta — sem resolução de vencedor. O `indicado`
-  // do tratamento continua aberto enquanto o grupo não fechar, mesmo com sessões já feitas.
+  // R-154 — toda indicação persistida é trabalho aberto. Não deduplicar por âncora/tipo:
+  // apenas atualizar o MESMO id para `realizado` retira uma pendência. Uma indicação legada
+  // com outro id continua visível por segurança clínica, inclusive quando compartilha âncora
+  // com procedimento já concluído.
   for (const e of (eventosRaw ?? []) as unknown as EventoRow[]) {
-    if (e.grupo_id == null || e.status !== 'indicado') continue;
-    pushPendencia(e, gruposComSessaoFeita.has(`${e.paciente_id}::${e.grupo_id}`));
+    if (e.status !== 'indicado') continue;
+    pushPendencia(e, e.grupo_id != null && gruposComSessaoFeita.has(`${e.paciente_id}::${e.grupo_id}`));
   }
 
   // R-55 — 2ª passagem, INDEPENDENTE do vencedor por âncora: histórico e acumulado

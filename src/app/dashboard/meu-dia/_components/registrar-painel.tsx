@@ -173,7 +173,9 @@ interface RegistrarPainelProps {
    *  separada (não precisa ter rascunho pra gerar orçamento de uma ficha antiga). */
   onAbrirPickerOrcamento: () => void;
   /** R-122 — detalhe é sempre um gesto explícito da faixa de ações rápidas. */
-  onAbrirDetalheDental: (dente: number) => void;
+  onAbrirDetalheDental?: (dente: number) => void;
+  /** Marca o primeiro uso do mapa sem transformar o atalho rápido em perfil do dente. */
+  onOdontogramaInteragido?: () => void;
   /** R-130 — variante explícita que abre o fluxo de ponte no pilar selecionado. */
   onIniciarPonte: (dente: number) => void;
   /** R-49 F1 — o campo mágico extraiu detalhe de endo; abre o editor já expandido. */
@@ -252,6 +254,7 @@ export function useRegistrarPainel({
   detalheEspecialidadeAberto,
   onAbrirPickerOrcamento,
   onAbrirDetalheDental,
+  onOdontogramaInteragido,
   onIniciarPonte,
   onAbrirDetalheEndo,
   realceCampoMagico,
@@ -263,7 +266,6 @@ export function useRegistrarPainel({
   const [textoAberto, setTextoAberto] = useState(false);
   const [gerandoEvolucao, setGerandoEvolucao] = useState(false);
   const [evolucaoSugeridaDex, setEvolucaoSugeridaDex] = useState(false);
-  const [controlesAbertos, setControlesAbertos] = useState(false);
   /** Entrada visual do R-140d: a captura real de etiquetas ainda não existe nesta fatia. */
   const [materiaisAberto, setMateriaisAberto] = useState(false);
   const [quantidadeAoRenderizar, setQuantidadeAoRenderizar] = useState(eventosDraft.length);
@@ -328,16 +330,13 @@ export function useRegistrarPainel({
   // `react-hooks/set-state-in-effect`, bloqueia a versão com `useEffect`).
   const [contextoIdAoResetar, setContextoIdAoResetar] = useState(contextoId);
   if (eventosDraft.length !== quantidadeAoRenderizar) {
-    const adicionouRegistro = eventosDraft.length > quantidadeAoRenderizar;
     setQuantidadeAoRenderizar(eventosDraft.length);
-    if (adicionouRegistro) setControlesAbertos(false);
   }
   if (contextoId !== contextoIdAoResetar) {
     setContextoIdAoResetar(contextoId);
     setTextoAberto(false);
     setGerandoEvolucao(false);
     setEvolucaoSugeridaDex(false);
-    setControlesAbertos(false);
     setMateriaisAberto(false);
     setQuantidadeAoRenderizar(eventosDraft.length);
     setAlertaNovo(null);
@@ -523,18 +522,25 @@ export function useRegistrarPainel({
   // C5 (contrato §5.5) — toque no odontograma escreve no MESMO "onde" que o resto do painel lê
   // (fonte única, nenhum estado novo).
   //
-  // R-122 — clicar no mapa só compõe a seleção. Histórico, faces e tabelas são abertos somente
-  // por "Abrir detalhe dental" na faixa; assim vários dentes podem ser marcados em sequência
-  // sem trocar o contexto visual a cada clique.
+  // R-154 — o mapa preserva o atalho rápido padrão: cada toque soma/remove um dente da
+  // seleção, para que a mesma faixa atenda um dente ou vários. Região continua sendo o
+  // caminho padrão logo abaixo do mapa enquanto não há seleção dental.
   function onToothToggle(dente: number) {
+    onOdontogramaInteragido?.();
     setEscopoRegional(null);
-    const sel = onde?.dentes ?? [];
-    if (!sel.includes(dente)) {
-      handleOndeChange({ dentes: [...sel, dente] });
+    if (tipoPendente) {
+      handleOndeChange({ dentes: [dente] });
       return;
     }
-    const resto = sel.filter((d) => d !== dente);
-    handleOndeChange(resto.length > 0 ? { dentes: resto } : null);
+
+    const dentesSelecionados = onde?.dentes ?? [];
+    if (dentesSelecionados.includes(dente)) {
+      const restantes = dentesSelecionados.filter((item) => item !== dente);
+      handleOndeChange(restantes.length > 0 ? { dentes: restantes } : null);
+      return;
+    }
+
+    handleOndeChange({ dentes: [...dentesSelecionados, dente] });
   }
 
   /** Item do catálogo escolhido — só o nome comercial, nunca o tipo estrutural (§A3: sem
@@ -683,24 +689,7 @@ export function useRegistrarPainel({
 
   const controlesOdontograma = (
     <div className="flex min-h-[126px] flex-col justify-center">
-      {!onde && escopoRegional == null && !controlesAbertos && !catalogoPendente ? (
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <p className="text-xs font-bold text-text-primary">Selecione um ou mais dentes</p>
-            <p className="mt-0.5 text-[11px] text-text-secondary">
-              Para boca, arcada, quadrante ou manutenção, use a aba Regiões acima.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setTextoAberto(true)}
-            className="min-h-9 shrink-0 rounded-lg px-2.5 text-[11px] font-bold text-teal-ink transition-colors hover:bg-teal-pale"
-          >
-            + Evolução
-          </button>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2">
           {catalogoPendente && (
             <div className="rounded-lg border border-teal/30 bg-teal/5 px-3 py-2">
               <div className="mb-1.5 flex items-center justify-between gap-2">
@@ -774,8 +763,7 @@ export function useRegistrarPainel({
             </p>
           )}
 
-        </div>
-      )}
+      </div>
 
       {textoAberto && (
         <div className="mt-2 rounded-lg border border-border bg-surface-alt p-2.5">
@@ -854,38 +842,6 @@ export function useRegistrarPainel({
             </div>
           ) : (
             <div className="flex flex-col gap-1.5">
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  aria-pressed={!controlesAbertos || onde != null}
-                  onClick={() => {
-                    setControlesAbertos(false);
-                    setEscopoRegional(null);
-                  }}
-                  className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition-colors ${
-                    !controlesAbertos || onde != null
-                      ? 'bg-teal/10 text-teal-ink'
-                      : 'text-text-secondary hover:bg-surface-alt'
-                  }`}
-                >
-                  Dentes/faces
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={controlesAbertos && onde == null}
-                  onClick={() => {
-                    setOnde(null);
-                    setControlesAbertos(true);
-                  }}
-                  className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition-colors ${
-                    controlesAbertos && onde == null
-                      ? 'bg-teal/10 text-teal-ink'
-                      : 'text-text-secondary hover:bg-surface-alt'
-                  }`}
-                >
-                  Regiões
-                </button>
-              </div>
               <Odontograma
                 eventos={eventosDraft}
                 eventosPersistidos={boca}
@@ -1044,7 +1000,6 @@ export function useRegistrarPainel({
   function voltarParaBoca() {
     setOrtoChipAberto(false);
     setEscopoRegional(null);
-    setControlesAbertos(false);
   }
 
   function abrirManutencao() {
