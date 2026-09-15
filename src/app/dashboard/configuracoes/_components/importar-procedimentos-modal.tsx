@@ -134,12 +134,21 @@ export function ImportarProcedimentosModal({ open, onOpenChange, onSaved }: Prop
           </p>
         </DialogHeader>
 
+        <span role="status" aria-live="polite" className="sr-only">
+          {stage === 'processing' ? 'Extraindo e organizando procedimentos.'
+            : stage === 'review' ? `${rows.length} procedimentos encontrados. Revise antes de salvar.`
+            : stage === 'saving' ? `Salvando procedimentos: ${savedCount} de ${validRows.length}.`
+            : stage === 'done' ? `${savedCount} procedimentos importados com sucesso.` : ''}
+        </span>
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
 
           {/* UPLOAD / PROCESSING */}
           {(stage === 'upload' || stage === 'processing') && (
-            <div
-              className={`border-2 border-dashed rounded-2xl p-10 flex flex-col items-center justify-center gap-4 text-center transition-colors ${
+            <button
+              type="button"
+              aria-label="Selecionar arquivo de procedimentos"
+              disabled={stage === 'processing'}
+              className={`w-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring border-2 border-dashed rounded-2xl p-10 flex flex-col items-center justify-center gap-4 text-center transition-colors ${
                 stage === 'processing'
                   ? 'border-teal/30 bg-teal/[0.03] cursor-default'
                   : 'border-border hover:border-teal/40 hover:bg-teal/[0.02] cursor-pointer'
@@ -155,25 +164,25 @@ export function ImportarProcedimentosModal({ open, onOpenChange, onSaved }: Prop
               {stage === 'processing' ? (
                 <>
                   <Loader2 className="w-9 h-9 text-teal animate-spin" />
-                  <div>
-                    <p className="text-sm font-semibold text-text-primary">{fileName}</p>
-                    <p className="text-xs text-text-secondary mt-1">Extraindo e organizando com IA...</p>
-                  </div>
+                  <span>
+                    <span className="block text-sm font-semibold text-text-primary">{fileName}</span>
+                    <span className="block text-xs text-text-secondary mt-1">Extraindo e organizando com IA...</span>
+                  </span>
                 </>
               ) : (
                 <>
-                  <div className="w-14 h-14 rounded-2xl bg-teal/10 flex items-center justify-center">
+                  <span className="w-14 h-14 rounded-2xl bg-teal/10 flex items-center justify-center">
                     <Upload className="w-6 h-6 text-teal" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-text-primary">
+                  </span>
+                  <span>
+                    <span className="block text-sm font-semibold text-text-primary">
                       Arraste o arquivo ou clique para selecionar
-                    </p>
-                    <p className="text-xs text-text-secondary mt-1">TXT · PDF · DOCX (Word)</p>
-                  </div>
+                    </span>
+                    <span className="block text-xs text-text-secondary mt-1">TXT · PDF · DOCX (Word)</span>
+                  </span>
                 </>
               )}
-            </div>
+            </button>
           )}
 
           <input
@@ -185,7 +194,7 @@ export function ImportarProcedimentosModal({ open, onOpenChange, onSaved }: Prop
           />
 
           {error && (
-            <div className="flex items-center gap-2.5 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-sm">
+            <div role="alert" className="flex items-center gap-2.5 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-sm">
               <AlertCircle className="w-4 h-4 shrink-0" />
               {error}
             </div>
@@ -204,7 +213,7 @@ export function ImportarProcedimentosModal({ open, onOpenChange, onSaved }: Prop
                 </div>
                 <button
                   onClick={() => { reset(); setTimeout(() => inputRef.current?.click(), 50); }}
-                  className="text-xs text-text-secondary hover:text-text-primary transition-colors underline-offset-2 hover:underline"
+                  className="min-h-11 px-2 text-xs text-text-secondary hover:text-text-primary transition-colors underline-offset-2 hover:underline"
                 >
                   Trocar arquivo
                 </button>
@@ -222,10 +231,11 @@ export function ImportarProcedimentosModal({ open, onOpenChange, onSaved }: Prop
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/50">
-                    {rows.map((row) => (
+                    {rows.map((row, index) => (
                       <tr key={row.key} className="group hover:bg-surface-alt/40 transition-colors">
                         <td className="px-2 py-1.5">
                           <input
+                            aria-label={`Nome do procedimento — linha ${index + 1}`}
                             value={row.nome}
                             onChange={(e) => updateRow(row.key, 'nome', e.target.value)}
                             placeholder="Nome do procedimento"
@@ -234,6 +244,7 @@ export function ImportarProcedimentosModal({ open, onOpenChange, onSaved }: Prop
                         </td>
                         <td className="px-2 py-1.5">
                           <input
+                            aria-label={`Categoria — linha ${index + 1}`}
                             value={row.categoria}
                             onChange={(e) => updateRow(row.key, 'categoria', e.target.value)}
                             className="w-full bg-transparent px-1.5 py-0.5 text-text-secondary rounded focus:outline-none focus:bg-surface-alt focus:ring-1 focus:ring-teal/40 text-sm"
@@ -242,6 +253,7 @@ export function ImportarProcedimentosModal({ open, onOpenChange, onSaved }: Prop
                         <td className="px-2 py-1.5">
                           <input
                             type="text" inputMode="decimal"
+                            aria-label={`Preço em reais — linha ${index + 1}`}
                             value={row.preco_padrao}
                             onChange={(e) => updateRow(row.key, 'preco_padrao', e.target.value)}
                             className="w-20 bg-transparent px-1.5 py-0.5 text-right font-mono text-text-primary rounded focus:outline-none focus:bg-surface-alt focus:ring-1 focus:ring-teal/40 text-sm ml-auto block"
@@ -250,6 +262,7 @@ export function ImportarProcedimentosModal({ open, onOpenChange, onSaved }: Prop
                         <td className="px-2 py-1.5">
                           <input
                             type="number"
+                            aria-label={`Duração em minutos — linha ${index + 1}`}
                             value={row.duracao_minutos}
                             onChange={(e) => updateRow(row.key, 'duracao_minutos', e.target.value)}
                             className="w-14 bg-transparent px-1.5 py-0.5 text-right font-mono text-text-primary rounded focus:outline-none focus:bg-surface-alt focus:ring-1 focus:ring-teal/40 text-sm ml-auto block"
@@ -257,8 +270,9 @@ export function ImportarProcedimentosModal({ open, onOpenChange, onSaved }: Prop
                         </td>
                         <td className="px-2 py-1.5 text-center">
                           <button
+                            aria-label={`Remover ${row.nome || "linha"} da importação`}
                             onClick={() => removeRow(row.key)}
-                            className="text-text-secondary/30 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                            className="inline-flex min-h-11 min-w-11 items-center justify-center text-muted-foreground hover:text-destructive focus-visible:outline-2 focus-visible:outline-ring transition-colors"
                           >
                             <X className="w-3.5 h-3.5" />
                           </button>
@@ -271,7 +285,7 @@ export function ImportarProcedimentosModal({ open, onOpenChange, onSaved }: Prop
 
               <button
                 onClick={addRow}
-                className="flex items-center gap-1.5 text-xs text-text-secondary hover:text-teal transition-colors"
+                className="min-h-11 flex items-center gap-1.5 text-xs text-text-secondary hover:text-teal transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Adicionar linha
@@ -319,7 +333,7 @@ export function ImportarProcedimentosModal({ open, onOpenChange, onSaved }: Prop
           {stage === 'done' ? (
             <button
               onClick={() => { onSaved(); handleClose(false); }}
-              className="bg-gradient-to-r from-teal to-teal-lt text-white px-5 py-2 rounded-xl font-semibold text-sm shadow-[0_4px_14px_rgba(47,156,133,0.3)]"
+              className="bg-gradient-to-r from-teal to-teal-lt text-white min-h-11 px-5 py-2 rounded-xl font-semibold text-sm shadow-[0_4px_14px_rgba(47,156,133,0.3)]"
             >
               Concluir
             </button>
@@ -327,14 +341,14 @@ export function ImportarProcedimentosModal({ open, onOpenChange, onSaved }: Prop
             <>
               <button
                 onClick={() => handleClose(false)}
-                className="px-4 py-2 rounded-xl border border-border text-sm font-semibold text-text-secondary hover:bg-surface-alt transition-colors"
+                className="min-h-11 px-4 py-2 rounded-xl border border-border text-sm font-semibold text-text-secondary hover:bg-surface-alt transition-colors"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleSave}
                 disabled={validRows.length === 0}
-                className="bg-gradient-to-r from-teal to-teal-lt text-white px-5 py-2 rounded-xl font-semibold text-sm disabled:opacity-50 flex items-center gap-2 shadow-[0_4px_14px_rgba(47,156,133,0.3)] hover:-translate-y-0.5 transition-all"
+                className="bg-gradient-to-r from-teal to-teal-lt text-white min-h-11 px-5 py-2 rounded-xl font-semibold text-sm disabled:opacity-50 flex items-center gap-2 shadow-[0_4px_14px_rgba(47,156,133,0.3)] hover:-translate-y-0.5 transition-all"
               >
                 <Check className="w-4 h-4" />
                 Importar {validRows.length} procedimento{validRows.length !== 1 ? 's' : ''}
@@ -344,7 +358,7 @@ export function ImportarProcedimentosModal({ open, onOpenChange, onSaved }: Prop
             <button
               onClick={() => handleClose(false)}
               disabled={stage === 'processing'}
-              className="px-4 py-2 rounded-xl border border-border text-sm font-semibold text-text-secondary hover:bg-surface-alt transition-colors disabled:opacity-50"
+              className="min-h-11 px-4 py-2 rounded-xl border border-border text-sm font-semibold text-text-secondary hover:bg-surface-alt transition-colors disabled:opacity-50"
             >
               Cancelar
             </button>

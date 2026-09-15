@@ -1,3 +1,5 @@
+import { redirect } from 'next/navigation';
+import { isTeamWorkspaceEnabled } from '@/server/auth/team-workspace-pilot';
 import { requirePermission } from '@/server/authorization/guards';
 import { ConfiguracoesClient } from './_components/configuracoes-client';
 import type { ConfiguracaoClinica, HorarioDisponivel, Procedimento, DentistaRole } from '@/types/database';
@@ -15,6 +17,10 @@ export default async function ConfiguracoesPage({
   const { supabase, user, clinicId } = await requirePermission('configuracoes');
 
   const params = await searchParams;
+  const catalogoNoConsultorio = isTeamWorkspaceEnabled();
+  if (catalogoNoConsultorio && params.aba === 'procedimentos') {
+    redirect('/dashboard/meu-consultorio/precos');
+  }
   const abaInicial = params.aba ?? 'clinica';
 
   const { data: dentistaPerfil } = await supabase
@@ -34,7 +40,9 @@ export default async function ConfiguracoesPage({
   ] = await Promise.all([
     supabase.from('configuracoes_clinica').select('*').eq('clinica_id', clinicId).maybeSingle(),
     supabase.from('horarios_disponiveis').select('*').eq('dentista_id', dentistaPerfil?.id ?? '').order('dia_semana', { ascending: true }),
-    supabase.from('procedimentos').select('*').eq('clinica_id', clinicId).eq('dentista_id', dentistaPerfil?.id ?? '').order('categoria', { ascending: true }),
+    catalogoNoConsultorio
+      ? Promise.resolve({ data: [] })
+      : supabase.from('procedimentos').select('*').eq('clinica_id', clinicId).eq('dentista_id', dentistaPerfil?.id ?? '').order('categoria', { ascending: true }),
     supabase.from('dentistas').select('id, nome, email, role, ativo, created_at').eq('clinica_id', clinicId).order('created_at', { ascending: true }),
     supabase.from('convites').select('id, email, role, expires_at, created_at').eq('clinica_id', clinicId).gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false }),
     supabase.from('clinicas').select('limite_dentistas, plano, status_assinatura, trial_ends_at, procedimentos_pendente').eq('id', clinicId).single(),
@@ -122,6 +130,7 @@ export default async function ConfiguracoesPage({
         elegibilidade={elegibilidade}
         abrirFormacaoInicial={params.criar === 'clinica'}
         procedimentosPendente={procedimentosPendente}
+        catalogoNoConsultorio={catalogoNoConsultorio}
         clinicId={clinicId}
         dentista={{
           id: dentistaPerfil?.id ?? '',
