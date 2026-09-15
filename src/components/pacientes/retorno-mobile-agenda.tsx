@@ -1,18 +1,20 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { addDays, addWeeks, endOfWeek, format, startOfWeek, subWeeks } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
-import { buscarDisponibilidadeSemana } from '@/server/agenda/buscar-disponibilidade';
-import { formatHora, slotEstaLivre, type DisponibilidadeDia } from '@/lib/agenda/disponibilidade';
+import { formatHora, slotEstaLivre, slotPodeSerSelecionadoParaRetorno, type DisponibilidadeDia } from '@/lib/agenda/disponibilidade';
 
 interface RetornoMobileAgendaProps {
   dentistaId: string | null;
   duracaoMin: number;
+  semanaInicio: Date;
+  onSemanaInicioChange: (semanaInicio: Date) => void;
+  dias: DisponibilidadeDia[] | null;
+  erro: string | null;
   selecionado: { data: string; minutoDoDia: number; agendaLivre: boolean } | null;
-  onSelecionar: (data: string, minutoDoDia: number, agendaLivre: boolean) => void;
-  onInvalidarSelecao?: () => void;
+  onSelecionar: (data: string, minutoDoDia: number | null, agendaLivre: boolean) => void;
 }
 
 function hojeISO(): string {
@@ -41,33 +43,14 @@ const DIA_LABEL_MOBILE: Record<number, string> = {
 export function RetornoMobileAgenda({
   dentistaId,
   duracaoMin,
+  semanaInicio,
+  onSemanaInicioChange,
+  dias,
+  erro,
   selecionado,
   onSelecionar,
-  onInvalidarSelecao,
 }: RetornoMobileAgendaProps) {
-  const [semanaInicio, setSemanaInicio] = useState(() => startOfWeek(new Date(), { weekStartsOn: 0 }));
-  const [dias, setDias] = useState<DisponibilidadeDia[] | null>(null);
-  const [erro, setErro] = useState<string | null>(null);
   const [diaAberto, setDiaAberto] = useState<string | null>(null);
-  const semanaInicioISO = format(semanaInicio, 'yyyy-MM-dd');
-  const chave = `${dentistaId ?? 'sem-dentista'}:${semanaInicioISO}`;
-  const [chaveCarregada, setChaveCarregada] = useState(chave);
-
-  if (chaveCarregada !== chave) {
-    setChaveCarregada(chave);
-    setDias(null);
-    setErro(null);
-    setDiaAberto(null);
-  }
-
-  useEffect(() => {
-    if (!dentistaId) return;
-    let cancelado = false;
-    buscarDisponibilidadeSemana(dentistaId, semanaInicioISO)
-      .then((resultado) => { if (!cancelado) setDias(resultado); })
-      .catch(() => { if (!cancelado) setErro('Não foi possível carregar a agenda.'); });
-    return () => { cancelado = true; };
-  }, [dentistaId, semanaInicioISO]);
 
   // A API continua retornando domingo–sábado para manter o contrato compartilhado com
   // a grade desktop. No mobile, domingo não entra na faixa: seis cartões de 44px cabem
@@ -99,12 +82,6 @@ export function RetornoMobileAgenda({
     [diaAtivo?.ocupados],
   );
 
-  useEffect(() => {
-    if (!selecionado || selecionado.data !== diaAtivo?.data) return;
-    if (selecionado.agendaLivre && diaAtivo?.temGrade === false) return;
-    if (!slots.includes(selecionado.minutoDoDia)) onInvalidarSelecao?.();
-  }, [diaAtivo?.data, diaAtivo?.temGrade, onInvalidarSelecao, selecionado, slots]);
-
   if (!dentistaId) {
     return <p className="rounded-xl border border-border bg-surface-alt/50 px-3 py-4 text-center text-sm text-text-secondary">Selecione o dentista para ver a agenda.</p>;
   }
@@ -115,7 +92,10 @@ export function RetornoMobileAgenda({
         <button
           type="button"
           aria-label="Semana anterior"
-          onClick={() => setSemanaInicio(startOfWeek(subWeeks(semanaInicio, 1), { weekStartsOn: 0 }))}
+          onClick={() => {
+            onSemanaInicioChange(startOfWeek(subWeeks(semanaInicio, 1), { weekStartsOn: 0 }));
+            setDiaAberto(null);
+          }}
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border text-text-secondary transition-colors hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal/40"
         >
           <ChevronLeft className="h-4 w-4" />
@@ -126,7 +106,10 @@ export function RetornoMobileAgenda({
         <button
           type="button"
           aria-label="Próxima semana"
-          onClick={() => setSemanaInicio(startOfWeek(addWeeks(semanaInicio, 1), { weekStartsOn: 0 }))}
+          onClick={() => {
+            onSemanaInicioChange(startOfWeek(addWeeks(semanaInicio, 1), { weekStartsOn: 0 }));
+            setDiaAberto(null);
+          }}
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border text-text-secondary transition-colors hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal/40"
         >
           <ChevronRight className="h-4 w-4" />
@@ -200,7 +183,12 @@ export function RetornoMobileAgenda({
                   value={selecionado?.data === diaAtivo.data ? formatHora(selecionado.minutoDoDia) : ''}
                   onChange={(event) => {
                     const [hora, minuto] = event.target.value.split(':').map(Number);
-                    if (Number.isInteger(hora) && Number.isInteger(minuto)) onSelecionar(diaAtivo.data, hora * 60 + minuto, true);
+                    const inicioMin = hora * 60 + minuto;
+                    if (Number.isInteger(hora) && Number.isInteger(minuto) && slotPodeSerSelecionadoParaRetorno(inicioMin, duracaoMin, diaAtivo, new Date())) {
+                      onSelecionar(diaAtivo.data, inicioMin, true);
+                    } else {
+                      onSelecionar(diaAtivo.data, null, true);
+                    }
                   }}
                   className="mt-2 min-h-11 w-full rounded-xl border border-border bg-surface-alt px-3 font-mono text-sm font-semibold text-text-primary outline-none focus:border-teal/40 focus:ring-2 focus:ring-teal/15"
                 />

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { ArrowLeft, Loader2, Stethoscope, X } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, startOfWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { motion, useReducedMotion } from 'motion/react';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
@@ -12,8 +12,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { listarProteticosAtivos, type ProteticoOption } from '@/app/dashboard/agendamentos/actions';
 import { formatHora } from '@/lib/agenda/disponibilidade';
+import { slotPodeSerSelecionadoParaRetorno } from '@/lib/agenda/disponibilidade';
 import type { DentistaRole } from '@/types/database';
 import type { MarcarRetornoForm } from '@/hooks/use-marcar-retorno';
+import { useDisponibilidadeRetorno } from '@/hooks/use-disponibilidade-retorno';
 import { RetornoMobileAgenda } from './retorno-mobile-agenda';
 import { RetornoSemanaGrid } from './retorno-semana-grid';
 
@@ -55,16 +57,27 @@ export function MarcarRetornoModal({
 }: MarcarRetornoModalProps) {
   const [etapa, setEtapa] = useState<Etapa>('retorno');
   const [proteticos, setProteticos] = useState<ProteticoOption[] | null>(null);
+  const [semanaInicio, setSemanaInicio] = useState(() => startOfWeek(new Date(), { weekStartsOn: 0 }));
+  const [sessaoAgenda, setSessaoAgenda] = useState(0);
   const reduzirMotion = useReducedMotion();
   const [abertoAnterior, setAbertoAnterior] = useState(open);
   const duracaoMin = parseInt(form.duracao, 10) || 30;
   const precisaEscolherDentista = role === 'secretaria';
-  const podeConfirmar = dentistaAlvoId != null && form.data != null && form.minutoDoDia != null;
-  const podeEnviar = Boolean(podeConfirmar && form.pedidoProtetico?.proteticoId && form.pedidoProtetico.dataEntrega && form.pedidoProtetico.observacao.trim());
+  const agenda = useDisponibilidadeRetorno(dentistaAlvoId, semanaInicio, open, sessaoAgenda);
+  const dias = agenda.estado === 'pronta' ? agenda.dias : null;
+  const erroAgenda = agenda.estado === 'erro' ? agenda.mensagem : null;
+  const diaSelecionado = form.data ? dias?.find((dia) => dia.data === form.data) : null;
+  const selecaoValida = form.minutoDoDia != null && diaSelecionado != null
+    && slotPodeSerSelecionadoParaRetorno(form.minutoDoDia, duracaoMin, diaSelecionado, new Date());
+  const podeConfirmar = dentistaAlvoId != null && form.data != null && selecaoValida && agenda.estado === 'pronta';
+  const podeEnviar = Boolean((pedidoPendente || podeConfirmar) && form.pedidoProtetico?.proteticoId && form.pedidoProtetico.dataEntrega && form.pedidoProtetico.observacao.trim());
 
   if (abertoAnterior !== open) {
     setAbertoAnterior(open);
-    if (open && !pedidoPendente) setEtapa('retorno');
+    if (open) {
+      setSessaoAgenda((atual) => atual + 1);
+      if (!pedidoPendente) setEtapa('retorno');
+    }
   }
 
   useEffect(() => {
@@ -76,9 +89,40 @@ export function MarcarRetornoModal({
     return () => { cancelado = true; };
   }, [open]);
 
+  useEffect(() => {
+    if (pedidoPendente) return;
+    if (!form.data || form.minutoDoDia == null) return;
+    if (agenda.estado !== 'pronta' || !diaSelecionado || !selecaoValida) {
+      setForm((atual) => ({ ...atual, data: null, minutoDoDia: null, agendaLivre: false }));
+    }
+  }, [agenda.estado, diaSelecionado, form.data, form.minutoDoDia, pedidoPendente, selecaoValida, setForm]);
+
   function alterarAberto(aberto: boolean) {
+    if (!aberto && (saving || pedidoPendente)) return;
     if (!aberto && !pedidoPendente) setEtapa('retorno');
     onOpenChange(aberto);
+  }
+
+  function alterarSemana(proximaSemana: Date) {
+    if (pedidoPendente) return;
+    setSemanaInicio(proximaSemana);
+    setForm((atual) => ({ ...atual, data: null, minutoDoDia: null, agendaLivre: false }));
+  }
+
+  function selecionarHorario(data: string, minutoDoDia: number | null, agendaLivre: boolean) {
+    if (pedidoPendente) return;
+    setForm((atual) => ({ ...atual, data, minutoDoDia, agendaLivre }));
+  }
+
+  function alterarHoraManual(valor: string) {
+    if (pedidoPendente) return;
+    const minutoDoDia = minutoDoInputHora(valor);
+    if (!form.data || !diaSelecionado) return;
+    if (minutoDoDia == null || !slotPodeSerSelecionadoParaRetorno(minutoDoDia, duracaoMin, diaSelecionado, new Date())) {
+      setForm((atual) => ({ ...atual, minutoDoDia: null, agendaLivre: false }));
+      return;
+    }
+    setForm((atual) => ({ ...atual, minutoDoDia, agendaLivre: !diaSelecionado.temGrade }));
   }
 
   function incluirProtetico() {
@@ -108,7 +152,7 @@ export function MarcarRetornoModal({
 
         <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border px-4 py-3 md:px-5">
           <DialogTitle className="font-heading text-lg font-semibold leading-tight text-text-primary md:text-xl">Marcar retorno</DialogTitle>
-          <button onClick={() => alterarAberto(false)} aria-label="Fechar" className="flex h-11 w-11 items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-surface-alt hover:text-text-primary"><X className="h-4 w-4" /></button>
+          <button disabled={saving || pedidoPendente} onClick={() => alterarAberto(false)} aria-label="Fechar" className="flex h-11 w-11 items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-surface-alt hover:text-text-primary disabled:opacity-50"><X className="h-4 w-4" /></button>
         </div>
 
         <div className="grid shrink-0 grid-cols-2 gap-px border-b border-border bg-border md:grid-cols-[minmax(0,1fr)_150px_100px]">
@@ -122,14 +166,14 @@ export function MarcarRetornoModal({
             {precisaEscolherDentista && (
               <div className="mb-4 space-y-1">
                 <Label className="text-xs text-text-secondary">Dentista responsável *</Label>
-                <Select value={dentistaAlvoId ?? undefined} onValueChange={(id) => { if (id) onDentistaAlvoChange(id); }}>
+                <Select disabled={saving || pedidoPendente} value={dentistaAlvoId ?? undefined} onValueChange={(id) => { if (id && !saving && !pedidoPendente) onDentistaAlvoChange(id); }}>
                   <SelectTrigger className="rounded-xl border-border bg-surface text-text-primary"><SelectValue placeholder="Selecione o dentista..." /></SelectTrigger>
                   <SelectContent className="border-border bg-surface">{dentistasClinica.map((dentista) => <SelectItem key={dentista.id} value={dentista.id}>{dentista.nome}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
             )}
-            <RetornoMobileAgenda dentistaId={dentistaAlvoId} duracaoMin={duracaoMin} selecionado={selecionado} onSelecionar={(data, minutoDoDia, agendaLivre) => setForm((atual) => ({ ...atual, data, minutoDoDia, agendaLivre }))} onInvalidarSelecao={() => setForm((atual) => ({ ...atual, minutoDoDia: null, agendaLivre: false }))} />
-            <div className="hidden md:block"><RetornoSemanaGrid dentistaId={dentistaAlvoId} duracaoMin={duracaoMin} selecionado={selecionado} onSelecionar={(data, minutoDoDia, agendaLivre) => setForm((atual) => ({ ...atual, data, minutoDoDia, agendaLivre }))} /></div>
+            <RetornoMobileAgenda dentistaId={dentistaAlvoId} duracaoMin={duracaoMin} semanaInicio={semanaInicio} onSemanaInicioChange={alterarSemana} dias={dias} erro={erroAgenda} selecionado={selecionado} onSelecionar={selecionarHorario} />
+            <div className="hidden md:block"><RetornoSemanaGrid dentistaId={dentistaAlvoId} duracaoMin={duracaoMin} semanaInicio={semanaInicio} onSemanaInicioChange={alterarSemana} dias={dias} erro={erroAgenda} selecionado={selecionado} onSelecionar={selecionarHorario} /></div>
           </div>
 
           <div className="flex min-h-0 w-full flex-col border-t border-border md:w-[250px] md:shrink-0 md:overflow-y-auto md:border-t-0 md:border-l">
@@ -137,7 +181,7 @@ export function MarcarRetornoModal({
               <motion.div key="retorno" initial={reduzirMotion ? false : { opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: reduzirMotion ? 0 : 0.16, ease: 'easeOut' }} className="flex-1 space-y-4 p-4 md:p-5">
                 <div className="hidden space-y-2 md:block">
                   <Label htmlFor="retorno-hora" className="text-[10px] font-bold uppercase tracking-widest text-teal-ink">Hora</Label>
-                  <Input id="retorno-hora" type="time" disabled={form.data == null} value={form.minutoDoDia != null ? formatHora(form.minutoDoDia) : ''} onChange={(event) => { const minuto = minutoDoInputHora(event.target.value); if (minuto != null) setForm((atual) => ({ ...atual, minutoDoDia: minuto })); }} className="min-h-[42px] rounded-xl border-border bg-surface-alt text-text-primary disabled:opacity-50" />
+                  <Input id="retorno-hora" type="time" disabled={form.data == null || agenda.estado !== 'pronta'} value={form.minutoDoDia != null ? formatHora(form.minutoDoDia) : ''} onChange={(event) => alterarHoraManual(event.target.value)} className="min-h-[42px] rounded-xl border-border bg-surface-alt text-text-primary disabled:opacity-50" />
                 </div>
                 <div className="space-y-2">
                   <Label className="text-[10px] font-bold uppercase tracking-widest text-teal-ink">Duração</Label>
@@ -160,7 +204,7 @@ export function MarcarRetornoModal({
         <div className="shrink-0 space-y-2.5 border-t border-border bg-surface p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:ml-auto md:w-[250px] md:border-l md:p-4">
           {error && <p role="alert" className="rounded-lg bg-coral-pale p-2 text-xs text-coral-ink">{error}</p>}
           {etapa === 'retorno' ? <>
-            {!error && !podeConfirmar && <p className="text-xs text-text-secondary">{dentistaAlvoId == null ? 'Escolha o dentista para ver a agenda.' : 'Escolha um horário livre para habilitar.'}</p>}
+            {!error && !podeConfirmar && <p className="text-xs text-text-secondary">{dentistaAlvoId == null ? 'Escolha o dentista para ver a agenda.' : erroAgenda ? 'A agenda não carregou. Tente outra semana.' : 'Escolha um horário sem conflito para habilitar.'}</p>}
             {proteticos?.length ? <Button type="button" variant="outline" onClick={incluirProtetico} disabled={saving || !podeConfirmar} className="min-h-11 w-full rounded-xl border-teal/40 text-teal-ink hover:bg-teal/5"><Stethoscope className="mr-2 h-4 w-4" />Incluir protético</Button> : null}
             <div className="grid grid-cols-2 gap-2">
               <Button type="button" variant="outline" onClick={() => alterarAberto(false)} disabled={saving} className="min-h-11 rounded-xl text-text-secondary hover:text-text-primary">Cancelar</Button>

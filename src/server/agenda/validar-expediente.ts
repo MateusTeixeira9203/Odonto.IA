@@ -49,11 +49,13 @@ function partesBRT(dataHora: string): { diaSemana: number; inicioMin: number } |
 export async function validarExpediente(input: {
   supabase: ClinicContext['supabase'];
   clinicId: string;
-  actorDentistaId: string;
+  actorDentistaId: string | null;
   actorRole: ClinicContext['role'];
   dentistaId: string;
   dataHora: string;
   duracaoMinutos: number;
+  /** Fluxos operacionais não podem agendar quando a grade não pôde ser consultada. */
+  failClosed?: boolean;
 }): Promise<ForaDoExpediente> {
   if (input.actorRole !== 'secretaria' && input.actorDentistaId !== input.dentistaId) {
     return { fora: false };
@@ -73,6 +75,7 @@ export async function validarExpediente(input: {
 
   if (error) {
     console.error('[validarExpediente] horarios_disponiveis falhou:', error.message);
+    if (input.failClosed) throw new Error('Não foi possível consultar o expediente do dentista.');
     return { fora: false };
   }
 

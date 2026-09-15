@@ -12,6 +12,7 @@
 
 import { useState } from 'react';
 import { Check, ChevronDown, FileText, Forward } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { RegistroCard } from '@/components/fichas/registro-card';
 import { TextoExpansivel } from '@/components/fichas/texto-expansivel';
 import { corpoEspecialidade } from '@/components/fichas/corpo-especialidade';
@@ -21,6 +22,7 @@ import type { MeuDiaVisita, MeuDiaEventoVisita, MeuDiaPendencia } from '@/server
 import { rotuloProcedimento } from '@/types/odontograma';
 import { fmtData } from './meu-dia-format';
 import { ColarDoWordDialog } from '@/components/pacientes/colar-do-word-dialog';
+import type { PendenciaPlanoView, PlanoTratamentoView } from '@/lib/meu-dia/plano-tratamento';
 
 export interface HistoricoBlocoProps {
   visitas: MeuDiaVisita[];
@@ -32,9 +34,8 @@ export interface HistoricoBlocoProps {
    *  do próprio dentista (histórico é compartilhado, mas dinheiro nunca cruza dentista). */
   onGerarOrcamento: (fichaId: string) => void;
   meuDentistaId: string;
-  /** Pendências pelas quais o dentista atual é responsável. É a única fonte do plano
-   * operacional; visitas abaixo são somente histórico, para não haver duas filas. */
-  pendencias: MeuDiaPendencia[];
+  /** Projeção completa e autorizada: plano, contador e contexto das visitas usam esta fonte. */
+  plano: PlanoTratamentoView;
   /** Atualiza o evento já salvo pelas actions protegidas da ficha. */
   onSituacaoChange: (
     pendencia: MeuDiaPendencia,
@@ -47,14 +48,14 @@ export interface HistoricoBlocoProps {
   /** Última ação da sessão, mantida pelo pai para sobreviver ao refresh do servidor. */
   ultimaAcao: { descricao: string } | null;
   onDesfazerUltimaAcao: () => void;
-  acaoEmAndamentoId: string | null;
+  acoesEmAndamento: ReadonlySet<string>;
   /** Encaminhamento continua no mesmo plano: seleção explícita preserva a ação existente. */
   modoEncaminhar: boolean;
   selecionadosEncaminhar: Set<string>;
   onToggleModoEncaminhar: () => void;
   onToggleSelecaoEncaminhar: (id: string) => void;
-  /** R-78 F4 — "ler tudo ⤢" do texto da visita abre a leitura grande no slot direito. */
-  onLerGrande: (visita: MeuDiaVisita) => void;
+  /** Abre a ficha de origem no prontuário, preservando Meu Dia no histórico do navegador. */
+  onAbrirFicha: (fichaId: string) => void;
 }
 
 /** Adapta o view-model do Meu dia pro shape que `eventosParaCards`/`RegistroCard` esperam —
@@ -87,14 +88,24 @@ function paraCard(e: MeuDiaEventoVisita): EventoParaCard {
 }
 
 function VisitaEntry({
-  v, aberta, onToggle, onGerarOrcamento, meuDentistaId, onLerGrande,
+  v, aberta, onToggle, onGerarOrcamento, meuDentistaId, pendenciasPorId,
+  onSituacaoChange, onRegistrarHoje, onConcluirEncaminhada, acoesEmAndamento,
+  modoEncaminhar, selecionadosEncaminhar, onToggleSelecaoEncaminhar, onAbrirFicha,
 }: {
   v: MeuDiaVisita;
   aberta: boolean;
   onToggle: () => void;
   onGerarOrcamento: (fichaId: string) => void;
   meuDentistaId: string;
-  onLerGrande: (visita: MeuDiaVisita) => void;
+  pendenciasPorId: ReadonlyMap<string, PendenciaPlanoView>;
+  onSituacaoChange: HistoricoBlocoProps['onSituacaoChange'];
+  onRegistrarHoje: HistoricoBlocoProps['onRegistrarHoje'];
+  onConcluirEncaminhada: HistoricoBlocoProps['onConcluirEncaminhada'];
+  acoesEmAndamento: ReadonlySet<string>;
+  modoEncaminhar: boolean;
+  selecionadosEncaminhar: Set<string>;
+  onToggleSelecaoEncaminhar: (id: string) => void;
+  onAbrirFicha: (fichaId: string) => void;
 }) {
   const texto = v.texto || v.resumo; // G9 — resumo sempre não-vazio (cai em 'Evolução' no pior caso)
   const abertos = v.eventos.filter((e) => e.status === 'indicado').length;
@@ -110,6 +121,9 @@ function VisitaEntry({
   // R-58 §2 — "indicada em DD/MM": só os cards com ao menos 1 evento de `feitosAqui`
   // (indicado numa ficha DIFERENTE desta) ganham a legenda.
   const indicadoEmPorId = new Map(v.feitosAqui.map((e) => [e.id, e.indicadoEm]));
+  const pendenciasDaVisita = v.eventos
+    .map((evento) => pendenciasPorId.get(evento.id))
+    .filter((pendencia): pendencia is PendenciaPlanoView => pendencia != null);
   const resumoProcedimentos = [...v.eventos, ...v.feitosAqui]
     .map((evento) => {
       const local = evento.dente != null
@@ -190,7 +204,7 @@ function VisitaEntry({
           <TextoExpansivel
             texto={texto}
             className="whitespace-pre-line text-sm text-text-primary"
-            onAbrirGrande={() => onLerGrande(v)}
+            onAbrirGrande={() => onAbrirFicha(v.fichaId)}
           />
 
           {v.ortoManutencao && (
@@ -234,6 +248,28 @@ function VisitaEntry({
           ))}
         </div>
           )}
+          {pendenciasDaVisita.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              <p className="px-0.5 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
+                Organizar pendências desta ficha
+              </p>
+              <AnimatePresence initial={false}>
+              {pendenciasDaVisita.map((pendencia) => (
+                <LinhaDoPlano
+                  key={pendencia.pendencia.id}
+                  item={pendencia}
+                  onSituacaoChange={onSituacaoChange}
+                  onRegistrarHoje={onRegistrarHoje}
+                  onConcluirEncaminhada={onConcluirEncaminhada}
+                  ocupada={acoesEmAndamento.has(pendencia.pendencia.id)}
+                  modoEncaminhar={modoEncaminhar}
+                  selecionada={selecionadosEncaminhar.has(pendencia.pendencia.id)}
+                  onToggleSelecaoEncaminhar={onToggleSelecaoEncaminhar}
+                />
+              ))}
+              </AnimatePresence>
+            </div>
+          )}
         </div>
       )}
     </article>
@@ -249,11 +285,10 @@ function localDaPendencia(pendencia: MeuDiaPendencia): string {
 }
 
 function LinhaDoPlano({
-  pendencia, meuDentistaId, onSituacaoChange, onRegistrarHoje, onConcluirEncaminhada,
+  item, onSituacaoChange, onRegistrarHoje, onConcluirEncaminhada,
   ocupada, modoEncaminhar, selecionada, onToggleSelecaoEncaminhar,
 }: {
-  pendencia: MeuDiaPendencia;
-  meuDentistaId: string;
+  item: PendenciaPlanoView;
   onSituacaoChange: HistoricoBlocoProps['onSituacaoChange'];
   onRegistrarHoje: HistoricoBlocoProps['onRegistrarHoje'];
   onConcluirEncaminhada: HistoricoBlocoProps['onConcluirEncaminhada'];
@@ -262,22 +297,30 @@ function LinhaDoPlano({
   selecionada: boolean;
   onToggleSelecaoEncaminhar: (id: string) => void;
 }) {
-  const propria = pendencia.dentistaId === meuDentistaId;
-  const recebida = pendencia.encaminhadoParaId === meuDentistaId && !propria;
-  const situacao = pendencia.momentoPlanejado === 'proxima_sessao' ? 'proxima_sessao' : 'sessao_atual';
+  const reduzirMovimento = useReducedMotion();
+  const { pendencia, permissoes, responsavelNome } = item;
+  const situacao = item.momentoEfetivo === 'proxima_sessao' ? 'proxima_sessao' : 'sessao_atual';
   const label = rotuloProcedimento(pendencia);
 
   return (
-    <article className={`rounded-xl border p-3 ${
-      situacao === 'proxima_sessao' ? 'border-warning/30 bg-warning-pale/20' : 'border-border bg-surface'
+    <motion.article
+      layout
+      initial={{ opacity: 0, y: reduzirMovimento ? 0 : 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: reduzirMovimento ? 0 : -4 }}
+      transition={{ duration: 0.16, ease: 'easeOut' }}
+      className={`rounded-xl border p-3 ${
+      item.grupo === 'acompanhada'
+        ? 'border-border bg-surface-alt/55'
+        : situacao === 'proxima_sessao' ? 'border-warning/30 bg-warning-pale/20' : 'border-border bg-surface'
     }`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-xs font-bold text-text-primary">{label} · {localDaPendencia(pendencia)}</p>
+          <p className="break-words text-xs font-bold text-text-primary">{label} · {localDaPendencia(pendencia)}</p>
           <p className="mt-1 text-[11px] text-text-secondary">
-            {situacao === 'proxima_sessao' ? 'Separado para esta consulta' : `Em aberto desde ${fmtData(pendencia.registradoEm)}`}
-            {' · '}{pendencia.dentistaNome}
-            {recebida && ' · encaminhado para você'}
+            {situacao === 'proxima_sessao' ? 'Separado para a próxima sessão' : `Em aberto desde ${fmtData(pendencia.registradoEm)}`}
+            {' · '}{item.grupo === 'acompanhada' ? `responsável: ${responsavelNome}` : pendencia.dentistaNome}
+            {item.grupo === 'recebida' && ' · encaminhado para você'}
           </p>
         </div>
         <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${
@@ -287,7 +330,7 @@ function LinhaDoPlano({
         </span>
       </div>
       {modoEncaminhar ? (
-        propria ? (
+        permissoes.encaminhar ? (
           <button
             type="button"
             aria-pressed={selecionada}
@@ -298,9 +341,9 @@ function LinhaDoPlano({
           >
             {selecionada ? '✓ Selecionado para encaminhar' : 'Selecionar para encaminhar'}
           </button>
-        ) : <p className="mt-2 text-[11px] text-text-secondary">Encaminhado para você; não pode ser reenviado.</p>
-      ) : <div className="mt-2 grid grid-cols-2 gap-1 rounded-lg border border-border bg-surface-alt p-1 sm:flex sm:w-fit">
-        {propria && (
+        ) : <p className="mt-2 text-[11px] text-text-secondary">Acompanhamento somente leitura.</p>
+      ) : (permissoes.alterarMomento || permissoes.registrarHoje || permissoes.concluirEncaminhada) ? <div className="mt-2 grid grid-cols-2 gap-1 rounded-lg border border-border bg-surface-alt p-1 sm:flex sm:w-fit">
+        {permissoes.alterarMomento && (
           <button
             type="button"
             disabled={ocupada}
@@ -313,7 +356,7 @@ function LinhaDoPlano({
             A fazer
           </button>
         )}
-        {propria && (
+        {permissoes.alterarMomento && (
           <button
             type="button"
             disabled={ocupada}
@@ -326,7 +369,7 @@ function LinhaDoPlano({
             Próxima sessão
           </button>
         )}
-        {propria ? (
+        {permissoes.registrarHoje ? (
           <button
             type="button"
             disabled={ocupada}
@@ -335,7 +378,7 @@ function LinhaDoPlano({
           >
             Registrar hoje
           </button>
-        ) : (
+        ) : permissoes.concluirEncaminhada ? (
           <button
             type="button"
             disabled={ocupada}
@@ -344,56 +387,70 @@ function LinhaDoPlano({
           >
             {ocupada ? 'Salvando…' : 'Concluir encaminhado'}
           </button>
-        )}
-      </div>}
-    </article>
+        ) : null}
+      </div> : null}
+    </motion.article>
   );
 }
 
 export function HistoricoBloco({
   visitas, pacienteId, pacienteNome, onImportado, onGerarOrcamento, meuDentistaId,
-  pendencias, onSituacaoChange, onRegistrarHoje, onConcluirEncaminhada,
-  ultimaAcao, onDesfazerUltimaAcao, acaoEmAndamentoId, onLerGrande,
+  plano, onSituacaoChange, onRegistrarHoje, onConcluirEncaminhada,
+  ultimaAcao, onDesfazerUltimaAcao, acoesEmAndamento, onAbrirFicha,
   modoEncaminhar, selecionadosEncaminhar, onToggleModoEncaminhar, onToggleSelecaoEncaminhar,
 }: HistoricoBlocoProps) {
   const [visitaAberta, setVisitaAberta] = useState<string | null>(visitas[0]?.fichaId ?? null);
   const [colarAberto, setColarAberto] = useState(false);
-  const planejados = pendencias.filter((pendencia) => pendencia.momentoPlanejado === 'proxima_sessao');
-  const emAberto = pendencias.filter((pendencia) => pendencia.momentoPlanejado !== 'proxima_sessao');
+  const pendenciasPorId = new Map(
+    [...plano.minhaFila, ...plano.recebidas, ...plano.acompanhadas]
+      .map((item) => [item.pendencia.id, item]),
+  );
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <section className="mb-4" aria-label="Plano da consulta">
+      <section className="mb-4" aria-label="Plano de tratamento">
         <div className="flex items-baseline justify-between gap-2">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-text-secondary">Plano da consulta</p>
-          <button type="button" onClick={onToggleModoEncaminhar} className="inline-flex items-center gap-1.5 rounded-lg border border-teal/35 bg-teal/10 px-2.5 py-1.5 text-[11px] font-bold text-teal-ink transition-colors hover:bg-teal/20"><Forward className="h-3.5 w-3.5" />{modoEncaminhar ? 'Cancelar encaminhamento' : 'Encaminhar procedimentos'}</button>
+          <p className="text-[11px] font-bold uppercase tracking-widest text-text-secondary">Plano de tratamento</p>
+          {(modoEncaminhar || plano.minhaFila.length > 0) && (
+            <button type="button" onClick={onToggleModoEncaminhar} className="inline-flex items-center gap-1.5 rounded-lg border border-teal/35 bg-teal/10 px-2.5 py-1.5 text-[11px] font-bold text-teal-ink transition-colors hover:bg-teal/20"><Forward className="h-3.5 w-3.5" />{modoEncaminhar ? 'Cancelar encaminhamento' : 'Encaminhar procedimentos'}</button>
+          )}
         </div>
-        <p className="mt-1 text-xs text-text-secondary">Atualize o que foi feito agora ou deixe separado para a próxima sessão.</p>
+        <p className="mt-1 text-xs text-text-secondary">Organizado automaticamente a partir das indicações clínicas.</p>
         {ultimaAcao && (
           <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-teal/25 bg-teal/10 px-3 py-2 text-xs font-semibold text-teal-ink">
             <span className="flex min-w-0 items-center gap-1.5 truncate"><Check className="h-3.5 w-3.5 shrink-0" />{ultimaAcao.descricao}</span>
             <button type="button" onClick={onDesfazerUltimaAcao} className="shrink-0 text-[11px] font-bold underline underline-offset-2 hover:text-text-primary">Desfazer</button>
           </div>
         )}
-        {planejados.length > 0 && (
+        {plano.total === 0 ? (
+          <p className="mt-3 rounded-lg border border-border bg-surface-alt px-3 py-2 text-xs text-text-secondary">Nenhum procedimento em aberto.</p>
+        ) : (
+          <div className="mt-3 grid gap-4">
+        {plano.minhaFila.length > 0 && (
           <div className="mt-3">
-            <p className="px-0.5 text-[10px] font-bold uppercase tracking-wider text-warning-ink">Para esta consulta</p>
-            <p className="mt-1 px-0.5 text-[11px] text-text-secondary">Marcados anteriormente como próxima sessão.</p>
-            <div className="mt-2 grid gap-1.5">{planejados.map((pendencia) => <LinhaDoPlano key={pendencia.id} pendencia={pendencia} meuDentistaId={meuDentistaId} onSituacaoChange={onSituacaoChange} onRegistrarHoje={onRegistrarHoje} onConcluirEncaminhada={onConcluirEncaminhada} ocupada={acaoEmAndamentoId === pendencia.id} modoEncaminhar={modoEncaminhar} selecionada={selecionadosEncaminhar.has(pendencia.id)} onToggleSelecaoEncaminhar={onToggleSelecaoEncaminhar} />)}</div>
+            <div className="flex items-baseline justify-between px-0.5"><p className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Minha fila</p><span className="text-[11px] font-semibold text-text-secondary">{plano.minhaFila.length}</span></div>
+            <div className="mt-2 grid gap-1.5"><AnimatePresence initial={false}>{plano.minhaFila.map((item) => <LinhaDoPlano key={item.pendencia.id} item={item} onSituacaoChange={onSituacaoChange} onRegistrarHoje={onRegistrarHoje} onConcluirEncaminhada={onConcluirEncaminhada} ocupada={acoesEmAndamento.has(item.pendencia.id)} modoEncaminhar={modoEncaminhar} selecionada={selecionadosEncaminhar.has(item.pendencia.id)} onToggleSelecaoEncaminhar={onToggleSelecaoEncaminhar} />)}</AnimatePresence></div>
           </div>
         )}
-        {planejados.length === 0 && <p className="mt-3 rounded-lg border border-border bg-surface-alt px-3 py-2 text-xs text-text-secondary">Nenhum procedimento separado para esta consulta.</p>}
+        {plano.recebidas.length > 0 && (
+          <div>
+            <div className="flex items-baseline justify-between px-0.5"><p className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Recebidos por encaminhamento</p><span className="text-[11px] font-semibold text-text-secondary">{plano.recebidas.length}</span></div>
+            <div className="mt-2 grid gap-1.5"><AnimatePresence initial={false}>{plano.recebidas.map((item) => <LinhaDoPlano key={item.pendencia.id} item={item} onSituacaoChange={onSituacaoChange} onRegistrarHoje={onRegistrarHoje} onConcluirEncaminhada={onConcluirEncaminhada} ocupada={acoesEmAndamento.has(item.pendencia.id)} modoEncaminhar={modoEncaminhar} selecionada={false} onToggleSelecaoEncaminhar={onToggleSelecaoEncaminhar} />)}</AnimatePresence></div>
+          </div>
+        )}
+        {plano.acompanhadas.length > 0 && (
+          <div>
+            <div className="flex items-baseline justify-between px-0.5"><p className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Acompanhados por outro dentista</p><span className="text-[11px] font-semibold text-text-secondary">{plano.acompanhadas.length}</span></div>
+            <div className="mt-2 grid gap-1.5"><AnimatePresence initial={false}>{plano.acompanhadas.map((item) => <LinhaDoPlano key={item.pendencia.id} item={item} onSituacaoChange={onSituacaoChange} onRegistrarHoje={onRegistrarHoje} onConcluirEncaminhada={onConcluirEncaminhada} ocupada={false} modoEncaminhar={false} selecionada={false} onToggleSelecaoEncaminhar={onToggleSelecaoEncaminhar} />)}</AnimatePresence></div>
+          </div>
+        )}
+          </div>
+        )}
       </section>
       <div className="mb-3 border-t border-border pt-3">
         <p className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Histórico clínico</p>
-        <p className="mt-1 text-xs text-text-secondary">Pendências antigas e visitas anteriores, com contexto completo do tratamento.</p>
+        <p className="mt-1 text-xs text-text-secondary">Visitas mais recentes primeiro, com contexto completo do tratamento.</p>
       </div>
-      {emAberto.length > 0 && (
-        <section className="mb-3" aria-label="Procedimentos em aberto">
-          <div className="flex items-baseline justify-between gap-2 px-0.5"><p className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Em aberto</p><span className="text-[11px] font-semibold text-text-secondary">{emAberto.length}</span></div>
-          <div className="mt-2 grid gap-1.5">{emAberto.map((pendencia) => <LinhaDoPlano key={pendencia.id} pendencia={pendencia} meuDentistaId={meuDentistaId} onSituacaoChange={onSituacaoChange} onRegistrarHoje={onRegistrarHoje} onConcluirEncaminhada={onConcluirEncaminhada} ocupada={acaoEmAndamentoId === pendencia.id} modoEncaminhar={modoEncaminhar} selecionada={selecionadosEncaminhar.has(pendencia.id)} onToggleSelecaoEncaminhar={onToggleSelecaoEncaminhar} />)}</div>
-        </section>
-      )}
       {visitas.length === 0 ? (
         <div className="flex flex-col gap-2">
           <p className="text-sm text-text-secondary">
@@ -418,7 +475,15 @@ export function HistoricoBloco({
                 onToggle={() => setVisitaAberta((atual) => atual === v.fichaId ? null : v.fichaId)}
                 onGerarOrcamento={onGerarOrcamento}
                 meuDentistaId={meuDentistaId}
-                onLerGrande={onLerGrande}
+                pendenciasPorId={pendenciasPorId}
+                onSituacaoChange={onSituacaoChange}
+                onRegistrarHoje={onRegistrarHoje}
+                onConcluirEncaminhada={onConcluirEncaminhada}
+                acoesEmAndamento={acoesEmAndamento}
+                modoEncaminhar={modoEncaminhar}
+                selecionadosEncaminhar={selecionadosEncaminhar}
+                onToggleSelecaoEncaminhar={onToggleSelecaoEncaminhar}
+                onAbrirFicha={onAbrirFicha}
               />
             ))}
           </div>

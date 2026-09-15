@@ -239,3 +239,20 @@ export function slotEstaLivre(
 
   return true;
 }
+
+/**
+ * Regra de seleção do retorno: agenda ocupada e passado nunca são selecionáveis, mas expediente
+ * configurado continua sendo aviso recuperável do servidor. Não é usada por WhatsApp nem Agenda.
+ */
+export function slotPodeSerSelecionadoParaRetorno(
+  minutoDoDia: number,
+  duracaoMin: number,
+  dia: DisponibilidadeDia,
+  agora: Date,
+): boolean {
+  const fimMin = minutoDoDia + duracaoMin;
+  if (dia.ocupados.some((o) => fimMin > o.inicioMin && minutoDoDia < o.inicioMin + o.duracaoMin)) return false;
+
+  const { data: hoje, minutoDoDia: minutoAgora } = partesBRT(agora);
+  return dia.data > hoje || (dia.data === hoje && minutoDoDia > minutoAgora);
+}

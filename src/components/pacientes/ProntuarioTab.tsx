@@ -65,6 +65,7 @@ interface ProntuarioTabProps {
   canWrite: boolean;
   catalogoProcedimentos: MeuDiaCatalogoProcedimento[];
   dados: ProntuarioLongitudinalData;
+  fichaInicialId?: string | null;
   onGerarOrcamento?: (fichaId: string, resumo?: ResumoOrcamentoDaFicha) => Promise<void> | void;
   orcamentoRevisao?: string;
   eventosOrcamentoConfirmados?: string[];
@@ -155,6 +156,7 @@ export function ProntuarioTab({
   canWrite,
   catalogoProcedimentos,
   dados,
+  fichaInicialId = null,
   onGerarOrcamento,
   orcamentoRevisao,
   eventosOrcamentoConfirmados,
@@ -173,6 +175,7 @@ export function ProntuarioTab({
   const [textoVisita, setTextoVisita] = useState('');
   const [visitaKey, setVisitaKey] = useState(() => crypto.randomUUID());
   const [denteAberto, setDenteAberto] = useState<number | null>(null);
+  const [iniciarPonteDente, setIniciarPonteDente] = useState<number | null>(null);
   const [detalheEspecialidadeAberto, setDetalheEspecialidadeAberto] = useState(false);
   const [resumoAberto, setResumoAberto] = useState<ResumoAberto | null>(null);
   const [destinoNovoRegistroId, setDestinoNovoRegistroId] = useState<string | null>(null);
@@ -199,6 +202,15 @@ export function ProntuarioTab({
   const [carregandoExclusao, setCarregandoExclusao] = useState(false);
   const [apagandoFicha, setApagandoFicha] = useState(false);
   const assinaturaPadRef = useRef<SignaturePadLib | null>(null);
+  const [fichaInicialAplicada, setFichaInicialAplicada] = useState<string | null>(null);
+  if (
+    fichaInicialId != null
+    && fichaInicialAplicada !== fichaInicialId
+    && dados.fichas.some((ficha) => ficha.id === fichaInicialId)
+  ) {
+    setFichaInicialAplicada(fichaInicialId);
+    setSuperficie({ tipo: 'ficha', fichaId: fichaInicialId, atendimentoId: null, retorno: CONTEXTO_TIMELINE_INICIAL });
+  }
 
   const novoRegistroAberto = superficie.tipo === 'editor';
 
@@ -254,13 +266,17 @@ export function ProntuarioTab({
       toast.info('Salve o atendimento antes de gerar o orçamento. Assim o orçamento fica ligado à ficha correta.');
     },
     onAbrirDetalheDental: (dente) => setDenteAberto(dente),
-    onIniciarPonte: (dente) => setDenteAberto(dente),
+    onIniciarPonte: (dente) => {
+      setDenteAberto(dente);
+      setIniciarPonteDente(dente);
+    },
     onAbrirDetalheEndo: (dente) => setDenteAberto(dente),
     onSalvarVisita: salvarRegistro,
     onSalvo: (resultado) => {
       setEventosDraft([]);
       setTextoVisita('');
       setDenteAberto(null);
+      setIniciarPonteDente(null);
       setDetalheEspecialidadeAberto(false);
       setDestinoNovoRegistroId(null);
       setAtendimentoDeOrigemId(null);
@@ -284,6 +300,28 @@ export function ProntuarioTab({
       router.refresh();
     },
   });
+
+  const modalRetorno = (
+    <MarcarRetornoModal
+      open={retornoAberto}
+      onOpenChange={(open) => {
+        setRetornoAberto(open);
+        if (!open) setRetornoAtendimentoId(null);
+      }}
+      pacienteNome={patientName}
+      role="dentista"
+      dentistasClinica={[]}
+      dentistaAlvoId={dentistaId}
+      onDentistaAlvoChange={() => undefined}
+      form={retorno.form}
+      setForm={retorno.setForm}
+      error={retorno.error}
+      saving={retorno.saving}
+      pedidoPendente={retorno.pedidoPendente}
+      onMarcarRetorno={() => void retorno.marcarRetorno(dentistaId)}
+      onTentarEnviarPedido={() => void retorno.tentarEnviarPedido(dentistaId)}
+    />
+  );
 
   const atendimentos = useMemo(() => dados.atendimentos, [dados.atendimentos]);
   const fichaAberta = superficie.tipo === 'ficha'
@@ -502,6 +540,7 @@ export function ProntuarioTab({
     setEventosDraft([]);
     setTextoVisita('');
     setDenteAberto(null);
+    setIniciarPonteDente(null);
     setDetalheEspecialidadeAberto(false);
     setDestinoNovoRegistroId(null);
     if (atendimentoDeOrigemId && destinoNovoRegistroId) {
@@ -520,13 +559,13 @@ export function ProntuarioTab({
   if (novoRegistroAberto) {
     const tratamentoDestino = todasFichas.find((ficha) => ficha.id === destinoNovoRegistroId) ?? null;
     return (
-      <section className="space-y-3" aria-label="Novo atendimento no prontuário">
+      <section className="space-y-3" aria-label="Nova evolução no prontuário">
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-4 py-3">
           <div className="flex items-center gap-2">
             <Stethoscope className="h-4 w-4 text-teal-ink" aria-hidden />
             <div>
                 <p className="text-sm font-bold text-text-primary">
-                  {tratamentoDestino ? `Novo atendimento em ${tratamentoDestino.nome}` : 'Novo atendimento'}
+                  {tratamentoDestino ? `Nova evolução em ${tratamentoDestino.nome}` : 'Nova evolução'}
                 </p>
                 <p className="text-xs text-text-secondary">
                   Nova entrada com autoria e data próprias — o registro anterior não é reescrito.
@@ -543,7 +582,7 @@ export function ProntuarioTab({
         </div>
 
         <div className="grid grid-cols-1 items-stretch gap-3 xl:grid-cols-[minmax(0,1.05fr)_minmax(720px,0.95fr)]">
-          <section className="flex min-h-[720px] flex-col rounded-2xl border border-border bg-surface p-4">
+          <section className="flex h-[720px] min-w-0 self-start flex-col overflow-hidden rounded-2xl border border-border bg-surface p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="font-heading text-lg text-text-primary">Revisão do atendimento</p>
@@ -551,7 +590,7 @@ export function ProntuarioTab({
               </div>
               {painel.acoesSecundarias}
             </div>
-            <div className="min-h-0 flex-1 pr-1">
+            <div className="min-h-0 flex-1 overflow-y-auto pr-1">
               <NestaSessaoBloco
                 vazio="Ainda não há registros nesta consulta. Use o Dex ou selecione uma região da boca."
                 eventosDraft={eventosDraft}
@@ -574,8 +613,14 @@ export function ProntuarioTab({
                 dente={denteAberto}
                 eventos={eventosDraft}
                 onChange={setEventosDraft}
-                onClose={() => { setDenteAberto(null); setDetalheEspecialidadeAberto(false); }}
+                onClose={() => {
+                  setDenteAberto(null);
+                  setIniciarPonteDente(null);
+                  setDetalheEspecialidadeAberto(false);
+                }}
                 dataPadrao={new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })}
+                iniciarPonte={iniciarPonteDente === denteAberto}
+                onPonteIniciada={() => setIniciarPonteDente(null)}
                 onDetalheAbertoChange={setDetalheEspecialidadeAberto}
                 catalogoProcedimentos={catalogoProcedimentos}
               />
@@ -651,7 +696,7 @@ export function ProntuarioTab({
             <div className="flex w-full items-center gap-2 sm:w-auto sm:flex-none">
               {podeEscreverFicha && fichaAtual && (
                 <Button className="min-h-11 flex-1 sm:min-h-8 sm:flex-none" onClick={() => abrirNovoRegistro({ fichaId: fichaAtual.id })}>
-                  <Plus className="h-4 w-4" /> Novo atendimento
+                  <Plus className="h-4 w-4" /> Nova evolução
                 </Button>
               )}
               {fichaAtual && (
@@ -1284,6 +1329,8 @@ export function ProntuarioTab({
             )}
           </DialogContent>
         </Dialog>
+
+        {modalRetorno}
       </section>
     );
   }
@@ -1301,7 +1348,7 @@ export function ProntuarioTab({
               <FileText className="h-4 w-4" /> Importar histórico
             </Button>
             <Button onClick={() => abrirNovoRegistro()} className="min-h-11">
-              <Plus className="h-4 w-4" /> Novo atendimento
+              <Plus className="h-4 w-4" /> Nova evolução
             </Button>
           </div>
         )}
@@ -1564,25 +1611,7 @@ export function ProntuarioTab({
         </ol>
       )}
 
-      <MarcarRetornoModal
-        open={retornoAberto}
-        onOpenChange={(open) => {
-          setRetornoAberto(open);
-          if (!open) setRetornoAtendimentoId(null);
-        }}
-        pacienteNome={patientName}
-        role="dentista"
-        dentistasClinica={[]}
-        dentistaAlvoId={dentistaId}
-        onDentistaAlvoChange={() => undefined}
-        form={retorno.form}
-        setForm={retorno.setForm}
-        error={retorno.error}
-        saving={retorno.saving}
-        pedidoPendente={retorno.pedidoPendente}
-        onMarcarRetorno={() => void retorno.marcarRetorno(dentistaId)}
-        onTentarEnviarPedido={() => void retorno.tentarEnviarPedido(dentistaId)}
-      />
+      {modalRetorno}
 
       <ColarDoWordDialog
         pacienteId={patientId}

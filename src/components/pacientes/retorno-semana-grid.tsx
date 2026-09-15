@@ -6,15 +6,14 @@
 // rejeitada: "só trazer o que já temos no sistema, só que menor, já resolveria"). Não reusa
 // `WeekView` (acoplada à página inteira da Agenda) — componente novo, mesma linguagem visual.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   format, startOfWeek, endOfWeek, eachDayOfInterval, addWeeks, subWeeks,
   addDays, addMonths, addYears, isToday as isDateToday, isSameDay, parseISO,
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
-import { buscarDisponibilidadeSemana } from '@/server/agenda/buscar-disponibilidade';
-import { formatHora, type DisponibilidadeDia } from '@/lib/agenda/disponibilidade';
+import { formatHora, slotPodeSerSelecionadoParaRetorno, type DisponibilidadeDia } from '@/lib/agenda/disponibilidade';
 
 // spec §8 propunha janela fixa 07h-20h — 13h sempre, mesmo pro dentista que trabalha 6.
 // Pedido dele ao vivo ("podemos deixar maior... sem precisar rolar"): a janela passa a ser
@@ -40,16 +39,22 @@ const SALTOS = [
   { label: '1 ano', alvo: (hoje: Date) => addYears(hoje, 1) },
 ] as const;
 
-/** Janela de horas a mostrar — min/max de `livres` entre os 7 dias carregados, arredondado
- *  pra hora cheia, expandida se precisar pra caber o horário selecionado (ex.: digitado no
- *  campo Hora fora do expediente — D10 permite; sem isso a barra de seleção renderiza fora
- *  da área visível, sem scroll que a alcance). Só dimensiona a grade; não limita o clique —
- *  pedido dele ao vivo é liberdade total de dia/hora. */
+/** Janela de horas a mostrar — une expediente e ocupações da semana, arredondada para a hora
+ * cheia. Um retorno/agendamento pode existir em dia sem grade ou fora do expediente; esconder
+ * esse bloco faria o profissional acreditar que a faixa está livre. A janela também expande para
+ * caber o horário selecionado (ex.: digitado no campo Hora fora do expediente). Só dimensiona a
+ * grade; não limita o clique — a decisão final continua no servidor. */
 function janelaHoras(
   dias: DisponibilidadeDia[] | null,
   selecionado: { minutoDoDia: number; duracaoMin: number } | null,
 ): { inicio: number; fim: number } {
-  const blocos = dias?.flatMap((d) => d.livres) ?? [];
+  const blocos = dias?.flatMap((dia) => [
+    ...dia.livres,
+    ...dia.ocupados.map((ocupado) => ({
+      inicioMin: ocupado.inicioMin,
+      fimMin: ocupado.inicioMin + ocupado.duracaoMin,
+    })),
+  ]) ?? [];
   const base = blocos.length === 0
     ? { inicio: HOUR_FALLBACK_START, fim: HOUR_FALLBACK_END }
     : {
@@ -74,41 +79,20 @@ function minutoDoClique(offsetY: number, hourStart: number, hourEnd: number): nu
 export interface RetornoSemanaGridProps {
   dentistaId: string | null;
   duracaoMin: number;
-  selecionado: { data: string; minutoDoDia: number } | null;
+  semanaInicio: Date;
+  onSemanaInicioChange: (semanaInicio: Date) => void;
+  dias: DisponibilidadeDia[] | null;
+  erro: string | null;
+  selecionado: { data: string; minutoDoDia: number; agendaLivre: boolean } | null;
   onSelecionar: (data: string, minutoDoDia: number, agendaLivre: boolean) => void;
 }
 
-export function RetornoSemanaGrid({ dentistaId, duracaoMin, selecionado, onSelecionar }: RetornoSemanaGridProps) {
-  const [semanaInicio, setSemanaInicio] = useState(() => startOfWeek(new Date(), { weekStartsOn: 0 }));
+export function RetornoSemanaGrid({ dentistaId, duracaoMin, semanaInicio, onSemanaInicioChange, dias, erro, selecionado, onSelecionar }: RetornoSemanaGridProps) {
   const [diaDestacado, setDiaDestacado] = useState<Date | null>(null);
-  const [dias, setDias] = useState<DisponibilidadeDia[] | null>(null);
-  const [erro, setErro] = useState<string | null>(null);
 
   const weekStart = semanaInicio;
   const weekEnd = endOfWeek(semanaInicio, { weekStartsOn: 0 });
   const weekStartVisivel = addDays(weekStart, 1);
-  const semanaInicioISO = format(weekStart, 'yyyy-MM-dd');
-
-  // Reset síncrono durante o RENDER (não no efeito) quando a semana/dentista muda — mesmo
-  // padrão de meu-dia-client.tsx ("idAoResetar"): evita o passe de render extra do efeito,
-  // e o lint do projeto (react-hooks/set-state-in-effect) bloqueia setState direto no corpo
-  // do efeito. O fetch em si (I/O de verdade) continua no useEffect abaixo.
-  const chaveSemana = `${dentistaId ?? 'sem-dentista'}:${semanaInicioISO}`;
-  const [chaveCarregada, setChaveCarregada] = useState(chaveSemana);
-  if (chaveCarregada !== chaveSemana) {
-    setChaveCarregada(chaveSemana);
-    setDias(null);
-    setErro(null);
-  }
-
-  useEffect(() => {
-    if (!dentistaId) return;
-    let cancelado = false;
-    buscarDisponibilidadeSemana(dentistaId, semanaInicioISO)
-      .then((r) => { if (!cancelado) setDias(r); })
-      .catch(() => { if (!cancelado) setErro('Não foi possível carregar a agenda.'); });
-    return () => { cancelado = true; };
-  }, [dentistaId, semanaInicioISO]);
 
   // A disponibilidade continua sendo buscada de domingo a sábado pelo contrato compartilhado.
   // O retorno, porém, opera de segunda a sábado tanto no desktop quanto no mobile.
@@ -118,12 +102,12 @@ export function RetornoSemanaGrid({ dentistaId, duracaoMin, selecionado, onSelec
   );
 
   function navegar(proxima: Date) {
-    setSemanaInicio(startOfWeek(proxima, { weekStartsOn: 0 }));
+    onSemanaInicioChange(startOfWeek(proxima, { weekStartsOn: 0 }));
     setDiaDestacado(null);
   }
 
   function aplicarSalto(alvo: Date) {
-    setSemanaInicio(startOfWeek(alvo, { weekStartsOn: 0 }));
+    onSemanaInicioChange(startOfWeek(alvo, { weekStartsOn: 0 }));
     setDiaDestacado(alvo);
   }
 
@@ -132,12 +116,9 @@ export function RetornoSemanaGrid({ dentistaId, duracaoMin, selecionado, onSelec
     [diasVisiveis, selecionado, duracaoMin],
   );
 
-  // Pedido dele ao vivo ("libere o clique no calendário todo") — o clique nunca trava
-  // por horário configurado ou já ocupado; quem decide de verdade é sempre o servidor
-  // (criarAgendamento, I4) no confirmar. A grade aqui é só um jeito rápido de apontar
-  // dia+hora, não um limite de disponibilidade.
   function handleClickDia(dia: DisponibilidadeDia, offsetY: number) {
     const minuto = minutoDoClique(offsetY, hourStart, hourEnd);
+    if (!slotPodeSerSelecionadoParaRetorno(minuto, duracaoMin, dia, new Date())) return;
     onSelecionar(dia.data, minuto, !dia.temGrade);
   }
 
@@ -252,7 +233,7 @@ export function RetornoSemanaGrid({ dentistaId, duracaoMin, selecionado, onSelec
                 <button
                   type="button"
                   aria-label={`Marcar retorno em ${format(parseISO(dia.data), "EEEE, d 'de' MMMM", { locale: ptBR })}`}
-                  title="Clique pra marcar o retorno"
+                  title="Escolha um horário livre para marcar o retorno"
                   onClick={(e) => {
                     const rect = e.currentTarget.getBoundingClientRect();
                     handleClickDia(dia, e.clientY - rect.top);
