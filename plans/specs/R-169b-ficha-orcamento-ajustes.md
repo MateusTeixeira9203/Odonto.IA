@@ -2,7 +2,7 @@
 
 > **SPEC** · **R-169b** · 🔵 recorte do R169 ativo
 > **Aberto:** 2026-09-14 · **Fechado:** — · **Fase:** contrato
-> **Revisão:** 4 — fluxo visual aprovado em 16/09; execução e Preview autorizados, sem nova tabela/RLS.
+> **Revisão:** 5 — fluxo visual aprovado em 16/09; correção de fidelidade do acordo aprovada durante o teste em Preview.
 > Recorte obrigatório da mesma entrega [R169](R-169-dex-ficha-edicao-rapida.md).
 > Destino: banco principal `zenfemoxvwerplrjgfqz`. Preview autorizado; SQL compatível isolado, sem promover o app em produção.
 > Contrato visual: [`../artefatos/R-157b-fluxo-orcamento-completo.html`](../artefatos/R-157b-fluxo-orcamento-completo.html), aprovado em 16/09/2026.
@@ -19,7 +19,24 @@ reforma geral de preços, descontos, parcelamento ou edição financeira.
 
 Expansão aprovada em 16/09: a montagem vira uma área ampla de comparação, com nomes completos,
 `No orçamento` e `Disponíveis na ficha` lado a lado, total sempre visível e acesso direto a
-`Preço fechado por arcada`. O fechamento do acordo existente permanece inalterado.
+`Preço fechado por arcada`.
+
+Correção aprovada no teste em Preview: depois da aprovação, a etapa do acordo herda todos os
+procedimentos aprovados automaticamente. Não pode começar com uma segunda lista obrigatória de
+check-boxes. `Alterar seleção` mantém a exceção disponível, mas só abre a lista quando o dentista
+precisa cobrar um subconjunto. A área financeira é prioridade do uso diário: fica maior no desktop
+e expõe na própria etapa `À vista`, `Entrada + parcelas`, `Parcelado`, desconto e observação do
+acordo. Esses controles não podem desaparecer em um acordeão residual da montagem.
+
+### Ajuste visual de fidelidade (16/09)
+
+- Diálogo amplo: até `1440px`; a clínica conserva o espaço flexível e o acordo recebe uma coluna
+  fixa de `560px` no desktop. No celular as colunas voltam a empilhar.
+- Ordem da área de acordo: título e total da etapa → faixa de itens herdados → desconto/valor →
+  três formas de pagamento → campos condicionais → observação → ações. A lista de itens não pode
+  ocupar o primeiro estado visual.
+- Usar os tokens já presentes da tela (`surface`, `surface-alt`, `border`, `teal`,
+  `text-primary`, `text-secondary`); sem cores fora do sistema.
 
 ## 2. Decisão e escopo
 
@@ -57,6 +74,9 @@ Expansão aprovada em 16/09: a montagem vira uma área ampla de comparação, co
 5. O aviso passa a mostrar somente procedimentos novos ainda não revisados. Após atualizar ou
    manter, o mesmo orçamento reabre na etapa de aceite/acordo; itens, aprovações e pagamentos
    anteriores permanecem.
+6. Ao iniciar uma cobrança, os itens aprovados e ainda sem cobrança entram herdados no acordo.
+   O dentista só abre `Alterar seleção` se quiser separar a etapa; os valores e a composição
+   permanecem visíveis sem exigir nova marcação.
 
 Executar: conferir base produtiva → contrato de identidade/retirada → leitura de diferenças →
 adição atômica → retirada/aviso persistente → QA financeiro integrado → liberação do pacote R169.

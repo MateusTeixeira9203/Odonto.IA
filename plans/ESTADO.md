@@ -1,6 +1,6 @@
 # Estado — Odonto.IA
 
-> 16/09/2026 · fluxo do orçamento publicado; correção de rolagem do dashboard pronta para Preview.
+> 16/09/2026 · correção de fidelidade da etapa de acordo em execução para Preview.
 
 ## Agora
 
@@ -37,6 +37,10 @@ Nenhuma promoção/main, cobrança real ou escrita no banco oficial autorizada n
   Cria estrutura comercial pendente e estoque; não inicia cobrança nem altera Stripe vigente.
 - Orçamento: montagem ampla 70/30, nomes completos, itens atuais versus disponíveis,
   total ao vivo, preço por arcada visível e retorno ao mesmo fluxo de aceite/acordo.
+- Feedback de Preview registrado: a etapa `Cobranças por etapa` não pode obrigar nova seleção
+  dos itens já aprovados. Ela deve herdá-los, deixar `Alterar seleção` como exceção e recuperar
+  os controles visíveis de à vista, entrada + parcelas, parcelado, desconto e observação. O painel
+  financeiro precisa ganhar espaço no desktop; este é o uso diário do dentista.
 - Alerta âmbar conta somente procedimento novo não revisado; `Manter orçamento como está`
   persiste a decisão em `activity_logs`, sem remover o procedimento da ficha.
 - Reativação pessoal no Dex adiada por Mateus; rascunho fora do código/migrations publicáveis.
@@ -51,7 +55,8 @@ Demais recortes futuros permanecem no [plano de conclusão](PLANO-CONCLUSAO-ATUA
 
 ## Próximo passo
 
-Mateus retestar no Preview a rolagem da lista e a atualização de uma ficha com itens novos.
+Publicar a correção de fidelidade da etapa de acordo em Preview. Mateus fará o teste manual;
+não acompanhar nem operar o Preview durante o teste.
 Não promover a produção antes da conferência e do gate de duas contas logadas.
 
 ## Continuidade segura
