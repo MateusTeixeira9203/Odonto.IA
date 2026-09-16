@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { z } from 'zod';
 import { getDentistaCached } from '@/lib/get-dentista';
 import { hojeBRT } from '@/lib/hora-brt';
 import { createClient } from '@/lib/supabase/server';
@@ -191,7 +192,7 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
   let calendarConnectedPerDentista: Record<string, boolean> = {};
 
   if (isSecretaria) {
-    const { data } = receptionContext
+    const { data, error } = receptionContext
       ? await supabase.rpc('listar_profissionais_agenda_operacional', { p_clinica_id: clinicaId })
       : await supabase
         .from('dentistas')
@@ -202,7 +203,9 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
         .in('role', ['admin', 'dentista'])
         .eq('ativo', true)
         .order('created_at', { ascending: true });
-    dentistasClinica = (data ?? []).map((d, i) => ({ id: d.id, nome: d.nome, slot: i }));
+    if (error) throw new Error('Não foi possível carregar os profissionais da agenda.');
+    const profissionais = z.array(z.object({ id: z.string().uuid(), nome: z.string() })).parse(data ?? []);
+    dentistasClinica = profissionais.map((d, i) => ({ id: d.id, nome: d.nome, slot: i }));
     if (!receptionContext) {
       calendarConnectedPerDentista = await getCalendarConnectedMap(
         dentistasClinica.map((d) => d.id),

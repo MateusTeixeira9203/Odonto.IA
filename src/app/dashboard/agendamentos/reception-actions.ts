@@ -66,8 +66,8 @@ async function defaultDependencies(): Promise<ReceptionActionDependencies> {
   const client = await createClient();
   return {
     reception: () => getReceptionContext(),
-    execute: (input) => client.rpc('criar_paciente_e_agendamento_operacional', input),
-    executeExisting: (input) => client.rpc('criar_agendamento_operacional', input),
+    execute: async (input) => client.rpc('criar_paciente_e_agendamento_operacional', input),
+    executeExisting: async (input) => client.rpc('criar_agendamento_operacional', input),
   };
 }
 

@@ -29,9 +29,9 @@ async function defaultDependencies(): Promise<ReceptionDependencies> {
   const client = await createClient();
   return {
     member: () => getMemberContext(),
-    profile: (clinicaId, userId) => client.from('secretarias')
+    profile: async (clinicaId, userId) => client.from('secretarias')
       .select('nome').eq('clinica_id', clinicaId).eq('usuario_id', userId).maybeSingle(),
-    clinic: (clinicaId) => client.from('clinicas').select('nome').eq('id', clinicaId).maybeSingle(),
+    clinic: async (clinicaId) => client.from('clinicas').select('nome').eq('id', clinicaId).maybeSingle(),
   };
 }
 

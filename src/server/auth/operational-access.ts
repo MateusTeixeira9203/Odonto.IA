@@ -31,7 +31,7 @@ export type OperationalAccessDependencies = {
 async function defaultDependencies(): Promise<OperationalAccessDependencies> {
   const client = await createClient();
   return {
-    check: (input) => client.rpc('tem_permissao_operacional', input),
+    check: async (input) => client.rpc('tem_permissao_operacional', input),
   };
 }
 
