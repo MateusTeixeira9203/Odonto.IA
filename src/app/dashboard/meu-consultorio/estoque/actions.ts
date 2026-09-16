@@ -23,6 +23,7 @@ import type {
 } from '@/server/estoque/kit-usage-contracts';
 import {
   cadastrarKit as cadastrarKitOperation,
+  editarKit as editarKitOperation,
   confirmarUsos as confirmarUsosOperation,
   corrigirUso as corrigirUsoOperation,
   declararUsos as declararUsosOperation,
@@ -87,6 +88,11 @@ function unavailableUsage<TData>(): KitUsageResult<TData> {
 export async function cadastrarKit(input: unknown): Promise<KitUsageResult<KitResultData>> {
   if (!isTeamWorkspaceEnabled()) return unavailableUsage();
   return cadastrarKitOperation(input);
+}
+
+export async function editarKit(input: unknown): Promise<KitUsageResult<KitResultData>> {
+  if (!isTeamWorkspaceEnabled()) return unavailableUsage();
+  return editarKitOperation(input);
 }
 
 export async function declararUsos(input: unknown): Promise<KitUsageResult<UsosResultData>> {

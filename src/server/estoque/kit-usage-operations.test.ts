@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   cadastrarKit,
+  editarKit,
   confirmarUsos,
   declararUsos,
   listarUsosDaFicha,
@@ -56,6 +57,34 @@ test('cadastro normaliza o kit e encaminha somente o contrato da RPC', async () 
     },
   });
   assert.deepEqual(result, { ok: true, data: { kitId: ids.kit, kitVersaoId: ids.versao, versao: 1 } });
+});
+
+test('edição encaminha CAS da versão e componentes revisados para a RPC', async () => {
+  const result = await editarKit({
+    clinicaIdEsperada: ids.clinica,
+    chaveIdempotencia: ids.chave,
+    kitId: ids.kit,
+    versaoEsperada: 3,
+    nome: ' Kit restaurador revisado ',
+    componentes: [{ itemId: ids.item, quantidadeBase: '1.5' }],
+  }, {
+    ...unusedDependencies,
+    async operateKit(payload) {
+      assert.deepEqual(payload, {
+        p_acao: 'editar',
+        p_entrada: {
+          clinicaIdEsperada: ids.clinica,
+          chaveIdempotencia: ids.chave,
+          kitId: ids.kit,
+          versaoEsperada: 3,
+          nome: 'Kit restaurador revisado',
+          componentes: [{ itemId: ids.item, quantidadeBase: '1.5' }],
+        },
+      });
+      return { data: { ok: true, data: { kitId: ids.kit, kitVersaoId: ids.versao, versao: 4 } }, error: null };
+    },
+  });
+  assert.deepEqual(result, { ok: true, data: { kitId: ids.kit, kitVersaoId: ids.versao, versao: 4 } });
 });
 
 test('confirmação recusa divergência fora dos usos antes da RPC', async () => {
