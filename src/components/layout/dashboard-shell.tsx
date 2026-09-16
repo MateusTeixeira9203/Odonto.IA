@@ -78,12 +78,14 @@ export function DashboardShell({ children, nome, clinicaNome, activeClinicId, ro
   }, [isCommandPaletteOpen, openCommandPalette, closeCommandPalette, managementOnly]);
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden">
+    // A janela é a única dona da rolagem. `overflow-x-hidden` transforma o eixo Y em
+    // `auto` pelo CSS e, junto de outro `overflow-y-auto`, criava rolagens concorrentes.
+    <div className="relative min-h-screen overflow-x-clip">
       <BrandBackground variant="product" position="fixed" />
 
       <MobileHeader onOpenDrawer={() => setIsDrawerOpen(true)} />
 
-      <main className="relative z-[1] w-full flex flex-col min-h-screen overflow-y-auto pt-14 md:pt-0 pb-28">
+      <main className="relative z-[1] flex min-h-screen w-full flex-col pt-14 pb-28 md:pt-0">
         {children}
       </main>
 
