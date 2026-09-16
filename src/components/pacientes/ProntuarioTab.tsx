@@ -4,13 +4,12 @@ import dynamic from 'next/dynamic';
 import { useId, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { AlertTriangle, ArrowLeft, CalendarPlus, Check, ChevronDown, ChevronRight, ClipboardCheck, Download, Ellipsis, FileText, FolderOpen, Forward, Loader2, PenLine, Plus, Star, Stethoscope, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CalendarPlus, Check, ChevronDown, ChevronRight, ClipboardCheck, Download, FileText, FolderOpen, Forward, Loader2, PenLine, Plus, Star, Stethoscope, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import type SignaturePadLib from 'signature_pad';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ToothDetailPanel } from '@/components/odontograma/ToothDetailPanel';
 import { Odontograma } from '@/components/odontograma/Odontograma';
 import { OrcamentoDaFicha } from '@/components/pacientes/orcamento-da-ficha';
@@ -202,6 +201,7 @@ export function ProntuarioTab({
   const [resumoExclusao, setResumoExclusao] = useState<ResumoExclusaoFicha | null>(null);
   const [carregandoExclusao, setCarregandoExclusao] = useState(false);
   const [apagandoFicha, setApagandoFicha] = useState(false);
+  const [exclusaoConfirmada, setExclusaoConfirmada] = useState(false);
   const assinaturaPadRef = useRef<SignaturePadLib | null>(null);
   const [fichaInicialAplicada, setFichaInicialAplicada] = useState<string | null>(null);
   if (
@@ -459,6 +459,7 @@ export function ProntuarioTab({
   }
 
   async function abrirExclusaoFicha(fichaId: string): Promise<void> {
+    setExclusaoConfirmada(false);
     setCarregandoExclusao(true);
     const resultado = await prepararExclusaoFicha(fichaId);
     setCarregandoExclusao(false);
@@ -471,9 +472,9 @@ export function ProntuarioTab({
   }
 
   async function confirmarExclusaoFicha(): Promise<void> {
-    if (!exclusaoFichaId) return;
+    if (!exclusaoFichaId || !exclusaoConfirmada) return;
     setApagandoFicha(true);
-    const resultado = await deletarFicha(exclusaoFichaId);
+    const resultado = await deletarFicha(exclusaoFichaId, true);
     setApagandoFicha(false);
     if (!resultado.ok) {
       toast.error(resultado.error ?? 'Não foi possível apagar a ficha.');
@@ -481,6 +482,7 @@ export function ProntuarioTab({
     }
     setExclusaoFichaId(null);
     setResumoExclusao(null);
+    setExclusaoConfirmada(false);
     voltarAoContextoAnterior();
     toast.success('Ficha apagada.');
     router.refresh();
@@ -710,24 +712,16 @@ export function ProntuarioTab({
                   <Download className="h-4 w-4" /> <span className="hidden min-[480px]:inline">Baixar PDF</span>
                 </Button>
               )}
-              {podeEscreverFicha && fichaAtual && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="icon" className="min-h-11 sm:min-h-8" aria-label="Mais ações da Ficha">
-                      <Ellipsis className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="min-w-52">
-                    <DropdownMenuItem
-                      className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-                      disabled={carregandoExclusao}
-                      onSelect={() => void abrirExclusaoFicha(fichaAtual.id)}
-                    >
-                      {carregandoExclusao ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                      Apagar Ficha
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+              {canWrite && fichaAtual && (
+                <Button
+                  variant="outline"
+                  className="min-h-11 border-destructive/40 text-destructive hover:border-destructive/60 hover:bg-destructive/10 hover:text-destructive sm:min-h-8"
+                  disabled={carregandoExclusao}
+                  onClick={() => void abrirExclusaoFicha(fichaAtual.id)}
+                >
+                  {carregandoExclusao ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                  Apagar ficha
+                </Button>
               )}
             </div>
           </div>
@@ -1119,26 +1113,37 @@ export function ProntuarioTab({
           if (!open && !apagandoFicha) {
             setExclusaoFichaId(null);
             setResumoExclusao(null);
+            setExclusaoConfirmada(false);
           }
         }}>
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Apagar esta Ficha?</DialogTitle>
               <DialogDescription>
-                Esta ação é permanente. A ficha só pode ser apagada porque não há assinatura, documento clínico, orçamento aceito ou pagamento vinculados.
+                Esta ação é permanente. Orçamentos, pagamentos, assinaturas e documentos vinculados também serão removidos.
               </DialogDescription>
             </DialogHeader>
             <div className="rounded-xl border border-border bg-surface-alt p-3 text-sm text-text-secondary">
-              Serão removidos {resumoExclusao?.eventos ?? 0} procedimento{(resumoExclusao?.eventos ?? 0) === 1 ? '' : 's'}, {resumoExclusao?.evolucoes ?? 0} {(resumoExclusao?.evolucoes ?? 0) === 1 ? 'evolução' : 'evoluções'} e {resumoExclusao?.orcamentosEditaveis ?? 0} orçamento{(resumoExclusao?.orcamentosEditaveis ?? 0) === 1 ? ' editável' : 's editáveis'}.
+              Serão removidos {resumoExclusao?.eventos ?? 0} procedimento{(resumoExclusao?.eventos ?? 0) === 1 ? '' : 's'}, {resumoExclusao?.evolucoes ?? 0} {(resumoExclusao?.evolucoes ?? 0) === 1 ? 'evolução' : 'evoluções'}, {resumoExclusao?.orcamentos ?? 0} orçamento{(resumoExclusao?.orcamentos ?? 0) === 1 ? '' : 's'}, {resumoExclusao?.pagamentos ?? 0} pagamento{(resumoExclusao?.pagamentos ?? 0) === 1 ? '' : 's'}, {resumoExclusao?.assinaturas ?? 0} assinatura{(resumoExclusao?.assinaturas ?? 0) === 1 ? '' : 's'} e {resumoExclusao?.documentos ?? 0} documento{(resumoExclusao?.documentos ?? 0) === 1 ? '' : 's'}.
             </div>
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-text-primary">
+              <input
+                type="checkbox"
+                checked={exclusaoConfirmada}
+                onChange={(event) => setExclusaoConfirmada(event.target.checked)}
+                className="mt-0.5 size-4 accent-destructive"
+              />
+              <span>Estou ciente de que esta exclusão é permanente e altera o histórico clínico e financeiro do paciente.</span>
+            </label>
             <DialogFooter>
               <Button variant="ghost" disabled={apagandoFicha} onClick={() => {
                 setExclusaoFichaId(null);
                 setResumoExclusao(null);
+                setExclusaoConfirmada(false);
               }}>
                 Cancelar
               </Button>
-              <Button variant="destructive" disabled={apagandoFicha} onClick={() => void confirmarExclusaoFicha()}>
+              <Button variant="destructive" disabled={apagandoFicha || !exclusaoConfirmada} onClick={() => void confirmarExclusaoFicha()}>
                 {apagandoFicha && <Loader2 className="h-4 w-4 animate-spin" />}
                 Apagar permanentemente
               </Button>

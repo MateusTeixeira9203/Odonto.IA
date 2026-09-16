@@ -1,10 +1,10 @@
 'use client';
 
 import { AlertTriangle, Trash2, Loader2 } from 'lucide-react';
+import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
   DialogDescription,
   DialogFooter,
@@ -32,6 +32,8 @@ export function ConfirmarDeleteOrcModal({
   valorJaRecebido,
   temAceiteAssinado,
 }: ConfirmarDeleteOrcModalProps) {
+  const [confirmadoParaOrcamentoId, setConfirmadoParaOrcamentoId] = useState<string | null>(null);
+  const confirmado = confirmDeleteOrcId !== null && confirmadoParaOrcamentoId === confirmDeleteOrcId;
   const temRecebido = valorJaRecebido > 0;
   const valorFmt = valorJaRecebido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   return (
@@ -103,6 +105,17 @@ export function ConfirmarDeleteOrcModal({
           </div>
         )}
 
+        <label className="mx-6 mb-5 flex cursor-pointer items-start gap-3 rounded-xl border border-coral/30 bg-coral/5 px-3.5 py-3 text-xs leading-relaxed text-text-primary">
+          <input
+            type="checkbox"
+            checked={confirmado}
+            onChange={(event) => setConfirmadoParaOrcamentoId(event.target.checked ? confirmDeleteOrcId : null)}
+            disabled={orcDeleteSaving}
+            className="mt-0.5 h-4 w-4 accent-coral"
+          />
+          <span>Estou ciente de que esta exclusão é permanente e que os dados listados acima serão removidos.</span>
+        </label>
+
         {orcDeleteError && (
           <p className="mx-6 mb-3 text-xs text-red-500 bg-red-500/10 rounded-xl px-3 py-2">
             {orcDeleteError}
@@ -120,7 +133,7 @@ export function ConfirmarDeleteOrcModal({
           </Button>
           <Button
             onClick={onExcluir}
-            disabled={orcDeleteSaving}
+            disabled={orcDeleteSaving || !confirmado}
             className="flex-1 bg-coral hover:bg-coral/90 text-white rounded-xl font-semibold"
           >
             {orcDeleteSaving

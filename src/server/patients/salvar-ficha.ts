@@ -80,7 +80,10 @@ export interface DeletarFichaResult {
 export interface ResumoExclusaoFicha {
   eventos: number;
   evolucoes: number;
-  orcamentosEditaveis: number;
+  orcamentos: number;
+  pagamentos: number;
+  assinaturas: number;
+  documentos: number;
 }
 
 export type PrepararExclusaoFichaResult =
@@ -393,11 +396,7 @@ export interface VinculosFicha {
   pagamentos: number;
 }
 
-/**
- * R-35 item 2 — orcamentos.ficha_id e pagamentos.orcamento_id são ON DELETE CASCADE.
- * O componente legado ainda usa este resumo visual. A decisão de apagar é revalidada em
- * `avaliarExclusaoFicha`, que bloqueia qualquer prova clínica ou financeira.
- */
+/** Prévia simples usada pela tela legada antes da exclusão física confirmada. */
 export async function contarVinculosFicha(fichaId: string): Promise<VinculosFicha> {
   const { supabase, clinicId } = await requireClinicContext();
 
@@ -419,11 +418,6 @@ export async function contarVinculosFicha(fichaId: string): Promise<VinculosFich
   return { orcamentos: orcamentoIds.length, pagamentos: count ?? 0 };
 }
 
-/**
- * deletarFicha — role dentista só apaga ficha própria; role admin apaga qualquer uma da
- * clínica. Fecha o gap do código morto removido na Fase 0 (client apagava sem checar autoria,
- * só a RLS segurava).
- */
 type ContextoExclusaoFicha = {
   supabase: Awaited<ReturnType<typeof requireClinicContext>>['supabase'];
   clinicId: string;
@@ -453,9 +447,6 @@ async function avaliarExclusaoFicha(fichaId: string): Promise<AvaliacaoExclusaoF
     .maybeSingle();
 
   if (!ficha) return { ok: false, error: 'Ficha não encontrada.' };
-  if (role === 'dentista' && ficha.dentista_id !== dentistaId) {
-    return { ok: false, error: 'Sem permissão para apagar fichas de outro dentista.' };
-  }
   const { count: eventos, error: eventosError } = await supabase
     .from('odontograma_eventos')
     .select('id', { count: 'exact', head: true })
@@ -494,62 +485,40 @@ async function avaliarExclusaoFicha(fichaId: string): Promise<AvaliacaoExclusaoF
     return { ok: false, error: 'Não foi possível verificar se esta ficha pode ser apagada.' };
   }
 
-  // R-03b (#B5) — a prova clínica assinada é imutável, mesmo quando a assinatura está no
-  // cabeçalho da ficha antiga em vez de em um evento moderno.
-  if (ficha.assinado_em != null || (eventosAssinados ?? 0) > 0) {
-    return { ok: false, error: 'Esta ficha tem procedimentos assinados e não pode ser apagada.' };
-  }
-
-  if ((documentos ?? 0) > 0) {
-    return { ok: false, error: 'Esta ficha possui documento clínico assinado e não pode ser apagada.' };
-  }
-
   const orcamentoIds = (orcamentos ?? []).map((orcamento) => orcamento.id);
   let pagamentos = 0;
-  let itensAprovados = 0;
   let assinaturasDeOrcamento = 0;
+  let documentosDeOrcamento = 0;
   if (orcamentoIds.length > 0) {
-    const [pagamentosResult, itensResult, assinaturasResult] = await Promise.all([
+    const [pagamentosResult, assinaturasResult, documentosResult] = await Promise.all([
       supabase
         .from('pagamentos')
         .select('id', { count: 'exact', head: true })
         .in('orcamento_id', orcamentoIds)
         .eq('clinica_id', clinicId),
       supabase
-        .from('orcamento_itens')
-        .select('id', { count: 'exact', head: true })
-        .in('orcamento_id', orcamentoIds)
-        .eq('clinica_id', clinicId)
-        .eq('aprovado', true),
-      supabase
         .from('assinaturas')
         .select('id', { count: 'exact', head: true })
         .in('orcamento_id', orcamentoIds)
         .eq('clinica_id', clinicId)
         .eq('tipo', 'orcamento'),
+      supabase
+        .from('documentos_aceite')
+        .select('id', { count: 'exact', head: true })
+        .in('orcamento_id', orcamentoIds)
+        .eq('clinica_id', clinicId),
     ]);
-    if (pagamentosResult.error || itensResult.error || assinaturasResult.error) {
-      console.error('[avaliarExclusaoFicha] falha ao validar prova financeira', {
+    if (pagamentosResult.error || assinaturasResult.error || documentosResult.error) {
+      console.error('[avaliarExclusaoFicha] falha ao calcular impacto financeiro', {
         pagamentos: pagamentosResult.error?.message,
-        itensAprovados: itensResult.error?.message,
         assinaturas: assinaturasResult.error?.message,
+        documentos: documentosResult.error?.message,
       });
       return { ok: false, error: 'Não foi possível verificar os vínculos financeiros desta ficha.' };
     }
     pagamentos = pagamentosResult.count ?? 0;
-    itensAprovados = itensResult.count ?? 0;
     assinaturasDeOrcamento = assinaturasResult.count ?? 0;
-  }
-
-  if (pagamentos > 0) {
-    return { ok: false, error: 'Esta ficha possui pagamento registrado e não pode ser apagada.' };
-  }
-  if (
-    (orcamentos ?? []).some((orcamento) => orcamento.status === 'aprovado')
-    || itensAprovados > 0
-    || assinaturasDeOrcamento > 0
-  ) {
-    return { ok: false, error: 'Esta ficha possui orçamento aceito e não pode ser apagada.' };
+    documentosDeOrcamento = documentosResult.count ?? 0;
   }
 
   return {
@@ -567,7 +536,10 @@ async function avaliarExclusaoFicha(fichaId: string): Promise<AvaliacaoExclusaoF
       resumo: {
         eventos: eventos ?? 0,
         evolucoes: evolucoes ?? 0,
-        orcamentosEditaveis: orcamentoIds.length,
+        orcamentos: orcamentoIds.length,
+        pagamentos,
+        assinaturas: (eventosAssinados ?? 0) + assinaturasDeOrcamento,
+        documentos: (documentos ?? 0) + documentosDeOrcamento,
       },
     },
   };
@@ -581,48 +553,22 @@ export async function prepararExclusaoFicha(fichaId: string): Promise<PrepararEx
 }
 
 /**
- * Exclusão física só para Ficha própria não assinada e sem prova clínica/financeira. O
- * paciente é sempre obtido da Ficha no servidor; nenhum identificador vindo da interface é
- * usado para definir o escopo da remoção nem o log de auditoria.
+ * Exclusão física confirmada. A RPC mantém a transação íntegra quando há orçamento, pagamento,
+ * assinatura ou documento relacionado; o cliente nunca escolhe clínica, paciente ou autor.
  */
-export async function deletarFicha(fichaId: string): Promise<DeletarFichaResult> {
+export async function deletarFicha(fichaId: string, confirmada: boolean): Promise<DeletarFichaResult> {
+  if (!confirmada || !z.string().uuid().safeParse(fichaId).success) {
+    return { ok: false, error: 'Confirme que está ciente da exclusão permanente.' };
+  }
   const avaliacao = await avaliarExclusaoFicha(fichaId);
   if (!avaliacao.ok) return avaliacao;
   const { supabase, clinicId, dentistaId, ficha, resumo } = avaliacao.contexto;
 
-  const { data: apagada, error } = await supabase
-    .from('fichas')
-    .delete()
-    .eq('id', fichaId)
-    .eq('clinica_id', clinicId)
-    .select('id');
+  const rpc = supabase.rpc.bind(supabase) as unknown as (fn: string, args: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
+  const { error } = await rpc('excluir_ficha_permanentemente', { p_ficha_id: fichaId });
 
   if (error) {
-    // R-03a: ficha com algum evento assinado é imutável até no DELETE — o cascade tenta
-    // desamarrar odontograma_eventos.assinatura_id e o trigger trg_odontograma_evento_imutavel
-    // barra (raise 'evento_assinado_imutavel'). Comportamento correto (protege prova clínica
-    // assinada — CFO), só precisa de mensagem clara em vez do erro cru do Postgres.
-    if (error.message.includes('evento_assinado_imutavel')) {
-      return { ok: false, error: 'Esta ficha tem procedimentos assinados e não pode ser apagada.' };
-    }
-    // R-35 item 2 — assinaturas.orcamento_id é ON DELETE RESTRICT: o cascade da ficha tenta
-    // apagar o orçamento, o orçamento tenta apagar a assinatura de aceite, e o Postgres barra
-    // (23503, foreign_key_violation) em vez de deixar a prova de aceite sumir em silêncio.
-    if (error.code === '23503') {
-      return {
-        ok: false,
-        error: 'Esta ficha tem um orçamento já aceito e assinado pelo paciente — não pode ser apagada.',
-      };
-    }
     console.error('[deletarFicha]', error.message);
-    return { ok: false, error: 'Erro ao apagar ficha.' };
-  }
-
-  // RLS pode barrar o DELETE sem devolver erro (0 linhas afetadas) — sem o .select() acima
-  // isso vira falso "ok: true" com a ficha intacta no banco. Achado ao vivo 28/07: a policy de
-  // DELETE do admin tinha sumido do banco (fichas_write_own sozinha só libera o dono).
-  if (!apagada || apagada.length === 0) {
-    console.error('[deletarFicha] DELETE bloqueado silenciosamente (RLS?) — 0 linhas para', fichaId);
     return { ok: false, error: 'Erro ao apagar ficha.' };
   }
 

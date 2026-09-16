@@ -1207,7 +1207,7 @@ export function PacienteDetailClient({
     if (!confirmDeleteOrcId) return;
     setOrcDeleteSaving(true);
     setOrcDeleteError(null);
-    const result = await excluirOrcamento(confirmDeleteOrcId, paciente.id);
+    const result = await excluirOrcamento(confirmDeleteOrcId, paciente.id, true);
     if (!result.error) {
       setOrcamentosState((prev) => prev.filter((o) => o.id !== confirmDeleteOrcId));
       setDetalheOrcId(null);
@@ -1985,7 +1985,7 @@ export function PacienteDetailClient({
         onIniciarFechamentoPagamento={handleIniciarFechamentoPagamento}
         onCancelarFechamentoPagamento={handleCancelarFechamentoPagamento}
         onDeleteClick={setConfirmDeleteOrcId}
-        podeExcluir={detalheOrc?.dentista_id === dentistaId}
+        podeExcluir={dentistaId != null}
         editingPagId={editingPagId}
         editPagForm={editPagForm}
         setEditPagForm={setEditPagForm}

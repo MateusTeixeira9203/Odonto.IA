@@ -28,6 +28,10 @@ export type StatusOrcamento = "rascunho" | "enviado" | "aprovado" | "recusado";
 const formaPagamentoSchema = z.enum([
   'dinheiro', 'pix', 'cartao_credito', 'cartao_debito', 'boleto', 'outro',
 ]);
+const exclusaoOrcamentoSchema = z.object({
+  orcamentoId: z.string().uuid(),
+  confirmada: z.literal(true),
+});
 const recebimentoSchema = z.object({
   orcamentoId: z.string().uuid(),
   pacienteId: z.string().uuid(),
@@ -1446,50 +1450,21 @@ export async function registrarPagamentoRapido(dados: {
 
 export async function excluirOrcamento(
   orcamentoId: string,
-  pacienteId?: string
+  pacienteId?: string,
+  confirmada = false,
 ): Promise<{ error?: string }> {
-  const { supabase, clinicId, dentistaId } = await requireClinicContext();
+  const parsed = exclusaoOrcamentoSchema.safeParse({ orcamentoId, confirmada });
+  if (!parsed.success) return { error: 'Confirme que está ciente da exclusão permanente.' };
+  const { supabase, role } = await requireClinicContext();
+  if (role === 'secretaria') return { error: 'Sem permissão para excluir orçamentos.' };
 
-  // R-66 — checa dono ANTES de tocar em qualquer linha filha. A policy orcamentos_delete_own
-  // é só-dono (sem exceção pra admin/secretaria); sem este check, pagamentos/orcamento_itens
-  // abaixo seriam apagados mesmo quando o DELETE final em orcamentos vai ser bloqueado pela
-  // RLS — deixando o orçamento "furado" (itens/pagamentos sumidos, registro sobrevivendo).
-  const { data: orcDono } = await supabase
-    .from('orcamentos')
-    .select('dentista_id')
-    .eq('id', orcamentoId)
-    .eq('clinica_id', clinicId)
-    .maybeSingle();
-
-  if (!orcDono) return { error: 'Orçamento não encontrado.' };
-  if (orcDono.dentista_id !== dentistaId) {
-    return { error: 'Você não tem permissão para excluir este orçamento — só o dentista responsável pode.' };
-  }
-
-  // Decisão de 14/08: nem pagamento recebido nem aceite assinado bloqueiam mais a exclusão.
-  // Quem decide é o dentista — o sistema avisa o que vai junto (pagamento sai do financeiro,
-  // assinatura de aceite é apagada) no diálogo de confirmação e para por aí. Antes disso o
-  // orçamento errado ficava preso na lista pra sempre, sem caminho de saída.
-  // A assinatura sai por cascade da FK (migration 143, que reverte o RESTRICT da 113).
-
-  // Um único DELETE: as três filhas (orcamento_itens, pagamentos, assinaturas) são todas
-  // ON DELETE CASCADE, então o Postgres as leva junto — atômico. Antes, os filhos eram
-  // apagados um a um ANTES do pai; se o DELETE do pai falhasse depois (FK ou RLS), itens e
-  // pagamentos já tinham sumido e o orçamento sobrevivia furado. Deixar o cascade fazer
-  // isso é o que garante o tudo-ou-nada.
-  // R-66 — `error` vem vazio quando a RLS bloqueia (policy orcamentos_delete_own é só dono):
-  // 0 linhas afetadas ainda é "sucesso" pro Postgrest. `.select('id')` é a única forma de
-  // saber se algo de fato saiu da tabela (mesmo padrão de outros updates otimistas do projeto).
-  const { data: deletado, error } = await supabase
-    .from("orcamentos")
-    .delete()
-    .eq("id", orcamentoId)
-    .eq("clinica_id", clinicId)
-    .select("id");
-
-  if (error) return { error: error.message };
-  if (!deletado || deletado.length === 0) {
-    return { error: "Você não tem permissão para excluir este orçamento — só o dentista responsável pode." };
+  const rpc = supabase.rpc.bind(supabase) as unknown as RpcCall;
+  const { error } = await rpc('excluir_orcamento_permanentemente', {
+    p_orcamento_id: parsed.data.orcamentoId,
+  });
+  if (error) {
+    console.error('[excluirOrcamento]', error.message);
+    return { error: 'Não foi possível excluir o orçamento.' };
   }
 
   if (pacienteId) revalidatePath(`/dashboard/pacientes/${pacienteId}`);

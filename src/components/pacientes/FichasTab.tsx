@@ -633,6 +633,7 @@ export function FichasTab({
   // antes de deixar confirmar, em vez de apagar em silêncio.
   const [vinculosFicha, setVinculosFicha] = React.useState<VinculosFicha | null>(null);
   const [vinculosLoading, setVinculosLoading] = React.useState(false);
+  const [exclusaoConfirmada, setExclusaoConfirmada] = React.useState(false);
   const [signingTarget, setSigningTarget] = React.useState<SigningTarget | null>(null);
   const [assinadoPorInput, setAssinadoPorInput] = React.useState('');
   const [orientacoesAssinatura, setOrientacoesAssinatura] = React.useState('');
@@ -1856,7 +1857,8 @@ export function FichasTab({
 
   const handleDelete = async (id: string) => {
     try {
-      const result = await deletarFicha(id);
+      if (!exclusaoConfirmada) return;
+      const result = await deletarFicha(id, true);
       if (!result.ok) {
         toast.error(result.error ?? "Erro ao apagar ficha.");
         return;
@@ -1868,6 +1870,7 @@ export function FichasTab({
     } finally {
       setShowDeleteConfirm(null);
       setVinculosFicha(null);
+      setExclusaoConfirmada(false);
     }
   };
 
@@ -2497,6 +2500,7 @@ export function FichasTab({
                           onClick={() => {
                             setShowDeleteConfirm(evo.id);
                             setVinculosFicha(null);
+                            setExclusaoConfirmada(false);
                             setVinculosLoading(true);
                             void contarVinculosFicha(evo.id)
                               .then(setVinculosFicha)
@@ -2972,7 +2976,7 @@ export function FichasTab({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => { setShowDeleteConfirm(null); setVinculosFicha(null); }}
+              onClick={() => { setShowDeleteConfirm(null); setVinculosFicha(null); setExclusaoConfirmada(false); }}
               className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             />
             <motion.div
@@ -3004,17 +3008,26 @@ export function FichasTab({
               ) : (
                 <div className="mb-8" />
               )}
+              <label className="mb-5 flex cursor-pointer items-start gap-3 rounded-xl border border-coral/30 bg-coral/5 px-4 py-3 text-left text-xs text-text-primary">
+                <input
+                  type="checkbox"
+                  checked={exclusaoConfirmada}
+                  onChange={(event) => setExclusaoConfirmada(event.target.checked)}
+                  className="mt-0.5 size-4 accent-coral"
+                />
+                <span>Estou ciente de que a exclusão é permanente e pode remover orçamento, recebimentos e documentos relacionados.</span>
+              </label>
               <div className="flex gap-3">
                 <Button
                   variant="outline"
-                  onClick={() => { setShowDeleteConfirm(null); setVinculosFicha(null); }}
+                  onClick={() => { setShowDeleteConfirm(null); setVinculosFicha(null); setExclusaoConfirmada(false); }}
                   className="flex-1 rounded-xl"
                 >
                   Cancelar
                 </Button>
                 <Button
                   onClick={() => void handleDelete(showDeleteConfirm)}
-                  disabled={vinculosLoading}
+                  disabled={vinculosLoading || !exclusaoConfirmada}
                   className="flex-1 bg-coral text-white hover:bg-coral/90 rounded-xl disabled:opacity-60"
                 >
                   Excluir

@@ -195,6 +195,7 @@ export function OrcamentosClient({
 
   // Exclusão de orçamento
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleteRiskConfirmed, setDeleteRiskConfirmed] = useState(false);
   const [deleteSaving, setDeleteSaving] = useState(false);
 
   // Traduzir para paciente (DEX Simplificar)
@@ -818,13 +819,14 @@ export function OrcamentosClient({
     .reduce((s, p) => s + p.valor, 0);
 
   const handleExcluir = async () => {
-    if (!confirmDeleteId) return;
+    if (!confirmDeleteId || !deleteRiskConfirmed) return;
     setDeleteSaving(true);
-    const result = await excluirOrcamento(confirmDeleteId);
+    const result = await excluirOrcamento(confirmDeleteId, undefined, true);
     if (!result.error) {
       setOrcamentos((prev) => prev.filter((o) => o.id !== confirmDeleteId));
       if (selected?.id === confirmDeleteId) setSelected(null);
       setConfirmDeleteId(null);
+      setDeleteRiskConfirmed(false);
       router.refresh();
     }
     setDeleteSaving(false);
@@ -1179,7 +1181,10 @@ export function OrcamentosClient({
                           className="p-2 rounded-xl text-white/70 hover:text-white hover:bg-white/15 transition-colors" title="Editar">
                           <Edit2 className="w-4 h-4" />
                         </button>
-                        <button onClick={() => setConfirmDeleteId(selected.id)}
+                        <button onClick={() => {
+                          setConfirmDeleteId(selected.id);
+                          setDeleteRiskConfirmed(false);
+                        }}
                           className="p-2 rounded-xl text-white/70 hover:text-red-300 hover:bg-red-500/20 transition-colors" title="Excluir">
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -1858,7 +1863,12 @@ export function OrcamentosClient({
       {/* Dialog: Confirmar exclusão de orçamento */}
       <Dialog
         open={!!confirmDeleteId}
-        onOpenChange={(open) => { if (!open) setConfirmDeleteId(null); }}
+        onOpenChange={(open) => {
+          if (!open) {
+            setConfirmDeleteId(null);
+            setDeleteRiskConfirmed(false);
+          }
+        }}
       >
         <DialogContent className="max-w-sm rounded-2xl bg-surface border-border">
           <DialogHeader>
@@ -1880,10 +1890,19 @@ export function OrcamentosClient({
               </p>
             </div>
           )}
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-coral/30 bg-coral/5 px-3.5 py-3 text-sm text-text-primary">
+            <input
+              type="checkbox"
+              checked={deleteRiskConfirmed}
+              onChange={(event) => setDeleteRiskConfirmed(event.target.checked)}
+              className="mt-0.5 size-4 accent-coral"
+            />
+            <span>Estou ciente de que esta exclusão é permanente e altera o histórico financeiro do paciente.</span>
+          </label>
           <DialogFooter className="gap-2">
             <Button
               variant="outline"
-              onClick={() => setConfirmDeleteId(null)}
+              onClick={() => { setConfirmDeleteId(null); setDeleteRiskConfirmed(false); }}
               disabled={deleteSaving}
               className="rounded-xl border-border text-text-primary hover:bg-surface-alt"
             >
@@ -1891,8 +1910,8 @@ export function OrcamentosClient({
             </Button>
             <Button
               onClick={() => void handleExcluir()}
-              disabled={deleteSaving}
-              className="bg-red-500 text-white hover:bg-red-600 rounded-xl"
+              disabled={deleteSaving || !deleteRiskConfirmed}
+              className="bg-coral text-white hover:bg-coral/90 rounded-xl"
             >
               {deleteSaving ? 'Excluindo...' : 'Excluir'}
             </Button>
