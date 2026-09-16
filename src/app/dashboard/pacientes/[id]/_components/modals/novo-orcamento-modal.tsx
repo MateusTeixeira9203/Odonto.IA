@@ -2,7 +2,7 @@
 
 import { MontarGrupoOrcamento } from './montar-grupo-orcamento';
 import React, { useEffect, useState } from 'react';
-import { Plus, Trash2, AlertTriangle, X, Loader2, Check, ChevronDown, MapPin } from 'lucide-react';
+import { Trash2, AlertTriangle, X, Loader2, Check, MapPin } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -24,12 +24,6 @@ import { ptBR } from 'date-fns/locale';
 import { parseValorBR, formatValorBR } from '@/lib/valor-br';
 import { stripDenteDoNome } from '@/lib/arcadas';
 import type { FichaParaOrc, ProcedimentoClinica, NovoOrcItem } from '../types';
-import type { FormaPagamento } from '@/app/dashboard/orcamentos/actions';
-
-const FORMA_LABEL: Record<FormaPagamento, string> = {
-  dinheiro: 'Dinheiro', pix: 'PIX', cartao_credito: 'Cartão de Crédito',
-  cartao_debito: 'Cartão de Débito', boleto: 'Boleto', outro: 'Outro',
-};
 
 export interface NovoOrcamentoModalProps {
   open: boolean;
@@ -47,7 +41,6 @@ export interface NovoOrcamentoModalProps {
   setNovoOrcItens: React.Dispatch<React.SetStateAction<NovoOrcItem[]>>;
   procedimentosClinica: ProcedimentoClinica[];
   novoOrcSubtotal: number;
-  novoOrcTotal: number;
   novoOrcValorFinal: number | null;
   setNovoOrcValorFinal: React.Dispatch<React.SetStateAction<number | null>>;
   orcSaving: boolean;
@@ -67,14 +60,6 @@ export interface NovoOrcamentoModalProps {
   dentistasClinica: { id: string; nome: string }[];
   dentistaAlvoId: string;
   onDentistaAlvoChange: (id: string) => void;
-  planoForma: 'avista' | 'parcelado' | null;
-  setPlanoForma: (v: 'avista' | 'parcelado' | null) => void;
-  planoNumParcelas: string;
-  setPlanoNumParcelas: (v: string) => void;
-  planoPrimeiroVencimento: string;
-  setPlanoPrimeiroVencimento: (v: string) => void;
-  planoParcelasForma: FormaPagamento | '';
-  setPlanoParcelasForma: (v: FormaPagamento | '') => void;
 }
 
 export function NovoOrcamentoModal({
@@ -90,7 +75,6 @@ export function NovoOrcamentoModal({
   setNovoOrcItens,
   procedimentosClinica,
   novoOrcSubtotal,
-  novoOrcTotal,
   novoOrcValorFinal,
   setNovoOrcValorFinal,
   orcSaving,
@@ -105,20 +89,10 @@ export function NovoOrcamentoModal({
   dentistasClinica,
   dentistaAlvoId,
   onDentistaAlvoChange,
-  planoForma,
-  setPlanoForma,
-  planoNumParcelas,
-  setPlanoNumParcelas,
-  planoPrimeiroVencimento,
-  setPlanoPrimeiroVencimento,
-  planoParcelasForma,
-  setPlanoParcelasForma,
 }: NovoOrcamentoModalProps) {
   const [valorFinalTexto, setValorFinalTexto] = useState(
     novoOrcValorFinal !== null ? formatValorBR(novoOrcValorFinal) : ''
   );
-  const [mostrarAjusteFinal, setMostrarAjusteFinal] = useState(false);
-  const [mostrarPagamento, setMostrarPagamento] = useState(false);
   useEffect(() => {
     // O valor em formato brasileiro é estado de apresentação: sincroniza uma mudança externa
     // (abrir outro orçamento, limpar modal) sem sobrescrever a digitação em andamento.
@@ -127,7 +101,6 @@ export function NovoOrcamentoModal({
     }, 0);
     return () => window.clearTimeout(timer);
   }, [novoOrcValorFinal]);
-  const temGrupos = novoOrcItens.some((item) => item.composicao?.length);
   const temDesconto = novoOrcValorFinal !== null && novoOrcSubtotal > 0 && novoOrcValorFinal < novoOrcSubtotal;
   const pctDesconto = temDesconto
     ? Math.round(((novoOrcSubtotal - novoOrcValorFinal!) / novoOrcSubtotal) * 100 * 10) / 10
@@ -338,124 +311,33 @@ export function NovoOrcamentoModal({
                 })}
               </div>
 
-              <button type="button" onClick={() => setNovoOrcItens((prev) => [...prev, { procedimentoId: '', descricao: '', quantidade: 1, preco: '', eventoIds: [], origem: 'manual', selecionado: true }])} className="min-h-11 w-full rounded-xl border border-dashed border-border py-3 text-sm text-text-secondary transition-colors hover:bg-surface-alt hover:text-text-primary">
-                <Plus className="mr-2 inline h-4 w-4" />Adicionar procedimento manual
-              </button>
-
-              <MontarGrupoOrcamento itens={novoOrcItens} onChange={(itens) => { setNovoOrcItens(itens); setNovoOrcValorFinal(null); setPlanoForma(null); }} disabled={orcSaving} />
+              <MontarGrupoOrcamento itens={novoOrcItens} onChange={(itens) => { setNovoOrcItens(itens); setNovoOrcValorFinal(null); }} disabled={orcSaving} />
             </div>
 
-            {/* Coluna do dinheiro — resumo, valor negociado, forma de pagamento (R-39a) */}
+            {/* A criação confirma a proposta; cobrança só existe na etapa seguinte. */}
             <div className="flex min-h-0 w-full flex-col border-t border-border bg-teal/[0.04] md:border-t-0 md:border-l">
               <div className="space-y-4 p-4 md:min-h-0 md:flex-1 md:overflow-y-auto md:p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-teal-ink">Área de trabalho</p>
-                    <p className="mt-1 text-lg font-semibold text-text-primary">Como ficou o orçamento?</p>
-                    <p className="mt-1 text-xs text-text-secondary">Revise os procedimentos e defina o valor final ou a forma combinada.</p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Total</p>
-                    <p className="mt-1 font-mono text-xl font-semibold text-text-primary">R$ {novoOrcTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                    <p className="mt-1 text-lg font-semibold text-text-primary">Revisar orçamento</p>
+                    <p className="mt-1 text-xs text-text-secondary">Confira o valor final antes de criar. A cobrança será combinada na próxima etapa.</p>
                   </div>
                 </div>
 
-                <div className="rounded-xl p-3 space-y-2 border border-teal/15 bg-teal/[0.07]">
-                  {temDesconto && (
-                    <>
-                      <div className="flex items-center justify-between">
-                        <p className="text-[10px] text-text-secondary font-mono">Subtotal</p>
-                        <p className="text-xs font-mono text-text-secondary line-through">
-                          R$ {novoOrcSubtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </p>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <p className="text-[10px] text-text-secondary font-mono">Desconto ({pctDesconto}%)</p>
-                        <p className="text-xs font-mono font-semibold text-coral-ink">
-                          − R$ {(novoOrcSubtotal - novoOrcTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </p>
-                      </div>
-                      <div className="h-px bg-teal/20" />
-                    </>
-                  )}
-                  <p className="text-[10px] text-text-secondary font-mono">
-                    {novoOrcItens.filter((item) => item.selecionado !== false && item.descricao.trim()).length} item(s) selecionado(s)
-                  </p>
+                <div className="rounded-xl border border-teal/20 bg-teal/[0.06] px-3 py-2.5 text-xs text-teal-ink">
+                  {novoOrcItens.filter((item) => item.selecionado !== false && item.descricao.trim()).length} procedimento{novoOrcItens.filter((item) => item.selecionado !== false && item.descricao.trim()).length === 1 ? '' : 's'} vieram da ficha clínica
                 </div>
 
-                {temGrupos ? (
-                  <p className="rounded-xl border border-border bg-card p-3 text-sm text-muted-foreground">Ajuste o preço de cada grupo nos campos ao lado. Depois de salvar e aprovar os grupos, defina a cobrança, os vencimentos e a observação do acordo por etapa.</p>
-                ) : modoPersistencia === 'novo' ? (
-                  <>
-                    <button type="button" onClick={() => setMostrarAjusteFinal((value) => !value)} className="flex min-h-11 w-full items-center justify-between rounded-xl px-1 text-left text-sm font-semibold text-text-primary hover:text-teal-ink">
-                      Ajustar valor final <ChevronDown className={`h-4 w-4 transition-transform ${mostrarAjusteFinal ? 'rotate-180' : ''}`} />
-                    </button>
-                    {mostrarAjusteFinal && (
-                      <div className="space-y-1.5 rounded-xl border border-border bg-surface p-3">
-                        <Label className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Valor final negociado (R$)</Label>
-                        <Input type="text" inputMode="decimal" placeholder={novoOrcSubtotal.toFixed(2)} value={valorFinalTexto} onChange={(e) => setValorFinalTexto(e.target.value)} onBlur={(e) => { const parsed = parseValorBR(e.target.value); setNovoOrcValorFinal(parsed > 0 ? parsed : null); setValorFinalTexto(parsed > 0 ? formatValorBR(parsed) : ''); }} className="h-11 rounded-xl border-border bg-surface-alt font-mono text-text-primary" />
-                        {temDesconto && <p className="text-[11px] font-semibold text-teal-ink">Desconto de {pctDesconto}% aplicado</p>}
-                        {novoOrcValorFinal !== null && novoOrcValorFinal > novoOrcSubtotal && <p className="text-[11px] text-warning-ink">Valor maior que o total</p>}
-                      </div>
-                    )}
-                    <button type="button" onClick={() => setMostrarPagamento((value) => !value)} className="flex min-h-11 w-full items-center justify-between rounded-xl px-1 text-left text-sm font-semibold text-text-primary hover:text-teal-ink">
-                      Definir forma de pagamento <span className="text-xs font-normal text-text-muted">opcional</span><ChevronDown className={`h-4 w-4 transition-transform ${mostrarPagamento ? 'rotate-180' : ''}`} />
-                    </button>
-                    {mostrarPagamento && (
-                      <div className="space-y-1.5 rounded-xl border border-border bg-surface p-3">
-                        <div className="grid grid-cols-2 gap-1.5">
-                          <button type="button" onClick={() => setPlanoForma(planoForma === 'avista' ? null : 'avista')} className={`min-h-11 rounded-xl border text-xs font-semibold transition-colors ${planoForma === 'avista' ? 'border-teal/40 bg-teal/10 text-teal-ink' : 'border-border text-text-secondary hover:border-teal/30 hover:text-teal-ink'}`}>À vista</button>
-                          <button type="button" onClick={() => setPlanoForma(planoForma === 'parcelado' ? null : 'parcelado')} className={`min-h-11 rounded-xl border text-xs font-semibold transition-colors ${planoForma === 'parcelado' ? 'border-teal/40 bg-teal/10 text-teal-ink' : 'border-border text-text-secondary hover:border-teal/30 hover:text-teal-ink'}`}>Parcelado</button>
-                        </div>
-                        {planoForma === 'parcelado' && (
-                    <div className="space-y-1.5 pt-0.5">
-                      <div className="grid grid-cols-2 gap-1.5">
-                        <div className="space-y-1">
-                          <Label className="text-[10px] text-text-secondary">Nº de parcelas</Label>
-                          <Input
-                            type="number" min={2} max={24}
-                            value={planoNumParcelas}
-                            onChange={(e) => setPlanoNumParcelas(e.target.value)}
-                            className="rounded-xl bg-surface border-border text-text-primary font-mono"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-[10px] text-text-secondary">1º vencimento</Label>
-                          <Input
-                            type="date"
-                            value={planoPrimeiroVencimento}
-                            onChange={(e) => setPlanoPrimeiroVencimento(e.target.value)}
-                            className="rounded-xl bg-surface border-border text-text-primary"
-                          />
-                        </div>
-                      </div>
-                      <Select
-                        value={planoParcelasForma || undefined}
-                        onValueChange={(v) => v && setPlanoParcelasForma(v as FormaPagamento)}
-                      >
-                        <SelectTrigger className="rounded-xl bg-surface border-border text-text-primary">
-                          <SelectValue placeholder="Forma das parcelas (opcional)..." />
-                        </SelectTrigger>
-                        <SelectContent className="bg-surface border-border">
-                          {(Object.keys(FORMA_LABEL) as FormaPagamento[]).map((f) => (
-                            <SelectItem key={f} value={f}>{FORMA_LABEL[f]}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {(() => {
-                        const n = parseInt(planoNumParcelas, 10);
-                        if (!n || n < 2 || novoOrcTotal <= 0) return null;
-                        return (
-                          <p className="text-[11px] text-text-secondary bg-surface rounded-xl px-3 py-2">
-                            {n}x de R$ {formatValorBR(novoOrcTotal / n)}
-                          </p>
-                        );
-                      })()}
-                    </div>
-                        )}
-                      </div>
-                    )}
-                  </>
+                {modoPersistencia === 'novo' ? (
+                  <div className="max-w-xl space-y-2 rounded-2xl border border-border bg-card p-4">
+                    <div className="flex items-baseline justify-between gap-3"><Label className="text-sm font-semibold text-text-primary">Valor final do orçamento</Label><span className="text-xs text-text-secondary">editável</span></div>
+                    <div className="flex items-center gap-2 rounded-xl border border-teal/40 bg-surface px-3"><span className="font-mono text-sm font-semibold text-teal-ink">R$</span><Input type="text" inputMode="decimal" aria-label="Valor final do orçamento" placeholder={formatValorBR(novoOrcSubtotal)} value={valorFinalTexto} onChange={(e) => setValorFinalTexto(e.target.value)} onBlur={(e) => { const parsed = parseValorBR(e.target.value); setNovoOrcValorFinal(parsed > 0 ? parsed : null); setValorFinalTexto(parsed > 0 ? formatValorBR(parsed) : ''); }} className="h-14 border-0 bg-transparent px-0 font-mono text-2xl font-semibold text-text-primary shadow-none focus-visible:ring-0" /></div>
+                    <p className="text-xs text-text-secondary">Use este campo apenas se houver negociação no total. A forma de pagamento será definida depois.</p>
+                    <div className="flex items-center justify-between border-t border-border pt-3 text-xs text-text-secondary"><span>Total dos procedimentos</span><span className="font-mono text-sm font-semibold text-text-primary">R$ {novoOrcSubtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                    {temDesconto && <p className="text-xs font-semibold text-teal-ink">Desconto de {pctDesconto}% aplicado</p>}
+                    {novoOrcValorFinal !== null && novoOrcValorFinal > novoOrcSubtotal && <p className="text-xs text-warning-ink">Valor maior que o total dos procedimentos.</p>}
+                  </div>
                 ) : (
                   <p className="rounded-xl border border-border bg-surface px-3 py-3 text-xs leading-relaxed text-text-secondary">Os recebimentos e o valor final continuam no orçamento atual. Estes novos itens entram como pendentes de aprovação.</p>
                 )}

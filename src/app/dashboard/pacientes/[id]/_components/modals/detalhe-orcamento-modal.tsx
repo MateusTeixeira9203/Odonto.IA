@@ -144,11 +144,10 @@ interface Props {
   onRecarregarDiferencasFicha: () => Promise<void>;
 }
 
-function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa, onFormChange }: {
+function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
   orcamento: OrcamentoComItens;
   pacienteId: string;
   permitirNovaEtapa: boolean;
-  onFormChange: (aberto: boolean) => void;
 }) {
   const router = useRouter();
   const hoje = hojeBRT();
@@ -261,7 +260,6 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa, onFormCha
         return;
       }
       setFormAberto(false);
-      onFormChange(false);
       setItemIds([]);
       setDesconto('');
       setObservacoes('');
@@ -645,9 +643,9 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa, onFormCha
 
             <div><button type="button" onClick={() => setObservacoesAbertas((atual) => !atual)} className="text-sm font-semibold text-text-primary">{observacoesAbertas ? 'Ocultar observação' : '+ Adicionar observação do acordo'}</button>{observacoesAbertas && <label className="mt-2 block space-y-1 text-sm text-foreground"><Textarea value={observacoes} onChange={(event) => setObservacoes(event.target.value)} maxLength={2000} disabled={saving} placeholder="Ex.: entrada hoje; restante no cartão a partir do próximo mês." /><span className="block text-xs text-muted-foreground">Interna para a equipe; não entra automaticamente no documento do paciente.</span></label>}</div>
             {erro && <p role="alert" className="text-xs text-coral-ink">{erro}</p>}
-            <div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => { setFormAberto(false); onFormChange(false); setErro(null); }} disabled={saving} className="min-h-11 flex-1">Cancelar</Button><Button size="sm" onClick={() => void criarEtapa()} disabled={saving || itemIds.length === 0} className="min-h-11 flex-1 bg-teal text-white hover:bg-teal-lt">{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Criar cobrança'}</Button></div>
+            <div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => { setFormAberto(false); setErro(null); }} disabled={saving} className="min-h-11 flex-1">Cancelar</Button><Button size="sm" onClick={() => void criarEtapa()} disabled={saving || itemIds.length === 0} className="min-h-11 flex-1 bg-teal text-white hover:bg-teal-lt">{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Criar cobrança'}</Button></div>
           </section>
-        ) : <Button variant="outline" onClick={() => { setItemIds(itensElegiveis.map((item) => item.id)); setAlterandoSelecao(false); setFormAberto(true); onFormChange(true); }} className="w-full border-teal/35 text-teal-ink hover:bg-teal/10"><Plus className="mr-1.5 h-4 w-4" />Cobrar nesta etapa</Button>
+        ) : <Button variant="outline" onClick={() => { setItemIds(itensElegiveis.map((item) => item.id)); setAlterandoSelecao(false); setFormAberto(true); }} className="w-full border-teal/35 text-teal-ink hover:bg-teal/10"><Plus className="mr-1.5 h-4 w-4" />Cobrar nesta etapa</Button>
       )}
       {erro && !formAberto && !cobrancaEditandoId && <p className="text-xs text-coral-ink">{erro}</p>}
     </div>
@@ -683,7 +681,6 @@ export function DetalheOrcamentoModal({
   const hoje = hojeBRT();
   /** R-39a: só Procedimentos e Atividade — Pagamentos virou a coluna do dinheiro. */
   const [tab, setTab] = useState<'procedimentos' | 'atividade'>('procedimentos');
-  const [novaEtapaAberta, setNovaEtapaAberta] = useState(false);
   const [showAceiteModal, setShowAceiteModal] = useState(false);
   const [motivoEstorno, setMotivoEstorno] = useState('');
   const [activityLogs, setActivityLogs] = useState<{ id: string; actor_nome: string | null; action: string; created_at: string }[]>([]);
@@ -794,7 +791,7 @@ export function DetalheOrcamentoModal({
   }
 
   return (
-    <Dialog open={!!detalheOrcId} onOpenChange={open => { if (!open) { setNovaEtapaAberta(false); onClose(); } }}>
+    <Dialog open={!!detalheOrcId} onOpenChange={open => { if (!open) onClose(); }}>
       <DialogContent
         className="flex flex-col rounded-3xl bg-surface border-border p-0 overflow-hidden gap-0 w-[94vw] sm:w-[82vw]"
         style={{ maxWidth: '1280px', maxHeight: '90vh', left: '50%' }}
@@ -862,7 +859,7 @@ export function DetalheOrcamentoModal({
             <div className="flex-1 min-h-0 flex flex-col-reverse sm:flex-row">
 
               {/* ── Coluna clínica ─────────────────────────────────────── */}
-              <div className={`${novaEtapaAberta ? 'sm:basis-[36%] sm:flex-none' : 'flex-1'} min-w-0 flex flex-col min-h-0`}>
+              <div className="min-w-0 flex flex-col min-h-0 sm:basis-[36%] sm:flex-none">
                 <Tabs
                   value={tab}
                   onValueChange={(v) => setTab(v as typeof tab)}
@@ -1104,11 +1101,11 @@ export function DetalheOrcamentoModal({
                   é gesto de balcão, não cabe atrás de um segundo clique. */}
               <div
                 id="ajustes-financeiros-orcamento"
-                className={`${novaEtapaAberta ? 'sm:basis-[64%] sm:w-auto' : 'sm:w-[416px] sm:shrink-0'} w-full border-t sm:border-t-0 sm:border-l border-border flex flex-col min-h-0 bg-teal/[0.04]`}
+                className="w-full border-t border-border sm:basis-[64%] sm:border-l sm:border-t-0 sm:flex-none flex flex-col min-h-0 bg-teal/[0.04]"
               >
                 <div className="flex-1 min-h-0 overflow-y-auto p-5">
                   {!orcEditMode && usarCobrancasPorEtapa ? (
-                    <CobrancasPorEtapa orcamento={detalheOrc} pacienteId={pacienteId} permitirNovaEtapa={!temAcordoGlobal} onFormChange={setNovaEtapaAberta} />
+                    <CobrancasPorEtapa orcamento={detalheOrc} pacienteId={pacienteId} permitirNovaEtapa={!temAcordoGlobal} />
                   ) : (
                     <>
                   {orcEditMode ? (

@@ -1,0 +1,54 @@
+<!--
+  item: R-157b · montagem de orçamento
+  rota alvo: /dashboard/pacientes/[id] · modal “Montar orçamento”
+  componente alvo: src/app/dashboard/pacientes/[id]/_components/modals/novo-orcamento-modal.tsx
+  data: 2026-09-16
+  status: aprovado em 16/09/2026
+-->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>R-157b · Montar orçamento</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#111313; --surface:#171919; --surface-alt:#1c1f1f; --field:#131515; --line:#303535; --muted:#989d9c; --text:#f2f4f3; --teal:#50c2b0; --teal-ink:#58cab8; --teal-soft:rgba(80,194,176,.09); --warning:#f4b51c; --warning-soft:#4a2605; --danger:#fb9a9b; }
+  * { box-sizing:border-box; } body { margin:0; min-height:100vh; display:grid; place-items:center; background:radial-gradient(circle at 50% 30%,#1c2221 0,#101111 52%); color:var(--text); font:15px/1.4 Outfit,system-ui,sans-serif; }
+  .modal { width:min(1280px,calc(100vw - 48px)); height:min(760px,calc(100vh - 64px)); display:flex; flex-direction:column; overflow:hidden; background:var(--surface); border:1px solid var(--line); border-radius:24px; box-shadow:0 32px 80px #0008; }
+  header { min-height:94px; display:flex; align-items:center; justify-content:space-between; padding:20px 28px; border-bottom:1px solid var(--line); }
+  h1 { font:400 28px/1 'DM Serif Display',serif; margin:0; } .subtitle { margin:6px 0 0; color:var(--muted); font-size:13px; } .close { width:38px; height:38px; border:0; background:transparent; color:var(--muted); font-size:24px; cursor:pointer; }
+  .workspace { min-height:0; flex:1; display:grid; grid-template-columns:minmax(340px,36%) minmax(0,64%); }
+  .procedures { min-width:0; display:flex; flex-direction:column; border-right:1px solid var(--line); } .panel-head { padding:22px 28px 15px; } .eyebrow { margin:0 0 7px; color:var(--teal-ink); font-size:11px; font-weight:700; letter-spacing:.17em; text-transform:uppercase; } h2 { margin:0; font-size:18px; line-height:1.2; } .head-row { display:flex; align-items:center; justify-content:space-between; gap:12px; } .count { padding:4px 8px; border-radius:999px; background:var(--teal-soft); color:var(--teal-ink); font-size:11px; font-weight:700; white-space:nowrap; } .helper { margin:7px 0 0; color:var(--muted); font-size:12px; }
+  .procedure-list { min-height:0; flex:1; overflow:auto; padding:0 18px 16px; } .procedure { display:grid; grid-template-columns:22px minmax(0,1fr) 38px 108px; align-items:center; gap:9px; min-height:66px; padding:10px; border:1px solid rgba(80,194,176,.42); border-radius:14px; background:linear-gradient(90deg,var(--teal-soft),transparent 68%); margin-bottom:9px; } .check { appearance:none; width:22px; height:22px; margin:0; border-radius:7px; background:var(--teal); display:grid; place-items:center; } .check::after { content:'✓'; color:#0f3430; font-weight:800; font-size:14px; } .name { min-width:0; } .name strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; } .name span { display:block; color:var(--muted); font-size:12px; margin-top:2px; } .quantity { width:38px; height:42px; display:grid; place-items:center; border:1px solid var(--line); border-radius:11px; background:var(--field); color:var(--text); font-family:ui-monospace,monospace; } .price { height:42px; display:flex; align-items:center; gap:4px; padding:0 10px; border:1px solid var(--line); border-radius:11px; background:var(--field); color:var(--text); font:14px ui-monospace,monospace; } .price b { color:var(--muted); font-size:11px; } .missing { border-color:#a56606; background:#361c04; } .missing-note { margin:-3px 0 9px; display:flex; align-items:center; justify-content:space-between; padding:8px 12px; border:1px solid #875008; border-radius:11px; background:var(--warning-soft); color:var(--warning); font-size:12px; font-weight:600; } .missing-note button { color:#ffd453; background:none; border:0; font:inherit; font-weight:700; cursor:pointer; }
+  .procedures-footer { border-top:1px solid var(--line); padding:15px 18px; } .group { width:100%; height:42px; border:1px dashed #4d6260; border-radius:11px; background:transparent; color:var(--text); font:600 13px Outfit,sans-serif; } .group small { color:var(--muted); font-weight:400; margin-left:5px; }
+  .review { min-width:0; display:flex; flex-direction:column; background:linear-gradient(115deg,rgba(80,194,176,.055),transparent 45%); } .review-scroll { flex:1; padding:28px 34px; overflow:auto; } .review-title { display:flex; justify-content:space-between; gap:24px; align-items:flex-start; } .review-title h2 { font-size:22px; } .review-title p:not(.eyebrow) { margin:7px 0 0; color:var(--muted); font-size:13px; } .source { margin-top:22px; display:flex; align-items:center; gap:10px; padding:11px 13px; border:1px solid rgba(80,194,176,.25); border-radius:12px; background:var(--teal-soft); color:var(--teal-ink); font-size:13px; } .source strong { color:var(--text); }
+  .value-card { max-width:630px; margin-top:28px; padding:20px; border:1px solid var(--line); border-radius:16px; background:var(--surface-alt); } .value-label { display:flex; justify-content:space-between; align-items:baseline; gap:12px; } .value-label label { font-size:14px; font-weight:700; } .value-label span { color:var(--muted); font-size:12px; } .money-field { display:flex; align-items:center; gap:9px; margin-top:10px; height:58px; padding:0 17px; border:1px solid rgba(80,194,176,.52); border-radius:13px; background:var(--field); } .money-field b { color:var(--teal-ink); font-size:14px; } .money-field input { width:100%; border:0; outline:0; background:transparent; color:var(--text); font:700 25px ui-monospace,monospace; } .value-help { margin:9px 0 0; color:var(--muted); font-size:12px; }
+  .total-line { display:flex; justify-content:space-between; align-items:center; margin-top:18px; padding-top:17px; border-top:1px solid var(--line); color:var(--muted); font-size:13px; } .total-line strong { color:var(--text); font:700 17px ui-monospace,monospace; }
+  .action { display:flex; gap:10px; border-top:1px solid var(--line); padding:18px 22px; } .action button { height:45px; border-radius:12px; font:700 14px Outfit,sans-serif; cursor:pointer; } .primary { flex:1; border:0; background:#38a892; color:#fff; } .secondary { width:132px; border:1px solid var(--line); background:transparent; color:var(--text); }
+  @media(max-width:800px) { body { display:block; } .modal { width:100%; height:100vh; border:0; border-radius:0; } .workspace { display:block; overflow:auto; } .procedures { border-right:0; border-bottom:1px solid var(--line); } .procedure-list { max-height:42vh; } .review-scroll { padding:24px 20px; } .review-title { display:block; } .procedure { grid-template-columns:22px minmax(0,1fr) 34px 100px; gap:7px; } }
+</style>
+</head>
+<body>
+<main class="modal">
+  <header><div><h1>Montar orçamento</h1><p class="subtitle">Revise os procedimentos da ficha e confirme o valor final.</p></div><button class="close" aria-label="Fechar">×</button></header>
+  <div class="workspace">
+    <aside class="procedures">
+      <div class="panel-head"><p class="eyebrow">Procedimentos da ficha</p><div class="head-row"><h2>Revisar valores</h2><span class="count">6 selecionados</span></div><p class="helper">Ajuste somente os preços que precisarem de correção.</p></div>
+      <div class="procedure-list">
+        <div class="procedure missing"><input class="check" type="checkbox" checked><div class="name"><strong>Pino/núcleo</strong><span>◉ D45</span></div><span class="quantity">1</span><div class="price"><b>R$</b>5.000,00</div></div><div class="missing-note"><span>△ Fora do catálogo</span><button>Cadastrar “Pino/núcleo”</button></div>
+        <div class="procedure"><input class="check" type="checkbox" checked><div class="name"><strong>Fratura</strong><span>◉ D47</span></div><span class="quantity">1</span><div class="price"><b>R$</b>5.000,00</div></div>
+        <div class="procedure"><input class="check" type="checkbox" checked><div class="name"><strong>Fratura</strong><span>◉ D45</span></div><span class="quantity">1</span><div class="price"><b>R$</b>5.000,00</div></div>
+        <div class="procedure"><input class="check" type="checkbox" checked><div class="name"><strong>Implante</strong><span>◉ D21</span></div><span class="quantity">1</span><div class="price"><b>R$</b>1.500,00</div></div>
+        <div class="procedure"><input class="check" type="checkbox" checked><div class="name"><strong>Implante</strong><span>◉ D23</span></div><span class="quantity">1</span><div class="price"><b>R$</b>1.500,00</div></div>
+        <div class="procedure"><input class="check" type="checkbox" checked><div class="name"><strong>Fratura</strong><span>◉ D24</span></div><span class="quantity">1</span><div class="price"><b>R$</b>5.000,00</div></div>
+      </div>
+      <div class="procedures-footer"><button class="group">Agrupar procedimentos <small>ex.: arcada superior</small></button></div>
+    </aside>
+    <section class="review"><div class="review-scroll"><div class="review-title"><div><p class="eyebrow">Área de trabalho</p><h2>Revisar orçamento</h2><p>Confira o valor final antes de criar. A forma de pagamento será definida na próxima etapa.</p></div></div><div class="source"><span>✓</span><span><strong>6 procedimentos</strong> vieram da ficha clínica</span></div><div class="value-card"><div class="value-label"><label for="valor-final">Valor final do orçamento</label><span>editável</span></div><div class="money-field"><b>R$</b><input id="valor-final" value="18.000,00" inputmode="decimal"></div><p class="value-help">Use este campo apenas se houver uma negociação no total. A cobrança será combinada depois.</p><div class="total-line"><span>Total dos procedimentos</span><strong>R$ 18.000,00</strong></div></div></div><div class="action"><button class="secondary">Cancelar</button><button class="primary">Criar orçamento</button></div></section>
+  </div>
+</main>
+</body>
+</html>

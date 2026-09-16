@@ -21,9 +21,6 @@ import {
   criarOrcamento,
   adicionarItensAoOrcamento,
   criarProcedimentoRapido,
-  gerarParcelas,
-  definirPlanoAvista,
-  type FormaPagamento,
 } from '@/app/dashboard/orcamentos/actions';
 import { composicaoParaSalvar } from '@/lib/orcamentos/grupos';
 import { parseValorBR, formatValorBR } from '@/lib/valor-br';
@@ -155,21 +152,11 @@ export function useOrcamentoModal({
       setNovoOrcDentistaAlvoId(dentistasClinica[0].id);
     }
   }, [dentistasClinica, novoOrcDentistaAlvoId]);
-  // R-34 — forma de pagamento já na criação (reduz a fricção de ter os dois passos).
-  const [novoOrcPlanoForma, setNovoOrcPlanoForma] = useState<'avista' | 'parcelado' | null>(null);
-  const [novoOrcNumParcelas, setNovoOrcNumParcelas] = useState('3');
-  const [novoOrcPrimeiroVencimento, setNovoOrcPrimeiroVencimento] = useState('');
-  const [novoOrcParcelasForma, setNovoOrcParcelasForma] = useState<FormaPagamento | ''>('');
-
   const novoOrcSubtotal = useMemo(
     () => novoOrcItens
       .filter((item) => item.selecionado !== false)
       .reduce((s, i) => s + i.quantidade * parseValorBR(i.preco), 0),
     [novoOrcItens]
-  );
-  const novoOrcTotal = useMemo(
-    () => novoOrcValorFinal !== null ? Math.max(0, novoOrcValorFinal) : novoOrcSubtotal,
-    [novoOrcSubtotal, novoOrcValorFinal]
   );
 
   // Cadastro rápido (handleCadastrarProcedimento, abaixo) precisa refletir no catálogo usado
@@ -743,15 +730,6 @@ export function useOrcamentoModal({
       setOrcError('Selecione o dentista responsável.');
       return;
     }
-    const numeroParcelas = parseInt(novoOrcNumParcelas, 10);
-    if (modoPersistencia.tipo === 'novo' && novoOrcPlanoForma === 'parcelado' && (!numeroParcelas || numeroParcelas < 2 || numeroParcelas > 24)) {
-      setOrcError('Informe entre 2 e 24 parcelas.');
-      return;
-    }
-    if (modoPersistencia.tipo === 'novo' && novoOrcPlanoForma === 'parcelado' && !novoOrcPrimeiroVencimento) {
-      setOrcError('Informe o primeiro vencimento das parcelas.');
-      return;
-    }
     setOrcError(null);
     setOrcSaving(true);
 
@@ -891,41 +869,6 @@ export function useOrcamentoModal({
         setIsNovoOrcOpen(false);
         setNovoOrcItens([ITEM_VAZIO]);
 
-        // R-34 — plano de pagamento definido junto da criação (opcional). Roda depois do
-        // orçamento existir de verdade (precisa do id real, não do temp/otimista acima).
-        let precisaAtualizar = false;
-        if (result.id && novoOrcPlanoForma === 'parcelado') {
-          const planoResult = await gerarParcelas({
-            orcamentoId: result.id,
-            numeroParcelas,
-            primeiroVencimento: novoOrcPrimeiroVencimento,
-            valorAcordado: novoTotal,
-            parcelasForma: novoOrcParcelasForma || undefined,
-          });
-          if (planoResult.error) {
-            toast.error(`Orçamento criado, mas o parcelamento falhou: ${planoResult.error}`);
-          } else {
-            precisaAtualizar = true;
-          }
-        } else if (result.id && novoOrcPlanoForma === 'avista') {
-          const planoResult = await definirPlanoAvista({ orcamentoId: result.id, valorAcordado: novoTotal });
-          if (planoResult.error) {
-            toast.error(`Orçamento criado, mas a forma de pagamento falhou: ${planoResult.error}`);
-          } else {
-            precisaAtualizar = true;
-          }
-        }
-        setNovoOrcPlanoForma(null);
-        setNovoOrcNumParcelas('3');
-        setNovoOrcPrimeiroVencimento('');
-        setNovoOrcParcelasForma('');
-        if (precisaAtualizar && result.id) {
-          try {
-            novoOrc = await carregarOrcamentoPersistido(result.id);
-          } catch {
-            router.refresh();
-          }
-        }
         onOrcamentoCriado?.(novoOrc);
 
         toast.success('Orçamento criado como rascunho', {
@@ -954,7 +897,6 @@ export function useOrcamentoModal({
         setResumoOrigemOrcamento(null);
         setBloqueioFicha(null);
         setContextoClinicoPendente(false);
-        setNovoOrcPlanoForma(null); setNovoOrcNumParcelas('3'); setNovoOrcPrimeiroVencimento(''); setNovoOrcParcelasForma('');
       }
     },
     etapaNovoOrc,
@@ -975,7 +917,6 @@ export function useOrcamentoModal({
     setNovoOrcItens,
     procedimentosClinica: procedimentosClinicaCompleto,
     novoOrcSubtotal,
-    novoOrcTotal,
     novoOrcValorFinal,
     setNovoOrcValorFinal,
     orcSaving,
@@ -990,14 +931,6 @@ export function useOrcamentoModal({
     dentistasClinica,
     dentistaAlvoId: novoOrcDentistaAlvoId,
     onDentistaAlvoChange: handleDentistaAlvoChange,
-    planoForma: novoOrcPlanoForma,
-    setPlanoForma: setNovoOrcPlanoForma,
-    planoNumParcelas: novoOrcNumParcelas,
-    setPlanoNumParcelas: setNovoOrcNumParcelas,
-    planoPrimeiroVencimento: novoOrcPrimeiroVencimento,
-    setPlanoPrimeiroVencimento: setNovoOrcPrimeiroVencimento,
-    planoParcelasForma: novoOrcParcelasForma,
-    setPlanoParcelasForma: setNovoOrcParcelasForma,
   };
 
   return {
