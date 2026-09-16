@@ -1,10 +1,11 @@
 # Estado — Odonto.IA
 
-> 16/09/2026 · atualização em teste; Mateus assumiu os testes de uso.
+> 16/09/2026 · fluxo completo do orçamento aprovado; implementação em validação para Preview.
 
 ## Agora
 
-Preview dos sublotes publicado em `codex/conclusao-atualizacao`.
+Item ativo: R-169b, montagem e atualização fluida do orçamento contra o artefato aprovado.
+Preview dos sublotes publicado em `codex/conclusao-atualizacao`; novo lote ainda local.
 Worktree: `/home/mtx/.local/share/odontoia-testes/integracao`.
 Base `2b93247`; sublotes e correções em `1906f83` publicados no Preview.
 CI 35049713925 passou: typecheck, 387 testes, lint e build.
@@ -35,7 +36,10 @@ Nenhuma promoção/main, cobrança real ou escrita no banco oficial autorizada n
   Apenas “Enviei” explícito registra envio manual; abrir não confirma pagamento nem aceite.
 - Cadastro Free: três modelos, escolha do pagador, R$200/dentista e identidade clínica opcional.
   Cria estrutura comercial pendente e estoque; não inicia cobrança nem altera Stripe vigente.
-- Refinamento de orçamento já concluído segundo Mateus; preservado.
+- Orçamento: montagem ampla 70/30, nomes completos, itens atuais versus disponíveis,
+  total ao vivo, preço por arcada visível e retorno ao mesmo fluxo de aceite/acordo.
+- Alerta âmbar conta somente procedimento novo não revisado; `Manter orçamento como está`
+  persiste a decisão em `activity_logs`, sem remover o procedimento da ficha.
 - Reativação pessoal no Dex adiada por Mateus; rascunho fora do código/migrations publicáveis.
 - Estabilidade fica por último.
 
@@ -48,7 +52,7 @@ Demais recortes futuros permanecem no [plano de conclusão](PLANO-CONCLUSAO-ATUA
 
 ## Próximo passo
 
-Conferir o CI/deployment do último SHA da branch e entregar a Mateus o roteiro de QA.
+Finalizar auditoria do R-169b, publicar o novo SHA no Preview e testar o fluxo ponta a ponta.
 Não promover a produção antes da conferência e do gate de duas contas logadas.
 
 ## Continuidade segura

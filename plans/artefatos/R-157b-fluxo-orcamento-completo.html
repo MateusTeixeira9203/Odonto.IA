@@ -1,0 +1,988 @@
+<!-- ARTEFATO · R-157b · rota: /dashboard/pacientes/[id] · componente: novo-orcamento-modal + detalhe-orcamento-modal · 2026-09-16 · status: aprovado -->
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>R-157b · Fluxo completo do orçamento</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f4f4f6;
+      --backdrop: rgba(18, 20, 20, .28);
+      --surface: #ffffff;
+      --surface-raised: #fafafa;
+      --surface-soft: #f2f5f4;
+      --surface-accent: #eaf5f2;
+      --border: #e2e2e5;
+      --border-strong: #cdd4d2;
+      --text: #09090b;
+      --muted: #6f7473;
+      --subtle: #999e9d;
+      --accent: #2f9c85;
+      --accent-strong: #247b6a;
+      --accent-ink: #ffffff;
+      --accent-border: #acd8ce;
+      --amber: #b56b00;
+      --amber-surface: #fff7e6;
+      --amber-border: #efc56e;
+      --danger: #c85151;
+      --danger-surface: #fff0f0;
+      --shadow: 0 20px 50px rgba(9, 9, 11, .12);
+      --radius-xs: 5px;
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 18px;
+      --s1: 4px;
+      --s2: 8px;
+      --s3: 12px;
+      --s4: 16px;
+      --s5: 20px;
+      --s6: 24px;
+      --s8: 32px;
+    }
+
+    html[data-theme="dark"] {
+      --bg: #0d0f0f;
+      --backdrop: rgba(0, 0, 0, .58);
+      --surface: #171919;
+      --surface-raised: #1c1f1f;
+      --surface-soft: #202424;
+      --surface-accent: #192b28;
+      --border: #303535;
+      --border-strong: #444b4a;
+      --text: #f2f4f3;
+      --muted: #a3a8a7;
+      --subtle: #777d7c;
+      --accent: #50c2b0;
+      --accent-strong: #78d0c2;
+      --accent-ink: #10211e;
+      --accent-border: #275b52;
+      --amber: #ffc342;
+      --amber-surface: #382509;
+      --amber-border: #795215;
+      --danger: #ff8c8c;
+      --danger-surface: #351d1d;
+      --shadow: 0 28px 70px rgba(0, 0, 0, .42);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background: var(--bg);
+      font-family: Outfit, ui-sans-serif, system-ui, sans-serif;
+      font-size: 16px;
+    }
+    button, input, select, textarea { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .demo-bar {
+      min-height: 54px;
+      display: flex;
+      align-items: center;
+      gap: var(--s4);
+      padding: 8px 22px;
+      color: var(--text);
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .demo-title { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+    .demo-title strong { font-size: 14px; font-weight: 600; }
+    .approved-label { color: var(--muted); font-size: 12px; white-space: nowrap; }
+    .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--accent); }
+    .scenario-tabs { display: flex; gap: 6px; margin-left: auto; }
+    .scenario-button, .theme-button {
+      height: 40px;
+      padding: 0 13px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--muted);
+      background: transparent;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .scenario-button:hover, .theme-button:hover { color: var(--text); background: var(--surface-soft); }
+    .scenario-button.active { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
+    .theme-button { width: 44px; height: 44px; padding: 0; font-size: 17px; }
+
+    .page {
+      min-height: calc(100vh - 54px);
+      display: grid;
+      place-items: center;
+      padding: 28px;
+      background: color-mix(in srgb, var(--bg) 82%, var(--text) 18%);
+    }
+    .modal {
+      width: min(1500px, calc(100vw - 56px));
+      height: min(840px, calc(100vh - 110px));
+      min-height: 650px;
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+    }
+    .modal-header {
+      min-height: 76px;
+      display: flex;
+      align-items: center;
+      gap: var(--s4);
+      padding: 15px 24px;
+      border-bottom: 1px solid var(--border);
+    }
+    .title-stack { min-width: 0; }
+    h1, h2, h3, p { margin: 0; }
+    h1 { font: 400 27px/1 "DM Serif Display", Georgia, serif; }
+    h2 { font-size: 22px; line-height: 1.2; font-weight: 600; }
+    h3 { font-size: 15px; line-height: 1.25; font-weight: 600; }
+    .modal-subtitle { margin-top: 6px; color: var(--muted); font-size: 13px; }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      color: var(--accent-strong);
+      background: var(--surface-accent);
+      border: 1px solid var(--accent-border);
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .header-spacer { flex: 1; }
+    .progress-label { color: var(--muted); font-size: 13px; }
+    .close-button {
+      width: 44px;
+      height: 44px;
+      border: 0;
+      border-radius: var(--radius-sm);
+      color: var(--muted);
+      background: transparent;
+      font-size: 24px;
+    }
+    .close-button:hover { color: var(--text); background: var(--surface-soft); }
+
+    .content { min-height: 0; overflow: hidden; }
+    .screen { height: 100%; min-height: 0; }
+    .detail-screen { display: grid; grid-template-columns: minmax(360px, 34%) 1fr; }
+    .side-list { min-width: 0; padding: 22px; border-right: 1px solid var(--border); overflow: auto; }
+    .detail-main { padding: 26px; overflow: auto; }
+
+    .eyebrow {
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+    }
+    .section-copy { margin-top: 6px; color: var(--muted); line-height: 1.45; }
+    .procedure-preview { margin-top: 18px; border-top: 1px solid var(--border); }
+    .preview-row {
+      min-height: 58px;
+      display: grid;
+      grid-template-columns: 28px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .check-icon {
+      width: 22px; height: 22px; display: grid; place-items: center;
+      border-radius: 999px; color: var(--accent-ink); background: var(--accent);
+      font-size: 13px; font-weight: 600;
+    }
+    .preview-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+    .money { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+
+    .review-card {
+      max-width: 910px;
+      margin-top: 20px;
+      padding: 22px;
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+    }
+    .review-card.amber { background: var(--amber-surface); border-color: var(--amber-border); }
+    .review-card-header { display: flex; align-items: flex-start; gap: 14px; }
+    .review-icon {
+      flex: 0 0 auto; width: 34px; height: 34px; display: grid; place-items: center;
+      border-radius: 999px; color: var(--amber); background: color-mix(in srgb, var(--amber) 14%, transparent);
+      font-weight: 600;
+    }
+    .review-title { font-size: 17px; font-weight: 600; }
+    .review-copy { margin-top: 4px; color: var(--muted); line-height: 1.45; }
+    .review-card.amber .review-copy { color: color-mix(in srgb, var(--amber) 70%, var(--muted)); }
+    .review-actions { display: flex; gap: 10px; margin-top: 18px; }
+
+    .btn {
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0 16px;
+      border: 1px solid var(--border-strong);
+      border-radius: 9px;
+      color: var(--text);
+      background: var(--surface);
+      font-weight: 600;
+    }
+    .btn:hover { background: var(--surface-soft); }
+    .btn-primary { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
+    .btn-primary:hover { background: var(--accent-strong); }
+    .btn-amber { color: #241600; background: var(--amber); border-color: var(--amber); }
+    .btn-amber:hover { filter: brightness(.96); }
+    .btn-ghost { border-color: transparent; background: transparent; }
+    .btn-danger { color: var(--danger); background: transparent; border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
+    .btn-small { min-height: 40px; padding: 0 11px; font-size: 13px; }
+    .btn-link { min-height: 40px; padding: 0 6px; color: var(--accent-strong); background: transparent; border: 0; font-weight: 600; }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+
+    .workbench {
+      height: 100%; min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(680px, 1fr) minmax(310px, 31%);
+    }
+    .editing-area {
+      min-width: 0; min-height: 0; display: grid; grid-template-rows: auto 1fr auto;
+      border-right: 1px solid var(--border);
+    }
+    .area-header { padding: 20px 22px 16px; border-bottom: 1px solid var(--border); }
+    .area-title-row { margin-top: 5px; display: flex; align-items: center; gap: 12px; }
+    .area-title-row h2 { min-width: 0; }
+    .counter { color: var(--accent-strong); font-size: 13px; font-weight: 600; white-space: nowrap; }
+    .source-line { margin-top: 7px; color: var(--muted); font-size: 13px; }
+
+    .lists-wrap { min-height: 0; display: grid; grid-template-columns: 1fr 1fr; }
+    .lists-wrap.single-list { grid-template-columns: 1fr; }
+    .list-column { min-width: 0; min-height: 0; display: grid; grid-template-rows: auto 1fr; }
+    .list-column + .list-column { border-left: 1px solid var(--border); }
+    .list-heading {
+      min-height: 68px;
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 16px;
+      background: var(--surface-raised);
+      border-bottom: 1px solid var(--border);
+    }
+    .list-heading-copy { min-width: 0; }
+    .list-heading-copy strong { display: block; font-size: 14px; }
+    .list-heading-copy span { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; }
+    .list-heading .btn { margin-left: auto; }
+    .items { min-height: 0; overflow: auto; padding: 0 14px 18px; }
+    .item-row {
+      min-height: 74px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 2px;
+      border-bottom: 1px solid var(--border);
+    }
+    .item-main { min-width: 0; }
+    .item-name { font-size: 15px; line-height: 1.3; font-weight: 600; }
+    .item-meta { margin-top: 4px; display: flex; align-items: center; flex-wrap: wrap; gap: 7px; color: var(--muted); font-size: 12px; }
+    .new-label {
+      display: inline-flex; align-items: center; min-height: 22px; padding: 0 7px;
+      color: var(--amber); background: var(--amber-surface); border: 1px solid var(--amber-border);
+      border-radius: 999px; font-size: 11px; font-weight: 600;
+    }
+    .item-actions { display: flex; align-items: center; gap: 8px; }
+    .price-field {
+      width: 120px; height: 44px; padding: 0 10px;
+      color: var(--text); background: var(--surface-raised); border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm); font-variant-numeric: tabular-nums; text-align: right;
+    }
+    .price-field.needs-price { border-color: var(--amber); background: var(--amber-surface); }
+    .price-required { color: var(--amber); font-weight: 600; }
+    .icon-action {
+      min-width: 44px; min-height: 44px; padding: 0 10px;
+      color: var(--muted); background: transparent; border: 1px solid transparent; border-radius: var(--radius-sm);
+    }
+    .icon-action:hover { color: var(--text); background: var(--surface-soft); border-color: var(--border); }
+    .add-action { color: var(--accent-strong); border-color: var(--accent-border); background: var(--surface-accent); }
+    .group-block { margin-top: 14px; border: 1px solid var(--accent-border); border-radius: var(--radius-md); overflow: hidden; }
+    .group-header { display: flex; align-items: center; gap: 10px; padding: 13px; background: var(--surface-accent); }
+    .group-header-copy { min-width: 0; flex: 1; }
+    .group-header-copy strong { display: block; }
+    .group-header-copy span { color: var(--muted); font-size: 12px; }
+    .group-member { padding: 9px 13px; color: var(--muted); border-top: 1px solid var(--accent-border); font-size: 13px; }
+    .empty-list { padding: 26px 12px; color: var(--muted); text-align: center; line-height: 1.5; }
+
+    .editor-footer {
+      min-height: 72px;
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 16px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+    }
+    .editor-footer .right-actions { margin-left: auto; display: flex; gap: 10px; }
+
+    .summary-area { min-width: 0; padding: 24px; overflow: auto; background: color-mix(in srgb, var(--surface) 92%, var(--accent) 8%); }
+    .summary-box { margin-top: 20px; padding: 18px; background: var(--surface-raised); border: 1px solid var(--border); border-radius: var(--radius-md); }
+    .summary-line { min-height: 35px; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--muted); }
+    .summary-line strong { color: var(--text); font-variant-numeric: tabular-nums; }
+    .summary-line.positive strong { color: var(--accent-strong); }
+    .summary-line.negative strong { color: var(--danger); }
+    .summary-total { margin-top: 10px; padding-top: 16px; border-top: 1px solid var(--border); }
+    .summary-total span { display: block; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+    .summary-total strong { display: block; margin-top: 5px; font: 400 31px/1.2 "DM Serif Display", Georgia, serif; font-variant-numeric: tabular-nums; }
+    .summary-note { margin-top: 18px; padding: 13px; color: var(--muted); background: var(--surface-soft); border-radius: var(--radius-sm); line-height: 1.45; font-size: 13px; }
+
+    .composer {
+      margin: 14px 14px 0;
+      padding: 15px;
+      background: var(--surface-soft);
+      border: 1px solid var(--accent-border);
+      border-radius: var(--radius-md);
+    }
+    .composer-top { display: flex; align-items: center; gap: 10px; }
+    .composer-top h3 { flex: 1; }
+    .segmented { display: inline-flex; padding: 3px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+    .segment { min-height: 32px; padding: 0 10px; border: 0; border-radius: 6px; color: var(--muted); background: transparent; font-size: 12px; font-weight: 600; }
+    .segment.active { color: var(--accent-ink); background: var(--accent); }
+    .composer-fields { margin-top: 13px; display: grid; grid-template-columns: 1fr 140px; gap: 10px; }
+    .field-label { display: block; margin-bottom: 5px; color: var(--muted); font-size: 12px; }
+    .text-field, .select-field {
+      width: 100%; height: 44px; padding: 0 11px;
+      color: var(--text); background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+    }
+    .composer-selection { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 7px; color: var(--muted); font-size: 12px; }
+    .composer-actions { margin-top: 13px; display: flex; justify-content: flex-end; gap: 8px; }
+
+    .focus-screen { height: 100%; min-height: 0; display: grid; grid-template-columns: minmax(350px, 32%) 1fr; }
+    .compact-procedures { min-height: 0; display: grid; grid-template-rows: auto 1fr auto; border-right: 1px solid var(--border); }
+    .compact-header { padding: 22px; border-bottom: 1px solid var(--border); }
+    .compact-list { min-height: 0; overflow: auto; padding: 0 18px; }
+    .compact-row { min-height: 58px; display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); }
+    .compact-row input { width: 18px; height: 18px; accent-color: var(--accent); }
+    .compact-footer { padding: 16px 20px; background: var(--surface-accent); border-top: 1px solid var(--accent-border); }
+    .compact-footer .summary-line { min-height: 28px; }
+    .focus-workspace { min-width: 0; min-height: 0; display: grid; grid-template-rows: 1fr auto; }
+    .workspace-scroll { overflow: auto; padding: 28px 30px; }
+    .workspace-footer { min-height: 74px; display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 12px 24px; border-top: 1px solid var(--border); }
+    .notice { margin-top: 18px; padding: 13px 15px; color: var(--accent-strong); background: var(--surface-accent); border: 1px solid var(--accent-border); border-radius: var(--radius-sm); }
+    .accept-summary { margin-top: 20px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .metric { padding: 18px; background: var(--surface-raised); border: 1px solid var(--border); border-radius: var(--radius-md); }
+    .metric span { display: block; color: var(--muted); font-size: 12px; }
+    .metric strong { display: block; margin-top: 7px; font-size: 24px; font-variant-numeric: tabular-nums; }
+
+    .payment-grid { margin-top: 24px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+    .payment-option { min-height: 54px; color: var(--muted); background: var(--surface-raised); border: 1px solid var(--border); border-radius: var(--radius-sm); font-weight: 600; }
+    .payment-option.active { color: var(--accent-strong); background: var(--surface-accent); border-color: var(--accent); }
+    .form-grid { margin-top: 20px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .form-field label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 12px; }
+    .agreement-preview { margin-top: 20px; padding: 16px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 18px; background: var(--surface-accent); border: 1px solid var(--accent-border); border-radius: var(--radius-md); }
+    .preview-part span { display: block; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+    .preview-part strong { display: block; margin-top: 5px; font-size: 18px; font-variant-numeric: tabular-nums; }
+    .plus { color: var(--accent-strong); font-size: 24px; }
+    .switch-row { margin-top: 18px; display: flex; align-items: center; gap: 10px; }
+    .switch-row input { width: 18px; height: 18px; accent-color: var(--accent); }
+
+    .success-screen { height: 100%; display: grid; place-items: center; padding: 28px; }
+    .success-card { width: min(650px, 100%); text-align: center; }
+    .success-icon { width: 58px; height: 58px; margin: 0 auto 18px; display: grid; place-items: center; color: var(--accent-ink); background: var(--accent); border-radius: 999px; font-size: 26px; }
+    .success-card h2 { font: 400 31px/1.2 "DM Serif Display", Georgia, serif; }
+    .success-card > p { margin-top: 9px; color: var(--muted); }
+    .success-summary { margin-top: 24px; padding: 18px; text-align: left; background: var(--surface-raised); border: 1px solid var(--border); border-radius: var(--radius-md); }
+    .success-actions { margin-top: 20px; display: flex; justify-content: center; gap: 10px; }
+
+    .toast {
+      position: fixed; left: 50%; bottom: 24px; z-index: 50;
+      transform: translateX(-50%) translateY(18px);
+      padding: 11px 15px; color: var(--accent-ink); background: var(--accent);
+      border-radius: var(--radius-sm); box-shadow: var(--shadow);
+      opacity: 0; pointer-events: none; transition: opacity .18s ease, transform .18s ease;
+      font-weight: 600;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    @media (max-width: 1050px) {
+      .demo-bar { flex-wrap: wrap; }
+      .scenario-tabs { order: 3; width: 100%; margin: 0; overflow-x: auto; }
+      .page { padding: 12px; }
+      .modal { width: calc(100vw - 24px); height: calc(100vh - 90px); }
+      .workbench { grid-template-columns: minmax(0, 1fr) 290px; }
+      .lists-wrap { grid-template-columns: 1fr; overflow: auto; }
+      .list-column { min-height: 320px; }
+      .list-column + .list-column { border-left: 0; border-top: 1px solid var(--border); }
+      .items { overflow: visible; }
+    }
+
+    @media (max-width: 760px) {
+      .demo-bar { align-items: flex-start; flex-wrap: wrap; padding: 10px 12px; }
+      .scenario-tabs { order: 3; width: 100%; margin: 0; overflow-x: auto; }
+      .scenario-button { white-space: nowrap; }
+      .theme-button { margin-left: auto; }
+      .page { min-height: calc(100vh - 100px); padding: 0; display: block; }
+      .modal { width: 100%; height: auto; min-height: calc(100vh - 100px); overflow: visible; border-radius: 0; border-left: 0; border-right: 0; }
+      .modal-header { padding: 13px 15px; }
+      .progress-label, .status-pill { display: none; }
+      .content, .screen { height: auto; overflow: visible; }
+      .detail-screen, .focus-screen, .workbench { grid-template-columns: 1fr; overflow: visible; }
+      .side-list, .compact-procedures { display: none; }
+      .detail-main { padding: 18px; }
+      .editing-area { grid-template-rows: auto auto auto; border-right: 0; overflow: visible; }
+      .summary-area { border-top: 1px solid var(--border); }
+      .lists-wrap, .list-column, .items { min-height: 0; overflow: visible; }
+      .editor-footer { position: sticky; bottom: 0; flex-wrap: wrap; }
+      .editor-footer .right-actions { width: 100%; }
+      .editor-footer .right-actions .btn { flex: 1; }
+      .focus-workspace { min-height: 0; grid-template-rows: auto auto; }
+      .workspace-scroll { padding: 20px 16px; }
+      .payment-grid, .form-grid, .accept-summary { grid-template-columns: 1fr; }
+      .agreement-preview { grid-template-columns: 1fr; text-align: left; }
+      .plus { display: none; }
+      .workspace-footer { position: sticky; bottom: 0; padding: 10px 14px; background: var(--surface); }
+      .workspace-footer .btn { flex: 1; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <header class="demo-bar">
+    <div class="demo-title"><span class="dot"></span><strong>R-157b · fluxo do orçamento</strong><span class="approved-label">aprovado em 16/09/2026</span></div>
+    <nav class="scenario-tabs" aria-label="Cenários do artefato">
+      <button class="scenario-button" data-scenario="new">Novo orçamento</button>
+      <button class="scenario-button active" data-scenario="update">Atualização com novidades</button>
+      <button class="scenario-button" data-scenario="skip">Revisar sem adicionar</button>
+    </nav>
+    <button class="theme-button" id="themeToggle" aria-label="Alternar tema">◐</button>
+  </header>
+
+  <main class="page">
+    <section class="modal" aria-label="Fluxo do orçamento">
+      <header class="modal-header">
+        <div class="title-stack">
+          <h1 id="modalTitle">Orçamento</h1>
+          <p class="modal-subtitle" id="modalSubtitle">Mariana Costa · Ficha de 16/09/2026</p>
+        </div>
+        <span class="status-pill" id="statusPill">Proposto</span>
+        <div class="header-spacer"></div>
+        <span class="progress-label" id="progressLabel">Orçamento atual · R$ 6.500,00</span>
+        <button class="close-button" id="closeButton" aria-label="Fechar">×</button>
+      </header>
+      <div class="content" id="app" aria-live="polite"></div>
+    </section>
+  </main>
+  <div class="toast" id="toast" role="status"></div>
+
+  <script>
+    const initialIncluded = [
+      { id: 'i1', name: 'Restauração direta em resina composta', location: 'D36 · face oclusal', value: 500, arch: 'lower' },
+      { id: 'i2', name: 'Implante osseointegrado', location: 'D27', value: 2200, arch: 'upper' },
+      { id: 'i3', name: 'Núcleo de preenchimento / retentor intrarradicular', location: 'D23', value: 600, arch: 'upper' },
+      { id: 'i4', name: 'Restauração direta em resina composta', location: 'D38 · face distal', value: 500, arch: 'lower' },
+      { id: 'i5', name: 'Restauração direta em resina composta', location: 'D37 · face oclusal', value: 500, arch: 'lower' },
+      { id: 'i6', name: 'Implante osseointegrado', location: 'D28', value: 2200, arch: 'upper' }
+    ];
+    const initialAvailable = [
+      { id: 'a1', name: 'Restauração direta em resina composta', location: 'D45 · face oclusal', value: 500, arch: 'lower', isNew: true },
+      { id: 'a2', name: 'Sutura pós-operatória', location: 'Região do D26', value: 0, arch: 'upper', isNew: true },
+      { id: 'a3', name: 'Profilaxia e polimento coronário', location: 'Boca toda', value: 350, arch: 'all', isNew: true },
+      { id: 'a4', name: 'Retorno para acompanhamento clínico', location: 'Sem cobrança definida', value: 0, arch: 'all', isNew: false }
+    ];
+
+    const clone = (value) => JSON.parse(JSON.stringify(value));
+    const money = (value) => Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const numberInput = (value) => Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const parseMoney = (value) => Number(String(value).replace(/\./g, '').replace(',', '.').replace(/[^0-9.-]/g, '')) || 0;
+
+    const state = {
+      scenario: 'update',
+      screen: 'detail',
+      included: clone(initialIncluded),
+      available: clone(initialAvailable),
+      baselineIds: initialIncluded.map(item => item.id),
+      baselineTotal: initialIncluded.reduce((sum, item) => sum + item.value, 0),
+      reviewed: false,
+      group: null,
+      composerOpen: false,
+      composerArch: 'upper',
+      acceptedIds: [],
+      paymentMode: 'entry',
+      entry: 1000,
+      installments: 3,
+      receivedNow: false
+    };
+
+    const app = document.getElementById('app');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalSubtitle = document.getElementById('modalSubtitle');
+    const statusPill = document.getElementById('statusPill');
+    const progressLabel = document.getElementById('progressLabel');
+    const toast = document.getElementById('toast');
+
+    function notify(message) {
+      toast.textContent = message;
+      toast.classList.add('show');
+      window.clearTimeout(notify.timer);
+      notify.timer = window.setTimeout(() => toast.classList.remove('show'), 1800);
+    }
+
+    function includedTotal() {
+      const groupedIds = new Set(state.group?.itemIds || []);
+      const loose = state.included.filter(item => !groupedIds.has(item.id)).reduce((sum, item) => sum + item.value, 0);
+      return loose + (state.group?.value || 0);
+    }
+
+    function addedTotal() {
+      return state.included.filter(item => !state.baselineIds.includes(item.id)).reduce((sum, item) => sum + item.value, 0);
+    }
+
+    function removedTotal() {
+      return initialIncluded.filter(item => state.baselineIds.includes(item.id) && !state.included.some(current => current.id === item.id)).reduce((sum, item) => sum + item.value, 0);
+    }
+
+    function hasChanges() {
+      return state.included.some(item => !state.baselineIds.includes(item.id)) || initialIncluded.some(item => !state.included.some(current => current.id === item.id)) || Boolean(state.group);
+    }
+
+    function pendingPriceItems() {
+      const groupedIds = new Set(state.group?.itemIds || []);
+      return state.included.filter(item => !groupedIds.has(item.id) && item.value <= 0);
+    }
+
+    function acceptanceUnits() {
+      const groupedIds = new Set(state.group?.itemIds || []);
+      const units = state.included.filter(item => !groupedIds.has(item.id)).map(item => ({ ...item, isGroup: false }));
+      if (state.group) {
+        units.unshift({
+          id: 'commercial-group',
+          name: state.group.name,
+          location: `${state.group.itemIds.length} procedimentos · preço fechado`,
+          value: state.group.value,
+          isGroup: true
+        });
+      }
+      return units;
+    }
+
+    function reset(scenario) {
+      state.scenario = scenario;
+      state.screen = scenario === 'new' ? 'edit' : 'detail';
+      state.included = scenario === 'new' ? clone([...initialIncluded, ...initialAvailable.slice(0, 3)]) : clone(initialIncluded);
+      state.available = scenario === 'new' ? [] : clone(initialAvailable);
+      state.baselineIds = scenario === 'new' ? [] : initialIncluded.map(item => item.id);
+      state.baselineTotal = scenario === 'new' ? 0 : initialIncluded.reduce((sum, item) => sum + item.value, 0);
+      state.reviewed = false;
+      state.group = null;
+      state.composerOpen = false;
+      state.composerArch = 'upper';
+      state.acceptedIds = [];
+      state.paymentMode = 'entry';
+      state.entry = 1000;
+      state.installments = 3;
+      state.receivedNow = false;
+      document.querySelectorAll('.scenario-button').forEach(button => button.classList.toggle('active', button.dataset.scenario === scenario));
+      render();
+    }
+
+    function setHeader(title, subtitle, status, progress) {
+      modalTitle.textContent = title;
+      modalSubtitle.textContent = subtitle;
+      statusPill.textContent = status;
+      progressLabel.textContent = progress;
+    }
+
+    function renderDetail() {
+      const pending = state.available.filter(item => item.isNew).length;
+      const showAmber = !state.reviewed && pending > 0;
+      setHeader('Orçamento', 'Mariana Costa · Ficha de 16/09/2026', 'Proposto', `Orçamento atual · ${money(includedTotal())}`);
+      app.innerHTML = `
+        <div class="screen detail-screen">
+          <aside class="side-list">
+            <span class="eyebrow">Procedimentos</span>
+            <div class="area-title-row"><h2>No orçamento</h2><span class="counter">${state.included.length}</span></div>
+            <p class="source-line">Todos vieram da ficha selecionada.</p>
+            <div class="procedure-preview">
+              ${state.included.map(item => `
+                <div class="preview-row">
+                  <span class="check-icon">✓</span>
+                  <span class="preview-name">${item.name} · ${item.location}</span>
+                  <span class="money">${money(item.value)}</span>
+                </div>`).join('')}
+            </div>
+          </aside>
+          <section class="detail-main">
+            <span class="eyebrow">Resumo financeiro</span>
+            <h2 style="margin-top:7px">Proposta em aberto</h2>
+            <p class="section-copy">Revise novidades da ficha ou continue o fechamento com o paciente.</p>
+            <div class="review-card ${showAmber ? 'amber' : ''}">
+              <div class="review-card-header">
+                <div class="review-icon">${showAmber ? '!' : '✓'}</div>
+                <div>
+                  <div class="review-title">${showAmber ? `${pending} novos procedimentos para revisar` : `${state.available.length} procedimentos estão fora do orçamento`}</div>
+                  <p class="review-copy">${showAmber ? 'Eles foram adicionados à ficha depois desta proposta. Você decide o que entra no orçamento.' : 'A revisão foi concluída. Eles continuam disponíveis na ficha, sem pendência.'}</p>
+                </div>
+              </div>
+              <div class="review-actions">
+                <button class="btn ${showAmber ? 'btn-amber' : ''}" data-action="open-edit">${showAmber ? 'Revisar atualização' : 'Editar orçamento'}</button>
+                <button class="btn btn-primary" data-action="go-acceptance">Continuar fechamento</button>
+              </div>
+            </div>
+            <div class="summary-box" style="max-width:910px">
+              <div class="summary-line"><span>Valor proposto</span><strong>${money(includedTotal())}</strong></div>
+              <div class="summary-line"><span>Procedimentos</span><strong>${state.included.length}</strong></div>
+              <div class="summary-line"><span>Origem</span><strong>Ficha de 16/09/2026</strong></div>
+            </div>
+          </section>
+        </div>`;
+    }
+
+    function groupBlock() {
+      if (!state.group) return '';
+      const members = state.included.filter(item => state.group.itemIds.includes(item.id));
+      return `
+        <div class="group-block">
+          <div class="group-header">
+            <div class="group-header-copy"><strong>${state.group.name}</strong><span>${members.length} procedimentos · preço fechado</span></div>
+            <strong class="money">${money(state.group.value)}</strong>
+            <button class="icon-action" data-action="ungroup" aria-label="Desagrupar">Desagrupar</button>
+          </div>
+          ${members.map(item => `<div class="group-member">${item.name} · ${item.location}</div>`).join('')}
+        </div>`;
+    }
+
+    function composer() {
+      if (!state.composerOpen) return '';
+      const candidates = state.included.filter(item => item.arch === state.composerArch);
+      return `
+        <div class="composer">
+          <div class="composer-top">
+            <h3>Preço fechado por arcada</h3>
+            <div class="segmented" aria-label="Escolher arcada">
+              <button class="segment ${state.composerArch === 'upper' ? 'active' : ''}" data-action="set-arch" data-arch="upper">Superior</button>
+              <button class="segment ${state.composerArch === 'lower' ? 'active' : ''}" data-action="set-arch" data-arch="lower">Inferior</button>
+            </div>
+          </div>
+          <div class="composer-fields">
+            <label><span class="field-label">Nome do grupo</span><input class="text-field" id="groupName" value="Arcada ${state.composerArch === 'upper' ? 'superior' : 'inferior'}"></label>
+            <label><span class="field-label">Valor fechado</span><input class="text-field" id="groupValue" inputmode="decimal" value="${state.composerArch === 'upper' ? '4.500,00' : '1.200,00'}"></label>
+          </div>
+          <div class="composer-selection">Serão agrupados: ${candidates.map(item => `${item.name} (${item.location.split(' · ')[0]})`).join(' · ') || 'nenhum procedimento desta arcada'}</div>
+          <div class="composer-actions"><button class="btn btn-small" data-action="close-composer">Cancelar</button><button class="btn btn-primary btn-small" data-action="create-group" ${candidates.length < 2 ? 'disabled' : ''}>Criar grupo</button></div>
+        </div>`;
+    }
+
+    function renderIncludedItems() {
+      const groupedIds = new Set(state.group?.itemIds || []);
+      const loose = state.included.filter(item => !groupedIds.has(item.id));
+      return `${groupBlock()}${loose.map(item => `
+        <div class="item-row" data-id="${item.id}">
+          <div class="item-main">
+            <div class="item-name">${item.name}</div>
+            <div class="item-meta"><span>${item.location}</span>${!state.baselineIds.includes(item.id) ? '<span class="new-label">Adicionado agora</span>' : ''}${item.value <= 0 ? '<span class="price-required">Informe o preço</span>' : ''}</div>
+          </div>
+          <div class="item-actions">
+            <input class="price-field ${item.value <= 0 ? 'needs-price' : ''}" aria-label="Preço de ${item.name}" aria-invalid="${item.value <= 0}" data-price="${item.id}" value="${numberInput(item.value)}">
+            <button class="icon-action" data-action="remove" data-id="${item.id}" aria-label="Retirar ${item.name} do orçamento">Retirar</button>
+          </div>
+        </div>`).join('')}`;
+    }
+
+    function renderAvailableItems() {
+      if (!state.available.length) return '<div class="empty-list">Todos os procedimentos selecionados estão no orçamento.</div>';
+      return state.available.map(item => `
+        <div class="item-row" data-id="${item.id}">
+          <div class="item-main">
+            <div class="item-name">${item.name}</div>
+            <div class="item-meta"><span>${item.location}</span>${item.isNew && !state.reviewed ? '<span class="new-label">Novo</span>' : '<span>Revisado</span>'}</div>
+          </div>
+          <div class="item-actions"><button class="icon-action add-action" data-action="add" data-id="${item.id}">Adicionar →</button></div>
+        </div>`).join('');
+    }
+
+    function renderEdit() {
+      const isNew = state.scenario === 'new';
+      const changeValue = includedTotal() - state.baselineTotal;
+      setHeader(isNew ? 'Montar orçamento' : 'Atualizar orçamento', 'Mariana Costa · Ficha selecionada de 16/09/2026', isNew ? 'Novo' : 'Proposto', `${state.included.length} no orçamento · ${money(includedTotal())}`);
+      app.innerHTML = `
+        <div class="screen workbench">
+          <section class="editing-area">
+            <header class="area-header">
+              <span class="eyebrow">Montagem do preço</span>
+              <div class="area-title-row"><h2>${isNew ? 'Procedimentos da ficha' : 'Compare antes de atualizar'}</h2><span class="counter">${state.included.length} incluídos</span></div>
+              <p class="source-line">${isNew ? 'Defina os valores e retire somente o que não fará parte desta proposta.' : 'Veja o que já está no orçamento e escolha o que entra agora.'}</p>
+            </header>
+            <div class="lists-wrap ${isNew ? 'single-list' : ''}">
+              <section class="list-column">
+                <header class="list-heading">
+                  <div class="list-heading-copy"><strong>No orçamento · ${state.included.length}</strong><span>Valores que compõem o total</span></div>
+                  <button class="btn btn-small" data-action="open-composer">Preço fechado por arcada</button>
+                </header>
+                <div class="items">${composer()}${renderIncludedItems()}</div>
+              </section>
+              <section class="list-column" ${isNew ? 'style="display:none"' : ''}>
+                <header class="list-heading"><div class="list-heading-copy"><strong>Disponíveis na ficha · ${state.available.length}</strong><span>Fora do orçamento atual</span></div>${state.available.some(item => item.isNew && !state.reviewed) ? '<button class="btn btn-small" data-action="add-all">Adicionar todos os novos</button>' : ''}</header>
+                <div class="items">${renderAvailableItems()}</div>
+              </section>
+            </div>
+            <footer class="editor-footer">
+              <button class="btn btn-ghost" data-action="back-detail">Cancelar</button>
+              <div class="right-actions">
+                <button class="btn" data-action="save-exit">${!hasChanges() && !isNew ? 'Manter orçamento como está' : 'Salvar e sair'}</button>
+                <button class="btn btn-primary" data-action="save-continue" ${pendingPriceItems().length ? 'disabled' : ''}>${isNew ? 'Criar e continuar' : 'Atualizar e continuar'} →</button>
+              </div>
+            </footer>
+          </section>
+          <aside class="summary-area">
+            <span class="eyebrow">Resumo do orçamento</span>
+            <h2 style="margin-top:7px">Total sempre visível</h2>
+            <p class="section-copy">Acompanhe o efeito de cada inclusão, retirada ou preço fechado.</p>
+            <div class="summary-box">
+              ${isNew ? '' : `<div class="summary-line"><span>Total anterior</span><strong>${money(state.baselineTotal)}</strong></div>`}
+              <div class="summary-line positive"><span>Adições</span><strong>+ ${money(addedTotal())}</strong></div>
+              <div class="summary-line negative"><span>Retirados</span><strong>− ${money(removedTotal())}</strong></div>
+              ${state.group ? `<div class="summary-line"><span>${state.group.name}</span><strong>${money(state.group.value)}</strong></div>` : ''}
+              <div class="summary-total"><span>${isNew ? 'Total do orçamento' : 'Novo total'}</span><strong>${money(includedTotal())}</strong></div>
+            </div>
+            <div class="summary-note" ${pendingPriceItems().length ? 'role="alert"' : ''}>${pendingPriceItems().length ? `${pendingPriceItems().length} procedimento${pendingPriceItems().length > 1 ? 's estão' : ' está'} sem preço. Informe o valor para continuar.` : (changeValue === 0 && !state.group ? 'Nenhuma alteração financeira até agora.' : `Variação desta revisão: ${changeValue >= 0 ? '+' : '−'} ${money(Math.abs(changeValue))}.`)}</div>
+          </aside>
+        </div>`;
+    }
+
+    function renderAcceptance() {
+      const units = acceptanceUnits();
+      if (!state.acceptedIds.length) state.acceptedIds = units.map(item => item.id);
+      const acceptedItems = units.filter(item => state.acceptedIds.includes(item.id));
+      const acceptedTotal = acceptedItems.reduce((sum, item) => sum + item.value, 0);
+      const acceptedProcedures = acceptedItems.reduce((sum, item) => sum + (item.isGroup ? state.group.itemIds.length : 1), 0);
+      setHeader('Orçamento', 'Mariana Costa · Ficha de 16/09/2026', 'Em negociação', `${acceptedProcedures} procedimentos aceitos · ${money(acceptedTotal)}`);
+      app.innerHTML = `
+        <div class="screen focus-screen">
+          <aside class="compact-procedures">
+            <header class="compact-header"><span class="eyebrow">Procedimentos</span><div class="area-title-row"><h2>O que foi aceito?</h2><span class="counter">${acceptedProcedures}/${state.included.length}</span></div><p class="source-line">Preço fechado é aprovado como um único bloco.</p></header>
+            <div class="compact-list">
+              ${units.map(item => `
+                <label class="compact-row"><input type="checkbox" data-accept="${item.id}" ${state.acceptedIds.includes(item.id) ? 'checked' : ''}><span class="preview-name">${item.name} · ${item.location}</span><span class="money">${money(item.value)}</span></label>`).join('')}
+            </div>
+            <footer class="compact-footer"><div class="summary-line"><span>Aceito</span><strong>${money(acceptedTotal)}</strong></div><button class="btn-link" data-action="accept-all">Aprovar tudo</button></footer>
+          </aside>
+          <section class="focus-workspace">
+            <div class="workspace-scroll">
+              <span class="eyebrow">Aceite do paciente</span>
+              <h2 style="margin-top:7px">O que o paciente decidiu fazer agora?</h2>
+              <p class="section-copy">A proposta continua inteira. Aqui você escolhe somente o que seguirá para o acordo.</p>
+              <div class="notice">${acceptedProcedures} procedimentos selecionados para o fechamento.</div>
+              <div class="accept-summary">
+                <div class="metric"><span>Valor proposto</span><strong>${money(includedTotal())}</strong></div>
+                <div class="metric"><span>Valor aceito</span><strong>${money(acceptedTotal)}</strong></div>
+              </div>
+              <div class="summary-box"><div class="summary-line"><span>Ficam na proposta para depois</span><strong>${state.included.length - acceptedProcedures}</strong></div><div class="summary-line"><span>Seguem para o acordo</span><strong>${acceptedProcedures}</strong></div></div>
+            </div>
+            <footer class="workspace-footer"><button class="btn" data-action="back-edit">Voltar ao orçamento</button><button class="btn btn-primary" data-action="go-agreement" ${acceptedItems.length ? '' : 'disabled'}>Continuar para o acordo →</button></footer>
+          </section>
+        </div>`;
+    }
+
+    function acceptedData() {
+      const items = acceptanceUnits().filter(item => state.acceptedIds.includes(item.id));
+      const procedureCount = items.reduce((sum, item) => sum + (item.isGroup ? state.group.itemIds.length : 1), 0);
+      return { items, procedureCount, total: items.reduce((sum, item) => sum + item.value, 0) };
+    }
+
+    function renderAgreement() {
+      const accepted = acceptedData();
+      const entry = state.paymentMode === 'entry' ? Math.min(state.entry, accepted.total) : 0;
+      const balance = Math.max(accepted.total - entry, 0);
+      const parcelValue = state.paymentMode === 'cash' ? accepted.total : balance / Math.max(state.installments, 1);
+      setHeader('Orçamento', 'Mariana Costa · Ficha de 16/09/2026', 'Aceito', `${accepted.procedureCount} procedimentos aceitos · ${money(accepted.total)}`);
+      app.innerHTML = `
+        <div class="screen focus-screen">
+          <aside class="compact-procedures">
+            <header class="compact-header"><span class="eyebrow">Procedimentos</span><div class="area-title-row"><h2>Itens do acordo</h2><span class="counter">${accepted.procedureCount}</span></div><p class="source-line">Vieram marcados do aceite. Aqui você só define o pagamento.</p></header>
+            <div class="compact-list">${accepted.items.map(item => `<div class="compact-row"><span class="check-icon">✓</span><span class="preview-name">${item.name} · ${item.location}</span><span class="money">${money(item.value)}</span></div>`).join('')}</div>
+            <footer class="compact-footer"><div class="summary-line"><span>Aprovado</span><strong>${money(accepted.total)}</strong></div><button class="btn-link" data-action="back-acceptance">Alterar seleção</button></footer>
+          </aside>
+          <section class="focus-workspace">
+            <div class="workspace-scroll">
+              <span class="eyebrow">Área de trabalho</span>
+              <h2 style="margin-top:7px">Como ficou o acordo?</h2>
+              <p class="section-copy">Os procedimentos já estão escolhidos. Defina somente como esta etapa será cobrada.</p>
+              <div class="notice">${accepted.procedureCount} procedimentos herdados da aprovação · Total ${money(accepted.total)}</div>
+              <div class="payment-grid">
+                <button class="payment-option ${state.paymentMode === 'cash' ? 'active' : ''}" data-payment="cash">À vista</button>
+                <button class="payment-option ${state.paymentMode === 'entry' ? 'active' : ''}" data-payment="entry">Entrada + parcelas</button>
+                <button class="payment-option ${state.paymentMode === 'installments' ? 'active' : ''}" data-payment="installments">Parcelado</button>
+              </div>
+              ${state.paymentMode === 'cash' ? `
+                <div class="form-grid"><div class="form-field"><label>Valor à vista</label><input class="text-field" value="${numberInput(accepted.total)}" readonly></div><div class="form-field"><label>Forma de recebimento</label><select class="select-field"><option>Pix</option><option>Dinheiro</option><option>Cartão</option></select></div></div>
+                <div class="agreement-preview"><div class="preview-part"><span>Total à vista</span><strong>${money(accepted.total)}</strong></div></div>` : `
+                <div class="form-grid">
+                  ${state.paymentMode === 'entry' ? `<div class="form-field"><label>Valor da entrada</label><input class="text-field" id="entryValue" inputmode="decimal" value="${numberInput(entry)}"></div>` : ''}
+                  <div class="form-field"><label>Parcelas do restante</label><select class="select-field" id="installments">${[2,3,4,5,6,8,10,12].map(n => `<option value="${n}" ${n === state.installments ? 'selected' : ''}>${n} parcelas</option>`).join('')}</select></div>
+                  <div class="form-field"><label>Primeiro vencimento</label><input class="text-field" type="date" value="2026-10-10"></div>
+                  <div class="form-field"><label>Forma de pagamento</label><select class="select-field"><option>Cartão de crédito</option><option>Pix combinado</option><option>Boleto</option></select></div>
+                </div>
+                <div class="agreement-preview">
+                  ${state.paymentMode === 'entry' ? `<div class="preview-part"><span>Entrada</span><strong>${money(entry)}</strong></div><div class="plus">＋</div>` : ''}
+                  <div class="preview-part"><span>Cartão parcelado</span><strong>${state.installments}× de ${money(parcelValue)}</strong></div>
+                </div>`}
+              <label class="switch-row"><input type="checkbox" id="receivedNow" ${state.receivedNow ? 'checked' : ''}><span>Entrada já recebida agora</span></label>
+              <button class="btn-link" style="margin-top:14px" data-action="note">＋ Adicionar observação do acordo</button>
+            </div>
+            <footer class="workspace-footer"><button class="btn" data-action="back-acceptance">Voltar</button><button class="btn btn-primary" data-action="confirm-agreement">Confirmar acordo</button></footer>
+          </section>
+        </div>`;
+    }
+
+    function renderSuccess() {
+      const accepted = acceptedData();
+      const entry = state.paymentMode === 'entry' ? Math.min(state.entry, accepted.total) : 0;
+      const balance = Math.max(accepted.total - entry, 0);
+      setHeader('Orçamento', 'Mariana Costa · Ficha de 16/09/2026', 'Acordo confirmado', state.receivedNow ? `Recebido agora · ${money(entry || accepted.total)}` : 'Aguardando primeiro recebimento');
+      app.innerHTML = `
+        <div class="screen success-screen">
+          <div class="success-card">
+            <div class="success-icon">✓</div>
+            <h2>Acordo confirmado</h2>
+            <p>O orçamento permanece aberto e você pode registrar a entrada agora ou concluir sem recebimento.</p>
+            <div class="success-summary">
+              <div class="summary-line"><span>Procedimentos aceitos</span><strong>${accepted.procedureCount}</strong></div>
+              <div class="summary-line"><span>Total do acordo</span><strong>${money(accepted.total)}</strong></div>
+              ${state.paymentMode === 'entry' ? `<div class="summary-line"><span>Entrada combinada</span><strong>${money(entry)}</strong></div><div class="summary-line"><span>Saldo parcelado</span><strong>${state.installments}× de ${money(balance / state.installments)}</strong></div>` : ''}
+              <div class="summary-line"><span>Status do recebimento</span><strong>${state.receivedNow ? 'Entrada recebida' : 'Nada recebido ainda'}</strong></div>
+            </div>
+            <div class="success-actions"><button class="btn" data-action="finish">Concluir sem recebimento</button><button class="btn btn-primary" data-action="receive">Registrar entrada agora</button></div>
+          </div>
+        </div>`;
+    }
+
+    function render() {
+      if (state.screen === 'detail') renderDetail();
+      if (state.screen === 'edit') renderEdit();
+      if (state.screen === 'acceptance') renderAcceptance();
+      if (state.screen === 'agreement') renderAgreement();
+      if (state.screen === 'success') renderSuccess();
+    }
+
+    app.addEventListener('input', event => {
+      const id = event.target.dataset.price;
+      if (id) {
+        const item = state.included.find(candidate => candidate.id === id);
+        if (item) item.value = parseMoney(event.target.value);
+        const needsPrice = !item || item.value <= 0;
+        event.target.classList.toggle('needs-price', needsPrice);
+        event.target.setAttribute('aria-invalid', String(needsPrice));
+        const rowMeta = event.target.closest('.item-row')?.querySelector('.item-meta');
+        const existingWarning = rowMeta?.querySelector('.price-required');
+        if (!needsPrice) existingWarning?.remove();
+        if (needsPrice && rowMeta && !existingWarning) rowMeta.insertAdjacentHTML('beforeend', '<span class="price-required">Informe o preço</span>');
+        const summary = document.querySelector('.summary-area');
+        if (summary) {
+          summary.querySelector('.summary-total strong').textContent = money(includedTotal());
+          progressLabel.textContent = `${state.included.length} no orçamento · ${money(includedTotal())}`;
+          const pending = pendingPriceItems().length;
+          const continueButton = document.querySelector('[data-action="save-continue"]');
+          if (continueButton) continueButton.disabled = pending > 0;
+          const note = summary.querySelector('.summary-note');
+          if (note) {
+            note.textContent = pending ? `${pending} procedimento${pending > 1 ? 's estão' : ' está'} sem preço. Informe o valor para continuar.` : 'Valores completos. Você pode continuar o fechamento.';
+            if (pending) note.setAttribute('role', 'alert'); else note.removeAttribute('role');
+          }
+        }
+      }
+      if (event.target.id === 'entryValue') { state.entry = parseMoney(event.target.value); renderAgreement(); }
+    });
+
+    app.addEventListener('change', event => {
+      if (event.target.dataset.accept) {
+        const id = event.target.dataset.accept;
+        state.acceptedIds = event.target.checked ? [...new Set([...state.acceptedIds, id])] : state.acceptedIds.filter(itemId => itemId !== id);
+        renderAcceptance();
+      }
+      if (event.target.id === 'installments') { state.installments = Number(event.target.value); renderAgreement(); }
+      if (event.target.id === 'receivedNow') { state.receivedNow = event.target.checked; renderAgreement(); }
+    });
+
+    app.addEventListener('click', event => {
+      const target = event.target.closest('button');
+      if (!target) return;
+      const action = target.dataset.action;
+      if (target.dataset.payment) { state.paymentMode = target.dataset.payment; renderAgreement(); return; }
+      if (action === 'open-edit') { state.screen = 'edit'; render(); }
+      if (action === 'back-detail') { state.screen = state.scenario === 'new' ? 'edit' : 'detail'; render(); }
+      if (action === 'add') {
+        const item = state.available.find(candidate => candidate.id === target.dataset.id);
+        if (!item) return;
+        state.available = state.available.filter(candidate => candidate.id !== item.id);
+        state.included.push(item);
+        renderEdit();
+        requestAnimationFrame(() => document.querySelector(`[data-price="${item.id}"]`)?.focus());
+      }
+      if (action === 'add-all') {
+        const items = state.available.filter(item => item.isNew && !state.reviewed);
+        if (!items.length) return;
+        const itemIds = new Set(items.map(item => item.id));
+        state.available = state.available.filter(item => !itemIds.has(item.id));
+        state.included.push(...items);
+        renderEdit();
+        const firstPending = items.find(item => item.value <= 0) || items[0];
+        requestAnimationFrame(() => document.querySelector(`[data-price="${firstPending.id}"]`)?.focus());
+        notify(`${items.length} novos procedimentos adicionados`);
+      }
+      if (action === 'remove') {
+        const item = state.included.find(candidate => candidate.id === target.dataset.id);
+        if (!item) return;
+        if (state.group?.itemIds.includes(item.id)) state.group = null;
+        state.included = state.included.filter(candidate => candidate.id !== item.id);
+        state.available.unshift({ ...item, isNew: false });
+        state.acceptedIds = state.acceptedIds.filter(id => id !== item.id);
+        renderEdit();
+      }
+      if (action === 'open-composer') { state.composerOpen = true; renderEdit(); }
+      if (action === 'close-composer') { state.composerOpen = false; renderEdit(); }
+      if (action === 'set-arch') { state.composerArch = target.dataset.arch; renderEdit(); }
+      if (action === 'create-group') {
+        const itemIds = state.included.filter(item => item.arch === state.composerArch).map(item => item.id);
+        state.group = { name: document.getElementById('groupName').value.trim() || `Arcada ${state.composerArch === 'upper' ? 'superior' : 'inferior'}`, value: parseMoney(document.getElementById('groupValue').value), itemIds };
+        state.composerOpen = false;
+        renderEdit();
+        notify('Preço fechado criado');
+      }
+      if (action === 'ungroup') { state.group = null; renderEdit(); notify('Procedimentos desagrupados'); }
+      if (action === 'save-exit') {
+        state.reviewed = true;
+        state.available.forEach(item => item.isNew = false);
+        state.screen = 'detail';
+        render();
+        notify(hasChanges() ? 'Orçamento atualizado' : 'Revisão concluída sem alterações');
+      }
+      if (action === 'save-continue' || action === 'go-acceptance') {
+        state.reviewed = true;
+        state.available.forEach(item => item.isNew = false);
+        state.acceptedIds = acceptanceUnits().map(item => item.id);
+        state.screen = 'acceptance';
+        render();
+      }
+      if (action === 'back-edit') { state.screen = 'edit'; render(); }
+      if (action === 'accept-all') { state.acceptedIds = acceptanceUnits().map(item => item.id); renderAcceptance(); }
+      if (action === 'go-agreement') { state.screen = 'agreement'; render(); }
+      if (action === 'back-acceptance') { state.screen = 'acceptance'; render(); }
+      if (action === 'confirm-agreement') { state.screen = 'success'; render(); }
+      if (action === 'note') { notify('No produto, a observação abre logo abaixo do acordo'); }
+      if (action === 'finish') { notify('Fluxo concluído sem registrar recebimento'); }
+      if (action === 'receive') { state.receivedNow = true; renderSuccess(); notify('Entrada marcada como recebida nesta demonstração'); }
+    });
+
+    document.querySelectorAll('.scenario-button').forEach(button => button.addEventListener('click', () => reset(button.dataset.scenario)));
+    document.getElementById('themeToggle').addEventListener('click', () => {
+      document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    });
+    document.getElementById('closeButton').addEventListener('click', () => notify('A demonstração mantém a janela aberta para você continuar testando'));
+
+    render();
+  </script>
+</body>
+</html>

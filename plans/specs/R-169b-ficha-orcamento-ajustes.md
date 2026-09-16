@@ -2,9 +2,10 @@
 
 > **SPEC** · **R-169b** · 🔵 recorte do R169 ativo
 > **Aberto:** 2026-09-14 · **Fechado:** — · **Fase:** contrato
-> **Revisão:** 3 — execução autorizada; pendências na auditoria existente, sem nova tabela/RLS.
+> **Revisão:** 4 — fluxo visual aprovado em 16/09; execução e Preview autorizados, sem nova tabela/RLS.
 > Recorte obrigatório da mesma entrega [R169](R-169-dex-ficha-edicao-rapida.md).
 > Destino: banco principal `zenfemoxvwerplrjgfqz`. Preview autorizado; SQL compatível isolado, sem promover o app em produção.
+> Contrato visual: [`../artefatos/R-157b-fluxo-orcamento-completo.html`](../artefatos/R-157b-fluxo-orcamento-completo.html), aprovado em 16/09/2026.
 
 ## 1. Problema
 
@@ -16,12 +17,21 @@ Clarificação do usuário em 14/09: o novo comportamento é **oferecer a difere
 orçamento**, com aviso explícito e inclusão somente dos procedimentos faltantes. Não é uma
 reforma geral de preços, descontos, parcelamento ou edição financeira.
 
+Expansão aprovada em 16/09: a montagem vira uma área ampla de comparação, com nomes completos,
+`No orçamento` e `Disponíveis na ficha` lado a lado, total sempre visível e acesso direto a
+`Preço fechado por arcada`. O fechamento do acordo existente permanece inalterado.
+
 ## 2. Decisão e escopo
 
 - Ao abrir um orçamento ligado à ficha, comparar os procedimentos elegíveis dela com os IDs já
   vinculados. Aviso: **“Há 1 procedimento nesta ficha que ainda não está neste orçamento.”**
 - Mostrar nome/região/data de inclusão na ficha e permitir **Revisar e adicionar** só os itens
   escolhidos. O procedimento já está na ficha; a ação agora se chama **Adicionar ao orçamento**.
+- Na atualização, mostrar os itens atuais como contexto e os faltantes como escolhas separadas;
+  `Adicionar todos os novos` não seleciona itens que já foram revisados. Item selecionado sem
+  preço bloqueia a continuação e recebe foco com mensagem no próprio campo.
+- `Manter orçamento como está` registra a revisão explícita. O item continua na ficha e disponível
+  para inclusão futura, mas deixa de acender o aviso âmbar.
 - Não recriar orçamento, reenviar todos os procedimentos nem importar itens duplicados.
 - A entrada “Gerar/Novo orçamento” da ficha, quando já existir orçamento relacionado, também
   oferece **Atualizar orçamento existente**; não cria outro por falta de descoberta do anterior.
@@ -41,11 +51,12 @@ reforma geral de preços, descontos, parcelamento ou edição financeira.
 
 1. Ficha recebe procedimento novo pelo Dex; salva na mesma ficha com ID próprio.
 2. Dentista abre o orçamento da ficha; aviso lista apenas faltantes, com data de inclusão.
-3. Revisar e adicionar abre a montagem existente filtrada aos selecionados; preço sem vínculo
-   não é inventado e pode ser preenchido como já ocorre no orçamento.
+3. Revisar atualização abre a montagem ampla no mesmo modal: itens atuais à esquerda, disponíveis
+   ao lado e resumo de `total anterior + adições = novo total` sempre visível.
 4. Adicionar ao orçamento grava novos itens/vínculos em uma transação e atualiza o modal atual.
-5. O aviso passa a mostrar somente o que ainda falta; itens já incluídos, aprovações e pagamentos
-   permanecem. O dentista pode continuar no mesmo orçamento e registrar pagamento normalmente.
+5. O aviso passa a mostrar somente procedimentos novos ainda não revisados. Após atualizar ou
+   manter, o mesmo orçamento reabre na etapa de aceite/acordo; itens, aprovações e pagamentos
+   anteriores permanecem.
 
 Executar: conferir base produtiva → contrato de identidade/retirada → leitura de diferenças →
 adição atômica → retirada/aviso persistente → QA financeiro integrado → liberação do pacote R169.
@@ -141,8 +152,11 @@ type DiferencasFichaOrcamento = {
   mesmo que ambos sejam renderizados por `ProntuarioTab` e usem o mesmo callback antigo.
   Passar origem tipada `{ tipo: 'ficha'; fichaId: string }` pela abertura do modal; o callback
   da listagem histórica conserva sua apresentação atual, sem herdar esse estado por compartilhamento.
-- Cor/contador permanecem ao apenas abrir/fechar o modal. Somem quando nenhum faltante elegível
-  restar; adicionar seleção parcial mantém o restante. Adiar não resolve a inclusão pendente.
+- Abrir/fechar ou cancelar não altera cor/contador. **Adicionar**, **Atualizar e continuar** ou
+  **Manter orçamento como está** registram revisão dos IDs efetivamente apresentados. Eles deixam
+  de contar como novidade sem sair da lista `Disponíveis na ficha`; um novo `evento_id` volta a
+  acender o âmbar. A decisão usa `activity_logs` com ação
+  `orcamento_evento.inclusao_revisada`, escopada por clínica/ficha/orçamento.
 - Clique no CTA tem feedback/trava imediatos e abre o destino sem repetir descoberta; um modal por vez.
 - Aviso compacto só no orçamento solicitado; cada entrada clínica não reabre nem repete a proposta.
 - Após incluir, retirar IDs confirmados do contador imediatamente e conferir o resumo em background;
