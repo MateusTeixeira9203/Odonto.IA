@@ -1,14 +1,13 @@
 # Estado — Odonto.IA
 
-> 16/09/2026 · fluxo completo do orçamento publicado no Preview e CI aprovado.
+> 16/09/2026 · fluxo do orçamento publicado; correção de rolagem do dashboard pronta para Preview.
 
 ## Agora
 
 Item ativo: R-169b, montagem e atualização fluida do orçamento contra o artefato aprovado.
-Preview publicado em `codex/conclusao-atualizacao`: código `e619a0c`, contrato `d9a65b8`.
+Preview em `codex/conclusao-atualizacao`: orçamento `e619a0c`, rolagem única do shell `c9c1fe9`.
 Worktree: `/home/mtx/.local/share/odontoia-testes/integracao`.
 CI 35118081587 passou: typecheck, 391 testes, lint e build.
-Preview principal: `https://odonto-qxp905zmt-mateusteixeira9203s-projects.vercel.app`.
 Commits separados autorizados somente para Preview.
 Projeto Vercel: `odonto-ia-teste`. Supabase Free: `etlqznuoxiilvxzygpat`.
 Nenhuma promoção/main, cobrança real ou escrita no banco oficial autorizada nesta execução.
@@ -52,7 +51,7 @@ Demais recortes futuros permanecem no [plano de conclusão](PLANO-CONCLUSAO-ATUA
 
 ## Próximo passo
 
-Mateus testar no Preview a atualização de uma ficha com procedimentos novos e ignorados.
+Mateus retestar no Preview a rolagem da lista e a atualização de uma ficha com itens novos.
 Não promover a produção antes da conferência e do gate de duas contas logadas.
 
 ## Continuidade segura
