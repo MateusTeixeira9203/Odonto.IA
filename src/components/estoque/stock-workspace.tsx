@@ -12,6 +12,7 @@ import { StockDetail } from './stock-detail';
 import type { StockMutation, StockPorts } from './stock-ports';
 import { useStockData, type StockFilter } from './use-stock-data';
 import { compareStockQuantity, formatStockQuantity } from './stock-format';
+import { StockKitsPanel } from './stock-kits-panel';
 
 export function StockWorkspace({ initialContext, ports }: { initialContext: StockAccessContext; ports: StockPorts }) {
   const stock = useStockData(initialContext, ports);
@@ -53,6 +54,7 @@ export function StockWorkspace({ initialContext, ports }: { initialContext: Stoc
     {stock.detailLoading && !stock.detail && <p role="status" className="mt-6 text-sm text-muted-foreground">Carregando detalhe do material…</p>}
     {stock.detailError && <section role="alert" className="mt-6 rounded-2xl border border-border bg-card p-5"><p className="text-sm text-destructive">{stock.detailError}</p>{stock.selectedItemId && <Button type="button" variant="outline" className="mt-4 min-h-11" disabled={stock.detailLoading} onClick={() => { const itemId = stock.selectedItemId; if (itemId) void stock.openDetail(itemId); }}>Tentar novamente</Button>}</section>}
     {stock.detail && <StockDetail data={stock.detail} permissions={permissions} busy={stock.detailLoading} onClose={stock.closeDetail} onAction={(action, movement) => setForm({ action, movement })} onMore={() => { if (stock.detail) void stock.openDetail(stock.detail.item.id, stock.detail.proximoCursor); }} />}
+    {permissions.includes('estoque.gerir') && stock.list && <StockKitsPanel clinicaId={stock.context.clinicaId} titular={stock.titular} itens={stock.list.itens} />}
     {form && (form.action === 'cadastrarItem' || stock.detail) && <StockForm action={form.action} clinicId={stock.context.clinicaId} titular={stock.titular} item={form.action === 'cadastrarItem' ? undefined : stock.detail?.item} lots={stock.detail?.lotes ?? []} movement={form.movement} ports={ports} onClose={() => setForm(null)} onRefresh={stock.refresh} onSaved={async () => { setNotice('Registro confirmado.'); await stock.refresh(); }} />}
   </div>;
 }

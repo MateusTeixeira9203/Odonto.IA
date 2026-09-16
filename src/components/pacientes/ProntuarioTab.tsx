@@ -26,6 +26,7 @@ import {
 import { salvarAtendimentoDoProntuario } from '@/app/dashboard/pacientes/[id]/prontuario-actions';
 import { MarcarRetornoModal } from '@/components/pacientes/marcar-retorno-modal';
 import { ColarDoWordDialog } from '@/components/pacientes/colar-do-word-dialog';
+import { MateriaisFicha } from '@/components/pacientes/materiais-ficha';
 import { useMarcarRetorno } from '@/hooks/use-marcar-retorno';
 import type { MeuDiaCatalogoProcedimento } from '@/server/dashboard/get-meu-dia';
 import type { ProntuarioAtendimento, ProntuarioEvento, ProntuarioLongitudinalData } from '@/server/patients/get-prontuario-longitudinal';
@@ -1029,13 +1030,7 @@ export function ProntuarioTab({
               )}
             </article>
 
-            <article className="rounded-2xl border border-border bg-surface p-4">
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-text-secondary">Rastreabilidade</p>
-              <p className="mt-2 text-sm text-text-primary">Materiais não informados</p>
-              <p className="mt-1 text-xs leading-relaxed text-text-secondary">
-                    A leitura de etiquetas será registrada nesta consulta quando o módulo de materiais estiver disponível.
-              </p>
-            </article>
+            {atendimentoAberto.atendimentoId ? <MateriaisFicha clinicaId={clinicaId} atendimentoId={atendimentoAberto.atendimentoId} dentistaId={dentistaId} /> : <article className="rounded-2xl border border-border bg-surface p-4"><p className="text-xs font-bold uppercase tracking-[0.14em] text-text-secondary">Materiais</p><p className="mt-2 text-sm text-text-primary">Materiais estarão disponíveis depois que a consulta for salva.</p></article>}
 
             <article className="rounded-2xl border border-border bg-surface p-4">
               <p className="text-xs font-bold uppercase tracking-[0.14em] text-text-secondary">Materiais e documentos</p>
