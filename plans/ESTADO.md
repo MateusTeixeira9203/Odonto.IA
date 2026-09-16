@@ -1,12 +1,13 @@
 # Estado — Odonto.IA
 
-> 16/09/2026 · atualização em teste; Mateus fará QA manual.
+> 16/09/2026 · atualização em teste; Mateus assumiu os testes de uso.
 
 ## Agora
 
 Preview dos sublotes publicado em `codex/conclusao-atualizacao`.
 Worktree: `/home/mtx/.local/share/odontoia-testes/integracao`.
-Base `2b93247`; sublotes `cbb0d4a` publicados, com follow-up de tipos do CI.
+Base `2b93247`; sublotes e correções em `1906f83` publicados no Preview.
+CI 35049713925 passou: typecheck, 387 testes, lint e build.
 Commits separados autorizados somente para Preview.
 Projeto Vercel: `odonto-ia-teste`. Supabase Free: `etlqznuoxiilvxzygpat`.
 Nenhuma promoção/main, cobrança real ou escrita no banco oficial autorizada nesta execução.
@@ -14,20 +15,22 @@ Nenhuma promoção/main, cobrança real ou escrita no banco oficial autorizada n
 ## Evidência e limites
 
 [Relatório dos sublotes](auditorias/2026-09-16-sublotes-atualizacao.md) é dono dos resultados.
-- 387 testes unitários passaram; ESLint dos 64 arquivos TS/TSX alterados passou.
+- Base 1906f83: 387 testes unitários e CI completo passaram. Último ajuste UI dos kits
+  tem teste focado de edição/CAS; Mateus pediu para assumir os testes restantes.
 - Runtime SQL/PGlite: estoque, recepção, editor, recebimentos, PDF e cadastro passaram.
 - Treze migrations aplicadas só no Free; objetos conferidos, sem depender do histórico de migrations.
 - Contagens preservadas: 7 clínicas, 41 pacientes, 83 pagamentos.
 - HTTP autenticado: financeiro A/B e isolamento; leitura de kits pelo proprietário autorizado.
 - Build/typecheck completos rodam no [CI da branch](https://github.com/MateusTeixeira9203/Odonto.IA/actions?query=branch%3Acodex%2Fconclusao-atualizacao).
-  Primeiro run dos sublotes encontrou tipos incompatíveis, corrigidos em follow-up. QA visual pendente.
+  Follow-up de tipos validado. Conferência de interface pelo Mateus ainda pendente.
 - Não houve duas sessões de navegador no novo pacote: isolamento/RLS não está fechado para produção.
 
 ## Implementação atual
 
 - Recepção sem CRO/dentista fictício, rotas operacionais e editor de concessões.
 - Recebimentos por capacidade, estado canônico, repetição segura e erros recuperáveis.
-- Kits com quantidades por componente; materiais avulsos/kit na ficha, baixa, retomada e correção.
+- Kits: criar/editar composição e quantidades; retirar componente não usado antes de declarar.
+  Materiais avulsos/kit na ficha, baixa, retomada e correção.
 - Orçamento em PDF real; compartilhar arquivo no celular ou baixar/abrir WhatsApp no desktop.
   Apenas “Enviei” explícito registra envio manual; abrir não confirma pagamento nem aceite.
 - Cadastro Free: três modelos, escolha do pagador, R$200/dentista e identidade clínica opcional.

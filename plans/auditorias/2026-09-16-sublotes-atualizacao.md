@@ -39,7 +39,7 @@ Correções de funções já aplicadas são forwards, não reescrita do passado.
 
 ## Evidência técnica
 
-- Suite serial final: **387/387 testes**; ESLint dos **64 TS/TSX alterados** passou.
+- Última suite serial completa, antes do follow-up UI: **387/387 testes**; ESLint dos **64 TS/TSX alterados** passou.
 - Seis harnesses PGlite passaram: `r140e2-kits-ficha-sql`, `r159c-reception-sql`,
   `r159d-editor-acessos`, `r163c-recebimentos`, `r161f-pdf-manual`, `r165-cadastro-comercial`.
   Exercitam roles/RLS, outro tenant, concessão/revogação, CAS/replay, rollback/auditoria,
@@ -69,6 +69,8 @@ Correções de funções já aplicadas são forwards, não reescrita do passado.
   e BigInt(...) sem mudar target/cálculo. Testes focados 7 de recepção e 10 financeiros passaram.
   [CI por branch](https://github.com/MateusTeixeira9203/Odonto.IA/actions?query=branch%3Acodex%2Fconclusao-atualizacao)
   é a fonte do resultado remoto final; não confundir Vercel Ready com typecheck aprovado.
+  **Run 35049713925 / 1906f83 passou**: typecheck, 387 testes, lint e build.
+  Preview de teste correspondente: https://odonto-ia-teste-dj39qgf1i-mateusteixeira9203s-projects.vercel.app.
 - Nenhuma mensagem WhatsApp/email, contrato Stripe real ou cobrança foi disparada.
 
 ## QA manual antes de qualquer promoção
@@ -87,7 +89,7 @@ Correções de funções já aplicadas são forwards, não reescrita do passado.
 
 **Limitações explícitas:** navegador/duas sessões ainda não executados no novo pacote;
 check SQL com JWT não substitui esse gate. Não afirmar isolamento visual ou release final aprovados.
-Editar/arquivar kits completos ainda não têm UI; correção troca quantidade/lote do mesmo item.
+Arquivamento de kits ainda não tem UI; correção troca quantidade/lote do mesmo item.
 Rastreabilidade de serial/implantável/reutilizável/OCR não integra o consumo simples entregue.
 Recebimento em conflito pede atualizar a página; não há recarga orientada própria no diálogo.
 Cadastro comercial não inclui checkout/vagas/cobertura ativa, transição, trial ou convites cobertos;
@@ -99,3 +101,11 @@ Publicação somente na branch de Preview depois dos ajustes críticos, com comm
 Migrations separadas de produto/documentação. CI final e deployment devem corresponder ao mesmo SHA.
 Em falha no Preview: conservar dados novos, voltar app compatível ou corrigir por forward;
 não dropar ledger/histórico nem restaurar snapshot sobre fatos novos. Main/produção intactas.
+
+## Follow-up de interface dos kits
+
+Edição reutiliza o formulário, envia versão esperada (CAS), mantém chave após erro e conserva
+composição anterior na ficha. Antes da declaração é possível retirar um material não usado
+(ex.: kit de três, uso de dois); alteração invalida a chave, usos persistidos não são removidos.
+Teste focado de edição/CAS e ESLint passaram. Depois disso Mateus pediu para assumir os testes
+restantes: nenhum novo ciclo de QA manual/local será iniciado pelo agente. Publicar somente Preview.
