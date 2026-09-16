@@ -1,14 +1,14 @@
 # Estado — Odonto.IA
 
-> 16/09/2026 · fluxo completo do orçamento aprovado; implementação em validação para Preview.
+> 16/09/2026 · fluxo completo do orçamento publicado no Preview e CI aprovado.
 
 ## Agora
 
 Item ativo: R-169b, montagem e atualização fluida do orçamento contra o artefato aprovado.
-Preview dos sublotes publicado em `codex/conclusao-atualizacao`; novo lote ainda local.
+Preview publicado em `codex/conclusao-atualizacao`: código `e619a0c`, contrato `d9a65b8`.
 Worktree: `/home/mtx/.local/share/odontoia-testes/integracao`.
-Base `2b93247`; sublotes e correções em `1906f83` publicados no Preview.
-CI 35049713925 passou: typecheck, 387 testes, lint e build.
+CI 35118081587 passou: typecheck, 391 testes, lint e build.
+Preview principal: `https://odonto-qxp905zmt-mateusteixeira9203s-projects.vercel.app`.
 Commits separados autorizados somente para Preview.
 Projeto Vercel: `odonto-ia-teste`. Supabase Free: `etlqznuoxiilvxzygpat`.
 Nenhuma promoção/main, cobrança real ou escrita no banco oficial autorizada nesta execução.
@@ -52,7 +52,7 @@ Demais recortes futuros permanecem no [plano de conclusão](PLANO-CONCLUSAO-ATUA
 
 ## Próximo passo
 
-Finalizar auditoria do R-169b, publicar o novo SHA no Preview e testar o fluxo ponta a ponta.
+Mateus testar no Preview a atualização de uma ficha com procedimentos novos e ignorados.
 Não promover a produção antes da conferência e do gate de duas contas logadas.
 
 ## Continuidade segura
