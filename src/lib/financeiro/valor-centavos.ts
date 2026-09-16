@@ -23,8 +23,8 @@ export function parseValorCentavos(valor: string): number | null {
     inteiro = texto;
   }
 
-  const centavos = BigInt(inteiro) * 100n + BigInt(fracao.padEnd(2, '0') || '0');
-  if (centavos <= 0n || centavos > 999_999_999_999n || centavos > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+  const centavos = BigInt(inteiro) * BigInt(100) + BigInt(fracao.padEnd(2, '0') || '0');
+  if (centavos <= BigInt(0) || centavos > BigInt(999_999_999_999) || centavos > BigInt(Number.MAX_SAFE_INTEGER)) return null;
   return Number(centavos);
 }
 
