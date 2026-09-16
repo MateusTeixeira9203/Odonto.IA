@@ -186,7 +186,7 @@ export function RecebimentosOperacionaisClient({ clinicaId, initialPage }: { cli
       {!rows.length && <p className="rounded-xl border border-border bg-card p-8 text-sm text-muted-foreground">Nenhuma cobrança autorizada.</p>}
       {proximoOffset !== null && <div className="mt-4 flex justify-center"><Button variant="outline" disabled={pending || carregandoMais} onClick={carregarMais}>{carregandoMais ? 'Carregando…' : 'Carregar mais'}</Button></div>}
       <Dialog open={modal !== null} onOpenChange={(open) => { if (!open && !pending) setModal(null); }}>
-        <DialogContent className="bg-card text-foreground sm:max-w-md" onEscapeKeyDown={(event) => { if (pending) event.preventDefault(); }} onPointerDownOutside={(event) => { if (pending) event.preventDefault(); }}>
+        <DialogContent className="bg-card text-foreground sm:max-w-md" showCloseButton={!pending}>
           <DialogHeader><DialogTitle>{titulo}</DialogTitle><DialogDescription>{modal?.row.pacienteNome} · {modal?.row.dentistaNome}</DialogDescription></DialogHeader>
           <form className="space-y-4" onSubmit={confirmarEnvio}>
             {precisaValor && <div className="space-y-2"><Label htmlFor="recebimento-valor">Valor</Label><Input id="recebimento-valor" value={valor} onChange={(event) => setValor(event.target.value)} inputMode="decimal" placeholder="0,00" autoComplete="off" /></div>}
