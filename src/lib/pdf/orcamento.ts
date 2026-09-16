@@ -4,7 +4,6 @@ import {
   Text,
   View,
   StyleSheet,
-  Font,
   renderToBuffer,
 } from "@react-pdf/renderer";
 import { createElement } from "react";
@@ -16,11 +15,13 @@ interface Procedimento {
   dente?: string;
   valor: number;
   quantidade: number;
+  total?: number;
+  composicao?: string[];
 }
 
 interface OrcamentoData {
   id: string;
-  numero: number;
+  numero: number | string;
   data: string;
   validade: string;
   status: string;
@@ -41,6 +42,7 @@ interface OrcamentoData {
     cro: string;
   };
   procedimentos: Procedimento[];
+  mostrarValorPorItem?: boolean;
   subtotal: number;
   desconto: number;
   /** R-114 — o devido (valor_acordado ?? soma dos itens aprovados), não a proposta inteira. */
@@ -349,7 +351,7 @@ function OrcamentoPDF({ data }: { data: OrcamentoData }) {
             createElement(Text, { style: [styles.tableHeaderText, styles.colProcedimento] }, "Procedimento"),
             createElement(Text, { style: [styles.tableHeaderText, styles.colDente] }, "Dente"),
             createElement(Text, { style: [styles.tableHeaderText, styles.colQtd] }, "Qtd"),
-            createElement(Text, { style: [styles.tableHeaderText, styles.colValor] }, "Valor Unit."),
+            data.mostrarValorPorItem !== false && createElement(Text, { style: [styles.tableHeaderText, styles.colValor] }, "Valor Unit."),
             createElement(Text, { style: [styles.tableHeaderText, styles.colTotal] }, "Total")
           ),
           // Linhas
@@ -357,11 +359,11 @@ function OrcamentoPDF({ data }: { data: OrcamentoData }) {
             createElement(
               View,
               { style: styles.tableRow, key: idx },
-              createElement(Text, { style: [styles.tableCell, styles.colProcedimento] }, proc.nome),
+              createElement(Text, { style: [styles.tableCell, styles.colProcedimento] }, [proc.nome, ...(proc.composicao ?? [])].join('\n')),
               createElement(Text, { style: [styles.tableCell, styles.colDente] }, proc.dente || "-"),
               createElement(Text, { style: [styles.tableCell, styles.colQtd] }, String(proc.quantidade)),
-              createElement(Text, { style: [styles.tableCell, styles.colValor] }, formatCurrency(proc.valor)),
-              createElement(Text, { style: [styles.tableCell, styles.colTotal] }, formatCurrency(proc.valor * proc.quantidade))
+              data.mostrarValorPorItem !== false && createElement(Text, { style: [styles.tableCell, styles.colValor] }, formatCurrency(proc.valor)),
+              createElement(Text, { style: [styles.tableCell, styles.colTotal] }, data.mostrarValorPorItem !== false || proc.composicao?.length ? formatCurrency(proc.total ?? proc.valor * proc.quantidade) : '—')
             )
           )
         )
@@ -370,7 +372,7 @@ function OrcamentoPDF({ data }: { data: OrcamentoData }) {
       createElement(
         View,
         { style: styles.totais },
-        createElement(
+        data.mostrarValorPorItem !== false && createElement(
           View,
           { style: styles.totalRow },
           createElement(Text, { style: styles.totalLabel }, "Subtotal:"),
@@ -430,7 +432,7 @@ function OrcamentoPDF({ data }: { data: OrcamentoData }) {
         View,
         { style: styles.assinatura },
         createElement(View, { style: styles.assinaturaLinha }),
-        createElement(Text, { style: styles.assinaturaTexto }, `${data.dentista.nome} - CRO: ${data.dentista.cro}`)
+        createElement(Text, { style: styles.assinaturaTexto }, data.dentista.cro ? `${data.dentista.nome} - CRO: ${data.dentista.cro}` : data.dentista.nome)
       ),
       // Footer
       createElement(

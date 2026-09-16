@@ -1,12 +1,37 @@
+import { lerOrcamentoParaCompartilhar } from '@/server/orcamentos/compartilhamento';
+import { montarDocumentoPdf } from '@/lib/orcamentos/documento-pdf';
 import { createClient } from '@/lib/supabase/server';
 import { getDentistaCached } from '@/lib/get-dentista';
 import { buildOrcamentoHTML, type OrcamentoHtmlData } from '@/lib/prontuario-html';
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
   const { id } = await params;
+
+  if (new URL(req.url).searchParams.get('download') === '1') {
+    try {
+      const authorized = await lerOrcamentoParaCompartilhar(id);
+      if (!authorized) return new Response('Orçamento indisponível para compartilhamento.', { status: 404, headers: { 'Cache-Control': 'private, no-store' } });
+      const { gerarPDFOrcamento } = await import('@/lib/pdf/orcamento');
+      const buffer = await gerarPDFOrcamento(montarDocumentoPdf(authorized.documento));
+      return new Response(new Uint8Array(buffer), { headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="orcamento-${id.slice(0, 8)}.pdf"`,
+        'Cache-Control': 'private, no-store',
+        'X-Content-Type-Options': 'nosniff',
+        'X-Documento-Metadados': encodeURIComponent(JSON.stringify({
+          clinicaId: authorized.clinicaId, snapshot: authorized.snapshot,
+          pacienteNome: authorized.documento.paciente.nome,
+          pacienteTelefone: authorized.documento.paciente.telefone,
+        })),
+      } });
+    } catch {
+      return new Response('Não foi possível preparar o PDF. Tente novamente.', { status: 503, headers: { 'Cache-Control': 'private, no-store' } });
+    }
+  }
+
 
   const dentista = await getDentistaCached();
   if (!dentista) return new Response('Não autorizado', { status: 401 });

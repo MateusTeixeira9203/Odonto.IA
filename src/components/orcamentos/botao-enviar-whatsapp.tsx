@@ -1,96 +1,62 @@
-"use client";
-
-import { MessageCircle } from "lucide-react";
-import { toast } from "sonner";
-import { useRouter } from "next/navigation";
-import { marcarOrcamentoEnviado } from "@/app/dashboard/orcamentos/actions";
+'use client';
+import { FileDown, Loader2, MessageCircle, Share2 } from 'lucide-react';
+import { useId } from 'react';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { useOrcamentoWhatsApp } from '@/hooks/use-orcamento-whatsapp';
 
 interface BotaoEnviarWhatsAppProps {
   orcamentoId: string;
   pacienteTelefone: string | null | undefined;
   pacienteNome: string;
   valorTotal: number | null;
-  /** "full" exibe botão largo com texto (usado nas ações rápidas da secretária) */
   variant?: 'icon' | 'full';
 }
 
-function formatarTelefone(telefone: string): string {
-  const numeros = telefone.replace(/\D/g, "");
-  if (numeros.startsWith("55") && numeros.length >= 12) return numeros;
-  return `55${numeros}`;
-}
-
-function formatarMoeda(valor: number): string {
-  return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
-
-export function BotaoEnviarWhatsApp({
-  orcamentoId,
-  pacienteTelefone,
-  pacienteNome,
-  valorTotal,
-  variant = 'icon',
-}: BotaoEnviarWhatsAppProps) {
-  const router = useRouter();
-
-  async function handleEnviar() {
-    if (!pacienteTelefone) {
-      toast.error("Paciente não possui telefone cadastrado");
-      return;
-    }
-
-    const telefoneFormatado = formatarTelefone(pacienteTelefone);
-    const valorFormatado = formatarMoeda(valorTotal ?? 0);
-    const codigoOrc = orcamentoId.slice(0, 8).toUpperCase();
-
-    const pdfUrl = `${window.location.origin}/api/orcamentos/${orcamentoId}/pdf`;
-
-    const mensagem = encodeURIComponent(
-      `Olá ${pacienteNome}! 👋\n\n` +
-        `Segue o orçamento #${codigoOrc} no valor de ${valorFormatado}.\n\n` +
-        `📄 Acesse o PDF aqui: ${pdfUrl}\n\n` +
-        `Qualquer dúvida, estamos à disposição! 😊\n\n` +
-        `_Enviado via Odonto.IA_`
-    );
-
-    window.open(`https://wa.me/${telefoneFormatado}?text=${mensagem}`, "_blank");
-
-    // R-114 — marcarOrcamentoEnviado é idempotente (só grava se enviado_em ainda for null),
-    // então chama direto, sem checar status antes (que ficou inerte pra orçamento novo).
-    const result = await marcarOrcamentoEnviado(orcamentoId);
-    if (!result.error) {
-      toast.success("WhatsApp aberto e orçamento marcado como enviado!");
-      router.refresh();
-    } else {
-      toast.success("WhatsApp aberto! Envie a mensagem para o paciente.");
-    }
-  }
-
-  const semTelefone = !pacienteTelefone;
-
-  if (variant === 'full') {
-    return (
-      <button
-        onClick={() => void handleEnviar()}
-        disabled={semTelefone}
-        className="flex items-center gap-3 px-4 py-3 bg-teal/10 hover:bg-teal/20 border border-teal/20 text-teal rounded-xl text-sm font-semibold transition-all disabled:opacity-50 w-full"
-        title={semTelefone ? "Paciente sem telefone cadastrado" : "Enviar por WhatsApp"}
-      >
-        <MessageCircle className="w-4 h-4 shrink-0" />
-        Enviar por WhatsApp
-        {semTelefone && <span className="ml-auto text-[10px] font-normal text-text-secondary">sem telefone</span>}
-      </button>
-    );
-  }
-
-  return (
-    <button
-      onClick={() => void handleEnviar()}
-      disabled={semTelefone}
-      className="p-2 rounded-xl hover:bg-teal/10 transition-colors text-text-secondary hover:text-teal disabled:opacity-40"
-      title={semTelefone ? "Paciente sem telefone cadastrado" : "Enviar por WhatsApp"}
-    >
-      <MessageCircle className="w-4 h-4" />
-    </button>
-  );
+export function BotaoEnviarWhatsApp({ orcamentoId, variant = 'icon' }: BotaoEnviarWhatsAppProps) {
+  const flow = useOrcamentoWhatsApp(orcamentoId);
+  const labelId = useId();
+  return <>
+    <Button variant="ghost" size={variant === 'full' ? 'lg' : 'icon'}
+      className={variant === 'full' ? 'w-full justify-start text-primary' : 'text-muted-foreground hover:text-primary'}
+      aria-label="Enviar orçamento pelo WhatsApp" title="Enviar orçamento pelo WhatsApp"
+      onClick={() => void flow.prepare()}>
+      <MessageCircle className="size-4" />{variant === 'full' && 'Enviar por WhatsApp'}
+    </Button>
+    <Dialog open={flow.open} onOpenChange={flow.changeOpen}>
+      <DialogContent className="bg-card text-foreground sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Enviar orçamento</DialogTitle>
+          <DialogDescription>Confira a mensagem e envie o arquivo ao paciente pelo WhatsApp.</DialogDescription>
+        </DialogHeader>
+        {flow.loading && <p role="status" className="flex items-center gap-2 text-muted-foreground"><Loader2 className="size-4 animate-spin" /> Preparando PDF…</p>}
+        {flow.error && <div role="alert" className="space-y-3"><p>{flow.error}</p><Button variant="outline" onClick={() => void flow.prepare()}>Tentar novamente</Button></div>}
+        {flow.prepared && <>
+          <div className="rounded-lg border border-border p-3">
+            <p className="font-medium">{flow.prepared.metadata.pacienteNome}</p>
+            <p className="text-muted-foreground">{flow.prepared.metadata.pacienteTelefone ?? 'Telefone não cadastrado'}</p>
+          </div>
+          <div className="space-y-2">
+            <label htmlFor={labelId} className="font-medium">Mensagem</label>
+            <Textarea id={labelId} value={flow.message} onChange={(event) => flow.setMessage(event.target.value)} maxLength={2000} rows={4} disabled={flow.saving || flow.sharing} />
+          </div>
+          {!flow.url && <p role="alert" className="text-muted-foreground">Confira o telefone no cadastro do paciente e preencha a mensagem para continuar.</p>}
+          <div className="grid gap-2">
+            {flow.canShare && <Button size="lg" disabled={!flow.url || flow.sharing || flow.saving} onClick={() => void flow.share()}><Share2 />Compartilhar PDF e mensagem</Button>}
+            <Button variant={flow.canShare ? 'outline' : 'default'} size="lg" disabled={!flow.url || flow.sharing || flow.saving} onClick={flow.downloadAndOpen}><FileDown />Baixar PDF e abrir WhatsApp</Button>
+          </div>
+          <p className="text-sm text-muted-foreground">No computador, anexe o PDF baixado à conversa. No compartilhamento do celular, escolha o WhatsApp e confira o destinatário.</p>
+          {flow.attempted && <div className="space-y-3 border-t border-border pt-4" aria-live="polite">
+            <p>Você enviou a mensagem com o PDF?</p>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => void flow.confirm()} disabled={flow.saving || flow.sharing}>{flow.saving ? 'Registrando…' : 'Enviei'}</Button>
+              <Button variant="outline" onClick={() => flow.changeOpen(false)} disabled={flow.saving || flow.sharing}>Não enviei</Button>
+              {flow.url && <a href={flow.url} target="_blank" rel="noopener noreferrer" className="self-center text-primary underline">Abrir WhatsApp</a>}
+            </div>
+          </div>}
+        </>}
+      </DialogContent>
+    </Dialog>
+  </>;
 }
