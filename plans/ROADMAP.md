@@ -22,7 +22,8 @@
 
 | ID | Item | Estado |
 |---|---|---|
-| [**R-153**](specs/R-153-orcamento-ficha-fluxo-continuo.md) | **Orçamento da Ficha em fluxo contínuo** — uma Ficha por orçamento, catálogo confiável e continuidade no perfil do paciente | 🔵 integrada em `main`; aguarda confirmação do deploy e validação dirigida. |
+| [**R-170**](specs/R-170-responsabilidade-procedimento-encaminhado.md) | **Responsabilidade do procedimento encaminhado** — executor mantém escrita e continuidade; origem acompanha em leitura | 🔵 ativo |
+| [**R-153**](specs/R-153-orcamento-ficha-fluxo-continuo.md) | **Orçamento da Ficha em fluxo contínuo** — uma Ficha por orçamento, catálogo confiável e continuidade no perfil do paciente | 🟡 integrada em `main`; aguarda confirmação do deploy e validação dirigida. |
 
 ## Publicado, aguardando validação dirigida
 

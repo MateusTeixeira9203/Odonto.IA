@@ -4,7 +4,7 @@
 
 ## Agora
 
-Item ativo: R-169c, exclusão explícita de ficha e orçamento com confirmação de risco.
+Item ativo: R-170, responsabilidade de procedimento encaminhado.
 Preview em `codex/conclusao-atualizacao`: orçamento `e619a0c`, rolagem única do shell `c9c1fe9`.
 Worktree: `/home/mtx/.local/share/odontoia-testes/integracao`.
 CI 35118081587 passou: typecheck, 391 testes, lint e build.
@@ -53,6 +53,34 @@ Nenhuma promoção/main, cobrança real ou escrita no banco oficial autorizada n
   retorna `Não foi possível excluir o orçamento.` — a RPC `excluir_orcamento_permanentemente`
   ainda não foi aplicada no banco conectado ao Preview. A tela do Prontuário ainda exibe o bloco
   `Fichas em curso` e o chip de contagem; não tratar o item como entregue.
+- Novo relato de encaminhamento (16/09), dentro da ficha — não no Meu Dia: depois de o destinatário
+  preencher o detalhe e marcar o procedimento como realizado, ele deixa de conseguir manipular ou
+  reencontrar os dados; o autor continua com acesso. A RPC de conclusão não apaga `detalhe` nem
+  `encaminhado_para`: ela só altera `status` e `realizado_em`. A causa estrutural confirmada é a
+  regra de autoria: destinatário só tem escrita estreita de status e, para endodontia/implante,
+  detalhe técnico; autor conserva todos os controles. Ainda falta fechar a condição visual que
+  oculta o item no caso observado. Diagnóstico adicional: `encaminhado_para` é usado tanto como
+  destinatário operacional quanto como responsável do filtro. A conclusão preserva esse campo;
+  assim, na visão "Meus" do autor, um procedimento já executado pelo colega fica oculto mesmo com
+  `detalhe` salvo. Autor também pode hoje alterar status de evento encaminhado, criando ambiguidade
+  sobre quem de fato concluiu. Há também incoerência: a UI oferece adicionar procedimentos a uma
+  ficha compartilhada, mas a RPC bloqueia quem não é o autor da ficha. Direção ainda a aprovar:
+  ficha aberta como contêiner compartilhado da clínica, autoria preservada por procedimento e
+  executor registrado separadamente, e nova ficha somente quando a original estiver assinada. O
+  print mais recente ainda mostra os resumos
+  `1 atendimento` e `24 pendências` no Prontuário; remover essa faixa sem remover os filtros da
+  linha do tempo.
+- Contrato de produto detalhado pelo Mateus (16/09): no Meu Dia, a abertura do paciente deve
+  mostrar histórico clínico completo em ordem do atendimento mais recente ao mais antigo, com
+  filtros por "meus atendimentos" e por cada doutor. Ao abrir uma ficha por um encaminhamento, o
+  destinatário lê todos os procedimentos, mas só pode editar/concluir o que recebeu e os novos
+  procedimentos que ele próprio adicionar. Enquanto a ficha não estiver assinada, ele pode adicionar
+  procedimentos à mesma ficha encaminhada; esses eventos preservam sua autoria. Não pode alterar os
+  demais procedimentos da ficha. O autor de origem vê o retorno e os detalhes executados na mesma
+  ficha. Decisão adicional: depois de encaminhar, o dentista de origem perde toda escrita sobre
+  aquele procedimento (inclusive status); conserva leitura de status e de todos os detalhes
+  técnicos/histórico. O destinatário conserva responsabilidade e acesso ao procedimento mesmo após
+  marcá-lo realizado.
 - Alerta âmbar conta somente procedimento novo não revisado; `Manter orçamento como está`
   persiste a decisão em `activity_logs`, sem remover o procedimento da ficha.
 - Reativação pessoal no Dex adiada por Mateus; rascunho fora do código/migrations publicáveis.
@@ -67,10 +95,10 @@ Demais recortes futuros permanecem no [plano de conclusão](PLANO-CONCLUSAO-ATUA
 
 ## Próximo passo
 
-Implementar R-169c contra a spec, migrar somente o banco de Preview e testar com dois dentistas
-da clínica de teste antes de publicar. Mateus fará o teste manual do Preview; não acompanhar nem
-operar o Preview durante o teste.
-Não promover a produção antes da conferência e do gate de duas contas logadas.
+Implementar R-170 contra a spec aprovada, migrar somente o banco de Preview e testar com dois
+dentistas da clínica de teste antes de publicar. Mateus fará o teste manual do Preview; não
+acompanhar nem operar o Preview durante o teste. Não promover a produção antes da conferência e
+do gate de duas contas logadas.
 
 ## Continuidade segura
 
