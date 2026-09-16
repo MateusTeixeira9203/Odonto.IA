@@ -159,6 +159,7 @@ interface PacienteDetailClientProps {
   orcamentosAviso?: string | null;
   clinicaId: string;
   dentistaId: string;
+  userId: string;
   role: DentistaRole;
   plano: PlanoId;
   fichasRecentesSSR?: FichaRecente[];
@@ -173,6 +174,7 @@ export function PacienteDetailClient({
   orcamentosAviso = null,
   clinicaId,
   dentistaId,
+  userId,
   role,
   plano,
   fichasRecentesSSR,
@@ -1568,6 +1570,8 @@ export function PacienteDetailClient({
                         patientId={paciente.id}
                         clinicaId={clinicaId}
                         dentistaId={dentistaId}
+                        userId={userId}
+                        clinicaId={clinicaId}
                         patientName={displayNome}
                         canWrite={canWriteClinical}
                         dados={prontuario ?? { atendimentos: [], fichas: [], boca: [], profissionaisClinicos: [], errosParciais: [] }}

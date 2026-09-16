@@ -1,7 +1,9 @@
+import type { ComponenteGrupoOrcamento } from '@/lib/orcamentos/grupos';
 // R-03c-1 — aceite assinado do orçamento (prova comercial, distinta da assinatura
 // clínica do R-03a). Ver plans/_arquivo/specs/R-03c-1-aceite-assinado-orcamento.md.
 
 type TermosItem = {
+  composicao?: ComponenteGrupoOrcamento[] | null;
   descricao: string | null;
   dente: string | null;
   quantidade: number;
