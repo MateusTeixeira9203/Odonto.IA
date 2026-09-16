@@ -27,9 +27,11 @@ interface DashboardShellProps {
   pendenciasEnabled?: boolean;
   clinicaOwnerEnabled?: boolean;
   managementOnly?: boolean;
+  operationalReception?: boolean;
+  operationalRecebimentos?: boolean;
 }
 
-export function DashboardShell({ children, nome, clinicaNome, activeClinicId, role, avatarUrl, plano, consultorioPessoalEnabled = false, pendenciasEnabled = false, clinicaOwnerEnabled = false, managementOnly = false }: DashboardShellProps) {
+export function DashboardShell({ children, nome, clinicaNome, activeClinicId, role, avatarUrl, plano, consultorioPessoalEnabled = false, pendenciasEnabled = false, clinicaOwnerEnabled = false, managementOnly = false, operationalReception = false, operationalRecebimentos = false }: DashboardShellProps) {
   const router = useRouter();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -96,6 +98,8 @@ export function DashboardShell({ children, nome, clinicaNome, activeClinicId, ro
         pendenciasEnabled={pendenciasEnabled}
         clinicaOwnerEnabled={clinicaOwnerEnabled}
         managementOnly={managementOnly}
+        operationalReception={operationalReception}
+        operationalRecebimentos={operationalRecebimentos}
       />
 
       <MobileDrawer
@@ -110,6 +114,8 @@ export function DashboardShell({ children, nome, clinicaNome, activeClinicId, ro
         pendenciasEnabled={pendenciasEnabled}
         clinicaOwnerEnabled={clinicaOwnerEnabled}
         managementOnly={managementOnly}
+        operationalReception={operationalReception}
+        operationalRecebimentos={operationalRecebimentos}
       />
 
       {/* FASE 1: guia desativado — ver roadmap-3-fases A2 */}
@@ -117,9 +123,9 @@ export function DashboardShell({ children, nome, clinicaNome, activeClinicId, ro
 
       {/* D4 — hub monta também pra secretária: ela tem os 3 alertas computados e é
           quem liga pro paciente; antes o botão dela existia mas nunca abria nada (C2) */}
-      {!managementOnly && role !== 'protetico' && <DexWidget nome={nome} />}
+      {!managementOnly && !operationalReception && role !== 'protetico' && <DexWidget nome={nome} />}
 
-      {!managementOnly && hasMountedPalette && (
+      {!managementOnly && !operationalReception && hasMountedPalette && (
         <CommandPalette
           open={isCommandPaletteOpen}
           onClose={closeCommandPalette}

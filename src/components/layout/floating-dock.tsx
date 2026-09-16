@@ -30,6 +30,8 @@ interface FloatingDockProps {
   pendenciasEnabled?: boolean;
   clinicaOwnerEnabled?: boolean;
   managementOnly?: boolean;
+  operationalReception?: boolean;
+  operationalRecebimentos?: boolean;
 }
 
 const ROLE_PT: Record<string, string> = {
@@ -58,12 +60,12 @@ const CONSULTORIO_PESSOAL_NAV_ITEM = {
 
 const subscribeMounted = () => () => {};
 
-export function FloatingDock({ nome, clinicaNome, activeClinicId, role, avatarUrl, plano, consultorioPessoalEnabled = false, pendenciasEnabled = false, clinicaOwnerEnabled = false, managementOnly = false }: FloatingDockProps) {
+export function FloatingDock({ nome, clinicaNome, activeClinicId, role, avatarUrl, plano, consultorioPessoalEnabled = false, pendenciasEnabled = false, clinicaOwnerEnabled = false, managementOnly = false, operationalReception = false, operationalRecebimentos = false }: FloatingDockProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const mounted = useSyncExternalStore(subscribeMounted, () => true, () => false);
-  const dexBadge = useDexBadge(!managementOnly && role !== 'protetico');
+  const dexBadge = useDexBadge(!managementOnly && !operationalReception && role !== 'protetico');
   const { clinicas, loading: clinicasLoading, switching, switchClinic } = useClinicSwitcher();
 
   // R-19 — convenção de zona segura: o dock publica sua presença (body.has-dock) pra que barras
@@ -86,7 +88,15 @@ export function FloatingDock({ nome, clinicaNome, activeClinicId, role, avatarUr
   const navItems = consultorioPessoalEnabled
     ? NAV_ITEMS.map(item => item.id === 'financeiro' ? (clinicaOwnerEnabled ? { ...CONSULTORIO_PESSOAL_NAV_ITEM, href: '/clinica', label: 'Clínica' } : CONSULTORIO_PESSOAL_NAV_ITEM) : item)
     : NAV_ITEMS;
-  const navigation = managementOnly ? [{ href: '/clinica', icon: Building2, label: 'Clínica', id: 'clinica' }, { href: '/equipe', icon: Users, label: 'Equipe', id: 'equipe' }, { href: '/estoque', icon: Package, label: 'Estoque', id: 'estoque' }] : pendenciasEnabled ? [...navItems.slice(0, 4), { href: '/pendencias', icon: ListChecks, label: 'Pendências', id: 'pendencias' }, ...navItems.slice(4)] : navItems;
+  const navigation = operationalReception
+    ? [
+      ...NAV_ITEMS.filter((item) => item.id === 'pacientes' || item.id === 'agenda'),
+      { href: '/dashboard/pendencias', icon: ListChecks, label: 'Pendências', id: 'pendencias' },
+      ...(operationalRecebimentos ? [{ href: '/dashboard/recebimentos', icon: Wallet, label: 'Recebimentos', id: 'recebimentos' }] : []),
+    ]
+    : managementOnly
+      ? [{ href: '/clinica', icon: Building2, label: 'Clínica', id: 'clinica' }, { href: '/equipe', icon: Users, label: 'Equipe', id: 'equipe' }, { href: '/estoque', icon: Package, label: 'Estoque', id: 'estoque' }]
+      : pendenciasEnabled ? [...navItems.slice(0, 4), { href: '/pendencias', icon: ListChecks, label: 'Pendências', id: 'pendencias' }, ...navItems.slice(4)] : navItems;
   const visibleItems = role === 'protetico' ? [] : navigation.filter(item => {
     if ('hideFromSecretaria' in item && item.hideFromSecretaria && role === 'secretaria') return false;
     return true;

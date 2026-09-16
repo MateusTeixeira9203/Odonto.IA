@@ -28,6 +28,8 @@ interface MobileDrawerProps {
   pendenciasEnabled?: boolean;
   clinicaOwnerEnabled?: boolean;
   managementOnly?: boolean;
+  operationalReception?: boolean;
+  operationalRecebimentos?: boolean;
 }
 
 const NAV_ITEMS = [
@@ -47,13 +49,16 @@ const CONSULTORIO_PESSOAL_NAV_ITEM = {
   label: 'Consultório',
 } as const;
 
-export function MobileDrawer({ open, onClose, nome, clinicaNome, role, avatarUrl, plano, consultorioPessoalEnabled = false, pendenciasEnabled = false, clinicaOwnerEnabled = false, managementOnly = false }: MobileDrawerProps) {
+export function MobileDrawer({ open, onClose, nome, clinicaNome, role, avatarUrl, plano, consultorioPessoalEnabled = false, pendenciasEnabled = false, clinicaOwnerEnabled = false, managementOnly = false, operationalReception = false, operationalRecebimentos = false }: MobileDrawerProps) {
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const { logout, isLoggingOut } = useLogout();
 
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    const timer = setTimeout(() => setMounted(true), 0);
+    return () => clearTimeout(timer);
+  }, []);
 
   const avatarInitials = nome.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
   const financeiroLocked = !temFeature(plano ?? 'SOLO', 'financeiro');
@@ -63,7 +68,15 @@ export function MobileDrawer({ open, onClose, nome, clinicaNome, role, avatarUrl
   const navItems = consultorioPessoalEnabled
     ? NAV_ITEMS.map(item => item.href === '/dashboard/financeiro' ? (clinicaOwnerEnabled ? { ...CONSULTORIO_PESSOAL_NAV_ITEM, href: '/clinica', label: 'Clínica' } : CONSULTORIO_PESSOAL_NAV_ITEM) : item)
     : NAV_ITEMS;
-  const navigation = managementOnly ? [{ href: '/clinica', icon: Building2, label: 'Clínica', id: 'clinica' }, { href: '/equipe', icon: Users, label: 'Equipe', id: 'equipe' }, { href: '/estoque', icon: Package, label: 'Estoque', id: 'estoque' }] : pendenciasEnabled ? [...navItems.slice(0, 4), { href: '/pendencias', icon: ListChecks, label: 'Pendências', id: 'pendencias' }, ...navItems.slice(4)] : navItems;
+  const navigation = operationalReception
+    ? [
+      ...NAV_ITEMS.filter((item) => item.href === '/dashboard/pacientes' || item.href === '/dashboard/agendamentos'),
+      { href: '/dashboard/pendencias', icon: ListChecks, label: 'Pendências', id: 'pendencias' },
+      ...(operationalRecebimentos ? [{ href: '/dashboard/recebimentos', icon: Wallet, label: 'Recebimentos', id: 'recebimentos' }] : []),
+    ]
+    : managementOnly
+      ? [{ href: '/clinica', icon: Building2, label: 'Clínica', id: 'clinica' }, { href: '/equipe', icon: Users, label: 'Equipe', id: 'equipe' }, { href: '/estoque', icon: Package, label: 'Estoque', id: 'estoque' }]
+      : pendenciasEnabled ? [...navItems.slice(0, 4), { href: '/pendencias', icon: ListChecks, label: 'Pendências', id: 'pendencias' }, ...navItems.slice(4)] : navItems;
   const visibleItems = role === 'protetico'
     ? []
     : navigation.filter(item => !('hideFromSecretaria' in item && item.hideFromSecretaria && role === 'secretaria'));
