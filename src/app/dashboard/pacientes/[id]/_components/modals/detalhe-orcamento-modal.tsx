@@ -154,10 +154,15 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
   const hoje = hojeBRT();
   const [formAberto, setFormAberto] = useState(false);
   const [itemIds, setItemIds] = useState<string[]>([]);
+  const [alterandoSelecao, setAlterandoSelecao] = useState(false);
   const [desconto, setDesconto] = useState('');
   const [observacoes, setObservacoes] = useState('');
+  const [mostrarObservacao, setMostrarObservacao] = useState(false);
+  const [entrada, setEntrada] = useState('');
+  const [formaEntrada, setFormaEntrada] = useState<FormaPagamento>('pix');
+  const [dataEntrada, setDataEntrada] = useState(hoje);
   const [cartaoCredito, setCartaoCredito] = useState(false);
-  const [formaCobranca, setFormaCobranca] = useState<'avista' | 'parcelado'>('avista');
+  const [formaCobranca, setFormaCobranca] = useState<'avista' | 'entrada_parcelas' | 'parcelado'>('avista');
   const [numeroParcelas, setNumeroParcelas] = useState('3');
   const [primeiroVencimento, setPrimeiroVencimento] = useState(hoje);
   const [saving, setSaving] = useState(false);
@@ -188,7 +193,25 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
   }, 0), [itemIds, orcamento.itens]);
   const descontoNumero = parseValorBR(desconto);
   const valorFinal = Math.max(0, subtotalSelecionado - descontoNumero);
+  const entradaNumero = parseValorBR(entrada);
   const itemPorId = useMemo(() => new Map(orcamento.itens.map((item) => [item.id, item])), [orcamento.itens]);
+
+  const abrirNovaEtapa = () => {
+    setItemIds(itensElegiveis.map((item) => item.id));
+    setAlterandoSelecao(false);
+    setErro(null);
+    setFormAberto(true);
+  };
+
+  // O acordo começa exatamente com o que foi aceito. A lista existe somente para o
+  // caso deliberado de separar uma etapa; nunca pede ao dentista uma segunda aprovação.
+  useEffect(() => {
+    if (permitirNovaEtapa && orcamento.cobrancas.length === 0 && itensElegiveis.length > 0 && !formAberto) {
+      abrirNovaEtapa();
+    }
+  // `itensElegiveis` só deve abrir a primeira etapa; mudanças posteriores partem do botão explícito.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orcamento.id]);
 
   const toggleItem = (itemId: string) => {
     setItemIds((current) => current.includes(itemId)
@@ -225,8 +248,12 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
       setErro('Informe entre 2 e 24 parcelas.');
       return;
     }
-    if (formaCobranca === 'parcelado' && parcelas < 2) {
+    if (formaCobranca !== 'avista' && parcelas < 2) {
       setErro('Parcelamento mensal começa em 2 parcelas.');
+      return;
+    }
+    if (formaCobranca === 'entrada_parcelas' && (entradaNumero <= 0 || entradaNumero >= valorFinal)) {
+      setErro('A entrada precisa ser maior que zero e menor que o valor da etapa.');
       return;
     }
     setSaving(true);
@@ -246,15 +273,45 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
         setErro(result.error);
         return;
       }
+      if (formaCobranca === 'entrada_parcelas' && !result.id) {
+        setFormAberto(false);
+        setErro('A cobrança foi criada, mas a entrada precisa ser registrada na etapa.');
+        router.refresh();
+        return;
+      }
+      if (formaCobranca === 'entrada_parcelas' && result.id) {
+        const recebimentoEntrada = await registrarRecebimentoCobranca({
+          cobrancaId: result.id,
+          pacienteId,
+          valor: entradaNumero,
+          formaPagamento: formaEntrada,
+          data: dataEntrada,
+        });
+        if (recebimentoEntrada.error) {
+          setFormAberto(false);
+          setErro(`A cobrança foi criada, mas a entrada não foi registrada: ${recebimentoEntrada.error}`);
+          router.refresh();
+          return;
+        }
+      }
       setFormAberto(false);
       setItemIds([]);
       setDesconto('');
       setObservacoes('');
+      setMostrarObservacao(false);
+      setEntrada('');
+      setDataEntrada(hoje);
       setFormaCobranca('avista');
       setCartaoCredito(false);
       setNumeroParcelas('3');
       setPrimeiroVencimento(hoje);
-      toast.success(cartaoCredito && parcelas > 1 ? 'Cartão confirmado. Parcelas distribuídas pelos meses.' : parcelas === 1 ? 'Cobrança criada. O saldo já apareceu no Financeiro.' : 'Parcelas mensais criadas no Financeiro.');
+      toast.success(formaCobranca === 'entrada_parcelas'
+        ? 'Entrada registrada e parcelas mensais criadas no Financeiro.'
+        : cartaoCredito && parcelas > 1
+          ? 'Cartão confirmado. Parcelas distribuídas pelos meses.'
+          : parcelas === 1
+            ? 'Cobrança criada. O saldo já apareceu no Financeiro.'
+            : 'Parcelas mensais criadas no Financeiro.');
       router.refresh();
     } catch {
       setErro("Não foi possível confirmar a operação. Confira o histórico antes de tentar novamente; seus campos foram preservados.");
@@ -557,28 +614,41 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
 
       {permitirNovaEtapa && itensElegiveis.length > 0 && (
         formAberto ? (
-          <div className="rounded-2xl border border-teal/30 bg-teal/5 p-3 space-y-3">
-            <div><p className="text-sm font-semibold text-text-primary">Nova cobrança</p><p className="text-xs text-text-secondary mt-1">Selecione itens aprovados. O desconto vale somente para esta etapa.</p></div>
-            <div className="space-y-1.5">{itensElegiveis.map((item) => <label key={item.id} className="flex items-center gap-2 rounded-lg bg-surface px-2.5 py-2 text-xs text-text-primary"><input type="checkbox" checked={itemIds.includes(item.id)} onChange={() => toggleItem(item.id)} className="accent-teal" /><span className="min-w-0 flex-1 truncate">{item.descricao ?? 'Procedimento'}</span><span className="font-mono">R$ {fmt(item.preco_total ?? 0)}</span></label>)}</div>
-            <div className="grid grid-cols-2 gap-2"><div><Label className="text-[10px] text-text-secondary">Desconto da etapa</Label><Input value={desconto} inputMode="decimal" placeholder="0,00" onChange={(event) => setDesconto(event.target.value)} className="mt-1 h-9 font-mono" /></div><div className="rounded-lg border border-border bg-surface px-3 py-2"><p className="text-[10px] text-text-secondary">Valor a cobrar</p><p className="font-mono text-sm font-semibold text-text-primary">R$ {fmt(valorFinal)}</p></div></div>
-            <div className="space-y-2 rounded-lg border border-border bg-surface p-2.5">
-              <Label className="text-[10px] text-text-secondary">Forma de cobrança</Label>
-              <div className="grid grid-cols-2 gap-1.5"><button type="button" onClick={() => setFormaCobranca('avista')} className={`h-9 rounded-lg border text-xs font-semibold ${formaCobranca === 'avista' ? 'border-teal/40 bg-teal/10 text-teal-ink' : 'border-border text-text-secondary hover:border-teal/30'}`}>À vista</button><button type="button" onClick={() => setFormaCobranca('parcelado')} className={`h-9 rounded-lg border text-xs font-semibold ${formaCobranca === 'parcelado' ? 'border-teal/40 bg-teal/10 text-teal-ink' : 'border-border text-text-secondary hover:border-teal/30'}`}>Parcelado</button></div>
-              <div className={`grid gap-2 ${formaCobranca === 'parcelado' ? 'grid-cols-2' : 'grid-cols-1'}`}><div className={formaCobranca === 'parcelado' ? '' : 'hidden'}><Label className="text-[10px] text-text-secondary">Nº de parcelas</Label><Input type="number" min={2} max={24} value={numeroParcelas} onChange={(event) => setNumeroParcelas(event.target.value)} className="mt-1 h-9 font-mono" /></div><div><Label className="text-[10px] text-text-secondary">{cartaoCredito ? '1º lançamento' : '1º vencimento'}</Label><Input type="date" value={primeiroVencimento} onChange={(event) => setPrimeiroVencimento(event.target.value)} className="mt-1 h-9" /></div></div>
-              {formaCobranca === 'parcelado' && cartaoParceladoHabilitado && <label className="block space-y-1 text-sm text-foreground">Pagamento das parcelas
-                <select aria-label="Pagamento das parcelas da etapa" value={cartaoCredito ? 'cartao' : 'acordo'} onChange={e => setCartaoCredito(e.target.value === 'cartao')} disabled={saving} className="min-h-11 w-full rounded-lg border border-border bg-background px-3 text-foreground"><option value="acordo">Acordo com o paciente</option><option value="cartao">Cartão de crédito</option></select>
-                {cartaoCredito && <p className="text-xs text-muted-foreground">Ao salvar, as parcelas ficam confirmadas, cada uma no seu mês. Não será preciso dar baixa todo mês.</p>}
-              </label>}
-              {formaCobranca === 'parcelado' && Number(numeroParcelas) >= 2 && valorFinal > 0 && <p className="text-[11px] text-text-secondary">{numeroParcelas}x mensais de aproximadamente R$ {fmt(valorFinal / Number(numeroParcelas))}.</p>}
+          <div className="space-y-4">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-teal-ink">Área de trabalho</p>
+              <div className="mt-2 flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-xl font-semibold tracking-tight text-text-primary">Como ficou o acordo?</h3>
+                  <p className="mt-1 text-sm leading-relaxed text-text-secondary">Os procedimentos aprovados já vieram para esta etapa. Defina somente como ela será cobrada.</p>
+                </div>
+                <div className="shrink-0 text-right"><p className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Total da etapa</p><p className="mt-1 font-mono text-xl font-semibold text-text-primary">R$ {fmt(valorFinal)}</p></div>
+              </div>
             </div>
-            <label className="block space-y-1 text-sm text-foreground">Observação do acordo
-              <Textarea value={observacoes} onChange={(event) => setObservacoes(event.target.value)} maxLength={2000} disabled={saving} placeholder="Ex.: Superior no início do tratamento; inferior quando começar a próxima fase." />
-              <span className="block text-xs text-muted-foreground">Visível para a equipe autorizada. Não registra pagamento nem aparece automaticamente no documento do paciente.</span>
-            </label>
+
+            <div className="rounded-2xl border border-teal/30 bg-teal/5 px-3.5 py-3">
+              <div className="flex items-center justify-between gap-3"><div><p className="text-sm font-semibold text-teal-ink">{itemIds.length} procedimento{itemIds.length === 1 ? '' : 's'} herdado{itemIds.length === 1 ? '' : 's'} da aprovação</p><p className="mt-0.5 text-xs text-text-secondary">R$ {fmt(subtotalSelecionado)} antes do desconto</p></div><button type="button" onClick={() => setAlterandoSelecao((aberta) => !aberta)} className="shrink-0 text-xs font-semibold text-teal-ink hover:underline">{alterandoSelecao ? 'Concluir seleção' : 'Alterar seleção'}</button></div>
+              {alterandoSelecao && <div className="mt-3 max-h-56 space-y-1.5 overflow-y-auto border-t border-teal/20 pt-3">{itensElegiveis.map((item) => <label key={item.id} className="flex items-center gap-2 rounded-lg bg-surface px-3 py-2.5 text-sm text-text-primary"><input type="checkbox" checked={itemIds.includes(item.id)} onChange={() => toggleItem(item.id)} className="accent-teal" /><span className="min-w-0 flex-1 break-words">{item.descricao ?? 'Procedimento'}</span><span className="shrink-0 font-mono text-xs">R$ {fmt(item.preco_total ?? 0)}</span></label>)}</div>}
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_150px]"><div><Label className="text-xs text-text-secondary">Desconto da etapa</Label><Input value={desconto} inputMode="decimal" placeholder="0,00" onChange={(event) => setDesconto(event.target.value)} className="mt-1 h-11 font-mono" /></div><div className="rounded-xl border border-border bg-surface-alt/40 px-3 py-2.5"><p className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Valor a cobrar</p><p className="mt-1 font-mono text-lg font-semibold text-text-primary">R$ {fmt(valorFinal)}</p></div></div>
+
+            <div>
+              <Label className="text-xs text-text-secondary">Forma de pagamento</Label>
+              <div className="mt-2 grid grid-cols-3 gap-2" role="tablist" aria-label="Forma de pagamento da etapa">
+                {([['avista', 'À vista'], ['entrada_parcelas', 'Entrada + parcelas'], ['parcelado', 'Parcelado']] as const).map(([valor, rotulo]) => <button key={valor} type="button" role="tab" aria-selected={formaCobranca === valor} onClick={() => setFormaCobranca(valor)} className={`min-h-12 rounded-xl border px-2 text-xs font-semibold transition-colors ${formaCobranca === valor ? 'border-teal/45 bg-teal/10 text-teal-ink' : 'border-border bg-surface text-text-secondary hover:border-teal/30 hover:text-teal-ink'}`}>{rotulo}</button>)}
+              </div>
+            </div>
+
+            {formaCobranca === 'entrada_parcelas' && <div className="grid gap-3 rounded-xl border border-border bg-surface-alt/30 p-3 sm:grid-cols-2"><div><Label className="text-xs text-text-secondary">Entrada</Label><Input value={entrada} inputMode="decimal" placeholder="0,00" onChange={(event) => setEntrada(event.target.value)} className="mt-1 h-10 font-mono" /></div><div><Label className="text-xs text-text-secondary">Forma da entrada</Label><Select value={formaEntrada} onValueChange={(value) => setFormaEntrada(value as FormaPagamento)}><SelectTrigger className="mt-1 h-10"><SelectValue /></SelectTrigger><SelectContent>{Object.entries(FORMA_LABEL).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div><div><Label className="text-xs text-text-secondary">Data da entrada</Label><Input type="date" value={dataEntrada} onChange={(event) => setDataEntrada(event.target.value)} className="mt-1 h-10" /></div><div className="rounded-lg bg-surface px-3 py-2"><p className="text-[10px] text-text-secondary">Restante para parcelar</p><p className="mt-1 font-mono text-sm font-semibold text-text-primary">R$ {fmt(Math.max(0, valorFinal - entradaNumero))}</p></div></div>}
+
+            {formaCobranca !== 'avista' && <div className="grid gap-3 rounded-xl border border-border bg-surface-alt/30 p-3 sm:grid-cols-2"><div><Label className="text-xs text-text-secondary">Número de parcelas</Label><Input type="number" min={2} max={24} value={numeroParcelas} onChange={(event) => setNumeroParcelas(event.target.value)} className="mt-1 h-10 font-mono" /></div><div><Label className="text-xs text-text-secondary">{cartaoCredito && formaCobranca === 'parcelado' ? '1º lançamento' : '1º vencimento'}</Label><Input type="date" value={primeiroVencimento} onChange={(event) => setPrimeiroVencimento(event.target.value)} className="mt-1 h-10" /></div>{Number(numeroParcelas) >= 2 && valorFinal > 0 && <p className="sm:col-span-2 text-xs text-text-secondary">{numeroParcelas}x mensais de aproximadamente R$ {fmt((formaCobranca === 'entrada_parcelas' ? Math.max(0, valorFinal - entradaNumero) : valorFinal) / Number(numeroParcelas))}.</p>}{formaCobranca === 'parcelado' && cartaoParceladoHabilitado && <label className="sm:col-span-2 block space-y-1 text-sm text-foreground">Pagamento das parcelas<select aria-label="Pagamento das parcelas da etapa" value={cartaoCredito ? 'cartao' : 'acordo'} onChange={e => setCartaoCredito(e.target.value === 'cartao')} disabled={saving} className="min-h-11 w-full rounded-lg border border-border bg-background px-3 text-foreground"><option value="acordo">Acordo com o paciente</option><option value="cartao">Cartão de crédito</option></select>{cartaoCredito && <p className="text-xs text-muted-foreground">Ao salvar, as parcelas ficam confirmadas, cada uma no seu mês.</p>}</label>}</div>}
+
+            <div className="border-t border-border pt-3"><button type="button" onClick={() => setMostrarObservacao((aberta) => !aberta)} className="text-sm font-semibold text-text-primary hover:text-teal-ink">{mostrarObservacao ? '− Ocultar observação do acordo' : '+ Adicionar observação do acordo'}</button>{mostrarObservacao && <label className="mt-3 block space-y-1 text-sm text-foreground"><Textarea value={observacoes} onChange={(event) => setObservacoes(event.target.value)} maxLength={2000} disabled={saving} placeholder="Ex.: Superior no início do tratamento; inferior quando começar a próxima fase." /><span className="block text-xs text-muted-foreground">Visível para a equipe autorizada.</span></label>}</div>
             {erro && <p role="alert" className="text-xs text-coral-ink">{erro}</p>}
-            <div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => { setFormAberto(false); setErro(null); }} disabled={saving} className="flex-1">Cancelar</Button><Button size="sm" onClick={() => void criarEtapa()} disabled={saving || itemIds.length === 0} className="flex-1 bg-teal text-white hover:bg-teal-lt">{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Criar cobrança'}</Button></div>
+            <div className="grid grid-cols-2 gap-3"><Button variant="outline" onClick={() => { setFormAberto(false); setErro(null); }} disabled={saving} className="h-12">Cancelar</Button><Button onClick={() => void criarEtapa()} disabled={saving || itemIds.length === 0} className="h-12 bg-teal text-white hover:bg-teal-lt">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Criar cobrança'}</Button></div>
           </div>
-        ) : <Button variant="outline" onClick={() => setFormAberto(true)} className="w-full border-teal/35 text-teal-ink hover:bg-teal/10"><Plus className="mr-1.5 h-4 w-4" />Cobrar nesta etapa</Button>
+        ) : <Button variant="outline" onClick={abrirNovaEtapa} className="w-full border-teal/35 text-teal-ink hover:bg-teal/10"><Plus className="mr-1.5 h-4 w-4" />Cobrar nesta etapa</Button>
       )}
       {erro && !formAberto && !cobrancaEditandoId && <p className="text-xs text-coral-ink">{erro}</p>}
     </div>
@@ -726,8 +796,8 @@ export function DetalheOrcamentoModal({
   return (
     <Dialog open={!!detalheOrcId} onOpenChange={open => { if (!open) onClose(); }}>
       <DialogContent
-        className="flex flex-col rounded-3xl bg-surface border-border p-0 overflow-hidden gap-0 w-[94vw] sm:w-[82vw]"
-        style={{ maxWidth: '1280px', maxHeight: '90vh', left: '50%' }}
+        className="flex flex-col rounded-3xl bg-surface border-border p-0 overflow-hidden gap-0 w-[94vw]"
+        style={{ maxWidth: '1440px', maxHeight: '90vh', left: '50%' }}
         showCloseButton={false}
       >
         {detalheOrc && (
@@ -1034,7 +1104,7 @@ export function DetalheOrcamentoModal({
                   é gesto de balcão, não cabe atrás de um segundo clique. */}
               <div
                 id="ajustes-financeiros-orcamento"
-                className="w-full sm:w-[416px] sm:shrink-0 border-t sm:border-t-0 sm:border-l border-border flex flex-col min-h-0 bg-teal/[0.04]"
+                className="w-full sm:w-[560px] sm:shrink-0 border-t sm:border-t-0 sm:border-l border-border flex flex-col min-h-0 bg-teal/[0.04]"
               >
                 <div className="flex-1 min-h-0 overflow-y-auto p-5">
                   {!orcEditMode && usarCobrancasPorEtapa ? (
