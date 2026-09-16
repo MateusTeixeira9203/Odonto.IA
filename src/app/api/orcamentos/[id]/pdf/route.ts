@@ -23,7 +23,7 @@ export async function GET(
       id, status, total, valor_acordado, desconto, validade_dias, condicoes_pagamento, mostrar_valor_por_item, created_at,
       paciente:pacientes(nome, telefone),
       dentista:dentistas!orcamentos_dentista_id_fkey(nome),
-      itens:orcamento_itens(descricao, quantidade, preco_unitario, preco_total, aprovado),
+      itens:orcamento_itens(descricao, quantidade, preco_unitario, preco_total, aprovado, composicao),
       pagamentos(valor, status, forma_pagamento, data_pagamento)
     `)
     .eq('id', id)

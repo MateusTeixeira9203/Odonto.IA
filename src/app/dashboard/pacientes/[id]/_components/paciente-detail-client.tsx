@@ -158,6 +158,7 @@ interface PacienteDetailClientProps {
   orcamentosAviso?: string | null;
   clinicaId: string;
   dentistaId: string;
+  userId: string;
   role: DentistaRole;
   plano: PlanoId;
   fichasRecentesSSR?: FichaRecente[];
@@ -172,6 +173,7 @@ export function PacienteDetailClient({
   orcamentosAviso = null,
   clinicaId,
   dentistaId,
+  userId,
   role,
   plano,
   fichasRecentesSSR,
@@ -186,13 +188,11 @@ export function PacienteDetailClient({
 
   const [activeTab, setActiveTab] = useState('ficha-clinica');
   const [mountedTabs, setMountedTabs] = useState<Set<string>>(() => new Set(['ficha-clinica']));
-  const [fichaInicialId, setFichaInicialId] = useState<string | null>(null);
 
   // Lê ?tab= da URL para navegar direto à aba correta (ex: vindo do AttentionPanel)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tab = params.get('tab');
-    setFichaInicialId(params.get('ficha'));
     if (tab) {
       setActiveTab(tab);
       setMountedTabs(prev => new Set([...prev, tab]));
@@ -1485,10 +1485,11 @@ export function PacienteDetailClient({
                       <ProntuarioTab
                         patientId={paciente.id}
                         dentistaId={dentistaId}
+                        userId={userId}
+                        clinicaId={clinicaId}
                         patientName={displayNome}
                         canWrite={canWriteClinical}
                         dados={prontuario ?? { atendimentos: [], fichas: [], boca: [], profissionaisClinicos: [], errosParciais: [] }}
-                        fichaInicialId={fichaInicialId}
                         onGerarOrcamento={(fichaId) => void orcamentoModal.abrirOrcamentoParaFicha(fichaId)}
                         onAbrirArquivos={() => handleTabChange('arquivos')}
                         // R-107b — catálogo pro match local da busca livre do painel do dente.
