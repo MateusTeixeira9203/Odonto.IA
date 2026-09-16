@@ -11,6 +11,9 @@ import { Input } from '@/components/ui/input';
 import { useLogout } from '@/hooks/use-logout';
 import { cn } from '@/lib/utils';
 import type { TeamMember, TeamPage, TeamResult } from '@/server/auth/list-team';
+import type { MemberAccessEditorResult, EditorAccess } from '@/server/auth/member-access-editor';
+import type { PrepareMemberAccessResult } from '@/server/auth/prepare-member-access';
+import { MemberAccessEditor } from './member-access-editor';
 
 type TeamFailure = Extract<TeamResult, { ok: false }>;
 
@@ -19,11 +22,23 @@ type LoadPage = (input: {
   apos?: string | null;
 }) => Promise<TeamResult>;
 
+type LoadAccess = (input: { clinicaIdEsperada: string; membroId: string }) => Promise<MemberAccessEditorResult>;
+type SaveAccess = (input: {
+  clinicaIdEsperada: string;
+  membroId: string;
+  versaoEsperada: number;
+  acessos: EditorAccess[];
+  motivo: string;
+  chaveIdempotencia: string;
+}) => Promise<PrepareMemberAccessResult>;
+
 type TeamWorkspaceProps = {
   initialResult: TeamResult;
   canAttend: boolean;
   canReadStock?: boolean;
   loadPage: LoadPage;
+  loadAccess: LoadAccess;
+  saveAccess: SaveAccess;
 };
 
 const ROLE_LABEL: Record<TeamMember['papel'], string> = {
@@ -189,7 +204,7 @@ function TeamScreenFrame({
   );
 }
 
-export function TeamWorkspace({ initialResult, canAttend, canReadStock, loadPage }: TeamWorkspaceProps) {
+export function TeamWorkspace({ initialResult, canAttend, canReadStock, loadPage, loadAccess, saveAccess }: TeamWorkspaceProps) {
   const [page, setPage] = useState<TeamPage | null>(() => initialResult.ok ? initialResult.data : null);
   const [members, setMembers] = useState<TeamMember[]>(() => initialResult.ok ? initialResult.data.membros : []);
   const [selectedId, setSelectedId] = useState<string | null>(() => initialResult.ok ? initialResult.data.membros.at(0)?.membroId ?? null : null);
@@ -318,7 +333,7 @@ export function TeamWorkspace({ initialResult, canAttend, canReadStock, loadPage
           {selectedMember ? <>
             <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-5"><div className="min-w-0"><p className="font-mono text-[11px] font-medium tracking-[0.14em] text-muted-foreground uppercase">Informações da pessoa</p><h2 id="member-detail-title" className="mt-1 break-words font-heading text-[26px] leading-none text-foreground [overflow-wrap:anywhere]">{selectedMember.nome}</h2></div><Button variant="outline" size="icon" className="min-h-11 min-w-11 focus-visible:border-ring focus-visible:ring-ring xl:hidden" onClick={closeDetails} aria-label="Fechar detalhes"><X className="size-4" aria-hidden="true" /></Button></div>
             <div className="grid grid-cols-[48px_minmax(0,1fr)] gap-3 border-b border-border px-5 py-5"><span className="grid size-12 place-items-center rounded-full bg-surface-alt text-sm font-bold text-foreground/80">{personInitials(selectedMember)}</span><div className="min-w-0"><p className="break-words text-base font-bold text-foreground [overflow-wrap:anywhere]">{selectedMember.nome}</p><p className="mt-1 break-words text-sm text-foreground/80 [overflow-wrap:anywhere]">{selectedMember.email}</p><div className="mt-3 flex flex-wrap gap-2"><span className={cn('rounded-full bg-surface-alt px-2 py-1 font-mono text-[10px] tracking-wide text-foreground/80', selectedMember.proprietario && 'bg-teal-pale text-teal-ink')}>{memberLabel(selectedMember)}</span>{selectedMember.proprietario ? <span className="rounded-full bg-surface-alt px-2 py-1 font-mono text-[10px] tracking-wide text-foreground/80">{ROLE_LABEL[selectedMember.papel]}</span> : null}<span className="rounded-full bg-surface-alt px-2 py-1 text-xs text-foreground/80">{attendanceLabel(selectedMember)}</span><span className="rounded-full bg-surface-alt px-2 py-1 text-xs text-foreground/80">{STATUS_LABEL[selectedMember.status]}</span></div></div></div>
-            <div className="px-5 py-5"><p className="text-sm font-semibold text-foreground">Permissões</p><p className="mt-2 text-sm leading-6 text-muted-foreground">Permissões e convites serão disponibilizados nesta área.</p></div>
+            <MemberAccessEditor key={selectedMember.membroId} clinicaId={page.clinicaId} member={selectedMember} loadAccess={loadAccess} saveAccess={saveAccess} />
           </> : <div className="px-5 py-12 text-center"><UsersRound className="mx-auto size-5 text-muted-foreground" aria-hidden="true" /><h2 id="member-detail-title" className="mt-3 font-heading text-2xl text-foreground">Selecione uma pessoa</h2><p className="mt-2 text-sm leading-5 text-muted-foreground">Os detalhes de função e atuação aparecem aqui.</p></div>}
         </aside>
       </div>

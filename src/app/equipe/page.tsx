@@ -3,7 +3,7 @@ import { requireUser } from '@/server/auth/user';
 import { getMemberContext } from '@/server/auth/member-context';
 import { listTeam } from '@/server/auth/list-team';
 import { isTeamWorkspaceEnabled } from '@/server/auth/team-workspace-pilot';
-import { loadTeamPage } from './actions';
+import { loadMemberAccess, loadTeamPage, saveMemberAccess } from './actions';
 import { TeamWorkspace } from './_components/team-workspace';
 import { getStockAccessContext } from '@/server/estoque/access';
 
@@ -25,6 +25,8 @@ export default async function TeamPage() {
       canAttend={context.ok && context.data.perfilClinico !== null}
       canReadStock={stock?.ok === true && stock.data.permissoesCompartilhadas.includes('estoque.ler')}
       loadPage={loadTeamPage}
+      loadAccess={loadMemberAccess}
+      saveAccess={saveMemberAccess}
     />
   );
 }

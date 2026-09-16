@@ -62,13 +62,13 @@ function failure(codigo: PrepareMemberAccessFailure): PrepareMemberAccessResult 
 
 async function defaultDependencies(): Promise<PrepareMemberAccessDependencies> {
   const client = await createClient();
-  return { prepare: async (input) => client.rpc('preparar_acessos_membro', input) };
+  return { prepare: async (input) => client.rpc('configurar_acessos_editor_membro', input) };
 }
 
 /**
- * Persiste configuração em preparação. O R-159c usa equipe.ler na consulta protegida da equipe.
- * A RPC autentica e revalida responsável, clínica, alvo e versão dentro da transação.
- * Não usar como guard; outros módulos só podem consumir após seu próprio enforcement.
+ * Persiste a configuração limitada do editor R159d. A RPC autentica e revalida responsável,
+ * clínica, alvo, modelo gerido e versão dentro da transação; também cria a base vazia apenas
+ * quando a primeira edição é autorizada. Não usar como guard.
  */
 export async function prepareMemberAccess(
   input: unknown,
