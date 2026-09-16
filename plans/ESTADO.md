@@ -1,16 +1,18 @@
 # Estado — Odonto.IA
 
-> 16/09/2026 · correção de fidelidade da etapa de acordo em execução para Preview.
+> 16/09/2026 · pacote aprovado para produção, bloqueado somente por credenciais externas.
 
 ## Agora
 
-Item ativo: R-170, responsabilidade de procedimento encaminhado.
+Item ativo: publicação do pacote aprovado (orçamento + R-170).
 Preview em `codex/conclusao-atualizacao`: orçamento `e619a0c`, rolagem única do shell `c9c1fe9`.
 Worktree: `/home/mtx/.local/share/odontoia-testes/integracao`.
 CI 35118081587 passou: typecheck, 391 testes, lint e build.
 Commits separados autorizados somente para Preview.
 Projeto Vercel: `odonto-ia-teste`. Supabase Free: `etlqznuoxiilvxzygpat`.
-Nenhuma promoção/main, cobrança real ou escrita no banco oficial autorizada nesta execução.
+Mateus autorizou publicação direta em produção para o teste desta noite. Código R-170 foi
+commitado e enviado em `e4b086d`; a tentativa de `vercel --prod` falhou por ausência de
+credenciais da Vercel neste ambiente. A migration R-170 ainda não foi aplicada a nenhum banco.
 
 ## Evidência e limites
 
@@ -95,10 +97,10 @@ Demais recortes futuros permanecem no [plano de conclusão](PLANO-CONCLUSAO-ATUA
 
 ## Próximo passo
 
-Implementar R-170 contra a spec aprovada, migrar somente o banco de Preview e testar com dois
-dentistas da clínica de teste antes de publicar. Mateus fará o teste manual do Preview; não
-acompanhar nem operar o Preview durante o teste. Não promover a produção antes da conferência e
-do gate de duas contas logadas.
+Autenticar a Vercel neste ambiente e publicar a branch candidata em produção. Antes do teste
+noturno, aplicar `20260916152731_r170_responsabilidade_encaminhada.sql` no Supabase de produção
+e fazer o gate clínico com duas contas: origem sem escrita; destinatário conclui, edita detalhes,
+assina e adiciona procedimento na mesma ficha.
 
 ## Continuidade segura
 
