@@ -1,61 +1,54 @@
 # Estado — Odonto.IA
 
-> 15/09/2026 · execução da atualização autorizada com agentes Terra.
+> 16/09/2026 · atualização em teste; Mateus fará QA manual.
 
 ## Agora
 
-Bloco 0 do [plano de conclusão](PLANO-CONCLUSAO-ATUALIZACAO.md): base integrada sobre
-`origin/main` dc6523a, preservando os checkouts originais.
+Preparar Preview dos sublotes integrados em `codex/conclusao-atualizacao`.
 Worktree: `/home/mtx/.local/share/odontoia-testes/integracao`.
-Branch: `codex/conclusao-atualizacao`.
+Base publicada: `2b93247`; novos commits separados autorizados somente para Preview.
+Projeto Vercel: `odonto-ia-teste`. Supabase Free: `etlqznuoxiilvxzygpat`.
+Nenhuma promoção/main, cobrança real ou escrita no banco oficial autorizada nesta execução.
 
-Mateus autorizou **commits separados e push somente para Preview** nesta branch.
-Não há autorização de promoção/main nem escrita no banco oficial nesta execução.
-Preview publicado; próximo gate: CI completo e QA autenticado no aplicativo integrado.
+## Evidência e limites
 
-## Evidência atual
+[Relatório dos sublotes](auditorias/2026-09-16-sublotes-atualizacao.md) é dono dos resultados.
+- 387 testes unitários passaram; ESLint dos 64 arquivos TS/TSX alterados passou.
+- Runtime SQL/PGlite: estoque, recepção, editor, recebimentos, PDF e cadastro passaram.
+- Treze migrations aplicadas só no Free; objetos conferidos, sem depender do histórico de migrations.
+- Contagens preservadas: 7 clínicas, 41 pacientes, 83 pagamentos.
+- HTTP autenticado: financeiro A/B e isolamento; leitura de kits pelo proprietário autorizado.
+- Novo build/typecheck remoto e QA visual integrados ainda precisam ser conferidos.
+- Não houve duas sessões de navegador no novo pacote: isolamento/RLS não está fechado para produção.
 
-Detalhes em [integração de 15/09](auditorias/2026-09-15-integracao-atualizacao.md).
-- Onze conflitos reconciliados, preservando R166/R167/R169 e candidato.
-- Free `etlqznuoxiilvxzygpat`: R169 aplicado com adaptador compatível da view R163.
-- R163b cartão e guarda global/grupos aplicados somente no Free.
-- Contagens originais preservadas antes das fixtures; sem reset, exclusão ou backfill.
-- Suite focada 195/195; typecheck das ações sem erro; 18 bundles leves de UI passaram.
-- Cartão autenticado: parcelas mensais/centavos/métricas/repetição/concorrência/boleto/estorno passaram.
-- Complemento autenticado: 72 checks de grupos, outra conta/clínica e item retirado passaram.
-- Saúde da sessão integrada: falha técnica não expira sessão; cookie ilegível do projeto isolado.
-- QA auth atualizado: 6/6; rejeição do SDK e URL inválida recuperáveis. Revisão técnica de sessão/financeiro passou.
+## Implementação atual
 
-## Revisão antes do Preview
+- Recepção sem CRO/dentista fictício, rotas operacionais e editor de concessões.
+- Recebimentos por capacidade, estado canônico, repetição segura e erros recuperáveis.
+- Kits com quantidades por componente; materiais avulsos/kit na ficha, baixa, retomada e correção.
+- Orçamento em PDF real; compartilhar arquivo no celular ou baixar/abrir WhatsApp no desktop.
+  Apenas “Enviei” explícito registra envio manual; abrir não confirma pagamento nem aceite.
+- Cadastro Free: três modelos, escolha do pagador, R$200/dentista e identidade clínica opcional.
+  Cria estrutura comercial pendente e estoque; não inicia cobrança nem altera Stripe vigente.
+- Refinamento de orçamento já concluído segundo Mateus; preservado.
+- Reativação pessoal no Dex adiada por Mateus; rascunho fora do código/migrations publicáveis.
+- Estabilidade fica por último.
 
-Versão antiga de billing excluída; webhook/serviço conservam a versão publicada.
-Branch publicada com commits separados de schema, produto e documentação; produção intacta.
-Preview: https://odonto-ia-teste-git-codex-c-1e4d83-mateusteixeira9203s-projects.vercel.app
-Typecheck remoto passou após ajustes BigInt/env. Runner corrigido: 340/340 testes locais; CI final pendente.
-QA no navegador pendente: Vivaldi não mantém preenchimento; IAB pede login Vercel.
-Rollback de estoque com falha forçada de auditoria passou em PostgreSQL isolado.
-Secrets write-only de integrações externas não foram revelados nem alterados.
-Sem envio real de WhatsApp/e-mail durante os testes.
+## Decisões pendentes
 
-## Decisões aguardadas
+R165: como contar/aumentar/reduzir vagas e quando ativar cobertura (pago ou avaliação).
+Proprietário clínico conta como dentista; não clínico/secretária incluídos com dentistas pagos.
+Checkout centralizado, convites/cobertura e transição comercial não estão liberados.
+Demais recortes futuros permanecem no [plano de conclusão](PLANO-CONCLUSAO-ATUALIZACAO.md).
 
-- R165: assinatura individual nesta release ou proprietário pagando vagas; sem inventar preços.
-- R160: autonomia de desconto e aprovação por concessão nas clínicas geridas.
-- Rastreabilidade ampliada/hora clínica por cadeira precisam de recorte confirmado.
-- Visuais novos de kits/reativação pessoal não têm aceite presumido.
+## Próximo passo
 
-## Próximos passos do plano
+Publicar somente Preview, verificar CI/deployment e entregar a Mateus o roteiro de QA.
+Não promover a produção antes da conferência e do gate de duas contas logadas.
 
-Após Preview da base: entrada da recepção/equipe, operações de clínica, kits/consumo na ficha,
-reativação pessoal por dentista e compartilhamento manual de orçamento; ordem e dependências
-permanecem no plano único. Código anterior não equivale a módulo completamente verificado.
-R155 restante (rascunho/reconciliação/alertas) ainda requer integração e testes sandbox.
-
-## Cuidados de continuidade
+## Continuidade segura
 
 Snapshots privados: `/home/mtx/.local/share/odontoia-testes/preservacao-integracao-20260915-152017`.
-QA financeiro usa fixtures identificadas; manifestos privados em `/home/mtx/.local/share/odontoia-testes`.
-Não apagar clínicas/contas de teste nem restaurar contexto/governança antigos.
-Não sobrescrever root ou candidato; CLI antiga pode apontar ao oficial. Nunca usar db push.
-PC limitado: sem Next/build/tsc completo local; usar infraestrutura remota para o app completo.
-Somente testes de duas contas logadas no app fecham o gate de isolamento/RLS.
+Não apagar clínicas/contas de teste nem reverter contextos/governanças existentes.
+Root e candidato têm alterações preservadas; não sobrescrever nem usar `db push`.
+PC limitado: sem Next/build/tsc completo local; CI remoto para o app inteiro.

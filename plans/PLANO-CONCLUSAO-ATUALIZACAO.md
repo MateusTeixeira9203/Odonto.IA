@@ -1,13 +1,13 @@
 # Plano de conclusão da atualização — Odonto.IA
 
-15/09/2026 · Levantamento para organizar a execução, solicitado por Mateus.
+16/09/2026 · Levantamento atualizado para organizar a execução, solicitado por Mateus.
 **Não é uma nova spec.** Reúne entregas, decisões, lacunas e sequência; os contratos existentes continuam donos das regras.
-Execução autorizada por Mateus em 15/09, com agentes Terra. Bloco 0 em andamento: integração isolada. Mateus autorizou commits separados e push apenas da branch de Preview em 15/09; main, banco oficial e promoção permanecem fora desta autorização.
+Execução autorizada por Mateus em 15/09, com agentes Terra. Bloco 0 publicado no Preview com CI concluído; execução dos consumidores novos em andamento. Mateus autorizou commits separados e push apenas da branch de Preview em 15/09; main, banco oficial e promoção permanecem fora desta autorização.
 
 ## 1. Resultado que estamos fechando
 
 Uma atualização integrada de **Consultório/Clínica, equipe e permissões, financeiro/orçamentos,
-estoque e kits, Pendências/WhatsApp manual e reativação pessoal no Dex**, preservando o atendimento atual.
+estoque e kits e Pendências/WhatsApp manual**, preservando o atendimento atual.
 Dentista comum trabalha com seus dados; proprietário dentista atende e administra; proprietário não clínico administra sem perfil fictício.
 
 **Meta desejada: concluir hoje.** O levantamento não sustenta prometer que tudo será liberável hoje:
@@ -59,6 +59,10 @@ No plano, estes são marcos históricos superados. Objetos e deployments serão 
 
 ## 4. Inventário — o que existe e o que falta
 
+Atualização de 16/09: ver [evidência dos sublotes](auditorias/2026-09-16-sublotes-atualizacao.md).
+Reativação pessoal no Dex foi adiada por Mateus e não é requisito desta publicação.
+Checkout real e estabilidade permanecem posteriores ao QA manual do recorte atual.
+
 “Implementado” abaixo informa presença de código; a coluna final diz o que impede fechar o módulo.
 
 | Frente / fontes | Como está implementada | Pendência real |
@@ -70,18 +74,18 @@ No plano, estes são marcos históricos superados. Objetos e deployments serão 
 | Desconto e edição de etapa — R166/R167 | Fórmula de saldo líquido corrigida; edição preserva recebimentos, altera composição/valor final e recompõe previsões. Specs da main registram validação em produção. | Não refazer. Provar que grupos, titularidade e novo cartão não reintroduzem saldo errado ou apagam pagamentos. |
 | Consultório — [R161a](specs/R-161a-realocacao-financeiro-pessoal.md), [R161b](specs/R-161b-secoes-consultorio-precos.md), [R161c](specs/R-161c-procedimentos-personas.md) | `FinanceiroContent` e catálogo compartilhado reutilizados, título grande, Procedimentos realocado, links antigos preservados no piloto. Usuário conferiu a navegação. | QA integrado de CSV, catálogo vazio/importado, retorno por links antigos e disponibilidade por persona. |
 | Identidade/acessos — [R159](specs/R-159-acessos-clinica.md), a/b/c | Contexto de membro sem perfil clínico obrigatório, catálogo de concessões, armazenamento protegido e consulta de equipe. Verificados em recortes no Free. | Editor operacional, concessão/revogação, convites, desativação, limite de delegação/último responsável e aplicação consistente por operação. |
-| Entrada da recepção | `/pendencias` e ponte autorizada de agenda funcionam sem dentista fictício. | **Bloqueador:** Início/Agenda/Pacientes ainda podem cair no guard clínico e onboarding para secretária nova. Corrigir a jornada completa. |
+| Entrada da recepção | R159c implementa entrada sem dentista fictício, shell operacional, Agenda/Pacientes/Pendências por capacidade. | Jornada Next/Server Actions e duas sessões no Preview precisam de QA manual. |
 | Proprietários — [R163a](specs/R-163a-resultados-proprietarios.md) | `/clinica`, shell de gestão, Meus resultados reutilizado e agregação administrativa por mês/profissional. Campo de titular herdado e validado. | Dois tenants/contas na jornada integrada, proprietário não clínico completo, suspenso, preços/configurações/recepção e mutações financeiras permitidas. |
 | Financeiro clínico amplo — [R163](specs/R-163-financeiro-clinica.md) | A leitura agregada e titularidade estão no recorte R163a. | Não confundir leitura de métricas com caixa operacional completo: registrar/corrigir/estornar por permissão, entradas/despesas da clínica e consistência entre telas. Capacidade física/hora da clínica ainda não entregue. |
-| Cartão mensal — [R163b](specs/R-163b-cartao-parcelado-confirmado.md) | Código/SQL locais: gerar, reorganizar e criar etapa confirmando parcelas mensais. Concorrência com gerador legado corrigida após revisão. | **SQL não aplicado no Free; sem QA autenticado/visual final.** Integrar com edição/descontos recentes antes de concluir. |
-| Estoque manual — [R140e1](specs/R-140e1-estoque-base-manual.md), [autorização](specs/R-140e1a-autorizacao-estoque.md), [operações](specs/R-140e1b-operacoes-estoque.md) | Cadastro, lotes/entrada, consumo manual, descarte, contagem, correção e histórico; pessoal/comum, regras flexíveis e três modelos exercitados. | Falha deliberada da auditoria com rollback ainda sem prova runtime; QA Next/Server Actions e conferência visual integrados. |
-| Materiais na ficha — [R140e2](specs/R-140e2-estoque-ficha-kits.md) | Contrato existente; não há fluxo operacional completo implementado. | Declaração do uso, seleção de item/lote, baixa única, pendências, recuperação e correção auditada sem perder o clínico. |
-| Kits — R140e2 | Planejados; montar/aplicar/consumir kit ainda não implementados. | Cadastro/versões, componentes, uso do conjunto, quantidades ajustáveis, escopos e integração com a baixa na ficha. |
+| Cartão mensal — [R163b](specs/R-163b-cartao-parcelado-confirmado.md) | Integrado e aplicado no Free; parcelas mensais confirmadas, centavos, repetição e concorrência testados autenticados. | Conferência visual de filtros/métricas no Preview por Mateus. |
+| Estoque manual — [R140e1](specs/R-140e1-estoque-base-manual.md), [autorização](specs/R-140e1a-autorizacao-estoque.md), [operações](specs/R-140e1b-operacoes-estoque.md) | Cadastro, lotes/entrada, consumo manual, descarte, contagem, correção e histórico; pessoal/comum, regras flexíveis e três modelos exercitados. | Rollback por falha de auditoria já testado em runtime; falta QA Next/Server Actions e conferência visual integrada. |
+| Materiais na ficha — [R140e2](specs/R-140e2-estoque-ficha-kits.md) | Declaração, item/lote avulso ou kit, baixa atômica, retomada e correção auditada implementados; SQL aplicado no Free. | QA visual completo e duas contas; tipos especiais/OCR continuam fora do recorte. |
+| Kits — R140e2 | Criar kit com quantidades decimais por componente; aplicar conjunto na ficha; backend versiona composição e conserva snapshots. | Fluxo visual criar/aplicar/corrigir precisa de QA. Editor/arquivamento completo de kits ainda não exposto na UI. |
 | Etiquetas e materiais especiais — [R140d](specs/R-140d-rastreabilidade-etiquetas.md), R140e2 | Contratos de captura/revisão, ativos e ciclos; não declarar OCR/rastreabilidade completa entregues. | Extração revisada, vínculo item/lote/serial, repetição, implantáveis, reutilizáveis e uso limitado. Dependem de exemplos reais e ciclo validado. |
 | Pendências — [R161d](specs/R-161d-pendencias-kanban.md) | Kanban, filtros, busca, modelos, ativação, WhatsApp manual, envio, agenda, adiamento e histórico. RPCs/UI testados por recorte. | Jornada integrada da recepção, suspensão com JWT existente, conferência final; adaptar a reativação à decisão pessoal posterior. |
-| Orçamento pelo WhatsApp — complemento solicitado em 15/09 | `BotaoEnviarWhatsApp` já existe no candidato. Hoje monta mensagem fixa, aponta para `/api/orcamentos/[id]/pdf` e marca enviado na abertura. A rota exige dentista autenticado e retorna HTML. | Integrar modelo editável, permissões e confirmação de envio. Compartilhamento acessível ao paciente sem login de dentista; não divulgar a rota interna como se fosse um PDF público. |
-| Reativação no Dex — [R161e](specs/R-161e-reativacao-pessoal-dex.md) | Somente plano. Dex antigo e Pendências calculam retenção de formas diferentes. | Fonte única, prazo configurável, último atendimento POR dentista, card/atalhos, atualização sincronizada e delegação sem duplicar contato. |
-| Cadastro/pagador — [R165](specs/R-165-cadastro-responsavel-assinatura.md) | Duas modalidades propostas; ainda sem contrato comercial fechado/implementação do modelo centralizado. | Preços/cobertura/vagas/transição e acesso administrativo. Não liberar proprietário não clínico com gratuidade ou assinatura fictícia por suposição. |
+| Orçamento pelo WhatsApp — [R161f](specs/R-161f-orcamento-pdf-whatsapp.md) | PDF real, mensagem editável, share mobile e download/abertura desktop, confirmação Enviei explícita e snapshot protegido. | Conferir compartilhamento no celular e anexo manual desktop. Não há API, anexo por wa.me nem link público do prontuário. |
+| Reativação no Dex — [R161e](specs/R-161e-reativacao-pessoal-dex.md) | **Adiada por Mateus no recorte final; fora desta publicação.** Somente plano. Dex antigo e Pendências calculam retenção de formas diferentes. | Fonte única, prazo configurável, último atendimento POR dentista, card/atalhos, atualização sincronizada e delegação sem duplicar contato. |
+| Cadastro/pagador — [R165](specs/R-165-cadastro-responsavel-assinatura.md) | Cadastro Free dos três modelos, pagador individual/centralizado e estrutura comercial pendente. Proprietário não clínico sem perfil falso; estoque inicializado. | Vagas/ativação, checkout centralizado, cobertura efetiva e transição comercial; nada cobra em produção. |
 | Tabela/preços/descontos geridos — [R160](specs/R-160-precos-descontos.md) | Catálogo pessoal existe; tabela publicada da clínica e aprovação de exceções ainda são planejamento. | Configuração/publicação, aplicação em grupos/etapas, limites, aprovação e proteção contra desconto por caminho indireto. |
 | Estabilidade/cobrança — [R155](specs/R-155-estabilidade-operacional-acesso-recuperavel.md) | Fix do loop já publicado; recortes locais de reconciliação, sessão/rascunho, ledger, erros e telemetria. Não equivalem a pacote inteiro liberado. | Confirmar o que já entrou na main; ciclos sandbox, recusa real, webhook atrasado/repetido, suspensão, sessão/aba antiga, alertas e rollback. |
 
@@ -153,7 +157,10 @@ Cada relatório preserva suas limitações; aprovação de um não fecha os dema
 5. Correção mantém histórico e compensação; regularização administrativa não concede leitura de prontuário à secretária/proprietário.
 **Saída:** caso completo kit → atendimento → consumo → saldo/histórico → correção, incluindo duplo clique e componente sem saldo/acesso.
 
-### Bloco 8 — Pendências, reativação e orçamento pelo WhatsApp
+### Bloco 8 — Pendências e orçamento pelo WhatsApp
+
+Passos 2–5 e critério de acompanhamento independente adiados com R161e por decisão de Mateus.
+Nesta rodada executar apenas integração da recepção e compartilhamento manual de PDF.
 1. Fechar Kanban/rota/navegação R161d com a nova recepção e com dentista sem secretária.
 2. Alterar elegibilidade e reconciliação para o último atendimento de CADA dentista; retorno de colega não exclui o ciclo pessoal.
 3. Prazo 30/60/90/180, ativação e mensagem por profissional; contatos encerrados não renascem a cada atualização.
@@ -163,12 +170,11 @@ Cada relatório preserva suas limitações; aprovação de um não fecha os dema
    conferir número e mensagem preenchidos, editar se necessário, abrir WhatsApp e registrar **Enviei/Não enviei**.
 7. Reusar a configuração de mensagens para o tipo orçamento; versão/valor/grupos/condições do documento
    vêm do orçamento persistido. Texto livre não muda preço, aceite ou cobrança.
-8. Preparar compartilhamento limitado à versão da proposta: link não adivinhável, expirável e revogável,
-   sem sessão profissional nem acesso ao prontuário/finanças internas. Conferir acesso e documento antes de montar a mensagem.
-   Prazo de validade do link e política após revisão serão fechados no contrato dono antes de codar.
+8. Compartilhar **arquivo PDF**, conforme R161f confirmado: celular via share de arquivo quando
+   suportado; desktop baixa e abre WhatsApp para anexo manual. Sem link público, token público ou API.
 9. Autorizar por orçamento/clínica/responsável e capacidade de WhatsApp, tanto para dentista quanto recepção.
    Sem telefone válido ou acesso, orientar correção; não marcar enviado. Abertura não comprova entrega/leitura nem aceite.
-10. Não prometer anexo automático: `wa.me` prepara texto/link, não anexa PDF. Download/compartilhamento
+10. Não prometer anexo automático: `wa.me` prepara texto/texto, não anexa PDF. Download/compartilhamento
     de arquivo, se oferecido, terá fallback explícito conforme o dispositivo; não é envio por API.
 **Saída:** sem secretária o dentista resolve sozinho; com equipe não duplica a mesma tarefa; dois dentistas mantêm acompanhamentos independentes.
 Orçamento compartilhado deve abrir para o paciente sem login profissional e mostrar somente a proposta autorizada.
@@ -215,7 +221,7 @@ Seguir a sequência da seção 7; ativar por unidade/recorte verificável, prese
 | Estoque manual/kit/ficha | Uma baixa, pessoal/comum separados, recuperação após falha, correção auditada. |
 | Agenda cheia/retorno | Nome legível, ações no detalhe, responsável/horário corretos, conflito/expediente preservados. |
 | Confirmação de amanhã | Aparece hoje BRT; abrir WhatsApp não confirma; negar/adiar/remarcar preservam agenda e histórico. |
-| Orçamento pelo WhatsApp | Mensagem/modelo corretos; Enviei registra envio manual e Não enviei não registra. Paciente sem login abre a proposta; link expirado/revogado/adulterado nega acesso, sem vazamento de prontuário. |
+| Orçamento pelo WhatsApp | Mensagem/modelo corretos; Enviei registra envio manual e Não enviei não registra. PDF real anexado manualmente; snapshot revisado e falta de autorização impedem marcar envio, sem divulgação de prontuário. |
 | Reativação A/B | Prazo pessoal; consulta com B não retira A; mesmo contato não duplica entre Dex e Pendências. |
 | Consulta/Dex/Ficha | Relato MO, inclusão/retirada/renomeação e evolução preservados; orçamento não duplica evento. |
 | Falhas de rede/duplo clique | Erro explícito, rascunho preservado, retorno persistido reconciliado antes de repetir. |
@@ -243,7 +249,7 @@ Mateus autorizou esse push somente de Preview em 15/09. A conferência antes da 
 
 ## 8. Decisões e limites que não podem sumir
 
-1. **R165:** preço/cobertura de cada persona, vagas e transição comercial. Impede liberar novas contratações completas; não impede trabalhar estoque ou reativação no Free.
+1. **R165:** preço/cobertura confirmados em 16/09; faltam vagas e transição comercial. Impede liberar novas contratações completas; não impede trabalhar estoque ou reativação no Free.
 2. **R160:** confirmar política inicial de autonomia/desconto. Tabela pessoal realocada não resolve tabela gerida.
 3. **R163:** capacidade por sala/cadeira e rateio não estão implementados. Sem definição, hora clínica da unidade fica indisponível, nunca um número inventado.
 4. **R140d/e2:** etiquetas/tipos especiais têm dependência de exemplos e validação do ciclo. Kits não equivalem a OCR nem a esterilização rastreada.
@@ -262,5 +268,6 @@ Um integrador conserva a base; módulos independentes podem ser divididos depois
 Separar commits de migration, funcionalidade/correção e documentação; não juntar a atualização inteira num commit irreversível.
 Os detalhes permanecem nas specs/relatórios ligados; este documento é o roteiro de fechamento, com snapshot datado.
 
-**Ação atual:** bloco 0, consolidar a base; em seguida resolver as decisões
-do bloco 1 e concluir equipe/entrada. Não começar outra tela enquanto a base integrada não estiver identificada.
+**Ação atual:** finalizar CI/Preview dos sublotes, depois QA manual de Mateus.
+Base integrada, treze migrations novas no Free e implementação dos consumidores constam no relatório de 16/09.
+Pendências de produção/cobrança e itens adiados não são considerados concluídos pelo Preview.

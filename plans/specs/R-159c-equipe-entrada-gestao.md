@@ -197,3 +197,40 @@ escuro funcionou sem overflow na largura efetiva de 734px. Menu global mobile é
 com feedback de demonstração, não drawer de navegação do app conectado.
 A validação anterior de 320/390/1280 precisa ser repetida após o último ajuste de navegação;
 não presumir que a rodada anterior cobre automaticamente o HTML final.
+
+## 11. Promoção restrita: recepção operacional no piloto — 15/09
+
+O piloto passa a reconhecer uma recepção ativa sem linha em `dentistas`: o perfil
+operacional vem de `secretarias`, e ausência de CRO ou perfil clínico não dispara onboarding.
+Isto não altera `getDentistaCached` nem o contexto clínico legado. Um contexto operacional
+separado resolve sessão, `users.active_clinica_id`, vínculo ativo e membro; `dentistaId` é
+ausente para essa pessoa.
+
+Somente as permissões persistidas em `clinica_acessos.acessos` abaixo saem de preparação
+para enforcement neste piloto: `agenda.ler`, `agenda.editar`, `agenda.confirmar`,
+`pacientes.ler`, `pacientes.editar`, `financeiro.ler`, `financeiro.exportar`,
+`cobrancas.ler`, `recebimentos.registrar`, `recebimentos.corrigir`,
+`recebimentos.estornar`, `despesas.ler`, `despesas.gerir`. Não há fallback por cargo,
+responsável técnico, `admin` colaborativo ou ausência de configuração.
+
+`orcamentos.ler` e `contatos.whatsapp` são capacidades de leitura/envio operacional para
+consumidores que preservem o seu próprio DTO/RLS: não autorizam criar, aceitar, editar ou
+expor ficha clínica. Continuam negadas a protético no helper geral.
+
+`private.membro_tem_permissao_operacional(p_clinica_id, p_permissao, p_dentista_id)`
+valida `auth.uid()`, clínica ativa, vínculo ativo e a whitelist anterior. Para alvo
+profissional, `proprio`, `selecionados` e `clinica` usam o mesmo algoritmo de escopo
+profissional já usado em Pendências. Para recurso de unidade (`p_dentista_id = null`),
+somente escopo `clinica` autoriza. A função não aceita nem libera `clinico.*` ou
+`orcamentos.criar`; o consumidor financeiro mantém seu resolvedor de escopo próprio.
+
+Recepção só recebe navegação e DTOs administrativos de Agenda, Pacientes e Pendências que
+tenham a permissão correspondente; Pendências mantém o seu guard operacional próprio. Para
+paciente novo, a entrada de recepção é uma única operação
+atômica que cria paciente e agendamento para dentista-alvo ativo já autorizado; cadastro
+avulso não é uma porta alternativa. Cada criação/edição exige esse alvo da mesma clínica e
+permissão para ele; paciente não recebe prontuário, evolução, documentos, orçamento,
+modo consulta, Meu Dia, configurações ou financeiro apenas por ser recepção. Policies e
+ações revalidam o helper no banco a cada operação; esconder navegação não é autorização.
+Billing permanece aplicado pelos guards existentes e nenhuma assinatura, trial ou ownership
+é criada ou inferida.

@@ -1,9 +1,9 @@
 # R-161e — Reativação pessoal no Dex
 
 > **SPEC** · **R-161e** · ⏳ fila
-> **Aberto:** 2026-09-15 · **Fechado:** — · **Fase:** contrato proposto
-> Pedido atual: planejar antes de implementar. Regras de prazo/escopo confirmadas abaixo;
-> plano completo e novo visual ainda aguardam conferência. Nenhuma execução autorizada por este documento.
+> **Aberto:** 2026-09-15 · **Fechado:** — · **Fase:** adiada por Mateus no recorte final de 15/09
+> Regras pessoais preservadas para o próximo lote. Não incluir R161e nesta publicação.
+> Rascunho técnico não aplicado preservado fora da árvore executável, em diretório privado de testes.
 
 ## 1. Problema e situação encontrada
 
@@ -109,7 +109,7 @@ interface ResumoReativacao {
   prazoDias: PrazoReativacao;
   aContatar: number;
   esperandoResposta: number;
-  pacientes: PendenciaCard[]; // no máximo 3, autorizados; sem telefone bruto
+  pacientes: { id: string; pacienteNome: string; ultimaVisitaEm: string; status: 'a_contatar' | 'esperando_resposta' }[]; // máximo 3; abrir contato existente pela URL
   atualizadoEm: string;
 }
 ```
