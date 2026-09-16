@@ -49,6 +49,10 @@ Nenhuma promoção/main, cobrança real ou escrita no banco oficial autorizada n
   dentista também não consegue gerar orçamento a partir de uma Nova evolução sem salvar antes;
   deve herdar o salvamento provisório do Meu Dia. A área `Fichas em curso` deve sair; o progresso
   passa a aparecer no título/cartão da própria ficha, em função dos procedimentos dela.
+- Evidência de Preview (14:30–14:31): o modal de exclusão de orçamento exige o checkbox, mas
+  retorna `Não foi possível excluir o orçamento.` — a RPC `excluir_orcamento_permanentemente`
+  ainda não foi aplicada no banco conectado ao Preview. A tela do Prontuário ainda exibe o bloco
+  `Fichas em curso` e o chip de contagem; não tratar o item como entregue.
 - Alerta âmbar conta somente procedimento novo não revisado; `Manter orçamento como está`
   persiste a decisão em `activity_logs`, sem remover o procedimento da ficha.
 - Reativação pessoal no Dex adiada por Mateus; rascunho fora do código/migrations publicáveis.
