@@ -354,6 +354,7 @@ export const EstoqueFailureCodeSchema = z.enum([
   'CONFLITO',
   'CONTEXTO_ALTERADO',
   'SALDO_INSUFICIENTE',
+  'LOTE_VENCIDO',
   'INDISPONIVEL',
 ]);
 

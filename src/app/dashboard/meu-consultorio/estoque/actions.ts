@@ -13,6 +13,24 @@ import {
   receberMaterial as receberMaterialOperation,
 } from '@/server/estoque/operations';
 import type {
+  CorrecaoUsoResultData,
+  KitResultData,
+  KitUsageResult,
+  KitsResultData,
+  UsosResultData,
+  UsosListResultData,
+  PrevisualizacaoConfirmacaoUsosResultData,
+} from '@/server/estoque/kit-usage-contracts';
+import {
+  cadastrarKit as cadastrarKitOperation,
+  confirmarUsos as confirmarUsosOperation,
+  corrigirUso as corrigirUsoOperation,
+  declararUsos as declararUsosOperation,
+  listarKits as listarKitsOperation,
+  listarUsosDaFicha as listarUsosDaFichaOperation,
+  previsualizarConfirmacaoUsos as previsualizarConfirmacaoUsosOperation,
+} from '@/server/estoque/kit-usage-operations';
+import type {
   CadastroItemResultData,
   CorrecaoMovimentoResultData,
   DetalharEstoqueResultData,
@@ -60,6 +78,45 @@ export async function corrigirMovimento(
 ): Promise<EstoqueResult<CorrecaoMovimentoResultData>> {
   if (!isTeamWorkspaceEnabled()) return unavailable();
   return corrigirMovimentoOperation(input);
+}
+
+function unavailableUsage<TData>(): KitUsageResult<TData> {
+  return { ok: false, codigo: 'SEM_ACESSO', mensagem: 'Esta área não está disponível.' };
+}
+
+export async function cadastrarKit(input: unknown): Promise<KitUsageResult<KitResultData>> {
+  if (!isTeamWorkspaceEnabled()) return unavailableUsage();
+  return cadastrarKitOperation(input);
+}
+
+export async function declararUsos(input: unknown): Promise<KitUsageResult<UsosResultData>> {
+  if (!isTeamWorkspaceEnabled()) return unavailableUsage();
+  return declararUsosOperation(input);
+}
+
+export async function confirmarUsos(input: unknown): Promise<KitUsageResult<UsosResultData>> {
+  if (!isTeamWorkspaceEnabled()) return unavailableUsage();
+  return confirmarUsosOperation(input);
+}
+
+export async function corrigirUso(input: unknown): Promise<KitUsageResult<CorrecaoUsoResultData>> {
+  if (!isTeamWorkspaceEnabled()) return unavailableUsage();
+  return corrigirUsoOperation(input);
+}
+
+export async function listarKits(input: unknown): Promise<KitUsageResult<KitsResultData>> {
+  if (!isTeamWorkspaceEnabled()) return unavailableUsage();
+  return listarKitsOperation(input);
+}
+
+export async function listarUsosDaFicha(input: unknown): Promise<KitUsageResult<UsosListResultData>> {
+  if (!isTeamWorkspaceEnabled()) return unavailableUsage();
+  return listarUsosDaFichaOperation(input);
+}
+
+export async function previsualizarConfirmacaoUsos(input: unknown): Promise<KitUsageResult<PrevisualizacaoConfirmacaoUsosResultData>> {
+  if (!isTeamWorkspaceEnabled()) return unavailableUsage();
+  return previsualizarConfirmacaoUsosOperation(input);
 }
 
 export async function listarEstoque(input: unknown): Promise<EstoqueResult<ListarEstoqueResultData>> {

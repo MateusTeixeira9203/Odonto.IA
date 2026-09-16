@@ -44,6 +44,7 @@ const FAILURE_MESSAGES = {
   CONFLITO: 'O estoque mudou. Atualize os dados e confira novamente.',
   CONTEXTO_ALTERADO: 'A clínica ativa mudou. Atualize os dados antes de continuar.',
   SALDO_INSUFICIENTE: 'O saldo disponível não permite esta operação.',
+  LOTE_VENCIDO: 'O lote selecionado está vencido e não pode ser consumido.',
   INDISPONIVEL: 'Não foi possível concluir a operação de estoque. Tente novamente.',
 } as const;
 
