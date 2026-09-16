@@ -794,7 +794,7 @@ export function DetalheOrcamentoModal({
   }
 
   return (
-    <Dialog open={!!detalheOrcId} onOpenChange={open => { if (!open) onClose(); }}>
+    <Dialog open={!!detalheOrcId} onOpenChange={open => { if (!open) { setNovaEtapaAberta(false); onClose(); } }}>
       <DialogContent
         className="flex flex-col rounded-3xl bg-surface border-border p-0 overflow-hidden gap-0 w-[94vw] sm:w-[82vw]"
         style={{ maxWidth: '1280px', maxHeight: '90vh', left: '50%' }}
