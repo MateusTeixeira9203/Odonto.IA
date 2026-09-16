@@ -62,7 +62,13 @@ Correções de funções já aplicadas são forwards, não reescrita do passado.
   PGlite de regressão passou para criar/editar kit e declarar com segundo componente inválido,
   consumo/correção vencido, owner/colaborativa/secretária e rejeição sem permissão.
   UI retoma até 50 ou uma pendência individual, para um problema não bloquear as demais.
-- Não foi executado build/typecheck completo local (limite do PC). Novo CI remoto ainda pendente.
+- Não foi executado build/typecheck completo local (limite do PC). CI executa remotamente.
+  Run 35049417230 (`cbb0d4a`) detectou tipos incompatíveis de PromiseLike do Supabase,
+  callback da agenda, props Radix em BaseUI e literais BigInt no target existente.
+  Follow-up corrige adaptadores async, valida profissionais com Zod, usa props reais do Dialog
+  e BigInt(...) sem mudar target/cálculo. Testes focados 7 de recepção e 10 financeiros passaram.
+  [CI por branch](https://github.com/MateusTeixeira9203/Odonto.IA/actions?query=branch%3Acodex%2Fconclusao-atualizacao)
+  é a fonte do resultado remoto final; não confundir Vercel Ready com typecheck aprovado.
 - Nenhuma mensagem WhatsApp/email, contrato Stripe real ou cobrança foi disparada.
 
 ## QA manual antes de qualquer promoção

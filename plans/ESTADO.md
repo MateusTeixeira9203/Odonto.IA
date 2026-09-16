@@ -4,9 +4,10 @@
 
 ## Agora
 
-Preparar Preview dos sublotes integrados em `codex/conclusao-atualizacao`.
+Preview dos sublotes publicado em `codex/conclusao-atualizacao`.
 Worktree: `/home/mtx/.local/share/odontoia-testes/integracao`.
-Base publicada: `2b93247`; novos commits separados autorizados somente para Preview.
+Base `2b93247`; sublotes `cbb0d4a` publicados, com follow-up de tipos do CI.
+Commits separados autorizados somente para Preview.
 Projeto Vercel: `odonto-ia-teste`. Supabase Free: `etlqznuoxiilvxzygpat`.
 Nenhuma promoção/main, cobrança real ou escrita no banco oficial autorizada nesta execução.
 
@@ -18,7 +19,8 @@ Nenhuma promoção/main, cobrança real ou escrita no banco oficial autorizada n
 - Treze migrations aplicadas só no Free; objetos conferidos, sem depender do histórico de migrations.
 - Contagens preservadas: 7 clínicas, 41 pacientes, 83 pagamentos.
 - HTTP autenticado: financeiro A/B e isolamento; leitura de kits pelo proprietário autorizado.
-- Novo build/typecheck remoto e QA visual integrados ainda precisam ser conferidos.
+- Build/typecheck completos rodam no [CI da branch](https://github.com/MateusTeixeira9203/Odonto.IA/actions?query=branch%3Acodex%2Fconclusao-atualizacao).
+  Primeiro run dos sublotes encontrou tipos incompatíveis, corrigidos em follow-up. QA visual pendente.
 - Não houve duas sessões de navegador no novo pacote: isolamento/RLS não está fechado para produção.
 
 ## Implementação atual
@@ -43,7 +45,7 @@ Demais recortes futuros permanecem no [plano de conclusão](PLANO-CONCLUSAO-ATUA
 
 ## Próximo passo
 
-Publicar somente Preview, verificar CI/deployment e entregar a Mateus o roteiro de QA.
+Conferir o CI/deployment do último SHA da branch e entregar a Mateus o roteiro de QA.
 Não promover a produção antes da conferência e do gate de duas contas logadas.
 
 ## Continuidade segura
