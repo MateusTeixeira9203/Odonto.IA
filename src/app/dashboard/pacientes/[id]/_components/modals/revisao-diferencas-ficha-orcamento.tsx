@@ -202,7 +202,8 @@ export function RevisaoDiferencasFichaOrcamento({ diferencas, itens, onAtualizad
     }
   }
 
-  const temRevisao = diferencas.faltantes.length > 0
+  const faltantesNovos = diferencas.faltantes.filter((item) => !item.revisado);
+  const temRevisao = faltantesNovos.length > 0
     || diferencas.renomeacoesPendentes.length > 0
     || diferencas.retiradasPendentes.length > 0
     || diferencas.vinculos.length > 0;
@@ -219,16 +220,16 @@ export function RevisaoDiferencasFichaOrcamento({ diferencas, itens, onAtualizad
       <fieldset disabled={salvando !== null} className="contents">
       <legend className="sr-only">Ações da revisão do orçamento</legend>
 
-      {diferencas.faltantes.length > 0 && (
+      {faltantesNovos.length > 0 && (
         <div className="rounded-lg border border-warning/50 bg-card p-3">
-          <p className="font-semibold text-warning-ink">Há {diferencas.faltantes.length} procedimento{diferencas.faltantes.length === 1 ? '' : 's'} nesta ficha que ainda não está neste orçamento.</p>
+          <p className="font-semibold text-warning-ink">Há {faltantesNovos.length} procedimento{faltantesNovos.length === 1 ? '' : 's'} novo{faltantesNovos.length === 1 ? '' : 's'} para revisar.</p>
           <ul className="mt-2 space-y-1 text-xs text-text-secondary">
-            {diferencas.faltantes.map((faltante) => (
+            {faltantesNovos.map((faltante) => (
               <li key={faltante.eventoId}>{faltante.nome} · {faltante.local} · Adicionado à ficha em {dataCurta(faltante.adicionadoEm)}</li>
             ))}
           </ul>
           <Button type="button" size="sm" variant="outline" className="mt-3 min-h-11 border-warning text-warning-ink hover:bg-warning-pale" onClick={onRevisarAdicao}>
-            Revisar e adicionar
+            Revisar atualização
           </Button>
         </div>
       )}

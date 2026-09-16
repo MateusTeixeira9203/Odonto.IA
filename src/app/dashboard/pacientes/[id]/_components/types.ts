@@ -130,6 +130,8 @@ export type NovoOrcItem = {
   origem?: 'evento' | 'manual' | 'legado';
   /** R-135 — o card pode ficar visível, mas só entra no orçamento quando selecionado. */
   selecionado?: boolean;
+  /** Item fora do orçamento que já foi visto e recusado nesta proposta. */
+  revisado?: boolean;
 };
 
 export type OrcEditItem = {

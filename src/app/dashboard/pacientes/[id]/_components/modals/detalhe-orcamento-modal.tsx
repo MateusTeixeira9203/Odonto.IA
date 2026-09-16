@@ -650,6 +650,7 @@ export function DetalheOrcamentoModal({
     'cobranca.etapa_criada': 'Cobrança por etapa criada',
     'cobranca.etapa_editada': 'Cobrança por etapa editada',
     'cobranca.etapa_cancelada': 'Cobrança por etapa cancelada',
+    'orcamento_evento.inclusao_revisada': 'Novos procedimentos revisados',
     status_alterado: 'Status alterado',
   };
 

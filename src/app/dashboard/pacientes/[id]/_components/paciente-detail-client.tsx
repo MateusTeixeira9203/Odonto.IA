@@ -596,6 +596,9 @@ export function PacienteDetailClient({
     isSecretaria: role === 'secretaria',
     dentistasClinica,
     onOrcamentoCriado: (novoOrc) => setOrcamentosState((prev) => [novoOrc, ...prev]),
+    onOrcamentoAtualizado: (atualizado) => setOrcamentosState((atuais) => atuais.map((orcamento) => (
+      orcamento.id === atualizado.id ? atualizado : orcamento
+    ))),
     onContinuarConfiguracao: (orcamentoId) => setDetalheOrcId(orcamentoId),
     onAbrirOrcamentoExistente: (diferencas) => {
       setDiferencasOrcamentoAberto(diferencas);
@@ -616,6 +619,19 @@ export function PacienteDetailClient({
       } else {
         router.refresh();
       }
+    },
+    onRevisaoConcluida: (orcamentoId, eventoIdsRevisados) => {
+      const revisados = new Set(eventoIdsRevisados);
+      setDiferencasOrcamentoAberto((atuais) => {
+        if (atuais?.orcamentoId !== orcamentoId) return atuais;
+        return {
+          ...atuais,
+          faltantes: atuais.faltantes.map((faltante) => revisados.has(faltante.eventoId)
+            ? { ...faltante, revisado: true }
+            : faltante),
+        };
+      });
+      setRevisaoOrcamentoFicha((atual) => atual + 1);
     },
   });
 
@@ -1949,7 +1965,7 @@ export function PacienteDetailClient({
         diferencasFicha={diferencasOrcamentoAberto}
         onRevisarAdicao={() => {
           setDetalheOrcId(null);
-          orcamentoModal.abrirRevisaoDaFicha();
+          orcamentoModal.abrirRevisaoDaFicha(detalheOrc?.itens ?? []);
         }}
         onRecarregarDiferencasFicha={recarregarDiferencasDaFicha}
         orcEditMode={orcEditMode}

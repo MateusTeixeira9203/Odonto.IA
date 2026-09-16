@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import { requireClinicContext } from '@/server/auth/clinic';
 import { TIPO_LABEL, type TipoRegistroOdontograma } from '@/types/odontograma';
+import { idsDeInclusoesRevisadas } from '@/lib/orcamentos/revisao-inclusoes';
 
 const contextoSchema = z.object({
   fichaId: z.string().uuid(),
@@ -17,6 +18,7 @@ export type ProcedimentoFaltante = {
   nome: string;
   local: string;
   adicionadoEm: string;
+  revisado: boolean;
 };
 
 export type DiferencasFichaOrcamento = {
@@ -151,7 +153,7 @@ async function carregarContexto(fichaId: string, orcamentoId: string): Promise<{
     supabase.from('activity_logs')
       .select('id, entity_id, action, metadata, created_at')
       .eq('clinica_id', clinicId).eq('paciente_id', orcamento.paciente_id).eq('entity_type', 'orcamento').eq('entity_id', orcamentoId)
-      .in('action', ['orcamento_evento.retirada_dispensada', 'orcamento_evento.nome_aplicado', 'orcamento_evento.nome_dispensado'])
+      .in('action', ['orcamento_evento.retirada_dispensada', 'orcamento_evento.nome_aplicado', 'orcamento_evento.nome_dispensado', 'orcamento_evento.inclusao_revisada'])
       .order('created_at', { ascending: false }),
   ]);
   if (vinculosError || logsEventosError || logsOrcamentoError) throw new Error('Não foi possível atualizar as diferenças da ficha.');
@@ -186,10 +188,17 @@ export async function getDiferencasFichaOrcamento(input: unknown): Promise<
     .filter((log) => log.action === 'orcamento_evento.nome_aplicado' || log.action === 'orcamento_evento.nome_dispensado')
     .map((log) => metadataString(log.metadata, 'alteracao_id'))
     .filter((id): id is string => id !== null));
+  const inclusoesRevisadas = idsDeInclusoesRevisadas(contexto.logs);
 
   const faltantes = contexto.eventos
     .filter((evento) => evento.retirado_em === null && !vinculadosAtivos.has(evento.id) && !vinculadosPorEvento.has(evento.id))
-    .map((evento) => ({ eventoId: evento.id, nome: nomeEvento(evento), local: localEvento(evento), adicionadoEm: evento.created_at }));
+    .map((evento) => ({
+      eventoId: evento.id,
+      nome: nomeEvento(evento),
+      local: localEvento(evento),
+      adicionadoEm: evento.created_at,
+      revisado: inclusoesRevisadas.has(evento.id),
+    }));
 
   const ultimoNomePorEvento = new Map<string, LogAlteracao>();
   for (const log of contexto.logs) {
@@ -242,8 +251,55 @@ export async function getResumoOrcamentoDaFicha(input: unknown): Promise<
   const diferencas = await Promise.all(ids.map((orcamentoId) => getDiferencasFichaOrcamento({ fichaId: parsed.data.fichaId, orcamentoId })));
   const erros = diferencas.find((resultado) => !resultado.ok);
   if (erros && !erros.ok) return erros;
-  const eventoIds = new Set(diferencas.flatMap((resultado) => resultado.ok ? resultado.dados.faltantes.map((faltante) => faltante.eventoId) : []));
+  const eventoIds = new Set(diferencas.flatMap((resultado) => resultado.ok
+    ? resultado.dados.faltantes.filter((faltante) => !faltante.revisado).map((faltante) => faltante.eventoId)
+    : []));
   return { ok: true, dados: { fichaId: parsed.data.fichaId, orcamentoIds: ids, eventoIdsFaltantes: [...eventoIds], quantidadeProcedimentos: eventoIds.size } };
+}
+
+const revisarInclusoesSchema = contextoSchema.extend({
+  eventoIds: z.array(z.string().uuid()).min(1).max(100).refine(
+    (ids) => new Set(ids).size === ids.length,
+    'Não repita procedimentos na revisão.',
+  ),
+});
+
+/** Registra que o dentista viu os itens e decidiu não cobrá-los neste momento. */
+export async function revisarInclusoesFichaOrcamento(input: unknown): Promise<
+  { ok: true } | { ok: false; error: string }
+> {
+  const parsed = revisarInclusoesSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: 'Revise os procedimentos antes de continuar.' };
+
+  const diferencas = await getDiferencasFichaOrcamento(parsed.data);
+  if (!diferencas.ok) return diferencas;
+  const faltantesAtuais = new Set(diferencas.dados.faltantes.map((item) => item.eventoId));
+  if (parsed.data.eventoIds.some((id) => !faltantesAtuais.has(id))) {
+    return { ok: false, error: 'A ficha mudou enquanto você revisava. Reabra o orçamento para conferir.' };
+  }
+
+  const { supabase, clinicId, dentistaId } = await requireClinicContext();
+  const { data: orcamento } = await supabase.from('orcamentos')
+    .select('paciente_id')
+    .eq('id', parsed.data.orcamentoId)
+    .eq('ficha_id', parsed.data.fichaId)
+    .eq('clinica_id', clinicId)
+    .maybeSingle<{ paciente_id: string }>();
+  if (!orcamento) return { ok: false, error: 'Orçamento da ficha não encontrado.' };
+
+  const { error } = await supabase.from('activity_logs').insert({
+    clinica_id: clinicId,
+    actor_id: dentistaId,
+    paciente_id: orcamento.paciente_id,
+    entity_type: 'orcamento',
+    entity_id: parsed.data.orcamentoId,
+    action: 'orcamento_evento.inclusao_revisada',
+    metadata: { ficha_id: parsed.data.fichaId, evento_ids: parsed.data.eventoIds },
+  });
+  if (error) return { ok: false, error: 'Não foi possível registrar a revisão. Tente novamente.' };
+
+  revalidatePath(`/dashboard/pacientes/${orcamento.paciente_id}`);
+  return { ok: true };
 }
 
 const retirarSchema = z.object({

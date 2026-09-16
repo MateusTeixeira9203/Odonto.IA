@@ -11,6 +11,7 @@ export const EVENTS = {
   ORCAMENTO_RECUSADO:  'orcamento.recusado',
   ORCAMENTO_EXCLUIDO:  'orcamento.excluido',
   ORCAMENTO_EDITADO:   'orcamento.editado',
+  ORCAMENTO_INCLUSAO_REVISADA: 'orcamento_evento.inclusao_revisada',
 
   // ── Pagamentos ─────────────────────────────────────────────────────────────
   PAGAMENTO_REGISTRADO: 'pagamento.registrado',

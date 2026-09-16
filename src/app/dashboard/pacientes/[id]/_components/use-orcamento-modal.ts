@@ -36,7 +36,11 @@ import {
 import { TIPO_LABEL } from '@/types/odontograma';
 import type { TermosSnapshot } from '@/types/orcamento';
 import { eventosVisiveis, FILTRO_MEUS } from '@/lib/fichas/filtro-responsavel';
-import { getDiferencasFichaOrcamento, type DiferencasFichaOrcamento } from '@/server/orcamentos/ficha-orcamento-actions';
+import {
+  getDiferencasFichaOrcamento,
+  revisarInclusoesFichaOrcamento,
+  type DiferencasFichaOrcamento,
+} from '@/server/orcamentos/ficha-orcamento-actions';
 import type { NovoOrcamentoModalProps } from './modals/novo-orcamento-modal';
 import type {
   FichaParaOrc, EventoOdontogramaParaOrc, ProcedimentoClinica, NovoOrcItem, OrcamentoComItens,
@@ -55,11 +59,14 @@ export interface UseOrcamentoModalInput {
   /** Só quem mantém uma lista local de orçamentos (tela do paciente) precisa disto — chamado
    *  com o orçamento otimista recém-criado. Meu dia não passa nada. */
   onOrcamentoCriado?: (orcamento: OrcamentoComItens) => void;
+  onOrcamentoAtualizado?: (orcamento: OrcamentoComItens) => void;
   /** O perfil abre o detalhe persistido assim que a proposta nasce, sem exigir aba/card. */
   onContinuarConfiguracao?: (orcamentoId: string) => void;
   onAbrirOrcamentoExistente?: (contexto: DiferencasFichaOrcamento) => void;
   /** Inclusão incremental confirma no mesmo orçamento aberto; o dono recarrega seus dados locais. */
   onItensAdicionadosAoOrcamento?: (orcamentoId: string, eventoIdsConfirmados: string[]) => void;
+  /** Revisão explícita neutraliza o alerta sem esconder os itens disponíveis na montagem. */
+  onRevisaoConcluida?: (orcamentoId: string, eventoIdsRevisados: string[]) => void;
   /**
    * No Meu Dia, uma linha escolhida manualmente no catálogo ainda não tem evento clínico.
    * O chamador a transforma em procedimento planejado e persiste a ficha sem encerrar a visita
@@ -82,7 +89,7 @@ export type PrepararItensClinicosResult =
 export interface UseOrcamentoModalResult {
   abrirNovoOrcamento: () => Promise<void>;
   abrirOrcamentoParaFicha: (fichaId: string, orcamentoDestinoId?: string) => Promise<void>;
-  abrirRevisaoDaFicha: () => void;
+  abrirRevisaoDaFicha: (itensExistentes: OrcamentoComItens['itens']) => void;
   /** NOVO (R-46h) — só o Meu dia usa: abre direto no passo 'selecionar', pulando o "geral vs.
    *  por-ficha" que a tela do paciente precisa porque lá não há paciente já óbvio de antemão.
    *  R-83 (08/08) — `eventosRascunho`: itens indicados no rascunho ainda não salvo desta
@@ -127,7 +134,7 @@ const SELECT_FICHA_PARA_ORC_AGREGADO = `${CAMPOS_FICHA_ORC}, odontograma_eventos
 
 export function useOrcamentoModal({
   pacienteId, clinicaId, meuDentistaId, procedimentosClinica, erroCatalogo = null, isSecretaria, dentistasClinica,
-  onOrcamentoCriado, onContinuarConfiguracao, onAbrirOrcamentoExistente, onItensAdicionadosAoOrcamento, prepararItensClinicos,
+  onOrcamentoCriado, onOrcamentoAtualizado, onContinuarConfiguracao, onAbrirOrcamentoExistente, onItensAdicionadosAoOrcamento, onRevisaoConcluida, prepararItensClinicos,
 }: UseOrcamentoModalInput): UseOrcamentoModalResult {
   const router = useRouter();
 
@@ -136,6 +143,7 @@ export function useOrcamentoModal({
   const [fichasParaOrc, setFichasParaOrc] = useState<FichaParaOrc[]>([]);
   const [fichaOrcId, setFichaOrcId] = useState<string | null>(null);
   const [novoOrcItens, setNovoOrcItens] = useState<NovoOrcItem[]>([ITEM_VAZIO]);
+  const [itensExistentes, setItensExistentes] = useState<OrcamentoComItens['itens']>([]);
   const [registeringProcIdx, setRegisteringProcIdx] = useState<number | null>(null);
   const [orcSaving, setOrcSaving] = useState(false);
   const [orcError, setOrcError] = useState<string | null>(null);
@@ -650,15 +658,24 @@ export function useOrcamentoModal({
         ? { tipo: 'adicionar', orcamentoId: orcamentoDestinoId }
         : await carregarModoDaFicha(fichaId, alvoAtual());
       setModoPersistencia(modo);
+      let diferencasCarregadas: DiferencasFichaOrcamento | null = null;
       if (modo.tipo === 'adicionar') {
         const diferencas = await getDiferencasFichaOrcamento({ fichaId, orcamentoId: modo.orcamentoId });
         if (!diferencas.ok) throw new Error(diferencas.error);
+        diferencasCarregadas = diferencas.dados;
         if (onAbrirOrcamentoExistente) {
           onAbrirOrcamentoExistente(diferencas.dados);
           abriuOrcamentoExistente = true;
         }
       }
-      const itens = ficha ? fichaParaItens(ficha, alvoAtual(), idsJaOrcados) : [];
+      const revisados = new Set(diferencasCarregadas?.faltantes
+        .filter((item) => item.revisado)
+        .map((item) => item.eventoId) ?? []);
+      const itens = ficha ? fichaParaItens(ficha, alvoAtual(), idsJaOrcados).map((item) => ({
+        ...item,
+        selecionado: modo.tipo === 'adicionar' ? false : item.selecionado,
+        revisado: Boolean(item.eventoIds?.length) && item.eventoIds?.every((id) => revisados.has(id)),
+      })) : [];
       setNovoOrcItens(itens.length > 0 ? itens : [ITEM_VAZIO]);
       setResumoOrigemOrcamento(ficha ? resumoDaFichaParaOrcamento(ficha, alvoAtual(), idsJaOrcados) : null);
       setBloqueioFicha(bloqueioParaFichaSemItens(ficha, itens));
@@ -854,11 +871,31 @@ export function useOrcamentoModal({
           setOrcError(result.error);
         } else {
           const eventoIdsConfirmados = [...new Set(itensParaSalvar.flatMap((item) => item.eventoIds))];
+          const eventoIdsRevisados = [...new Set(novoOrcItens
+            .filter((item) => item.selecionado === false)
+            .flatMap((item) => item.eventoIds ?? []))];
+          if (fichaOrcId && eventoIdsRevisados.length > 0) {
+            const revisao = await revisarInclusoesFichaOrcamento({
+              fichaId: fichaOrcId,
+              orcamentoId: modoPersistencia.orcamentoId,
+              eventoIds: eventoIdsRevisados,
+            });
+            if (!revisao.ok) toast.error(revisao.error);
+            else onRevisaoConcluida?.(modoPersistencia.orcamentoId, eventoIdsRevisados);
+          }
           setEventoIdsJaOrcados((atuais) => new Set([...atuais, ...eventoIdsConfirmados]));
           setIsNovoOrcOpen(false);
           setNovoOrcItens([ITEM_VAZIO]);
+          setItensExistentes([]);
           onItensAdicionadosAoOrcamento?.(modoPersistencia.orcamentoId, eventoIdsConfirmados);
+          try {
+            const atualizado = await carregarOrcamentoPersistido(modoPersistencia.orcamentoId);
+            onOrcamentoAtualizado?.(atualizado);
+          } catch {
+            toast.error('Orçamento atualizado, mas não foi possível recarregar o resumo agora.');
+          }
           toast.success(`${itensValidos.length} procedimento${itensValidos.length === 1 ? '' : 's'} adicionado${itensValidos.length === 1 ? '' : 's'} ao orçamento.`);
+          onContinuarConfiguracao?.(modoPersistencia.orcamentoId);
           router.refresh();
         }
         setOrcSaving(false);
@@ -974,6 +1011,36 @@ export function useOrcamentoModal({
     }
   };
 
+  const manterOrcamentoComoEsta = async () => {
+    if (modoPersistencia.tipo !== 'adicionar' || !fichaOrcId || orcSaving) return;
+    const eventoIds = [...new Set(novoOrcItens.flatMap((item) => item.eventoIds ?? []))];
+    if (eventoIds.length === 0) return;
+    setOrcError(null);
+    setOrcSaving(true);
+    try {
+      const resultado = await revisarInclusoesFichaOrcamento({
+        fichaId: fichaOrcId,
+        orcamentoId: modoPersistencia.orcamentoId,
+        eventoIds,
+      });
+      if (!resultado.ok) {
+        setOrcError(resultado.error);
+        return;
+      }
+      onRevisaoConcluida?.(modoPersistencia.orcamentoId, eventoIds);
+      setIsNovoOrcOpen(false);
+      setNovoOrcItens([ITEM_VAZIO]);
+      setItensExistentes([]);
+      toast.success('Orçamento mantido. Os procedimentos revisados continuam disponíveis sem alerta.');
+      onContinuarConfiguracao?.(modoPersistencia.orcamentoId);
+      router.refresh();
+    } catch {
+      setOrcError('Não foi possível registrar a revisão. Tente novamente.');
+    } finally {
+      setOrcSaving(false);
+    }
+  };
+
   const modalProps: NovoOrcamentoModalProps = {
     open: isNovoOrcOpen,
     onOpenChange: (open) => {
@@ -981,6 +1048,7 @@ export function useOrcamentoModal({
       if (!open) {
         setEtapaNovoOrc('itens'); setFichasParaOrc([]); setOrcError(null); setNovoOrcValorFinal(null);
         setModoPersistencia({ tipo: 'novo' });
+        setItensExistentes([]);
         setEventoIdsJaOrcados(new Set());
         setResumoOrigemOrcamento(null);
         setBloqueioFicha(null);
@@ -1011,9 +1079,11 @@ export function useOrcamentoModal({
     setNovoOrcValorFinal,
     orcSaving,
     modoPersistencia: modoPersistencia.tipo,
+    itensExistentes,
     contextoClinicoPendente,
     resumoOrigemOrcamento,
     onCriarOrcamento: () => void handleCriarOrcamento(),
+    onManterOrcamento: () => void manterOrcamentoComoEsta(),
     onSelecionarFicha: selecionarFichaParaOrc,
     onCadastrarProcedimento: (idx) => void handleCadastrarProcedimento(idx),
     registeringProcIdx,
@@ -1035,7 +1105,10 @@ export function useOrcamentoModal({
   return {
     abrirNovoOrcamento,
     abrirOrcamentoParaFicha,
-    abrirRevisaoDaFicha: () => setIsNovoOrcOpen(true),
+    abrirRevisaoDaFicha: (itens) => {
+      setItensExistentes(itens);
+      setIsNovoOrcOpen(true);
+    },
     abrirPickerFichasAbertas,
     abrirMontagemManualMeuDia,
     isLoadingFichaParaOrc,

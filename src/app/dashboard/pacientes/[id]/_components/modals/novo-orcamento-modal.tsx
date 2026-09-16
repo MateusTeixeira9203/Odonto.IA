@@ -2,8 +2,8 @@
 import { isTeamWorkspaceEnabled } from '@/server/auth/team-workspace-pilot';
 
 import { MontarGrupoOrcamento } from './montar-grupo-orcamento';
-import React, { useEffect, useState } from 'react';
-import { Plus, Trash2, AlertTriangle, X, Loader2, Check, ChevronDown, MapPin } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Plus, Trash2, AlertTriangle, X, Loader2, Check, ChevronDown, MapPin, ArrowRight } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -24,7 +24,7 @@ import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { parseValorBR, formatValorBR } from '@/lib/valor-br';
 import { stripDenteDoNome } from '@/lib/arcadas';
-import type { FichaParaOrc, ProcedimentoClinica, NovoOrcItem } from '../types';
+import type { FichaParaOrc, ProcedimentoClinica, NovoOrcItem, OrcamentoItem } from '../types';
 import type { FormaPagamento } from '@/app/dashboard/orcamentos/actions';
 
 const FORMA_LABEL: Record<FormaPagamento, string> = {
@@ -56,6 +56,7 @@ export interface NovoOrcamentoModalProps {
   setNovoOrcValorFinal: React.Dispatch<React.SetStateAction<number | null>>;
   orcSaving: boolean;
   modoPersistencia: 'novo' | 'adicionar';
+  itensExistentes: OrcamentoItem[];
   /** Meu Dia sem evento inicial: a linha escolhida será registrada clinicamente antes da proposta. */
   contextoClinicoPendente: boolean;
   resumoOrigemOrcamento: {
@@ -64,6 +65,7 @@ export interface NovoOrcamentoModalProps {
     responsaveis: string[];
   } | null;
   onCriarOrcamento: () => void;
+  onManterOrcamento: () => void;
   onSelecionarFicha: (fichaId: string | null) => void;
   onCadastrarProcedimento: (idx: number) => void;
   registeringProcIdx: number | null;
@@ -99,9 +101,11 @@ export function NovoOrcamentoModal({
   setNovoOrcValorFinal,
   orcSaving,
   modoPersistencia,
+  itensExistentes,
   contextoClinicoPendente,
   resumoOrigemOrcamento,
   onCriarOrcamento,
+  onManterOrcamento,
   onSelecionarFicha,
   onCadastrarProcedimento,
   registeringProcIdx,
@@ -139,6 +143,28 @@ export function NovoOrcamentoModal({
     : 0;
   const quantidadeAdicionar = novoOrcItens.filter((item) => item.selecionado !== false && item.descricao.trim()).length;
   const contextoAdicao = `${quantidadeAdicionar} procedimento${quantidadeAdicionar === 1 ? '' : 's'} desta ficha ${quantidadeAdicionar === 1 ? 'será adicionado' : 'serão adicionados'} ao orçamento atual após sua confirmação.`;
+  const precoRefs = useRef(new Map<number, HTMLInputElement>());
+  const totalExistente = useMemo(
+    () => itensExistentes.reduce((total, item) => total + (item.preco_total ?? 0), 0),
+    [itensExistentes],
+  );
+  const indicesSemPreco = novoOrcItens.flatMap((item, index) => (
+    item.selecionado !== false && item.descricao.trim() && parseValorBR(item.preco) <= 0 ? [index] : []
+  ));
+  const novosDisponiveis = novoOrcItens.filter((item) => item.selecionado === false);
+
+  function adicionarTodosOsNovos(): void {
+    setNovoOrcItens((itens) => itens.map((item) => item.revisado ? item : { ...item, selecionado: true }));
+  }
+
+  function continuar(): void {
+    const primeiroSemPreco = indicesSemPreco[0];
+    if (primeiroSemPreco !== undefined) {
+      precoRefs.current.get(primeiroSemPreco)?.focus();
+      return;
+    }
+    onCriarOrcamento();
+  }
 
   const separarDescricao = (descricao: string): { procedimento: string; local: string | null } => {
     const marcador = descricao.indexOf(' — ');
@@ -163,7 +189,7 @@ export function NovoOrcamentoModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="flex max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-none flex-col gap-0 overflow-hidden rounded-3xl border-border bg-surface p-0 md:max-h-[90vh] md:w-[82vw] md:max-w-[1280px]"
+        className="flex max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-none flex-col gap-0 overflow-hidden rounded-3xl border-border bg-surface p-0 md:max-h-[92vh] md:w-[94vw] md:max-w-[1440px]"
         style={{ left: '50%' }}
         showCloseButton={false}
       >
@@ -288,12 +314,41 @@ export function NovoOrcamentoModal({
                   <option value="">Selecione</option><option value="clinica">A clínica</option><option value="dentista">O dentista responsável</option>
                 </select><span className="text-xs text-muted-foreground">Define em qual financeiro os recebimentos entram. O responsável pelo atendimento continua o mesmo.</span>
               </label>}
-              <MontarGrupoOrcamento itens={novoOrcItens} onChange={(itens) => { setNovoOrcItens(itens); setNovoOrcValorFinal(null); setPlanoForma(null); }} disabled={orcSaving} />
+              <div className={modoPersistencia === 'adicionar' ? 'grid items-start gap-4 xl:grid-cols-2' : 'space-y-2'}>
+                <section className="min-w-0 overflow-hidden rounded-2xl border border-border bg-card">
+                  {modoPersistencia === 'adicionar' && (
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-surface-alt px-4 py-3">
+                      <div>
+                        <p className="text-sm font-semibold text-text-primary">No orçamento · {itensExistentes.length + quantidadeAdicionar}</p>
+                        <p className="mt-0.5 text-xs text-text-secondary">Valores que compõem o novo total.</p>
+                      </div>
+                      <div className="w-full sm:w-auto">
+                        <MontarGrupoOrcamento itens={novoOrcItens} onChange={(itens) => { setNovoOrcItens(itens); setNovoOrcValorFinal(null); setPlanoForma(null); }} disabled={orcSaving} />
+                      </div>
+                    </div>
+                  )}
+                  {modoPersistencia === 'novo' && (
+                    <div className="mb-3 px-3 pt-3">
+                      <MontarGrupoOrcamento itens={novoOrcItens} onChange={(itens) => { setNovoOrcItens(itens); setNovoOrcValorFinal(null); setPlanoForma(null); }} disabled={orcSaving} />
+                    </div>
+                  )}
 
-              <div className="space-y-2">
+                  {modoPersistencia === 'adicionar' && itensExistentes.map((item) => (
+                    <div key={item.id} className="grid gap-3 border-b border-border/70 px-4 py-3 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_132px] sm:items-center">
+                      <div className="min-w-0">
+                        <p className="break-words text-sm font-semibold leading-snug text-text-primary">{item.descricao ?? 'Procedimento'}</p>
+                        {item.quantidade > 1 && <p className="mt-1 text-xs text-text-secondary">{item.quantidade} unidades</p>}
+                      </div>
+                      <div className="rounded-xl border border-border bg-surface px-3 py-2 text-right font-mono text-sm font-semibold text-text-primary">
+                        R$ {(item.preco_total ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </div>
+                    </div>
+                  ))}
+
                 {novoOrcItens.map((item, idx) => {
+                  if (modoPersistencia === 'adicionar' && item.selecionado === false) return null;
                   if (item.composicao?.length) return (
-                    <fieldset key={idx} disabled={orcSaving} className="space-y-3 rounded-xl border border-border bg-card p-3 text-foreground">
+                    <fieldset key={idx} disabled={orcSaving} className="space-y-3 border-b border-border/70 bg-card p-4 text-foreground last:border-b-0">
                       <p className="text-sm font-semibold">{item.descricao}</p>
                       <ul className="space-y-1 text-sm text-muted-foreground">{item.composicao.map((membro, index) => <li key={index}>{membro.quantidade} × {membro.descricao}</li>)}</ul>
                       <label className="block space-y-1 text-sm">Valor fechado do grupo (R$)<Input aria-label={`Valor do grupo ${item.descricao}`} inputMode="decimal" value={item.preco} onChange={(e) => setNovoOrcItens((prev) => prev.map((atual, i) => i === idx ? { ...atual, preco: e.target.value } : atual))} className="min-h-11" /></label>
@@ -306,7 +361,7 @@ export function NovoOrcamentoModal({
                   return (
                     <div
                       key={idx}
-                      className={`rounded-2xl border p-3 transition-colors ${selecionado ? 'border-teal/40 bg-teal/[0.05]' : 'border-border bg-surface-alt/50 opacity-70'}`}
+                      className={`border-b border-border/70 p-4 transition-colors last:border-b-0 ${selecionado ? 'bg-teal/[0.035]' : 'bg-surface-alt/50 opacity-70'}`}
                     >
                       <div className="flex items-start gap-3">
                         <button
@@ -326,16 +381,17 @@ export function NovoOrcamentoModal({
                             </div>
                           ) : (
                             <div>
-                              <p className="truncate text-sm font-semibold text-text-primary">{procedimento}</p>
+                              <p className="break-words text-sm font-semibold leading-snug text-text-primary">{procedimento}</p>
                               {local && <p className="mt-0.5 flex items-center gap-1 text-xs text-text-secondary"><MapPin className="h-3 w-3" />{local}</p>}
                             </div>
                           )}
                           <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 sm:max-w-sm">
                             <Input type="number" min="1" value={item.quantidade} onChange={(e) => setNovoOrcItens((prev) => prev.map((it, i) => i === idx ? { ...it, quantidade: parseInt(e.target.value) || 1 } : it))} aria-label="Quantidade" className="h-11 rounded-xl border-border bg-surface text-center font-mono text-text-primary" />
-                            <Input type="text" inputMode="decimal" placeholder="Preço" value={item.preco} onChange={(e) => setNovoOrcItens((prev) => prev.map((it, i) => i === idx ? { ...it, preco: e.target.value } : it))} onBlur={(e) => { const valor = parseValorBR(e.target.value); setNovoOrcItens((prev) => prev.map((it, i) => i === idx ? { ...it, preco: valor > 0 ? formatValorBR(valor) : it.preco } : it)); }} aria-label="Preço" className="h-11 rounded-xl border-border bg-surface font-mono text-text-primary" />
+                            <Input ref={(element) => { if (element) precoRefs.current.set(idx, element); else precoRefs.current.delete(idx); }} type="text" inputMode="decimal" placeholder="Preço" value={item.preco} onChange={(e) => setNovoOrcItens((prev) => prev.map((it, i) => i === idx ? { ...it, preco: e.target.value } : it))} onBlur={(e) => { const valor = parseValorBR(e.target.value); setNovoOrcItens((prev) => prev.map((it, i) => i === idx ? { ...it, preco: valor > 0 ? formatValorBR(valor) : it.preco } : it)); }} aria-label={`Preço de ${procedimento || 'procedimento'}`} aria-invalid={selecionado && parseValorBR(item.preco) <= 0} className={`h-11 rounded-xl bg-surface font-mono text-text-primary ${selecionado && parseValorBR(item.preco) <= 0 ? 'border-warning ring-1 ring-warning/30' : 'border-border'}`} />
                           </div>
+                          {selecionado && parseValorBR(item.preco) <= 0 && <p className="text-xs font-medium text-warning-ink">Informe o preço para continuar.</p>}
                         </div>
-                        <button type="button" onClick={() => setNovoOrcItens((prev) => prev.filter((_, i) => i !== idx))} className="h-11 w-11 shrink-0 rounded-xl text-text-secondary transition-colors hover:bg-coral-pale hover:text-coral-ink" aria-label="Remover procedimento"><Trash2 className="mx-auto h-4 w-4" /></button>
+                        <button type="button" onClick={() => setNovoOrcItens((prev) => modoPersistencia === 'adicionar' ? prev.map((atual, i) => i === idx ? { ...atual, selecionado: false } : atual) : prev.filter((_, i) => i !== idx))} className="h-11 w-11 shrink-0 rounded-xl text-text-secondary transition-colors hover:bg-coral-pale hover:text-coral-ink" aria-label="Remover procedimento"><Trash2 className="mx-auto h-4 w-4" /></button>
                       </div>
                       {!item.procedimentoId && item.descricao.trim() && (
                         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-warning/30 bg-warning-pale px-3 py-2">
@@ -348,26 +404,74 @@ export function NovoOrcamentoModal({
                     </div>
                   );
                 })}
+                </section>
+
+                {modoPersistencia === 'adicionar' && (
+                  <section className="min-w-0 overflow-hidden rounded-2xl border border-border bg-card">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-surface-alt px-4 py-3">
+                      <div>
+                        <p className="text-sm font-semibold text-text-primary">Disponíveis na ficha · {novosDisponiveis.length}</p>
+                        <p className="mt-0.5 text-xs text-text-secondary">Fora do orçamento atual.</p>
+                      </div>
+                      {novosDisponiveis.some((item) => !item.revisado) && (
+                        <Button type="button" variant="outline" size="sm" onClick={adicionarTodosOsNovos} disabled={orcSaving} className="min-h-10 border-teal/40 text-teal-ink hover:bg-teal/10">
+                          Adicionar todos os novos
+                        </Button>
+                      )}
+                    </div>
+                    {novosDisponiveis.length === 0 ? (
+                      <div className="p-6 text-center text-sm text-text-secondary">Todos os procedimentos desta ficha já estão na montagem.</div>
+                    ) : novosDisponiveis.map((item) => {
+                      const idx = novoOrcItens.indexOf(item);
+                      const { procedimento, local } = separarDescricao(item.descricao);
+                      return (
+                        <div key={item.eventoIds?.join(',') ?? idx} className="grid gap-3 border-b border-border/70 px-4 py-3 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="break-words text-sm font-semibold leading-snug text-text-primary">{procedimento}</p>
+                              <span className={item.revisado ? 'rounded-full bg-surface-alt px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-text-secondary' : 'rounded-full bg-warning-pale px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-warning-ink'}>
+                                {item.revisado ? 'Revisado' : 'Novo'}
+                              </span>
+                            </div>
+                            <p className="mt-1 flex items-center gap-1 text-xs text-text-secondary"><MapPin className="h-3 w-3" />{local ?? 'Sem região'}</p>
+                          </div>
+                          <Button type="button" variant="outline" size="sm" onClick={() => setNovoOrcItens((prev) => prev.map((atual, i) => i === idx ? { ...atual, selecionado: true } : atual))} disabled={orcSaving} className="min-h-10 border-teal/35 text-teal-ink hover:bg-teal/10">
+                            Adicionar <ArrowRight className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </section>
+                )}
               </div>
 
-              <button type="button" onClick={() => setNovoOrcItens((prev) => [...prev, { procedimentoId: '', descricao: '', quantidade: 1, preco: '', eventoIds: [], origem: 'manual', selecionado: true }])} className="min-h-11 w-full rounded-xl border border-dashed border-border py-3 text-sm text-text-secondary transition-colors hover:bg-surface-alt hover:text-text-primary">
-                <Plus className="mr-2 inline h-4 w-4" />Adicionar procedimento manual
-              </button>
+              {modoPersistencia === 'novo' && (
+                <button type="button" onClick={() => setNovoOrcItens((prev) => [...prev, { procedimentoId: '', descricao: '', quantidade: 1, preco: '', eventoIds: [], origem: 'manual', selecionado: true }])} className="min-h-11 w-full rounded-xl border border-dashed border-border py-3 text-sm text-text-secondary transition-colors hover:bg-surface-alt hover:text-text-primary">
+                  <Plus className="mr-2 inline h-4 w-4" />Adicionar procedimento manual
+                </button>
+              )}
             </div>
 
             {/* Coluna do dinheiro — resumo, valor negociado, forma de pagamento (R-39a) */}
             <div className="flex min-h-0 w-full flex-col border-t border-border bg-teal/[0.04] md:w-[416px] md:shrink-0 md:border-t-0 md:border-l">
               <div className="space-y-4 p-4 md:min-h-0 md:flex-1 md:overflow-y-auto md:p-5">
-                <p className="text-xs font-bold uppercase tracking-widest text-teal-ink">Resumo</p>
-
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">
-                    Total dos procedimentos
-                  </p>
-                  <p className="font-mono text-lg font-semibold text-text-primary">
-                    R$ {novoOrcSubtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </p>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-widest text-teal-ink">Resumo do orçamento</p>
+                  {modoPersistencia === 'adicionar' && <p className="mt-1 text-sm text-text-secondary">Acompanhe cada inclusão antes de confirmar.</p>}
                 </div>
+
+                {modoPersistencia === 'adicionar' && (
+                  <div className="space-y-3 rounded-2xl border border-border bg-card p-4 text-sm">
+                    <div className="flex items-center justify-between gap-3 text-text-secondary">
+                      <span>Total anterior</span>
+                      <strong className="font-mono text-text-primary">R$ {totalExistente.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 text-text-secondary">
+                      <span>Adições</span>
+                      <strong className="font-mono text-teal-ink">+ R$ {novoOrcSubtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
+                    </div>
+                  </div>
+                )}
 
                 <div className="rounded-2xl p-4 space-y-2 border border-teal/15 bg-teal/[0.07]">
                   {temDesconto && (
@@ -387,14 +491,22 @@ export function NovoOrcamentoModal({
                       <div className="h-px bg-teal/20" />
                     </>
                   )}
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-teal-ink/70">Total</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-teal-ink/70">{modoPersistencia === 'adicionar' ? 'Novo total' : 'Total'}</p>
                   <p className="font-mono text-3xl font-bold text-teal-ink leading-none">
-                    R$ {novoOrcTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    R$ {(modoPersistencia === 'adicionar' ? totalExistente + novoOrcSubtotal : novoOrcTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </p>
                   <p className="text-[10px] text-text-secondary font-mono">
-                    {novoOrcItens.filter((item) => item.selecionado !== false && item.descricao.trim()).length} item(s) selecionado(s)
+                    {modoPersistencia === 'adicionar'
+                      ? `${itensExistentes.length} atuais + ${quantidadeAdicionar} selecionado${quantidadeAdicionar === 1 ? '' : 's'}`
+                      : `${quantidadeAdicionar} item(s) selecionado(s)`}
                   </p>
                 </div>
+
+                {modoPersistencia === 'adicionar' && indicesSemPreco.length > 0 && (
+                  <p role="alert" className="rounded-xl border border-warning/40 bg-warning-pale p-3 text-sm font-medium text-warning-ink">
+                    {indicesSemPreco.length} procedimento{indicesSemPreco.length === 1 ? ' precisa' : 's precisam'} de preço antes de continuar.
+                  </p>
+                )}
 
                 {temGrupos ? (
                   <p className="rounded-xl border border-border bg-card p-3 text-sm text-muted-foreground">Ajuste o preço de cada grupo nos campos ao lado. Depois de salvar e aprovar os grupos, defina a cobrança, os vencimentos e a observação do acordo por etapa.</p>
@@ -484,12 +596,22 @@ export function NovoOrcamentoModal({
                   <p className="text-xs text-coral-ink bg-coral-pale rounded-xl px-3 py-2">{orcError}</p>
                 )}
                 <Button
-                  onClick={onCriarOrcamento}
+                  onClick={continuar}
                   disabled={Boolean(bloqueioCriacao) || orcSaving || novoOrcItens.every((item) => item.selecionado === false || !item.descricao.trim())}
                   className="w-full bg-teal text-white hover:bg-teal-lt rounded-xl disabled:opacity-50 font-bold"
                 >
-                  {orcSaving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Salvando...</> : modoPersistencia === 'adicionar' ? `Adicionar ${novoOrcItens.filter((item) => item.selecionado !== false && item.descricao.trim()).length} procedimento${novoOrcItens.filter((item) => item.selecionado !== false && item.descricao.trim()).length === 1 ? '' : 's'}` : 'Criar e continuar'}
+                  {orcSaving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Salvando...</> : modoPersistencia === 'adicionar' ? 'Atualizar e continuar' : 'Criar e continuar'}
                 </Button>
+                {modoPersistencia === 'adicionar' && (
+                  <Button
+                    variant="outline"
+                    onClick={onManterOrcamento}
+                    disabled={orcSaving}
+                    className="w-full rounded-xl border-border text-text-primary hover:bg-surface-alt"
+                  >
+                    Manter orçamento como está
+                  </Button>
+                )}
                 {podeTrocarFicha && (
                   <Button
                     variant="outline"
