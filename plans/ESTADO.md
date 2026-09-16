@@ -4,7 +4,7 @@
 
 ## Agora
 
-Item ativo: R-169b, montagem e atualização fluida do orçamento contra o artefato aprovado.
+Item ativo: R-169c, exclusão explícita de ficha e orçamento com confirmação de risco.
 Preview em `codex/conclusao-atualizacao`: orçamento `e619a0c`, rolagem única do shell `c9c1fe9`.
 Worktree: `/home/mtx/.local/share/odontoia-testes/integracao`.
 CI 35118081587 passou: typecheck, 391 testes, lint e build.
@@ -41,6 +41,14 @@ Nenhuma promoção/main, cobrança real ou escrita no banco oficial autorizada n
   dos itens já aprovados. Ela deve herdá-los, deixar `Alterar seleção` como exceção e recuperar
   os controles visíveis de à vista, entrada + parcelas, parcelado, desconto e observação. O painel
   financeiro precisa ganhar espaço no desktop; este é o uso diário do dentista.
+- Decisão de 16/09: exclusão física pode remover ficha ou orçamento mesmo com pagamentos e
+  assinaturas. Dentista da mesma clínica assume o risco após checkbox explícito; secretaria não
+  pode excluir. O Prontuário deve expor `Excluir ficha` fora do menu de três pontos.
+- Feedback em teste de 16/09: a secretária Cígias não conseguiu apagar um paciente; isso está
+  **pendente de escopo**, pois excluir paciente remove o prontuário e o financeiro inteiro. O
+  dentista também não consegue gerar orçamento a partir de uma Nova evolução sem salvar antes;
+  deve herdar o salvamento provisório do Meu Dia. A área `Fichas em curso` deve sair; o progresso
+  passa a aparecer no título/cartão da própria ficha, em função dos procedimentos dela.
 - Alerta âmbar conta somente procedimento novo não revisado; `Manter orçamento como está`
   persiste a decisão em `activity_logs`, sem remover o procedimento da ficha.
 - Reativação pessoal no Dex adiada por Mateus; rascunho fora do código/migrations publicáveis.
@@ -55,8 +63,9 @@ Demais recortes futuros permanecem no [plano de conclusão](PLANO-CONCLUSAO-ATUA
 
 ## Próximo passo
 
-Publicar a correção de fidelidade da etapa de acordo em Preview. Mateus fará o teste manual;
-não acompanhar nem operar o Preview durante o teste.
+Implementar R-169c contra a spec, migrar somente o banco de Preview e testar com dois dentistas
+da clínica de teste antes de publicar. Mateus fará o teste manual do Preview; não acompanhar nem
+operar o Preview durante o teste.
 Não promover a produção antes da conferência e do gate de duas contas logadas.
 
 ## Continuidade segura
