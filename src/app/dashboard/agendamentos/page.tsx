@@ -15,6 +15,7 @@ import {
   VISAO_PADRAO,
   type VisaoAgenda,
 } from './_components/date-helpers';
+import { getReceptionContext } from '@/server/auth/reception-context';
 
 export type AgendamentoRow = {
   id: string;
@@ -60,8 +61,13 @@ interface PageProps {
 }
 
 export default async function AgendamentosPage({ searchParams }: PageProps) {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect('/login');
+  const reception = await getReceptionContext();
+  const receptionContext = reception.ok ? reception.data : null;
+  const dentista = receptionContext ? null : await getDentistaCached();
+  if (!receptionContext && !dentista) redirect('/login');
+  const clinicaId = receptionContext?.clinicaId ?? dentista!.clinica_id;
+  const role = receptionContext ? 'secretaria' : dentista!.role;
+  const dentistaAtualId = dentista?.id ?? null;
 
   // A URL é a fonte única da janela visível: `?v=dia|semana|mes&d=yyyy-MM-dd`.
   // Antes era `?mes=yyyy-MM`, e a navegação por semana/dia acontecia só no estado do
@@ -83,7 +89,7 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
   const fimDoMes = fimDoMesDaAncora(ancora);
 
   const supabase = await createClient();
-  const isSecretaria = dentista.role === 'secretaria';
+  const isSecretaria = role === 'secretaria';
 
   // Secretária: vê todos os agendamentos da clínica
   // Dentista/admin: vê apenas seus próprios
@@ -93,13 +99,13 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
     .select(
       'id, clinica_id, paciente_id, dentista_id, data_hora, duracao_minutos, status, origem, observacoes, created_at, paciente:pacientes(id, nome, observacoes), dentista:dentistas!agendamentos_dentista_id_fkey(id, nome), criador:dentistas!agendamentos_created_by_fkey(id, nome)'
     )
-    .eq('clinica_id', dentista.clinica_id)
+    .eq('clinica_id', clinicaId)
     .gte('data_hora', janela.de)
     .lt('data_hora', janela.ate)
     .order('data_hora', { ascending: true });
 
   if (!isSecretaria) {
-    query.eq('dentista_id', dentista.id);
+    query.eq('dentista_id', dentistaAtualId!);
   }
 
   // Agendamentos ativos DEPOIS do mês da âncora.
@@ -114,13 +120,13 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
   const proximosQuery = supabase
     .from('agendamentos')
     .select('data_hora')
-    .eq('clinica_id', dentista.clinica_id)
+    .eq('clinica_id', clinicaId)
     .in('status', ['scheduled', 'confirmed'])
     .gte('data_hora', fimDoMes)
     .order('data_hora', { ascending: true });
 
   if (!isSecretaria) {
-    proximosQuery.eq('dentista_id', dentista.id);
+    proximosQuery.eq('dentista_id', dentistaAtualId!);
   }
 
   // R-102 — compromissos pessoais na mesma janela visível, mesmo filtro de dentista que
@@ -128,13 +134,13 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
   const bloqueiosQuery = supabase
     .from('agenda_bloqueios')
     .select('id, clinica_id, dentista_id, data_hora, duracao_minutos, titulo, criado_por, dentista:dentistas!agenda_bloqueios_dentista_id_fkey(id, nome)')
-    .eq('clinica_id', dentista.clinica_id)
+    .eq('clinica_id', clinicaId)
     .gte('data_hora', janela.de)
     .lt('data_hora', janela.ate)
     .order('data_hora', { ascending: true });
 
   if (!isSecretaria) {
-    bloqueiosQuery.eq('dentista_id', dentista.id);
+    bloqueiosQuery.eq('dentista_id', dentistaAtualId!);
   }
 
   // Dados em paralelo: agendamentos + contagem de secretárias + o que está fora da janela
@@ -146,14 +152,14 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
       supabase
         .from('dentistas')
         .select('id', { count: 'exact', head: true })
-        .eq('clinica_id', dentista.clinica_id)
+        .eq('clinica_id', clinicaId)
         .eq('role', 'secretaria')
         .eq('ativo', true),
       proximosQuery,
       supabase
         .from('dentistas')
         .select('id, nome')
-        .eq('clinica_id', dentista.clinica_id)
+        .eq('clinica_id', clinicaId)
         .eq('role', 'protetico')
         .eq('ativo', true)
         .order('nome', { ascending: true }),
@@ -185,23 +191,29 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
   let calendarConnectedPerDentista: Record<string, boolean> = {};
 
   if (isSecretaria) {
-    const { data } = await supabase
-      .from('dentistas')
-      .select('id, nome')
-      .eq('clinica_id', dentista.clinica_id)
-      // R-94 — .neq('role','secretaria') sozinho deixaria 'protetico' entrar aqui
-      // (não atende consulta, não pode ser "dentista responsável" do agendamento).
-      .in('role', ['admin', 'dentista'])
-      .eq('ativo', true)
-      .order('created_at', { ascending: true });
+    const { data } = receptionContext
+      ? await supabase.rpc('listar_profissionais_agenda_operacional', { p_clinica_id: clinicaId })
+      : await supabase
+        .from('dentistas')
+        .select('id, nome')
+        .eq('clinica_id', clinicaId)
+        // R-94 — .neq('role','secretaria') sozinho deixaria 'protetico' entrar aqui
+        // (não atende consulta, não pode ser "dentista responsável" do agendamento).
+        .in('role', ['admin', 'dentista'])
+        .eq('ativo', true)
+        .order('created_at', { ascending: true });
     dentistasClinica = (data ?? []).map((d, i) => ({ id: d.id, nome: d.nome, slot: i }));
-    calendarConnectedPerDentista = await getCalendarConnectedMap(
-      dentistasClinica.map((d) => d.id),
-    );
+    if (!receptionContext) {
+      calendarConnectedPerDentista = await getCalendarConnectedMap(
+        dentistasClinica.map((d) => d.id),
+      );
+    }
   }
 
   // Todos os dentistas podem gerenciar a própria agenda independente do plano.
   // Secretária cria em nome do dentista (status 'scheduled', pendente de confirmação).
+  // A recepção nova só abre o drawer para a criação atômica paciente+agenda. As demais
+  // actions históricas continuam exigindo um perfil dentista e não viram fallback por cargo.
   const canEdit = true;
 
   return (
@@ -212,9 +224,9 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
       <AgendamentosClient
         agendamentos={(agendamentosRaw ?? []) as unknown as AgendamentoRow[]}
         bloqueios={(bloqueiosRaw ?? []) as unknown as BloqueioRow[]}
-        clinicaId={dentista.clinica_id}
-        role={dentista.role}
-        dentistaAtualId={dentista.id}
+        clinicaId={clinicaId}
+        role={role}
+        dentistaAtualId={dentistaAtualId ?? ''}
         dentistas={dentistasClinica}
         calendarConnectedPerDentista={calendarConnectedPerDentista}
         temSecretaria={temSecretaria}
@@ -224,6 +236,7 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
         autoOpenNovo={novo === '1'}
         foraDaJanela={foraDaJanela}
         proteticos={proteticosRaw ?? []}
+        operationalReception={Boolean(receptionContext)}
       />
     </PageTransition>
   );

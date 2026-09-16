@@ -41,6 +41,7 @@ interface PacientesTableProps {
   pacientes: PacienteRow[];
   total: number;
   canCreate: boolean;
+  canOpenDetail?: boolean;
   currentParams: CurrentParams;
 }
 
@@ -79,6 +80,7 @@ export function PacientesTable({
   pacientes,
   total,
   canCreate,
+  canOpenDetail = true,
   currentParams,
 }: PacientesTableProps) {
   const router = useRouter();
@@ -315,10 +317,8 @@ export function PacientesTable({
                       initial={{ opacity: 0, y: 6 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: i * 0.02 }}
-                      onClick={() =>
-                        router.push(`/dashboard/pacientes/${paciente.id}`)
-                      }
-                      className="group hover:bg-surface-alt/60 transition-colors cursor-pointer border-l-2 border-transparent hover:border-l-teal/30"
+                      onClick={canOpenDetail ? () => router.push(`/dashboard/pacientes/${paciente.id}`) : undefined}
+                      className={`group hover:bg-surface-alt/60 transition-colors border-l-2 border-transparent hover:border-l-teal/30 ${canOpenDetail ? 'cursor-pointer' : ''}`}
                     >
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-3">
@@ -435,10 +435,8 @@ export function PacientesTable({
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.02 }}
-                  onClick={() =>
-                    router.push(`/dashboard/pacientes/${paciente.id}`)
-                  }
-                  className="flex items-center gap-3 p-4 hover:bg-surface-alt/60 transition-colors cursor-pointer group"
+                  onClick={canOpenDetail ? () => router.push(`/dashboard/pacientes/${paciente.id}`) : undefined}
+                  className={`flex items-center gap-3 p-4 hover:bg-surface-alt/60 transition-colors group ${canOpenDetail ? 'cursor-pointer' : ''}`}
                 >
                   <div
                     className={`w-10 h-10 rounded-xl flex items-center justify-center

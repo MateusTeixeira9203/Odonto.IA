@@ -11,6 +11,9 @@ type SortCol = (typeof VALID_SORT_COLS)[number];
 
 interface PacientesListProps {
   canCreate: boolean;
+  canOpenDetail?: boolean;
+  /** Contexto operacional já resolve a clínica, sem fabricar um perfil dentista. */
+  clinicaId?: string;
   params: {
     q?: string;
     sort?: string;
@@ -19,9 +22,10 @@ interface PacientesListProps {
   };
 }
 
-export async function PacientesList({ canCreate, params }: PacientesListProps) {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect('/login');
+export async function PacientesList({ canCreate, canOpenDetail = true, clinicaId, params }: PacientesListProps) {
+  const dentista = clinicaId ? null : await getDentistaCached();
+  if (!clinicaId && !dentista) redirect('/login');
+  const activeClinicaId = clinicaId ?? dentista!.clinica_id;
 
   const supabase = await createClient();
 
@@ -44,7 +48,7 @@ export async function PacientesList({ canCreate, params }: PacientesListProps) {
        followup_pendente, dentista:dentistas(nome)`,
       { count: 'exact' },
     )
-    .eq('clinica_id', dentista.clinica_id);
+    .eq('clinica_id', activeClinicaId);
 
   if (q) {
     // R-31a §3.3 — nome_busca é insensível a acento; email/telefone continuam como antes.
@@ -62,6 +66,7 @@ export async function PacientesList({ canCreate, params }: PacientesListProps) {
       pacientes={pacientes ?? []}
       total={count ?? 0}
       canCreate={canCreate}
+      canOpenDetail={canOpenDetail}
       currentParams={{
         q,
         sort: sortCol,

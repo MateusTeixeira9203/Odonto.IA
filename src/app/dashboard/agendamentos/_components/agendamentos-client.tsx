@@ -99,6 +99,7 @@ import {
 } from '../actions';
 import type { MotivoForaDoExpediente } from '@/lib/agenda/expediente';
 import { criarPacienteRapido } from '@/app/dashboard/pacientes/[id]/actions';
+import { atualizarStatusAgendamentoRecepcao, criarAgendamentoRecepcaoExistente, criarPacienteEAgendamentoRecepcao, reagendarAgendamentoRecepcao } from '../reception-actions';
 import { createClient } from '@/lib/supabase/client';
 import { normalizarNome } from '@/lib/normalizar-nome';
 import { HelpTooltip } from '@/components/ui/help-tooltip';
@@ -165,6 +166,8 @@ interface Props {
   foraDaJanela: ForaDaJanela | null;
   /** Protéticos ativos da clínica — vazio esconde o bloco "Enviar pro protético" (R-94). */
   proteticos: { id: string; nome: string }[];
+  /** Recepção sem perfil clínico: só habilita a criação atômica paciente+agenda. */
+  operationalReception?: boolean;
 }
 
 export function AgendamentosClient({
@@ -181,6 +184,7 @@ export function AgendamentosClient({
   autoOpenNovo = false,
   foraDaJanela,
   proteticos,
+  operationalReception = false,
 }: Props) {
   const router = useRouter();
   const isSecretaria = role === 'secretaria';
@@ -686,6 +690,35 @@ export function AgendamentosClient({
     criandoPacienteNovoRef.current = true;
     setCriandoPacienteNovo(true);
     const dentistaAlvo = isSecretaria ? novoForm.dentistaId : dentistaAtualId;
+    if (operationalReception) {
+      if (!dentistaAlvo || !novoForm.data || !novoForm.hora) {
+        criandoPacienteNovoRef.current = false;
+        setCriandoPacienteNovo(false);
+        setSaveError('Selecione um dentista, data e horário.');
+        return;
+      }
+      const result = await criarPacienteEAgendamentoRecepcao({
+        dentistaId: dentistaAlvo,
+        nome,
+        telefone: null,
+        dataHora: buildClinicDatetime(novoForm.data, novoForm.hora),
+        duracaoMinutos: parseInt(novoForm.duracao, 10) || 30,
+        observacoes: novoForm.observacoes.trim() || null,
+      });
+      criandoPacienteNovoRef.current = false;
+      setCriandoPacienteNovo(false);
+      if (!result.ok) {
+        setSaveError(result.error);
+        return;
+      }
+      setShowSugestoes(false);
+      setPacienteSugestoes([]);
+      setIsNewModalOpen(false);
+      resetForm();
+      toast.success('Paciente e agendamento criados.');
+      router.refresh();
+      return;
+    }
     const res = await criarPacienteRapido({ nome, telefone: null, dentistaId: dentistaAlvo || undefined, confirmarMesmoAssim });
     criandoPacienteNovoRef.current = false;
     setCriandoPacienteNovo(false);
@@ -711,14 +744,16 @@ export function AgendamentosClient({
   // Atualiza status do agendamento via server action
   const handleStatusChange = useCallback(async (id: string, status: string) => {
     const dbStatus = status as StatusAgendamento;
-    const result = await atualizarStatusAgendamento(id, dbStatus);
+    const result = operationalReception
+      ? await atualizarStatusAgendamentoRecepcao({ agendamentoId: id, status: dbStatus })
+      : await atualizarStatusAgendamento(id, dbStatus);
     if (!result.error) {
       setAgendamentos((prev) =>
         prev.map((apt) => (apt.id === id ? { ...apt, status } : apt))
       );
       setSelectedApt((prev) => (prev?.id === id ? { ...prev, status } : prev));
     }
-  }, []);
+  }, [operationalReception]);
 
   const resetForm = () => {
     setNovoForm({
@@ -826,6 +861,27 @@ export function AgendamentosClient({
     const dataHora = buildClinicDatetime(novoForm.data, novoForm.hora);
     const [ano, mes, dia] = novoForm.data.split('-').map(Number);
     const observacoesCombinadas = novoForm.observacoes.trim() || null;
+
+    if (operationalReception) {
+      const result = await criarAgendamentoRecepcaoExistente({
+        pacienteId: novoForm.pacienteId,
+        dentistaId: novoForm.dentistaId,
+        dataHora,
+        duracaoMinutos: parseInt(novoForm.duracao, 10) || 30,
+        observacoes: observacoesCombinadas,
+      });
+      if (!result.ok) {
+        setSaveError(result.error);
+        setIsSaving(false);
+        return;
+      }
+      setIsNewModalOpen(false);
+      resetForm();
+      toast.success('Agendamento criado.');
+      router.refresh();
+      setIsSaving(false);
+      return;
+    }
 
     const result = await criarAgendamento({
       pacienteId: novoForm.pacienteId,
@@ -973,6 +1029,18 @@ export function AgendamentosClient({
     // Timestamp explicitamente em BRT (UTC-3) — independente do timezone do browser
     const dataHora = buildClinicDatetime(editForm.data, editForm.hora);
 
+    if (operationalReception) {
+      const result = await reagendarAgendamentoRecepcao({
+        agendamentoId: selectedApt.id, dataHora,
+        duracaoMinutos: parseInt(editForm.duracao, 10) || 30,
+        observacoes: editForm.observacoes.trim() || null,
+      });
+      if (result.error) setSaveError(result.error);
+      else { setAvisoEdicao(null); router.refresh(); }
+      setIsSaving(false);
+      return;
+    }
+
     const result = await atualizarAgendamento(selectedApt.id, {
       dataHora,
       duracaoMinutos: parseInt(editForm.duracao, 10) || 30,
@@ -1032,7 +1100,9 @@ export function AgendamentosClient({
   const handleCancelar = async () => {
     if (!cancelDialog) return;
     setIsCancelling(true);
-    const result = await cancelarComMotivo(cancelDialog.aptId, cancelMotivo.trim() || null);
+    const result = operationalReception
+      ? await atualizarStatusAgendamentoRecepcao({ agendamentoId: cancelDialog.aptId, status: 'cancelled' })
+      : await cancelarComMotivo(cancelDialog.aptId, cancelMotivo.trim() || null);
     if (!result.error) {
       setAgendamentos(prev => prev.map(a => a.id === cancelDialog.aptId ? { ...a, status: 'cancelled' } : a));
       if (selectedApt?.id === cancelDialog.aptId) {
@@ -1608,7 +1678,9 @@ export function AgendamentosClient({
                         {criandoPacienteNovo
                           ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" />
                           : <UserPlus className="w-4 h-4 shrink-0" />}
-                        Cadastrar &ldquo;{novoForm.pacienteSearch.trim()}&rdquo; como novo paciente
+                        {operationalReception
+                          ? `Cadastrar e agendar “${novoForm.pacienteSearch.trim()}”`
+                          : `Cadastrar “${novoForm.pacienteSearch.trim()}” como novo paciente`}
                       </button>
                     )}
                   </div>

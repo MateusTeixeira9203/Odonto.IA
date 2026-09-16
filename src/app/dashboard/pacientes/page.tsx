@@ -6,6 +6,7 @@ import { PacientesList } from './_components/pacientes-list';
 import { PageTransition } from '@/components/layout/page-transition';
 import { PageContainer } from '@/components/layout/page-container';
 import { getDentistaCached } from '@/lib/get-dentista';
+import { getReceptionContext } from '@/server/auth/reception-context';
 
 interface PacientesPageProps {
   searchParams: Promise<{
@@ -17,14 +18,18 @@ interface PacientesPageProps {
 }
 
 export default async function PacientesPage({ searchParams }: PacientesPageProps) {
-  const dentista = await getDentistaCached();
-  if (!dentista) redirect('/login');
+  const reception = await getReceptionContext();
+  const receptionContext = reception.ok ? reception.data : null;
+  const dentista = receptionContext ? null : await getDentistaCached();
+  if (!receptionContext && !dentista) redirect('/login');
 
   // Solo/Clinica: dentista cria. Secretária: cria em nome do dentista. BASICO dentista: leitura.
   const canCreate =
-    dentista.plano === 'SOLO' ||
-    dentista.plano === 'CLINICA' ||
-    dentista.role === 'secretaria';
+    !receptionContext && (
+      dentista!.plano === 'SOLO' ||
+      dentista!.plano === 'CLINICA' ||
+      dentista!.role === 'secretaria'
+    );
 
   const params = await searchParams;
 
@@ -58,7 +63,12 @@ export default async function PacientesPage({ searchParams }: PacientesPageProps
         </header>
 
         <Suspense fallback={<PacientesListSkeleton />}>
-          <PacientesList canCreate={canCreate} params={params} />
+          <PacientesList
+            canCreate={canCreate}
+            canOpenDetail={!receptionContext}
+            clinicaId={receptionContext?.clinicaId}
+            params={params}
+          />
         </Suspense>
       </PageContainer>
     </PageTransition>
