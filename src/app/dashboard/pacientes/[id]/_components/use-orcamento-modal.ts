@@ -829,8 +829,11 @@ export function useOrcamentoModal({
         if (result.error) {
           setOrcError(result.error);
         } else {
+          const eventoIdsConfirmados = [...new Set(itensParaSalvar.flatMap((item) => item.eventoIds))];
+          setEventoIdsJaOrcados((atuais) => new Set([...atuais, ...eventoIdsConfirmados]));
           setIsNovoOrcOpen(false);
           setNovoOrcItens([ITEM_VAZIO]);
+          onItensAdicionadosAoOrcamento?.(modoPersistencia.orcamentoId, eventoIdsConfirmados);
           toast.success(`${itensValidos.length} procedimento${itensValidos.length === 1 ? '' : 's'} adicionado${itensValidos.length === 1 ? '' : 's'} ao orçamento.`);
           router.refresh();
         }
@@ -849,17 +852,44 @@ export function useOrcamentoModal({
       if (result.error) {
         setOrcError(result.error);
       } else {
-        const eventoIdsConfirmados = [...new Set(itensParaSalvar.flatMap((item) => item.eventoIds))];
-        setEventoIdsJaOrcados((atuais) => new Set([...atuais, ...eventoIdsConfirmados]));
+        const novoTotal = Math.max(0, subtotalValido - descontoValor);
+        let novoOrc: OrcamentoComItens = {
+          id: result.id ?? crypto.randomUUID(),
+          status: 'rascunho',
+          total: novoTotal,
+          valor_acordado: null,
+          desconto: descontoValor,
+          created_at: new Date().toISOString(),
+          validade_dias: 30,
+          condicoes_pagamento: null,
+          mostrar_valor_por_item: false,
+          dentista_id: isSecretaria ? novoOrcDentistaAlvoId : meuDentistaId,
+          itens: itensValidos.map((item, index) => ({
+            id: `temp-${index}`,
+            descricao: item.descricao,
+            quantidade: item.quantidade,
+            preco_total: item.quantidade * parseValorBR(item.preco),
+            composicao: composicaoParaSalvar(item),
+            aprovado: false,
+          })),
+          pagamentos: [],
+          cobrancas: [],
+          aprovado_por: null,
+          aprovado_em: null,
+          aceite: null,
+        };
+        let podeAbrirConfiguracao = false;
+        if (result.id) {
+          try {
+            novoOrc = await carregarOrcamentoPersistido(result.id);
+            podeAbrirConfiguracao = true;
+          } catch {
+            router.refresh();
+            toast.error('Proposta criada, mas não foi possível abrir a configuração agora. Recarregue o perfil para continuar.');
+          }
+        }
         setIsNovoOrcOpen(false);
         setNovoOrcItens([ITEM_VAZIO]);
-        onItensAdicionadosAoOrcamento?.(modoPersistencia.orcamentoId, eventoIdsConfirmados);
-        toast.success(`${itensValidos.length} procedimento${itensValidos.length === 1 ? '' : 's'} adicionado${itensValidos.length === 1 ? '' : 's'} ao orçamento.`);
-        router.refresh();
-      }
-      setOrcSaving(false);
-      return;
-    }
 
         // R-34 — plano de pagamento definido junto da criação (opcional). Roda depois do
         // orçamento existir de verdade (precisa do id real, não do temp/otimista acima).

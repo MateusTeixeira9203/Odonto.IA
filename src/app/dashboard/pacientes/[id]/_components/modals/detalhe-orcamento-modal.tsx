@@ -144,8 +144,11 @@ interface Props {
   onRecarregarDiferencasFicha: () => Promise<void>;
 }
 
-function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
-  orcamento: OrcamentoComItens; pacienteId: string; permitirNovaEtapa: boolean;
+function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa, onFormChange }: {
+  orcamento: OrcamentoComItens;
+  pacienteId: string;
+  permitirNovaEtapa: boolean;
+  onFormChange: (aberto: boolean) => void;
 }) {
   const router = useRouter();
   const hoje = hojeBRT();
@@ -258,6 +261,7 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
         return;
       }
       setFormAberto(false);
+      onFormChange(false);
       setItemIds([]);
       setDesconto('');
       setObservacoes('');
@@ -574,19 +578,76 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
 
       {permitirNovaEtapa && itensElegiveis.length > 0 && (
         formAberto ? (
-          <div className="rounded-2xl border border-teal/30 bg-teal/5 p-4 space-y-4">
-            <div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold text-text-primary">Nova cobrança</p><p className="mt-1 text-xs text-text-secondary">Os procedimentos aprovados já entraram nesta etapa.</p></div><button type="button" onClick={() => setAlterandoSelecao((atual) => !atual)} className="text-xs font-semibold text-teal-ink hover:underline">{alterandoSelecao ? 'Concluir seleção' : 'Alterar seleção'}</button></div>
-            {alterandoSelecao ? <div className="space-y-1.5">{itensElegiveis.map((item) => <label key={item.id} className="flex items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-2 text-xs text-text-primary"><input type="checkbox" checked={itemIds.includes(item.id)} onChange={() => toggleItem(item.id)} className="accent-teal" /><span className="min-w-0 flex-1 truncate">{item.descricao ?? 'Procedimento'}</span><span className="font-mono">R$ {fmt(item.preco_total ?? 0)}</span></label>)}</div> : <div className="rounded-xl border border-border bg-card px-3 py-2.5"><p className="text-xs text-text-secondary">{itemIds.length} procedimento{itemIds.length === 1 ? '' : 's'} nesta etapa</p><p className="mt-1 text-sm font-semibold text-text-primary">{itemIds.map((id) => itemPorId.get(id)?.descricao ?? 'Procedimento').join(' · ')}</p></div>}
-            <div className="grid grid-cols-2 gap-2"><div><Label className="text-[10px] text-text-secondary">Desconto da etapa</Label><Input value={desconto} inputMode="decimal" placeholder="0,00" onChange={(event) => setDesconto(event.target.value)} className="mt-1 h-9 font-mono" /></div><div className="rounded-lg border border-border bg-card px-3 py-2"><p className="text-[10px] text-text-secondary">Total da etapa</p><p className="font-mono text-sm font-semibold text-text-primary">R$ {fmt(valorFinal)}</p></div></div>
-            <div className="space-y-3 rounded-xl border border-border bg-card p-3"><Label className="text-[10px] text-text-secondary">Como ficou o acordo?</Label><div className="grid grid-cols-3 gap-1.5"><button type="button" onClick={() => setFormaCobranca('avista')} className={`h-9 rounded-lg border text-xs font-semibold ${formaCobranca === 'avista' ? 'border-teal/40 bg-teal/10 text-teal-ink' : 'border-border text-text-secondary'}`}>À vista</button><button type="button" onClick={() => setFormaCobranca('entrada_parcelas')} className={`h-9 rounded-lg border text-xs font-semibold ${formaCobranca === 'entrada_parcelas' ? 'border-teal/40 bg-teal/10 text-teal-ink' : 'border-border text-text-secondary'}`}>Entrada + parcelas</button><button type="button" onClick={() => setFormaCobranca('parcelado')} className={`h-9 rounded-lg border text-xs font-semibold ${formaCobranca === 'parcelado' ? 'border-teal/40 bg-teal/10 text-teal-ink' : 'border-border text-text-secondary'}`}>Parcelado</button></div>
-              {formaCobranca === 'entrada_parcelas' && <div className="space-y-2 rounded-lg bg-surface-alt p-2.5"><div className="grid grid-cols-2 gap-2"><div><Label className="text-[10px] text-text-secondary">Entrada</Label><Input value={entrada} inputMode="decimal" placeholder="0,00" onChange={(event) => setEntrada(event.target.value)} className="mt-1 h-9 font-mono" /></div><div><Label className="text-[10px] text-text-secondary">Forma da entrada</Label><Select value={entradaForma} onValueChange={(value) => setEntradaForma(value as FormaPagamento)}><SelectTrigger className="mt-1 h-9 text-xs"><SelectValue /></SelectTrigger><SelectContent>{Object.entries(FORMA_LABEL).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div></div><label className="flex items-center gap-2 text-xs text-text-secondary"><input type="checkbox" checked={entradaRegistrada} onChange={(event) => setEntradaRegistrada(event.target.checked)} className="accent-teal" />A entrada já foi recebida</label></div>}
-              {formaCobranca !== 'avista' && <><div className="grid grid-cols-2 gap-2"><div><Label className="text-[10px] text-text-secondary">Parcelas</Label><Input type="number" min={2} max={24} value={numeroParcelas} onChange={(event) => setNumeroParcelas(event.target.value)} className="mt-1 h-9 font-mono" /></div><div><Label className="text-[10px] text-text-secondary">1º vencimento</Label><Input type="date" value={primeiroVencimento} onChange={(event) => setPrimeiroVencimento(event.target.value)} className="mt-1 h-9" /></div></div><Select value={parcelasForma} onValueChange={(value) => setParcelasForma(value as 'acordo' | 'cartao_credito')}><SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="acordo">Acordo com o paciente</SelectItem><SelectItem value="cartao_credito">Parcelas no cartão de crédito</SelectItem></SelectContent></Select>{parcelasForma === 'cartao_credito' ? <p className="rounded-lg bg-teal/10 px-2.5 py-2 text-[11px] text-teal-ink">Cada parcela entra confirmada no mês programado. Não será necessário dar baixa mensal.</p> : <p className="text-[11px] text-text-secondary">{numeroParcelas}x mensais de R$ {fmt(valorParcelado / Math.max(2, Number(numeroParcelas) || 2))}; o recebimento continua pendente.</p>}</>}
+          <section className="space-y-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-teal-ink">Área de trabalho</p>
+                <p className="mt-1 text-lg font-semibold text-text-primary">Como ficou o acordo?</p>
+                <p className="mt-1 text-xs text-text-secondary">Os procedimentos já foram escolhidos. Defina somente como esta etapa será cobrada.</p>
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Total da etapa</p>
+                <p className="mt-1 font-mono text-xl font-semibold text-text-primary">R$ {fmt(valorFinal)}</p>
+              </div>
             </div>
+
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-teal/20 bg-teal/5 px-3 py-2.5">
+              <p className="text-xs font-semibold text-teal-ink">{itemIds.length} procedimento{itemIds.length === 1 ? '' : 's'} herdado{itemIds.length === 1 ? '' : 's'} da aprovação</p>
+              <button type="button" onClick={() => setAlterandoSelecao((atual) => !atual)} className="shrink-0 text-xs font-semibold text-teal-ink underline-offset-2 hover:underline">{alterandoSelecao ? 'Concluir seleção' : 'Alterar seleção'}</button>
+            </div>
+
+            {alterandoSelecao && (
+              <div className="space-y-1.5 rounded-xl border border-border bg-card p-2">
+                {itensElegiveis.map((item) => (
+                  <label key={item.id} className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-text-primary hover:bg-surface-alt">
+                    <input type="checkbox" checked={itemIds.includes(item.id)} onChange={() => toggleItem(item.id)} disabled={saving} className="accent-teal" />
+                    <span className="min-w-0 flex-1 truncate">{item.descricao ?? 'Procedimento'}</span>
+                    <span className="font-mono">R$ {fmt(item.preco_total ?? 0)}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px]">
+              <div>
+                <Label className="text-[10px] text-text-secondary">Forma de pagamento</Label>
+                <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+                  {([
+                    ['avista', 'À vista'],
+                    ['entrada_parcelas', 'Entrada + parcelas'],
+                    ['parcelado', 'Parcelado'],
+                  ] as const).map(([forma, label]) => (
+                    <button key={forma} type="button" onClick={() => setFormaCobranca(forma)} className={`min-h-11 rounded-[10px] border px-2 text-xs font-semibold ${formaCobranca === forma ? 'border-teal bg-teal/10 text-teal-ink' : 'border-border text-text-secondary hover:border-teal/30'}`}>{label}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <Label className="text-[10px] text-text-secondary">Desconto da etapa</Label>
+                <Input value={desconto} inputMode="decimal" placeholder="0,00" onChange={(event) => setDesconto(event.target.value)} disabled={saving} className="mt-1.5 min-h-11 font-mono" />
+              </div>
+            </div>
+
+            {formaCobranca === 'entrada_parcelas' && (
+              <div className="grid gap-3 rounded-xl border border-border bg-surface-alt/60 p-3 sm:grid-cols-2">
+                <div><Label className="text-[10px] text-text-secondary">Valor da entrada</Label><Input value={entrada} inputMode="decimal" placeholder="0,00" onChange={(event) => setEntrada(event.target.value)} disabled={saving} className="mt-1 min-h-11 font-mono" /></div>
+                <div><Label className="text-[10px] text-text-secondary">Forma da entrada</Label><Select value={entradaForma} onValueChange={(value) => setEntradaForma(value as FormaPagamento)}><SelectTrigger className="mt-1 min-h-11 text-xs"><SelectValue /></SelectTrigger><SelectContent>{Object.entries(FORMA_LABEL).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div>
+                <label className="flex items-center gap-2 text-xs text-text-secondary sm:col-span-2"><input type="checkbox" checked={entradaRegistrada} onChange={(event) => setEntradaRegistrada(event.target.checked)} disabled={saving} className="accent-teal" />A entrada já foi recebida agora</label>
+              </div>
+            )}
+
+            {formaCobranca !== 'avista' && (
+              <div className="space-y-3 rounded-xl border border-border bg-card p-3">
+                <div className="grid gap-3 sm:grid-cols-2"><div><Label className="text-[10px] text-text-secondary">Parcelas</Label><Input type="number" min={2} max={24} value={numeroParcelas} onChange={(event) => setNumeroParcelas(event.target.value)} disabled={saving} className="mt-1 min-h-11 font-mono" /></div><div><Label className="text-[10px] text-text-secondary">1º vencimento</Label><Input type="date" value={primeiroVencimento} onChange={(event) => setPrimeiroVencimento(event.target.value)} disabled={saving} className="mt-1 min-h-11" /></div></div>
+                <Select value={parcelasForma} onValueChange={(value) => setParcelasForma(value as 'acordo' | 'cartao_credito')}><SelectTrigger className="min-h-11 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="acordo">Acordo com o paciente</SelectItem><SelectItem value="cartao_credito">Parcelas no cartão de crédito</SelectItem></SelectContent></Select>
+                {parcelasForma === 'cartao_credito' ? <p className="rounded-lg bg-teal/10 px-3 py-2 text-xs text-teal-ink">Cada parcela entra confirmada no mês programado. Não será necessário dar baixa mensal.</p> : <p className="text-xs text-text-secondary">{numeroParcelas}x mensais de R$ {fmt(valorParcelado / Math.max(2, Number(numeroParcelas) || 2))}; o recebimento continua pendente.</p>}
+              </div>
+            )}
+
             <div><button type="button" onClick={() => setObservacoesAbertas((atual) => !atual)} className="text-sm font-semibold text-text-primary">{observacoesAbertas ? 'Ocultar observação' : '+ Adicionar observação do acordo'}</button>{observacoesAbertas && <label className="mt-2 block space-y-1 text-sm text-foreground"><Textarea value={observacoes} onChange={(event) => setObservacoes(event.target.value)} maxLength={2000} disabled={saving} placeholder="Ex.: entrada hoje; restante no cartão a partir do próximo mês." /><span className="block text-xs text-muted-foreground">Interna para a equipe; não entra automaticamente no documento do paciente.</span></label>}</div>
             {erro && <p role="alert" className="text-xs text-coral-ink">{erro}</p>}
-            <div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => { setFormAberto(false); setErro(null); }} disabled={saving} className="flex-1">Cancelar</Button><Button size="sm" onClick={() => void criarEtapa()} disabled={saving || itemIds.length === 0} className="flex-1 bg-teal text-white hover:bg-teal-lt">{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Criar cobrança'}</Button></div>
-          </div>
-        ) : <Button variant="outline" onClick={() => { setItemIds(itensElegiveis.map((item) => item.id)); setAlterandoSelecao(false); setFormAberto(true); }} className="w-full border-teal/35 text-teal-ink hover:bg-teal/10"><Plus className="mr-1.5 h-4 w-4" />Cobrar nesta etapa</Button>
+            <div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => { setFormAberto(false); onFormChange(false); setErro(null); }} disabled={saving} className="min-h-11 flex-1">Cancelar</Button><Button size="sm" onClick={() => void criarEtapa()} disabled={saving || itemIds.length === 0} className="min-h-11 flex-1 bg-teal text-white hover:bg-teal-lt">{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Criar cobrança'}</Button></div>
+          </section>
+        ) : <Button variant="outline" onClick={() => { setItemIds(itensElegiveis.map((item) => item.id)); setAlterandoSelecao(false); setFormAberto(true); onFormChange(true); }} className="w-full border-teal/35 text-teal-ink hover:bg-teal/10"><Plus className="mr-1.5 h-4 w-4" />Cobrar nesta etapa</Button>
       )}
       {erro && !formAberto && !cobrancaEditandoId && <p className="text-xs text-coral-ink">{erro}</p>}
     </div>
@@ -622,6 +683,7 @@ export function DetalheOrcamentoModal({
   const hoje = hojeBRT();
   /** R-39a: só Procedimentos e Atividade — Pagamentos virou a coluna do dinheiro. */
   const [tab, setTab] = useState<'procedimentos' | 'atividade'>('procedimentos');
+  const [novaEtapaAberta, setNovaEtapaAberta] = useState(false);
   const [showAceiteModal, setShowAceiteModal] = useState(false);
   const [motivoEstorno, setMotivoEstorno] = useState('');
   const [activityLogs, setActivityLogs] = useState<{ id: string; actor_nome: string | null; action: string; created_at: string }[]>([]);
@@ -800,7 +862,7 @@ export function DetalheOrcamentoModal({
             <div className="flex-1 min-h-0 flex flex-col-reverse sm:flex-row">
 
               {/* ── Coluna clínica ─────────────────────────────────────── */}
-              <div className="flex-1 min-w-0 flex flex-col min-h-0">
+              <div className={`${novaEtapaAberta ? 'sm:basis-[36%] sm:flex-none' : 'flex-1'} min-w-0 flex flex-col min-h-0`}>
                 <Tabs
                   value={tab}
                   onValueChange={(v) => setTab(v as typeof tab)}
@@ -1042,11 +1104,11 @@ export function DetalheOrcamentoModal({
                   é gesto de balcão, não cabe atrás de um segundo clique. */}
               <div
                 id="ajustes-financeiros-orcamento"
-                className="w-full sm:w-[416px] sm:shrink-0 border-t sm:border-t-0 sm:border-l border-border flex flex-col min-h-0 bg-teal/[0.04]"
+                className={`${novaEtapaAberta ? 'sm:basis-[64%] sm:w-auto' : 'sm:w-[416px] sm:shrink-0'} w-full border-t sm:border-t-0 sm:border-l border-border flex flex-col min-h-0 bg-teal/[0.04]`}
               >
                 <div className="flex-1 min-h-0 overflow-y-auto p-5">
                   {!orcEditMode && usarCobrancasPorEtapa ? (
-                    <CobrancasPorEtapa orcamento={detalheOrc} pacienteId={pacienteId} permitirNovaEtapa={!temAcordoGlobal} />
+                    <CobrancasPorEtapa orcamento={detalheOrc} pacienteId={pacienteId} permitirNovaEtapa={!temAcordoGlobal} onFormChange={setNovaEtapaAberta} />
                   ) : (
                     <>
                   {orcEditMode ? (

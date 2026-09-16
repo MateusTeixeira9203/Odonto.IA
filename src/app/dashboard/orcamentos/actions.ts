@@ -1213,6 +1213,10 @@ export async function editarOrcamento(
     return {
       error: "Este orçamento tem procedimento retirado. Use a alteração incremental na ficha para preservar o histórico.",
     };
+  }
+  if (erroItensAntes) {
+    return { error: "Não foi possível conferir os itens. O orçamento foi preservado." };
+  }
   if ((itensAntes ?? []).some((item) => item.composicao != null)) {
     return { error: 'Este orçamento contém grupos com composição preservada. A edição da lista inteira não está disponível.' };
   }

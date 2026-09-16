@@ -39,7 +39,7 @@ test('observação vazia é opcional, texto preserva acentos e quebra de linha, 
 test('documento mostra composição aprovada e escapa texto sem fabricar preço para os componentes', () => {
   const orc: OrcamentoHtmlData = { id:'orc-test',created_at:'2026-09-09',status:'aprovado',total:30000,
     valor_acordado:null,desconto:0,validade_dias:30,condicoes_pagamento:null,mostrar_valor_por_item:false,
-    paciente:{nome:'Teste',telefone:null},dentista:{nome:'Renato'},pagamentos:[],
+    paciente:{nome:'Teste',telefone:null},dentista:{nome:'Renato'},pagamentos:[],cobrancas:[],
     itens:[{descricao:'Arcada superior',quantidade:1,preco_total:15000,preco_unitario:15000,aprovado:true,
       composicao:[{descricao:'<script>alert(1)</script>',quantidade:1,procedimentoId:null,eventoIds:[]}]},
       {descricao:'Arcada inferior',quantidade:1,preco_total:15000,preco_unitario:15000,aprovado:false}] };

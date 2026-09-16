@@ -37,7 +37,6 @@ export default async function PacienteDetalhePage({
       prontuario={prontuario}
       clinicaId={dentista.clinica_id}
       dentistaId={dentista.id}
-      userId={dentista.user_id}
       role={dentista.role}
       plano={dentista.plano}
     />

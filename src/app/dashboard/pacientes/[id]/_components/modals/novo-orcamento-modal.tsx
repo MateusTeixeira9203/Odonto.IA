@@ -223,10 +223,10 @@ export function NovoOrcamentoModal({
 
         {/* ── Etapa 2: procedimentos à esquerda, dinheiro à direita (R-39a) ── */}
         {etapaNovoOrc === 'itens' && (
-          <div className="min-h-0 flex-1 overflow-y-auto md:flex md:flex-row md:overflow-hidden">
+          <div className="min-h-0 flex-1 overflow-y-auto md:grid md:grid-cols-[minmax(320px,36%)_minmax(0,64%)] md:overflow-hidden">
 
             {/* Coluna clínica — procedimentos */}
-            <div className="min-w-0 space-y-4 p-4 md:flex-1 md:overflow-y-auto md:p-6">
+            <div className="min-w-0 space-y-4 p-4 md:overflow-y-auto md:p-5">
               {isSecretaria && (
                 <div className="space-y-1">
                   <Label className="text-xs text-text-secondary">Dentista responsável *</Label>
@@ -278,8 +278,6 @@ export function NovoOrcamentoModal({
                 </div>
               )}
 
-              <MontarGrupoOrcamento itens={novoOrcItens} onChange={(itens) => { setNovoOrcItens(itens); setNovoOrcValorFinal(null); setPlanoForma(null); }} disabled={orcSaving} />
-
               <div className="space-y-2">
                 {novoOrcItens.map((item, idx) => {
                   if (item.composicao?.length) return (
@@ -296,21 +294,21 @@ export function NovoOrcamentoModal({
                   return (
                     <div
                       key={idx}
-                      className={`rounded-2xl border p-3 transition-colors ${selecionado ? 'border-teal/40 bg-teal/[0.05]' : 'border-border bg-surface-alt/50 opacity-70'}`}
+                      className={`rounded-xl border p-2.5 transition-colors ${selecionado ? 'border-teal/40 bg-teal/[0.05]' : 'border-border bg-surface-alt/50 opacity-70'}`}
                     >
-                      <div className="flex items-start gap-3">
+                      <div className="grid grid-cols-[24px_minmax(0,1fr)_40px] items-center gap-2">
                         <button
                           type="button"
                           aria-pressed={selecionado}
                           aria-label={`${selecionado ? 'Remover' : 'Adicionar'} ${procedimento || 'procedimento'} do orçamento`}
                           onClick={() => setNovoOrcItens((prev) => prev.map((it, i) => i === idx ? { ...it, selecionado: !selecionado } : it))}
-                          className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition-colors ${selecionado ? 'border-teal bg-teal text-white' : 'border-border text-transparent hover:border-teal/50'}`}
+                          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition-colors ${selecionado ? 'border-teal bg-teal text-white' : 'border-border text-transparent hover:border-teal/50'}`}
                         >
                           <Check className="h-3.5 w-3.5" />
                         </button>
-                        <div className="min-w-0 flex-1 space-y-2">
+                        <div className="min-w-0 space-y-2 sm:grid sm:grid-cols-[minmax(0,1fr)_150px] sm:items-center sm:gap-3 sm:space-y-0">
                           {manual ? (
-                            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(150px,0.55fr)]">
+                            <div className="grid gap-2 sm:col-span-2 sm:grid-cols-[minmax(0,1fr)_minmax(150px,0.55fr)]">
                               <Input list="catalogo-procedimentos" placeholder="Procedimento" value={procedimento} onChange={(e) => atualizarItemManual(idx, e.target.value, local ?? '')} className="h-11 rounded-xl border-border bg-surface text-text-primary" />
                               <Input placeholder="Localização opcional" aria-label="Localização clínica" value={local ?? ''} onChange={(e) => atualizarItemManual(idx, procedimento, e.target.value)} className="h-11 rounded-xl border-border bg-surface text-text-primary" />
                             </div>
@@ -320,9 +318,9 @@ export function NovoOrcamentoModal({
                               {local && <p className="mt-0.5 flex items-center gap-1 text-xs text-text-secondary"><MapPin className="h-3 w-3" />{local}</p>}
                             </div>
                           )}
-                          <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 sm:max-w-sm">
-                            <Input type="number" min="1" value={item.quantidade} onChange={(e) => setNovoOrcItens((prev) => prev.map((it, i) => i === idx ? { ...it, quantidade: parseInt(e.target.value) || 1 } : it))} aria-label="Quantidade" className="h-11 rounded-xl border-border bg-surface text-center font-mono text-text-primary" />
-                            <Input type="text" inputMode="decimal" placeholder="Preço" value={item.preco} onChange={(e) => setNovoOrcItens((prev) => prev.map((it, i) => i === idx ? { ...it, preco: e.target.value } : it))} onBlur={(e) => { const valor = parseValorBR(e.target.value); setNovoOrcItens((prev) => prev.map((it, i) => i === idx ? { ...it, preco: valor > 0 ? formatValorBR(valor) : it.preco } : it)); }} aria-label="Preço" className="h-11 rounded-xl border-border bg-surface font-mono text-text-primary" />
+                          <div className="grid grid-cols-[34px_minmax(0,1fr)] gap-1.5">
+                            <Input type="number" min="1" value={item.quantidade} onChange={(e) => setNovoOrcItens((prev) => prev.map((it, i) => i === idx ? { ...it, quantidade: parseInt(e.target.value) || 1 } : it))} aria-label="Quantidade" className="h-10 rounded-lg border-border bg-surface px-1 text-center font-mono text-text-primary" />
+                            <Input type="text" inputMode="decimal" placeholder="Preço" value={item.preco} onChange={(e) => setNovoOrcItens((prev) => prev.map((it, i) => i === idx ? { ...it, preco: e.target.value } : it))} onBlur={(e) => { const valor = parseValorBR(e.target.value); setNovoOrcItens((prev) => prev.map((it, i) => i === idx ? { ...it, preco: valor > 0 ? formatValorBR(valor) : it.preco } : it)); }} aria-label="Preço" className="h-10 rounded-lg border-border bg-surface px-2 font-mono text-text-primary" />
                           </div>
                         </div>
                         <button type="button" onClick={() => setNovoOrcItens((prev) => prev.filter((_, i) => i !== idx))} className="h-11 w-11 shrink-0 rounded-xl text-text-secondary transition-colors hover:bg-coral-pale hover:text-coral-ink" aria-label="Remover procedimento"><Trash2 className="mx-auto h-4 w-4" /></button>
@@ -343,23 +341,26 @@ export function NovoOrcamentoModal({
               <button type="button" onClick={() => setNovoOrcItens((prev) => [...prev, { procedimentoId: '', descricao: '', quantidade: 1, preco: '', eventoIds: [], origem: 'manual', selecionado: true }])} className="min-h-11 w-full rounded-xl border border-dashed border-border py-3 text-sm text-text-secondary transition-colors hover:bg-surface-alt hover:text-text-primary">
                 <Plus className="mr-2 inline h-4 w-4" />Adicionar procedimento manual
               </button>
+
+              <MontarGrupoOrcamento itens={novoOrcItens} onChange={(itens) => { setNovoOrcItens(itens); setNovoOrcValorFinal(null); setPlanoForma(null); }} disabled={orcSaving} />
             </div>
 
             {/* Coluna do dinheiro — resumo, valor negociado, forma de pagamento (R-39a) */}
-            <div className="flex min-h-0 w-full flex-col border-t border-border bg-teal/[0.04] md:w-[416px] md:shrink-0 md:border-t-0 md:border-l">
+            <div className="flex min-h-0 w-full flex-col border-t border-border bg-teal/[0.04] md:border-t-0 md:border-l">
               <div className="space-y-4 p-4 md:min-h-0 md:flex-1 md:overflow-y-auto md:p-5">
-                <p className="text-xs font-bold uppercase tracking-widest text-teal-ink">Resumo</p>
-
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">
-                    Total dos procedimentos
-                  </p>
-                  <p className="font-mono text-lg font-semibold text-text-primary">
-                    R$ {novoOrcSubtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </p>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-teal-ink">Área de trabalho</p>
+                    <p className="mt-1 text-lg font-semibold text-text-primary">Como ficou o orçamento?</p>
+                    <p className="mt-1 text-xs text-text-secondary">Revise os procedimentos e defina o valor final ou a forma combinada.</p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Total</p>
+                    <p className="mt-1 font-mono text-xl font-semibold text-text-primary">R$ {novoOrcTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                  </div>
                 </div>
 
-                <div className="rounded-2xl p-4 space-y-2 border border-teal/15 bg-teal/[0.07]">
+                <div className="rounded-xl p-3 space-y-2 border border-teal/15 bg-teal/[0.07]">
                   {temDesconto && (
                     <>
                       <div className="flex items-center justify-between">
@@ -377,10 +378,6 @@ export function NovoOrcamentoModal({
                       <div className="h-px bg-teal/20" />
                     </>
                   )}
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-teal-ink/70">Total</p>
-                  <p className="font-mono text-3xl font-bold text-teal-ink leading-none">
-                    R$ {novoOrcTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </p>
                   <p className="text-[10px] text-text-secondary font-mono">
                     {novoOrcItens.filter((item) => item.selecionado !== false && item.descricao.trim()).length} item(s) selecionado(s)
                   </p>
