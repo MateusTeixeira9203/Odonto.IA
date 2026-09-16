@@ -426,10 +426,14 @@ export function ProntuarioTab({
 
   async function salvarEncaminhamento(): Promise<void> {
     if (encaminhamentoEventoIds.length === 0) return;
+    if (!destinoEncaminhamentoId) {
+      toast.error('Escolha o profissional que assumirá o procedimento.');
+      return;
+    }
     setAcaoProcedimento('encaminhamento');
     const resultado = await encaminharProcedimento({
       eventoIds: encaminhamentoEventoIds,
-      dentistaDestinoId: destinoEncaminhamentoId || null,
+      dentistaDestinoId: destinoEncaminhamentoId,
     });
     setAcaoProcedimento(null);
     if (!resultado.ok) {
@@ -437,7 +441,7 @@ export function ProntuarioTab({
       return;
     }
     setEncaminhamentoEventoIds([]);
-    toast.success(destinoEncaminhamentoId ? 'Procedimento encaminhado.' : 'Encaminhamento removido.');
+    toast.success('Procedimento encaminhado.');
     router.refresh();
   }
 
@@ -634,9 +638,13 @@ export function ProntuarioTab({
       && evento.assinaturaId == null
       && evento.retiradoEm == null
       && evento.fichaId != null
-      && evento.dentistaId === dentistaId
+      && (evento.encaminhadoParaId ?? evento.dentistaId) === dentistaId
     ));
     const podeEscreverFicha = podeEditarProcedimentosDaSuperficie(superficie, canWrite);
+    const podeAdicionarNaFicha = podeEscreverFicha && fichaAtual != null && !fichaAtual.assinadoEm && (
+      fichaAtual.responsavel.id === dentistaId
+      || eventosDaFicha.some((evento) => evento.encaminhadoParaId === dentistaId && evento.retiradoEm == null)
+    );
     const podeComplementar = podeEscreverFicha;
     const podeMarcarRetornoDaVisita = podeEscreverFicha
       && atendimentoAberto.atendimentoId != null
@@ -746,14 +754,14 @@ export function ProntuarioTab({
                 </div>
                 {podeEscreverFicha && fichaAtual && !fichaAtual.assinadoEm && (
                   <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
-                    <Button
+                    {podeAdicionarNaFicha && <Button
                       className="min-h-11 flex-1 sm:flex-none"
                       aria-controls={painelAdicionarId}
                       aria-expanded={fichaComAdicaoAbertaId === fichaAtual.id}
                       onClick={() => setFichaComAdicaoAbertaId((idAberto) => idAberto === fichaAtual.id ? null : fichaAtual.id)}
                     >
                       <Plus className="h-4 w-4" /> {fichaComAdicaoAbertaId === fichaAtual.id ? 'Fechar adição' : 'Adicionar procedimentos'}
-                    </Button>
+                    </Button>}
                     <Button
                       variant="outline"
                       className="min-h-11 flex-1 sm:flex-none"
@@ -774,7 +782,7 @@ export function ProntuarioTab({
                   </Button>
                 )}
               </div>
-              {fichaComAdicaoAbertaId === fichaAtual?.id && fichaAtual && (
+              {fichaComAdicaoAbertaId === fichaAtual?.id && fichaAtual && podeAdicionarNaFicha && (
                 <div id={painelAdicionarId}>
                   <AdicionarProcedimentosFicha
                     key={`${clinicaId}:${dentistaId}:${patientId}:${fichaAtual.id}`}
@@ -798,27 +806,35 @@ export function ProntuarioTab({
                     const eventoIds = grupo.eventos.map((item) => item.id);
                     const assinado = grupo.eventos.some((item) => item.assinaturaId != null);
                     const retirado = grupo.eventos.some((item) => item.retiradoEm != null);
+                    const temEncaminhamento = grupo.eventos.some((item) => item.encaminhadoParaId != null);
                     const autorAtual = grupo.eventos.every((item) => item.dentistaId === dentistaId);
                     const encaminhadoAoAtual = grupo.eventos.every((item) => item.encaminhadoParaId === dentistaId);
                     const ficha = evento.fichaId === fichaAtual?.id
                       ? fichaAtual
                       : evento.fichaId ? atendimentoAberto.fichas.find((item) => item.id === evento.fichaId) : null;
                     const fichaAssinada = ficha?.assinadoEm != null;
-                    const podeAlterarStatus = podeEscreverFicha && !retirado && !assinado && !fichaAssinada && (autorAtual || encaminhadoAoAtual);
+                    const podeAlterarStatus = podeEscreverFicha && !retirado && !assinado && !fichaAssinada
+                      && (temEncaminhamento ? encaminhadoAoAtual : autorAtual);
                     const realizados = grupo.eventos.filter((item) => item.status === 'realizado').length;
                     const todosRealizados = realizados === grupo.eventos.length;
                     const todosAFazer = realizados === 0;
-                    const podeOrganizar = podeAlterarStatus && autorAtual && todosAFazer;
+                    const podeOrganizar = podeAlterarStatus && !temEncaminhamento && autorAtual && todosAFazer;
                     const emProximaSessao = todosAFazer && grupo.eventos.every((item) => item.momento_planejado === 'proxima_sessao');
                     const integrantesEditaveis = podeEscreverFicha && !fichaAssinada
                       ? grupo.eventos.filter((item) => !item.retiradoEm && !item.assinaturaId && (
-                        item.dentistaId === dentistaId
-                        || (item.encaminhadoParaId === dentistaId && (item.tipo === 'endodontia' || item.tipo === 'implante'))
+                        item.encaminhadoParaId == null
+                          ? item.dentistaId === dentistaId
+                          : item.encaminhadoParaId === dentistaId && (item.tipo === 'endodontia' || item.tipo === 'implante')
                       ))
                       : [];
                     const podeEditarDetalhes = integrantesEditaveis.length > 0;
+                    const eventoVisualizado = grupo.eventos.find((item) => item.id === eventoDetalheAbertoId);
                     const eventoEmEdicao = integrantesEditaveis.find((item) => item.id === eventoDetalheAbertoId);
-                    const detalheAberto = eventoEmEdicao != null;
+                    const detalheAberto = eventoVisualizado != null;
+                    const podeVerDetalhes = grupo.eventos.some((item) => (
+                      (item.tipo === 'endodontia' || item.tipo === 'implante')
+                      && item.encaminhadoParaId != null
+                    ));
                     const statusClasse = todosRealizados
                       ? 'bg-clinical-done-pale text-clinical-done-ink'
                       : !todosAFazer
@@ -841,6 +857,12 @@ export function ProntuarioTab({
                           Registrado por {evento.autorOriginal.nome}
                           {evento.autorOriginal.cro ? ` · CRO ${evento.autorOriginal.cro}` : ''}
                         </p>
+                        {evento.responsavelEncaminhado && (
+                          <p className="mt-1 text-xs font-medium text-teal-ink">
+                            Responsável clínico: {evento.responsavelEncaminhado.nome}
+                            {evento.responsavelEncaminhado.cro ? ` · CRO ${evento.responsavelEncaminhado.cro}` : ''}
+                          </p>
+                        )}
                         {evento.ultimaAlteracao && (
                           <p className="mt-1.5 text-xs text-text-secondary">
                             Última alteração: {evento.ultimaAlteracao.atorNome ?? 'Profissional não identificado'} · {formatarDataHora(evento.ultimaAlteracao.alteradoEm)} · {rotuloUltimaAlteracao(evento.ultimaAlteracao.acao)}
@@ -901,7 +923,7 @@ export function ProntuarioTab({
                             {emProximaSessao ? 'Planejado para a próxima sessão' : 'Levar para próxima sessão'}
                           </button>
                         )}
-                        {podeEscreverFicha && autorAtual && !retirado && !assinado && !fichaAssinada && todosAFazer && (
+                        {podeEscreverFicha && autorAtual && !temEncaminhamento && !retirado && !assinado && !fichaAssinada && todosAFazer && (
                           <button
                             type="button"
                             onClick={() => {
@@ -913,13 +935,17 @@ export function ProntuarioTab({
                             <Forward className="h-3.5 w-3.5" /> {evento.encaminhadoParaId ? 'Alterar encaminhamento' : 'Encaminhar'}
                           </button>
                         )}
-                        {podeEditarDetalhes && (
+                        {(podeEditarDetalhes || podeVerDetalhes) && (
                           <button
                             type="button"
-                            onClick={() => detalheAberto ? setEventoDetalheAbertoId(null) : abrirDetalhesDoEvento(integrantesEditaveis[0])}
+                            onClick={() => detalheAberto ? setEventoDetalheAbertoId(null) : abrirDetalhesDoEvento(
+                              integrantesEditaveis[0]
+                              ?? grupo.eventos.find((item) => item.tipo === 'endodontia' || item.tipo === 'implante')
+                              ?? grupo.eventos[0],
+                            )}
                             className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-xs font-bold text-text-secondary hover:bg-surface hover:text-text-primary"
                           >
-                            <PenLine className="h-3.5 w-3.5" /> {detalheAberto ? 'Fechar detalhes' : grupo.eventos.length > 1 ? 'Editar integrantes' : autorAtual ? 'Editar procedimento' : 'Ver/editar detalhes'}
+                            <PenLine className="h-3.5 w-3.5" /> {detalheAberto ? 'Fechar detalhes' : podeEditarDetalhes ? grupo.eventos.length > 1 ? 'Editar integrantes' : autorAtual ? 'Editar procedimento' : 'Editar detalhes' : 'Ver detalhes'}
                           </button>
                         )}
                         {ficha && podeEscreverFicha && autorAtual && (assinado || fichaAssinada) && (
@@ -934,9 +960,9 @@ export function ProntuarioTab({
                         {assinado && <span className="text-xs font-semibold text-text-secondary">Assinado · registro bloqueado</span>}
                         {carregando && <Loader2 className="h-4 w-4 animate-spin text-teal" aria-label="Salvando" />}
                       </div>
-                      {eventoEmEdicao && (
+                      {eventoVisualizado && (
                         <div>
-                        {grupo.eventos.length > 1 && (
+                        {eventoEmEdicao && grupo.eventos.length > 1 && (
                           <label className="mt-3 grid gap-1.5 text-xs font-semibold text-foreground">
                             Integrante que deseja editar
                             <select
@@ -952,12 +978,13 @@ export function ProntuarioTab({
                           </label>
                         )}
                         <ProcedimentoDetalheFicha
-                          key={eventoEmEdicao.id}
-                          evento={eventoEmEdicao}
-                          permitirNome={eventoEmEdicao.dentistaId === dentistaId}
-                          permitirObservacao={eventoEmEdicao.dentistaId === dentistaId}
-                          permitirDetalhe={eventoEmEdicao.tipo === 'endodontia' || eventoEmEdicao.tipo === 'implante'}
-                          permitirExclusao={eventoEmEdicao.dentistaId === dentistaId}
+                          key={eventoVisualizado.id}
+                          evento={eventoVisualizado}
+                          permitirNome={eventoEmEdicao?.dentistaId === dentistaId && eventoEmEdicao.encaminhadoParaId == null}
+                          permitirObservacao={eventoEmEdicao?.dentistaId === dentistaId && eventoEmEdicao.encaminhadoParaId == null}
+                          permitirDetalhe={eventoEmEdicao != null && (eventoEmEdicao.tipo === 'endodontia' || eventoEmEdicao.tipo === 'implante')}
+                          permitirExclusao={eventoEmEdicao?.dentistaId === dentistaId && eventoEmEdicao.encaminhadoParaId == null}
+                          somenteLeitura={eventoEmEdicao == null}
                           onFechar={() => setEventoDetalheAbertoId(null)}
                           onSalvo={() => {
                             setEventoDetalheAbertoId(null);

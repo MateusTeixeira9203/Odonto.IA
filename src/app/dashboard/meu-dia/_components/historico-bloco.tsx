@@ -401,6 +401,14 @@ export function HistoricoBloco({
 }: HistoricoBlocoProps) {
   const [visitaAberta, setVisitaAberta] = useState<string | null>(visitas[0]?.fichaId ?? null);
   const [colarAberto, setColarAberto] = useState(false);
+  const [filtroHistorico, setFiltroHistorico] = useState<'todos' | 'meus' | string>('todos');
+  const profissionaisDoHistorico = [...new Map(
+    visitas.map((visita) => [visita.dentistaId, visita.dentistaNome]),
+  ).entries()];
+  const visitasFiltradas = visitas.filter((visita) => (
+    filtroHistorico === 'todos'
+    || (filtroHistorico === 'meus' ? visita.dentistaId === meuDentistaId : visita.dentistaId === filtroHistorico)
+  ));
   const pendenciasPorId = new Map(
     [...plano.minhaFila, ...plano.recebidas, ...plano.acompanhadas]
       .map((item) => [item.pendencia.id, item]),
@@ -448,7 +456,31 @@ export function HistoricoBloco({
         )}
       </section>
       <div className="mb-3 border-t border-border pt-3">
-        <p className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Histórico clínico</p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Histórico clínico</p>
+          {profissionaisDoHistorico.length > 1 && (
+            <label className="sr-only" htmlFor="filtro-historico-clinico">Filtrar histórico por profissional</label>
+          )}
+          {profissionaisDoHistorico.length > 1 && (
+            <select
+              id="filtro-historico-clinico"
+              value={filtroHistorico}
+              onChange={(event) => {
+                const proximo = event.target.value;
+                setFiltroHistorico(proximo);
+                const primeira = visitas.find((visita) => (
+                  proximo === 'todos' || (proximo === 'meus' ? visita.dentistaId === meuDentistaId : visita.dentistaId === proximo)
+                ));
+                setVisitaAberta(primeira?.fichaId ?? null);
+              }}
+              className="min-h-9 rounded-lg border border-border bg-surface px-2 text-xs font-semibold text-text-primary"
+            >
+              <option value="todos">Todos os dentistas</option>
+              <option value="meus">Meus atendimentos</option>
+              {profissionaisDoHistorico.map(([id, nome]) => <option key={id} value={id}>{nome}</option>)}
+            </select>
+          )}
+        </div>
         <p className="mt-1 text-xs text-text-secondary">Visitas mais recentes primeiro, com contexto completo do tratamento.</p>
       </div>
       {visitas.length === 0 ? (
@@ -465,9 +497,11 @@ export function HistoricoBloco({
             Colar histórico do Word
           </button>
         </div>
+      ) : visitasFiltradas.length === 0 ? (
+        <p className="text-sm text-text-secondary">Nenhum atendimento neste filtro.</p>
       ) : (
           <div className="flex min-h-0 flex-col gap-2">
-            {visitas.map((v) => (
+            {visitasFiltradas.map((v) => (
               <VisitaEntry
                 key={v.fichaId}
                 v={v}
