@@ -1,8 +1,14 @@
 "use server";
 
+import { isTeamWorkspaceEnabled } from '@/server/auth/team-workspace-pilot';
 import { requireUser } from "@/server/auth/user";
 import { requireClinicContext } from "@/server/auth/clinic";
 import { enviarEmailD0 } from "@/server/services/onboarding-emails";
+import {
+  iniciarOnboardingComercial,
+  type CommercialOnboardingInput,
+  type CommercialOnboardingStartResult,
+} from "@/server/billing/commercial-onboarding";
 import type { FocoPrincipal } from "@/lib/persona";
 import type { Especialidade } from "@/lib/especialidades";
 
@@ -16,6 +22,22 @@ export interface IniciarOnboardingInput {
   nomeConsultorio: string;
   /** Persona escolhida na identidade (Workstream E). */
   foco: FocoPrincipal;
+}
+
+export type IniciarOnboardingR165Input = CommercialOnboardingInput;
+
+/**
+ * Registra uma unidade comercial R165 e devolve-a pendente de checkout. Esta ação
+ * não chama Stripe nem muda o fluxo R92; a futura tela de modalidade a consumirá.
+ */
+export async function iniciarOnboardingR165(
+  data: unknown,
+): Promise<CommercialOnboardingStartResult> {
+  if (!isTeamWorkspaceEnabled()) return { ok: false, codigo: 'INDISPONIVEL' };
+  const { supabase } = await requireUser();
+  return iniciarOnboardingComercial(data, {
+    start: async (input) => supabase.rpc('iniciar_onboarding_r165', input),
+  });
 }
 
 const LIMITE_POR_PLANO: Record<PlanoClinica, number> = { SOLO: 1, CLINICA: 5 };

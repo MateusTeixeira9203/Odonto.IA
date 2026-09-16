@@ -1,3 +1,5 @@
+import { isTeamWorkspaceEnabled } from '@/server/auth/team-workspace-pilot';
+import { CommercialOnboardingForm } from './_components/commercial-onboarding-form';
 import { redirect } from 'next/navigation';
 import { OnboardingClient, type OnboardingStep } from './_components/onboarding-client';
 import { getDentistaCached } from '@/lib/get-dentista';
@@ -29,6 +31,8 @@ export default async function OnboardingPage({
   const initialStep: OnboardingStep = dentista && (!billingAtivo || checkoutConfirmado || clinicaIsenta)
     ? 'dex'
     : 'identidade';
+
+  if (!dentista && isTeamWorkspaceEnabled()) return <CommercialOnboardingForm />;
 
   return (
     <OnboardingClient
