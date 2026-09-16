@@ -128,7 +128,7 @@ function rotuloStatusAgenda(status: string): string {
   return rotulos[status] ?? status;
 }
 
-type ResumoAberto = 'atendimentos' | 'tratamentos' | 'pendencias';
+type ResumoAberto = 'atendimentos' | 'pendencias';
 
 type GrupoProcedimento = {
   chave: string;
@@ -338,28 +338,11 @@ export function ProntuarioTab({
   const atendimentosVisiveis = atendimentos.filter((atendimento) => (
     filtroClinico === 'tudo' || atendimento.eventos.some((evento) => evento.status === filtroClinico)
   ));
-  const tratamentosEmCurso = dados.fichas.filter((ficha) => (
-    ficha.status === 'aberta'
-    && (ficha.totalProcedimentos === 0 || ficha.procedimentosPendentes > 0)
-  ));
   const todasFichas = dados.fichas;
   const eventosClinicosUnicos = Array.from(new Map(
     dados.fichas.flatMap((ficha) => ficha.eventos).map((evento) => [evento.id, evento] as const),
   ).values());
-  const resumosTratamento = tratamentosEmCurso.map((ficha) => {
-    const eventos = eventosClinicosUnicos.filter((evento) => evento.fichaId === ficha.id);
-    const realizados = eventos.filter((evento) => evento.status === 'realizado').length;
-    const procedimentos = [...new Set(eventos.map((evento) => (
-      nomeClinicoProcedimento(evento)
-    )))];
-    return {
-      ficha,
-      realizados,
-      total: eventos.length,
-      progresso: eventos.length > 0 ? Math.round((realizados / eventos.length) * 100) : 0,
-      procedimentos,
-    };
-  });
+  const fichasPorId = new Map(dados.fichas.map((ficha) => [ficha.id, ficha]));
   const eventosPendentes = eventosClinicosUnicos.filter((evento) => evento.status === 'indicado');
   const pendencias = eventosPendentes.length;
 
@@ -1340,7 +1323,7 @@ export function ProntuarioTab({
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-4 py-4">
         <div>
           <p className="font-heading text-xl text-text-primary">Prontuário</p>
-          <p className="mt-0.5 text-sm text-text-secondary">Fichas em curso, consultas e histórico clínico do paciente.</p>
+          <p className="mt-0.5 text-sm text-text-secondary">Consultas e histórico clínico do paciente.</p>
         </div>
         {canWrite && (
           <div className="flex flex-wrap items-center gap-2">
@@ -1354,44 +1337,10 @@ export function ProntuarioTab({
         )}
       </div>
 
-      <div className="space-y-4 rounded-2xl border border-border bg-surface p-4">
-        <div>
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-text-secondary">Fichas em curso</p>
-            <div className="mt-2 divide-y divide-border">
-              {resumosTratamento.slice(0, 3).map(({ ficha, realizados, total, progresso, procedimentos }) => (
-                <button
-                  key={ficha.id}
-                  type="button"
-                  onClick={() => abrirFicha(ficha.id)}
-                  className="grid w-full grid-cols-1 gap-2 py-3 text-left transition-colors hover:text-teal-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal/40 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-x-3"
-                >
-                  <span className="min-w-0">
-                    <span className="block truncate text-xs font-bold text-text-primary">{ficha.nome}</span>
-                    <span className="mt-0.5 block truncate text-[11px] text-text-secondary">
-                      {procedimentos.length > 0 ? procedimentos.slice(0, 3).join(' · ') : 'Sem procedimentos estruturados'}
-                    </span>
-                  </span>
-                  <span className="whitespace-nowrap text-[11px] font-bold tabular-nums text-text-secondary sm:text-right">
-                    {progresso}% · {realizados} de {total} procedimentos
-                  </span>
-                  <span
-                    aria-hidden="true"
-                    className="h-1 w-full overflow-hidden rounded-full bg-border sm:col-span-2"
-                  >
-                    <span className="block h-full rounded-full bg-teal transition-[width] motion-reduce:transition-none" style={{ width: `${progresso}%` }} />
-                  </span>
-                </button>
-              ))}
-              {resumosTratamento.length === 0 && (
-                <p className="py-3 text-xs text-text-secondary">Nenhuma Ficha em curso.</p>
-              )}
-            </div>
-          </div>
-        <div className="border-t border-border pt-4">
+      <div className="rounded-2xl border border-border bg-surface p-4">
             <div className="flex flex-wrap gap-2">
               {([
                 ['atendimentos', `${atendimentos.length} atendimento${atendimentos.length === 1 ? '' : 's'}`],
-                ['tratamentos', `${tratamentosEmCurso.length} ficha${tratamentosEmCurso.length === 1 ? '' : 's'} em curso`],
                 ['pendencias', `${pendencias} pendência${pendencias === 1 ? '' : 's'}`],
               ] as const).map(([tipo, rotulo]) => {
                 const aberto = resumoAberto === tipo;
@@ -1435,16 +1384,6 @@ export function ProntuarioTab({
                     {atendimentos.length === 0 && <p className="text-xs text-text-secondary">Nenhum atendimento registrado.</p>}
                   </div>
                 )}
-                {resumoAberto === 'tratamentos' && (
-                  <div className="grid gap-1">
-                    {tratamentosEmCurso.map((ficha) => (
-                      <button key={ficha.id} type="button" onClick={() => abrirFicha(ficha.id)} className="flex min-h-9 items-center justify-between gap-3 rounded-lg px-2 text-left text-xs font-semibold text-text-primary hover:bg-surface-alt">
-                        <span>{ficha.nome}</span><span className="text-text-secondary">Abrir ficha →</span>
-                      </button>
-                    ))}
-                    {tratamentosEmCurso.length === 0 && <p className="text-xs text-text-secondary">Nenhuma Ficha em curso.</p>}
-                  </div>
-                )}
                 {resumoAberto === 'pendencias' && (
                   <div className="grid gap-1">
                     {eventosPendentes.slice(0, 6).map((evento) => {
@@ -1472,7 +1411,6 @@ export function ProntuarioTab({
               </div>
             )}
           </div>
-      </div>
 
       <div className="flex flex-wrap items-center gap-2 border-b border-border pb-3">
         {([
@@ -1554,16 +1492,24 @@ export function ProntuarioTab({
                 )}
 
                 <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-3">
-                  {atendimento.fichas.map((ficha) => (
-                    <button
-                      key={ficha.id}
-                      type="button"
-                      onClick={() => abrirFicha(ficha.id, atendimento.id)}
-                      className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-bold text-text-secondary transition-colors hover:border-teal/40 hover:text-teal-ink"
-                    >
-                      <FolderOpen className="h-3.5 w-3.5" /> Abrir ficha · {ficha.nome} <ChevronRight className="h-3.5 w-3.5" />
-                    </button>
-                  ))}
+                  {atendimento.fichas.map((ficha) => {
+                    const fichaCompleta = fichasPorId.get(ficha.id);
+                    const total = fichaCompleta?.totalProcedimentos ?? 0;
+                    const realizados = fichaCompleta?.procedimentosRealizados ?? 0;
+                    const progresso = total > 0 ? Math.round((realizados / total) * 100) : 0;
+                    return (
+                      <button
+                        key={ficha.id}
+                        type="button"
+                        onClick={() => abrirFicha(ficha.id, atendimento.id)}
+                        className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-border px-3 text-xs font-bold text-text-secondary transition-colors hover:border-teal/40 hover:text-teal-ink"
+                      >
+                        <FolderOpen className="h-3.5 w-3.5" /> Abrir ficha · {ficha.nome}
+                        {total > 0 && <span className="border-l border-border pl-2 tabular-nums text-text-secondary">{progresso}% · {realizados}/{total}</span>}
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </button>
+                    );
+                  })}
                   {atendimento.fichas.length === 0 && (
                     <button
                       type="button"
