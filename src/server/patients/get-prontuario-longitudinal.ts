@@ -34,6 +34,8 @@ export type ProntuarioEvento = OdontogramaEventoDraft & {
   retiradoEm?: string | null;
   dentistaId: string;
   autorOriginal: ProntuarioProfissional;
+  /** Profissional que assumiu a responsabilidade clínica após encaminhamento. */
+  responsavelEncaminhado: ProntuarioProfissional | null;
   atualizadoEm: string;
   /**
    * Auditoria de uma alteração de encaminhamento. Não é a data clínica do
@@ -215,6 +217,7 @@ function paraEvento(
   raw: EventoRaw,
   ultimaAlteracao: ProntuarioEvento['ultimaAlteracao'],
   autorOriginal: ProntuarioProfissional,
+  responsavelEncaminhado: ProntuarioProfissional | null,
 ): ProntuarioEvento {
   const ancora: OdontogramaEventoDraft['ancora'] = { nivel: raw.nivel };
   if (raw.arcada) ancora.arcada = raw.arcada;
@@ -229,6 +232,7 @@ function paraEvento(
     retiradoEm: raw.retirado_em,
     dentistaId: raw.dentista_id,
     autorOriginal,
+    responsavelEncaminhado,
     tipo: raw.tipo,
     procedimentoId: raw.procedimento_id,
     procedimentoNome: raw.procedimento_nome,
@@ -382,6 +386,7 @@ export async function getProntuarioLongitudinal({
     evento,
     ultimaAlteracaoPorEvento.get(evento.id) ?? null,
     profissionais.get(evento.dentista_id) ?? profissionalDesconhecido,
+    evento.encaminhado_para ? profissionais.get(evento.encaminhado_para) ?? profissionalDesconhecido : null,
   ));
   const eventosAtivos = eventos.filter((evento) => evento.retiradoEm == null);
   const eventosPorAssinatura = mapaDeListas(eventos, (evento) => evento.assinaturaId ?? null);

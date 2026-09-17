@@ -199,7 +199,7 @@ export async function alternarStatusRegistro(params: {
     .in('id', params.eventoIds)
     .eq('clinica_id', clinicId)
     .is('retirado_em', null)
-    .eq('dentista_id', dentistaPerfil.id);
+    .or(`and(dentista_id.eq.${dentistaPerfil.id},encaminhado_para.is.null),encaminhado_para.eq.${dentistaPerfil.id}`);
 
   if (!eventos || eventos.length !== params.eventoIds.length) {
     return { ok: false, error: 'Registro não encontrado ou de outro dentista.' };
@@ -235,7 +235,7 @@ export async function alternarStatusRegistro(params: {
     .in('id', params.eventoIds)
     .eq('clinica_id', clinicId)
     .is('retirado_em', null)
-    .eq('dentista_id', dentistaPerfil.id);
+    .or(`and(dentista_id.eq.${dentistaPerfil.id},encaminhado_para.is.null),encaminhado_para.eq.${dentistaPerfil.id}`);
 
   if (error) {
     // R-03a: evento assinado individualmente é imutável mesmo com a ficha ainda aberta
@@ -278,7 +278,8 @@ export async function alternarMomentoRegistro(params: {
     .in('id', params.eventoIds)
     .eq('clinica_id', clinicId)
     .is('retirado_em', null)
-    .eq('dentista_id', dentistaPerfil.id);
+    .eq('dentista_id', dentistaPerfil.id)
+    .is('encaminhado_para', null);
 
   if (!eventos || eventos.length !== params.eventoIds.length) {
     return { ok: false, error: 'Registro não encontrado ou de outro dentista.' };
@@ -301,7 +302,8 @@ export async function alternarMomentoRegistro(params: {
     .in('id', params.eventoIds)
     .eq('clinica_id', clinicId)
     .is('retirado_em', null)
-    .eq('dentista_id', dentistaPerfil.id);
+    .eq('dentista_id', dentistaPerfil.id)
+    .is('encaminhado_para', null);
 
   if (error) {
     if (error.message.includes('evento_assinado_imutavel')) {
@@ -319,10 +321,8 @@ export async function alternarMomentoRegistro(params: {
 }
 
 /**
- * Autor encaminha (ou remove o encaminhamento de) um registro planejado seu a outro
- * dentista da clínica (R-04). Nunca transfere autoria — `dentista_id` continua o autor;
- * só `encaminhado_para` muda. RLS de escrita (migration 101) já cobre esta coluna pro
- * dono; nenhuma policy nova.
+ * Autor encaminha uma vez um registro planejado a outro dentista da clínica. Nunca transfere
+ * autoria — `dentista_id` continua o autor; `encaminhado_para` fixa a responsabilidade clínica.
  */
 export type EncaminharResult =
   | { ok: true; encaminhados: string[]; ignorados: string[] }
@@ -330,11 +330,11 @@ export type EncaminharResult =
 
 export async function encaminharProcedimento(params: {
   eventoIds: string[];
-  /** null = remove o encaminhamento existente. */
   dentistaDestinoId: string | null;
 }): Promise<EncaminharResult> {
   const { supabase, user, clinicId, role } = await requireClinicContext();
   if (role === 'secretaria') return { ok: false, error: 'Sem permissão.' };
+  if (params.dentistaDestinoId == null) return { ok: false, error: 'Um encaminhamento assumido não pode ser removido nem trocado.' };
   if (params.eventoIds.length === 0) return { ok: true, encaminhados: [], ignorados: [] };
 
   const { data: dentistaPerfil } = await supabase
@@ -357,7 +357,8 @@ export async function encaminharProcedimento(params: {
     .in('id', params.eventoIds)
     .eq('clinica_id', clinicId)
     .is('retirado_em', null)
-    .eq('dentista_id', dentistaPerfil.id);
+    .eq('dentista_id', dentistaPerfil.id)
+    .is('encaminhado_para', null);
 
   const idsIndicados = new Set(
     (eventos ?? []).filter((e) => e.status === 'indicado').map((e) => e.id),
@@ -388,25 +389,16 @@ export async function encaminharProcedimento(params: {
     };
   }
 
-  let destino: { id: string; nome: string } | null = null;
-  if (params.dentistaDestinoId != null) {
-    // Destino elegível: mesma clínica, ativo, nunca secretária, nunca o próprio autor —
-    // validado no servidor, não só escondido na UI (a RLS não filtra isso sozinha).
-    const { data: destinoData } = await supabase
-      .from('dentistas')
-      .select('id, nome')
-      .eq('id', params.dentistaDestinoId)
-      .eq('clinica_id', clinicId)
-      // R-94 — .neq('role','secretaria') sozinho deixaria 'protetico' virar destino
-      // de encaminhamento clínico; ele não atende paciente.
-      .in('role', ['admin', 'dentista'])
-      .eq('ativo', true)
-      .neq('id', dentistaPerfil.id)
-      .maybeSingle();
-
-    if (!destinoData) return { ok: false, error: 'Destino inválido.' };
-    destino = destinoData;
-  }
+  const { data: destino } = await supabase
+    .from('dentistas')
+    .select('id, nome')
+    .eq('id', params.dentistaDestinoId)
+    .eq('clinica_id', clinicId)
+    .in('role', ['admin', 'dentista'])
+    .eq('ativo', true)
+    .neq('id', dentistaPerfil.id)
+    .maybeSingle();
+  if (!destino) return { ok: false, error: 'Destino inválido.' };
 
   // R-140c: alteração e trilha de auditoria precisam ser uma operação só. A RPC
   // reafirma autor, clínica, status, ficha não assinada e destino antes de gravar
@@ -424,26 +416,22 @@ export async function encaminharProcedimento(params: {
     return { ok: false, error: 'Não foi possível encaminhar o registro.' };
   }
 
-  if (destino) {
-    const { data: paciente } = await supabase
-      .from('pacientes')
-      .select('nome')
-      .eq('id', eventosElegiveis[0].paciente_id)
-      .maybeSingle<{ nome: string }>();
+  const { data: paciente } = await supabase
+    .from('pacientes')
+    .select('nome')
+    .eq('id', eventosElegiveis[0].paciente_id)
+    .maybeSingle<{ nome: string }>();
 
-    await inserirNotificacao(supabase, {
-      clinicaId:     clinicId,
-      paraRole:      'dentista',
-      paraDentistaId: destino.id,
-      deDentistaId:  dentistaPerfil.id,
-      tipo:          'procedimento_encaminhado',
-      titulo:        `Procedimento encaminhado — ${paciente?.nome ?? 'Paciente'}`,
-      mensagem:      'Um procedimento planejado foi encaminhado pra você.',
-      href:          `/dashboard/pacientes/${eventosElegiveis[0].paciente_id}`,
-    });
-  }
+  await inserirNotificacao(supabase, {
+    clinicaId: clinicId, paraRole: 'dentista', paraDentistaId: destino.id,
+    deDentistaId: dentistaPerfil.id, tipo: 'procedimento_encaminhado',
+    titulo: `Procedimento encaminhado — ${paciente?.nome ?? 'Paciente'}`,
+    mensagem: 'Um procedimento planejado foi encaminhado pra você.',
+    href: `/dashboard/pacientes/${eventosElegiveis[0].paciente_id}`,
+  });
 
   revalidatePath(`/dashboard/pacientes/${eventosElegiveis[0].paciente_id}`);
+  revalidatePath('/dashboard/meu-dia');
   return { ok: true, encaminhados: idsElegiveis, ignorados };
 }
 
@@ -823,7 +811,15 @@ export async function assinarTodosRealizadosDaFicha(params: {
   assinaturaDataUrl: string;
   conclusao?: z.infer<typeof conclusaoAssinadaSchema>;
 }): Promise<AssinarProcedimentosResult> {
-  const { supabase, clinicId } = await requireClinicContext();
+  const { supabase, clinicId, user } = await requireClinicContext();
+
+  const { data: dentista } = await supabase
+    .from('dentistas')
+    .select('id')
+    .eq('clinica_id', clinicId)
+    .eq('user_id', user.id)
+    .maybeSingle<{ id: string }>();
+  if (!dentista) return { ok: false, error: 'Perfil de dentista não encontrado.' };
 
   const { data: eventos } = await supabase
     .from('odontograma_eventos')
@@ -833,7 +829,8 @@ export async function assinarTodosRealizadosDaFicha(params: {
     .eq('clinica_id', clinicId)
     .is('retirado_em', null)
     .eq('status', 'realizado')
-    .is('assinatura_id', null);
+    .is('assinatura_id', null)
+    .or(`and(dentista_id.eq.${dentista.id},encaminhado_para.is.null),encaminhado_para.eq.${dentista.id}`);
 
   const eventoIds = (eventos ?? []).map((e) => e.id as string);
   if (eventoIds.length === 0) {

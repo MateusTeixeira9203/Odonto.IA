@@ -2621,7 +2621,6 @@ export function FichasTab({
                               const encaminhavel = podeEncaminhar && data.status === 'indicado' && !data.encaminhadoPara;
                               const assinavel = podeAssinarLote && data.status === 'realizado' && !data.assinada;
                               const elegivel = modoAtual === 'encaminhar' ? encaminhavel : modoAtual === 'assinar' ? assinavel : false;
-                              const jaEncaminhado = podeEncaminhar && data.status === 'indicado' && !!data.encaminhadoPara;
                               // No modo, o que não é elegível pra esse tipo de lote apaga e fica inerte (#8).
                               if (emModo && !elegivel) {
                                 return (
@@ -2648,19 +2647,16 @@ export function FichasTab({
                                     onToggleStatus={
                                       emModo
                                         ? undefined
-                                        : podeEditarFicha(evo) && !data.assinada
+                                        : podeEditarFicha(evo) && !data.encaminhadoPara && !data.assinada
                                           ? () => void toggleStatusRegistro(evo, ids, data.status)
                                           : data.encaminhadoPara?.id === dentistaId && !data.assinada
                                             ? () => void concluirEncaminhado(evo, ids, data.status)
                                             : undefined
                                     }
                                     onToggleMomento={
-                                      !emModo && podeEditarFicha(evo) && !data.assinada
+                                      !emModo && podeEditarFicha(evo) && !data.encaminhadoPara && !data.assinada
                                         ? () => void toggleMomentoRegistro(evo, ids, data.momentoPlanejado)
                                         : undefined
-                                    }
-                                    onRemoverEncaminhamento={
-                                      !emModo && jaEncaminhado ? () => void encaminharRegistro(evo, ids, null) : undefined
                                     }
                                   >
                                     {/* R-04b — destino do encaminhamento edita a tabela; os demais veem read-only.
