@@ -24,6 +24,11 @@ const DRX = 'dent-x';
 const DRY = 'dent-y';
 
 const reg = (destino: { id: string; nome: string } | null): RegistroResponsavel => ({ encaminhadoPara: destino });
+const regDoAutor = (autorId: string, autorNome: string): RegistroResponsavel => ({
+  encaminhadoPara: null,
+  autorId,
+  autorNome,
+});
 const DRX_PESSOA = { id: DRX, nome: 'Dra. X' };
 
 // Fichas de exemplo: minha ficha com 1 registro meu + 1 encaminhado à Dra. X.
@@ -89,6 +94,15 @@ test('GATE: registro encaminhado à Dra. X aparece no filtro "[Dra. X]"', () => 
   const vis = eventosVisiveis(fichaMinhaMista.eventos, EU, DRX, EU);
   assert.equal(vis.length, 1);
   assert.equal(vis[0].encaminhadoPara?.id, DRX);
+});
+
+test('GATE: procedimento novo do dentista que recebeu a ficha entra em "Meus"', () => {
+  // A ficha foi criada por EU, mas a Dra. X recebeu um procedimento e registrou outro nela.
+  // Sem autorId, o segundo era atribuído a EU e ficava fora do orçamento da Dra. X.
+  const eventos = [reg(DRX_PESSOA), regDoAutor(DRX, 'Dra. X')];
+  const vis = eventosVisiveis(eventos, EU, FILTRO_MEUS, DRX);
+  assert.equal(vis.length, 2);
+  assert.deepEqual(derivarResponsaveis([{ autorId: EU, autorNome: 'Eu', eventos }]), [{ id: DRX, nome: 'Dra. X' }]);
 });
 
 test('fichaVisivel: Todos → sempre visível', () => {
