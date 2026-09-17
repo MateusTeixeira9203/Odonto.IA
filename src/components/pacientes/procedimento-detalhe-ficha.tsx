@@ -38,6 +38,7 @@ interface ProcedimentoDetalheFichaProps {
   permitirObservacao: boolean;
   permitirDetalhe: boolean;
   permitirExclusao: boolean;
+  somenteLeitura?: boolean;
   onFechar: () => void;
   onSalvo: () => void;
   onExcluido: () => void;
@@ -51,6 +52,7 @@ export function ProcedimentoDetalheFicha({
   permitirObservacao,
   permitirDetalhe,
   permitirExclusao,
+  somenteLeitura = false,
   onFechar,
   onSalvo,
   onExcluido,
@@ -82,6 +84,7 @@ export function ProcedimentoDetalheFicha({
   const temDetalheTecnico = detalhe.tipo !== 'sem_detalhe';
 
   async function salvar(): Promise<void> {
+    if (somenteLeitura) return;
     if (envioEmCurso.current || conflito) return;
     if (permitirNome && (!nome.trim() || nome.trim().length > 500)) {
       setErro('Informe um nome com até 500 caracteres.');
@@ -150,11 +153,11 @@ export function ProcedimentoDetalheFicha({
   }
 
   return (
-    <section className="mt-3 rounded-xl border border-teal/35 bg-teal/5 p-3" aria-label="Editar procedimento">
+    <section className="mt-3 rounded-xl border border-teal/35 bg-teal/5 p-3" aria-label={somenteLeitura ? 'Detalhes do procedimento' : 'Editar procedimento'}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-teal-ink">Editar procedimento</p>
-          <p className="mt-1 text-xs text-text-secondary">A edição fica nesta Ficha e registra a alteração no histórico clínico.</p>
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-teal-ink">{somenteLeitura ? 'Detalhes do procedimento' : 'Editar procedimento'}</p>
+          <p className="mt-1 text-xs text-text-secondary">{somenteLeitura ? 'Registro sob responsabilidade de outro profissional.' : 'A edição fica nesta Ficha e registra a alteração no histórico clínico.'}</p>
         </div>
         <button type="button" onClick={onFechar} disabled={salvando || apagando} className="flex min-h-11 min-w-11 items-center justify-center rounded-md p-1 text-text-secondary hover:bg-surface hover:text-text-primary" aria-label="Fechar detalhes">
           <X className="h-4 w-4" />
@@ -181,7 +184,7 @@ export function ProcedimentoDetalheFicha({
         </div>
       )}
 
-      <fieldset disabled={salvando || apagando}>
+      <fieldset disabled={somenteLeitura || salvando || apagando}>
       <legend className="sr-only">Campos editáveis do procedimento</legend>
       {permitirNome && (
         <label className="mt-3 grid gap-1.5 text-xs font-bold text-foreground">
@@ -213,20 +216,22 @@ export function ProcedimentoDetalheFicha({
         </label>
       )}
 
-      {permitirDetalhe && detalhe.tipo === 'endodontia' && (
+      {(permitirDetalhe || somenteLeitura) && detalhe.tipo === 'endodontia' && (
         <div className="mt-4 rounded-lg border border-border bg-surface p-3">
           <EndoForm
             valor={detalhe.valor}
             onChange={(valor) => { setDetalhe({ tipo: 'endodontia', valor }); setDetalheEditado(true); }}
+            readOnly={somenteLeitura}
           />
         </div>
       )}
 
-      {permitirDetalhe && detalhe.tipo === 'implante' && (
+      {(permitirDetalhe || somenteLeitura) && detalhe.tipo === 'implante' && (
         <div className="mt-4 rounded-lg border border-border bg-surface p-3">
           <ImplanteForm
             valor={detalhe.valor}
             onChange={(valor) => { setDetalhe({ tipo: 'implante', valor }); setDetalheEditado(true); }}
+            readOnly={somenteLeitura}
           />
         </div>
       )}
@@ -240,11 +245,11 @@ export function ProcedimentoDetalheFicha({
           </Button>
         ) : <span />}
         <div className="flex flex-wrap justify-end gap-2">
-        <Button variant="ghost" size="sm" className="min-h-11" onClick={onFechar} disabled={salvando || apagando}>Cancelar</Button>
-        <Button size="sm" className="min-h-11" onClick={() => void salvar()} disabled={salvando || apagando || !!conflito}>
+        <Button variant="ghost" size="sm" className="min-h-11" onClick={onFechar} disabled={salvando || apagando}>{somenteLeitura ? 'Fechar' : 'Cancelar'}</Button>
+        {!somenteLeitura && <Button size="sm" className="min-h-11" onClick={() => void salvar()} disabled={salvando || apagando || !!conflito}>
           {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Salvar alterações
-        </Button>
+        </Button>}
         </div>
       </div>
 

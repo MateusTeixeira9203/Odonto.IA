@@ -196,6 +196,23 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
   const valorParcelado = Math.max(0, valorFinal - entradaNumero);
   const itemPorId = useMemo(() => new Map(orcamento.itens.map((item) => [item.id, item])), [orcamento.itens]);
 
+  const abrirNovaEtapa = () => {
+    setItemIds(itensElegiveis.map((item) => item.id));
+    setAlterandoSelecao(false);
+    setErro(null);
+    setFormAberto(true);
+  };
+
+  // A primeira cobrança começa com os procedimentos já aprovados. Separar itens
+  // continua sendo uma escolha explícita do dentista dentro da etapa.
+  useEffect(() => {
+    if (permitirNovaEtapa && orcamento.cobrancas.length === 0 && itensElegiveis.length > 0 && !formAberto) {
+      abrirNovaEtapa();
+    }
+  // A abertura automática vale apenas para a primeira etapa do orçamento.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orcamento.id]);
+
   const toggleItem = (itemId: string) => {
     setItemIds((current) => current.includes(itemId)
       ? current.filter((id) => id !== itemId)
@@ -235,8 +252,12 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
       setErro('Informe entre 2 e 24 parcelas.');
       return;
     }
-    if (formaCobranca === 'parcelado' && parcelas < 2) {
+    if (formaCobranca !== 'avista' && parcelas < 2) {
       setErro('Parcelamento mensal começa em 2 parcelas.');
+      return;
+    }
+    if (formaCobranca === 'entrada_parcelas' && (entradaNumero <= 0 || entradaNumero >= valorFinal)) {
+      setErro('A entrada precisa ser maior que zero e menor que o valor da etapa.');
       return;
     }
     setSaving(true);
