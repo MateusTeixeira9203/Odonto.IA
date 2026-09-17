@@ -114,7 +114,7 @@ const CAMPOS_FICHA_ORC =
   'id, created_at, data_atendimento, queixa_principal, dentes_afetados, dentes_observacoes, ' +
   'dentista_id, dentista:dentistas(nome)';
 const CAMPOS_EVENTO_ORC =
-  'id, tipo, procedimento_id, procedimento_nome, status, origem, nivel, arcada, quadrante, dente, faces, papel_no_grupo, grupo_id, assinatura_id, observacao, ' +
+  'id, dentista_id, tipo, procedimento_id, procedimento_nome, status, origem, nivel, arcada, quadrante, dente, faces, papel_no_grupo, grupo_id, assinatura_id, observacao, ' +
   'encaminhado_para, encaminhado_dentista:dentistas!odontograma_eventos_encaminhado_para_fkey(nome)';
 const SELECT_FICHA_PARA_ORC = `${CAMPOS_FICHA_ORC}, odontograma_eventos(${CAMPOS_EVENTO_ORC})`;
 // R-130 — !inner mantém o agregado enxuto, mas a elegibilidade financeira não depende mais
@@ -271,11 +271,13 @@ export function useOrcamentoModal({
     });
   };
 
-  // R-53 (§2.1, X1) — adapta o evento cru pro shape que filtro-responsavel.ts espera.
+  // Um encaminhamento ganha prioridade; fora dele, a responsabilidade é de quem registrou
+  // o evento. Isso cobre o dentista que recebe uma ficha e acrescenta um novo procedimento.
   const paraResponsavel = (ev: EventoOdontogramaParaOrc) => ({
     encaminhadoPara: ev.encaminhado_para
       ? { id: ev.encaminhado_para, nome: ev.encaminhado_dentista?.nome ?? 'Dentista' }
       : null,
+    autorId: ev.dentista_id,
   });
 
   // R-53 — flatten de N fichas (o agregado) pro filtro de responsável + eventosParaItens.

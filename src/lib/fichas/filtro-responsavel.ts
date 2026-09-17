@@ -7,9 +7,13 @@
  * sem login — a verificação na tela é barrada nesta sessão.
  */
 
-/** Registro na ótica do filtro — só o destino do encaminhamento importa. */
+/** Registro na ótica do filtro. A autoria por evento é necessária quando uma ficha
+ * compartilhada recebe um novo procedimento de outro dentista. */
 export interface RegistroResponsavel {
   encaminhadoPara: { id: string; nome: string } | null;
+  /** Autor do evento; ausente nos dados legados, que continuam usando o autor da ficha. */
+  autorId?: string | null;
+  autorNome?: string | null;
 }
 
 /** Ficha na ótica do filtro. Sem eventos, a ficha inteira responde ao autor. */
@@ -40,7 +44,8 @@ export function responsavelPassaFiltro(
 /**
  * Responsáveis distintos presentes nas fichas do paciente — alimenta os chips.
  * Dedup por id, preservando a 1ª ocorrência. Um registro encaminhado conta pro
- * DESTINO (não pro autor); ficha sem eventos conta pro autor.
+ * DESTINO (não pro autor); sem encaminhamento, usa o autor do próprio evento e só então
+ * o autor da ficha. Ficha sem eventos conta pro autor da ficha.
  */
 export function derivarResponsaveis<E extends RegistroResponsavel>(
   fichas: FichaResponsavel<E>[],
@@ -49,7 +54,10 @@ export function derivarResponsaveis<E extends RegistroResponsavel>(
   for (const f of fichas) {
     if (f.eventos.length > 0) {
       for (const ev of f.eventos) {
-        m.set(ev.encaminhadoPara?.id ?? f.autorId, ev.encaminhadoPara?.nome ?? f.autorNome);
+        m.set(
+          ev.encaminhadoPara?.id ?? ev.autorId ?? f.autorId,
+          ev.encaminhadoPara?.nome ?? ev.autorNome ?? f.autorNome,
+        );
       }
     } else {
       m.set(f.autorId, f.autorNome);
@@ -70,7 +78,11 @@ export function eventosVisiveis<E extends RegistroResponsavel>(
   meuId: string,
 ): E[] {
   if (filtro === null) return eventos;
-  return eventos.filter((ev) => responsavelPassaFiltro(ev.encaminhadoPara?.id ?? autorId, filtro, meuId));
+  return eventos.filter((ev) => responsavelPassaFiltro(
+    ev.encaminhadoPara?.id ?? ev.autorId ?? autorId,
+    filtro,
+    meuId,
+  ));
 }
 
 /**
@@ -85,7 +97,7 @@ export function fichaVisivel<E extends RegistroResponsavel>(
   if (filtro === null) return true;
   if (ficha.eventos.length > 0) {
     return ficha.eventos.some((ev) =>
-      responsavelPassaFiltro(ev.encaminhadoPara?.id ?? ficha.autorId, filtro, meuId),
+      responsavelPassaFiltro(ev.encaminhadoPara?.id ?? ev.autorId ?? ficha.autorId, filtro, meuId),
     );
   }
   return responsavelPassaFiltro(ficha.autorId, filtro, meuId);

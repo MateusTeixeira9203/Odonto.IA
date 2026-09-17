@@ -79,6 +79,9 @@ export type OrcamentoComItens = {
  *  âncora vem achatada em colunas, não como objeto `AncoraClinica` — mesmo shape da tabela). */
 export type EventoOdontogramaParaOrc = {
   id: string;
+  /** A responsabilidade financeira de um evento sem encaminhamento é de quem o registrou,
+   * não necessariamente de quem criou a ficha. */
+  dentista_id?: string | null;
   tipo: TipoRegistroOdontograma;
   procedimento_id: string | null;
   procedimento_nome: string | null;
