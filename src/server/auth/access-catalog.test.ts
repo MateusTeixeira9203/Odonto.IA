@@ -16,8 +16,8 @@ function scope(tipo: AccessScope['tipo'], dentistaIds?: string[]): AccessScope {
   return { tipo };
 }
 
-test('o catálogo contém exatamente as permissões do R-159', () => {
-  assert.equal(ACCESS_PERMISSIONS.length, 45);
+test('o catálogo contém exatamente as permissões do R-159 e da governança aprovada', () => {
+  assert.equal(ACCESS_PERMISSIONS.length, 48);
   assert.equal(new Set(ACCESS_PERMISSIONS).size, ACCESS_PERMISSIONS.length);
   assert.deepEqual(ACCESS_PERMISSIONS.slice(-7), [
     'estoque.receber',
@@ -46,6 +46,14 @@ test('rejeita permissão desconhecida, propriedades extras e escopo indevido', (
   assert.equal(AccessSchema.safeParse({
     permissao: 'pacientes.ler', escopo: { tipo: 'proprio' },
   }).success, false);
+
+  assert.equal(AccessSchema.safeParse({
+    permissao: 'clinico.revisar_tecnicamente', escopo: { tipo: 'proprio' },
+  }).success, false);
+
+  assert.equal(AccessSchema.safeParse({
+    permissao: 'prontuario.exportar', escopo: { tipo: 'selecionados', dentistaIds: [dentistA] },
+  }).success, false);
 });
 
 test('novas ações de estoque aceitam os escopos previstos', () => {
@@ -64,7 +72,7 @@ test('novas ações de estoque aceitam os escopos previstos', () => {
   });
 });
 
-test('coleção completa de 45 permissões continua válida', () => {
+test('coleção completa de 48 permissões continua válida', () => {
   const collection = ACCESS_PERMISSIONS.map((permissao) => ({
     permissao,
     escopo: permissao === 'clinico.registrar' ? scope('proprio') : scope('clinica'),
