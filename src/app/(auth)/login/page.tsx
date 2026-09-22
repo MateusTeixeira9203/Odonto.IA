@@ -9,7 +9,7 @@ import { z } from "zod";
 import { motion } from "motion/react";
 import { ArrowRight, AlertCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { getDentistaLoginInfo } from "@/lib/auth";
+import { getLoginEntryInfo } from "@/lib/auth";
 import { toast } from "sonner";
 import { AuthEntryShell } from "@/components/auth/auth-entry-shell";
 import { authCallbackUrl, safeReturnPath } from "@/lib/auth/return-path";
@@ -92,16 +92,21 @@ function LoginFormContent(): React.JSX.Element {
         return;
       }
 
-      const { existe, role } = await getDentistaLoginInfo(supabase);
+      const { existe, role, possuiPerfilClinico } = await getLoginEntryInfo(supabase);
       const continuaFluxoDeAuth = redirectTo.startsWith("/convite/")
         || redirectTo === "/redefinir-senha";
+      const entradaPadrao = !possuiPerfilClinico
+        ? '/consultorio'
+        : role === 'protetico'
+          ? '/dashboard/protetico'
+          : '/dashboard';
       const destination = !existe && !continuaFluxoDeAuth
         ? "/onboarding"
-        : requestedNext
+        : continuaFluxoDeAuth
           ? redirectTo
-          : role === "protetico"
-            ? "/dashboard/protetico"
-            : "/dashboard";
+          : requestedNext && (possuiPerfilClinico || redirectTo.startsWith('/consultorio'))
+          ? redirectTo
+          : entradaPadrao;
       toast.success("Login realizado com sucesso!");
       // A sessão acabou de ser gravada pelo cliente Supabase. Navegação completa evita que
       // um refresh do App Router interrompa o push antes de o Dashboard receber o cookie novo.

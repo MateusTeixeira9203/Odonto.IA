@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { OnboardingClient, type OnboardingStep } from './_components/onboarding-client';
 import { getDentistaCached } from '@/lib/get-dentista';
+import { getMemberContext } from '@/server/auth/member-context';
 import { conferirRetornoCheckout } from '@/app/checkout/retorno/actions';
 import { clinicaIsentaDeCobranca } from '@/lib/billing/exemptions';
 
@@ -10,6 +11,9 @@ export default async function OnboardingPage({
   searchParams: Promise<{ step?: string; checkout?: string }>;
 }): Promise<React.JSX.Element> {
   const params = await searchParams;
+  const member = await getMemberContext();
+  if (member.ok && !member.data.perfilClinico) redirect('/consultorio');
+
   const dentista = await getDentistaCached();
 
   const billingAtivo = process.env.STRIPE_BILLING_ENABLED === 'true';
@@ -28,14 +32,9 @@ export default async function OnboardingPage({
   // Resume no passo 'plano' (volta da demo) só se já existe dentista — senão começa do início.
   const initialStep: OnboardingStep = dentista && (!billingAtivo || checkoutConfirmado || clinicaIsenta)
     ? 'dex'
-    : 'identidade';
+    : 'modalidade';
 
   return (
-    <OnboardingClient
-      initialStep={initialStep}
-      focoInicial={dentista?.foco_principal ?? null}
-      nomeInicial={dentista?.nome ? dentista.nome.split(' ')[0] : ''}
-      billingEnabled={billingAtivo}
-    />
+    <OnboardingClient initialStep={initialStep} />
   );
 }

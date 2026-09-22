@@ -1,9 +1,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { DentistaRole } from "@/types/database";
+import type { ClinicaUsuarioRole, DentistaRole } from "@/types/database";
 
 export interface DentistaLoginInfo {
   existe: boolean;
   role: DentistaRole | null;
+}
+
+export interface LoginEntryInfo {
+  existe: boolean;
+  role: ClinicaUsuarioRole | null;
+  possuiPerfilClinico: boolean;
 }
 
 /**
@@ -30,4 +36,32 @@ export async function getDentistaLoginInfo(
 
   if (error || !data) return { existe: false, role: null };
   return { existe: true, role: data.role as DentistaRole };
+}
+
+/** Resolve a entrada pelo membership ativo da clínica, inclusive para gestor sem CRO. */
+export async function getLoginEntryInfo(supabase: SupabaseClient): Promise<LoginEntryInfo> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { existe: false, role: null, possuiPerfilClinico: false };
+
+  const { data: userRecord, error: userError } = await supabase
+    .from('users').select('active_clinica_id').eq('id', user.id).maybeSingle();
+  if (userError || !userRecord?.active_clinica_id) {
+    return { existe: false, role: null, possuiPerfilClinico: false };
+  }
+
+  const clinicId = userRecord.active_clinica_id;
+  const { data: membership, error: membershipError } = await supabase
+    .from('clinica_usuarios').select('role, status')
+    .eq('usuario_id', user.id).eq('clinica_id', clinicId).eq('status', 'ativo').maybeSingle();
+  if (membershipError || !membership) return { existe: false, role: null, possuiPerfilClinico: false };
+
+  const { data: dentist, error: dentistError } = await supabase
+    .from('dentistas').select('id').eq('user_id', user.id).eq('clinica_id', clinicId).eq('ativo', true).maybeSingle();
+  if (dentistError) return { existe: false, role: null, possuiPerfilClinico: false };
+
+  return {
+    existe: true,
+    role: membership.role as ClinicaUsuarioRole,
+    possuiPerfilClinico: Boolean(dentist),
+  };
 }

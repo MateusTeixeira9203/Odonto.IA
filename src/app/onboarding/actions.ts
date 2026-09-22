@@ -3,80 +3,58 @@
 import { requireUser } from "@/server/auth/user";
 import { requireClinicContext } from "@/server/auth/clinic";
 import { enviarEmailD0 } from "@/server/services/onboarding-emails";
+import { completeOnboardingModalidade } from "@/server/services/onboarding-modalidade";
 import type { FocoPrincipal } from "@/lib/persona";
 import type { Especialidade } from "@/lib/especialidades";
 
 export type PlanoClinica = "SOLO" | "CLINICA";
 
-export interface IniciarOnboardingInput {
+export interface IniciarOnboardingModalidadeInput {
   nome: string;
-  cro: string;
+  cro: string | null;
   especialidade: Especialidade[];
-  /** Nome do consultório/clínica — obrigatório para todos os planos */
   nomeConsultorio: string;
-  /** Persona escolhida na identidade (Workstream E). */
-  foco: FocoPrincipal;
+  foco: FocoPrincipal | null;
+  modalidade: "colaborativa" | "gerida";
+  criadorAtende: boolean;
+  chaveIdempotencia: string;
 }
 
 const LIMITE_POR_PLANO: Record<PlanoClinica, number> = { SOLO: 1, CLINICA: 5 };
 
-// Extrai o código estruturado do erro lançado pela RPC. Formato: 'CODIGO: mensagem'.
-function rpcErrorCode(message: string): string {
-  return message.match(/^([A-Z_]+):/)?.[1] ?? "UNKNOWN";
-}
-
 /**
- * iniciarOnboarding — cria clínica + dentista + membership numa única transação
- * (RPC `complete_onboarding`), gravando a persona (`foco_principal`) e um plano
- * **provisório SOLO**.
- *
- * É chamado cedo no fluxo novo (logo após a identidade), pra a demo do Modo
- * Consulta poder rodar com um dentista real. O plano definitivo é escolhido no
- * passo `plano` (`definirPlano`). A conclusão é marcada no fim (`marcarOnboardingCompleto`).
- *
- * Idempotência e rollback ficam na própria RPC.
+ * Cria a primeira clínica com a modalidade declarada. A RPC nova mantém o fluxo
+ * legado isolado e permite um proprietário que não atua clinicamente.
  */
-export async function iniciarOnboarding(
-  data: IniciarOnboardingInput,
-): Promise<{ success: boolean; alreadyOnboarded?: boolean; error?: string }> {
-  const { supabase, user } = await requireUser();
+export async function iniciarOnboardingModalidade(
+  data: IniciarOnboardingModalidadeInput,
+): Promise<{ success: boolean; criadorAtende?: boolean; error?: string }> {
+  const { user } = await requireUser();
 
-  const { error } = await supabase.rpc("complete_onboarding", {
-    p_plano:          "SOLO", // provisório — definitivo no passo 'plano'
-    p_nome_clinica:   data.nomeConsultorio.trim(),
-    p_nome_usuario:   data.nome.trim(),
-    p_cro:            data.cro?.trim() || null,
-    p_especialidade:  data.especialidade,
-    p_telefone:       null,
-    p_cidade:         null,
-    p_estado:         null,
-    p_email:          user.email ?? null,
-    p_foco_principal: data.foco,
+  const result = await completeOnboardingModalidade({
+    nomeClinica: data.nomeConsultorio,
+    modalidade: data.modalidade,
+    criadorAtende: data.criadorAtende,
+    nomeUsuario: data.nome,
+    cro: data.cro?.trim() || null,
+    especialidade: data.especialidade,
+    email: user.email ?? null,
+    foco: data.foco,
+    chaveIdempotencia: data.chaveIdempotencia,
   });
 
-  if (error) {
-    const code = rpcErrorCode(error.message);
-
-    // Usuário já tem clínica ativa — o client redireciona pro dashboard.
-    if (code === "ALREADY_ONBOARDED") {
-      return { success: false, alreadyOnboarded: true };
-    }
-
-    console.error("[iniciarOnboarding] RPC error:", { code, message: error.message });
-    return {
-      success: false,
-      error: "Erro ao criar sua conta. Tente novamente ou contate o suporte.",
-    };
+  if (!result.ok) {
+    return { success: false, error: result.mensagem };
   }
 
-  if (user.email) {
+  if (user.email && data.criadorAtende) {
     void enviarEmailD0({
       email: user.email,
       nomeDentista: data.nome.trim().split(" ")[0],
     });
   }
 
-  return { success: true };
+  return { success: true, criadorAtende: result.data.criadorAtende };
 }
 
 /**

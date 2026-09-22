@@ -1,678 +1,145 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { motion, AnimatePresence } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
+import { Building2, Check, ChevronRight, Loader2, Stethoscope, UserRound, Users } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import {
-  Calendar, Users, Settings, CheckCircle2, Loader2, ChevronRight,
-  Stethoscope, Building2, Check,
-} from 'lucide-react';
-import {
-  iniciarOnboarding, definirPlano, marcarOnboardingCompleto,
-  definirProcedimentosPendente, type PlanoClinica,
-} from '../actions';
-import { getPersona, type FocoPrincipal } from '@/lib/persona';
-import { PLANOS } from '@/lib/planos';
+import { toast } from 'sonner';
+
+import { iniciarOnboardingModalidade } from '../actions';
 import { especialidadesSchema } from '@/lib/especialidades';
 import { EspecialidadeChips } from '@/components/ui/especialidade-chips';
-import { toast } from 'sonner';
 import { DexApresentacao } from './dex-apresentacao';
 
-// ── Constantes ────────────────────────────────────────────────────────────────
-
-const PLANOS_CONFIG = [
-  {
-    id: 'SOLO' as PlanoClinica,
-    label: 'Solo',
-    tagline: 'Para você e sua equipe',
-    preco: `R$${PLANOS.SOLO.preco}`,
-    periodo: '/mês',
-    minimo: null,
-    icon: Stethoscope,
-    features: [
-      '1 Dentista + 1 Secretária',
-      'IA, fichas e planejamento',
-      'Agenda e financeiro',
-      'Orçamentos e tratamentos',
-    ],
-  },
-  {
-    id: 'CLINICA' as PlanoClinica,
-    label: 'Clínica',
-    tagline: 'Para múltiplos dentistas',
-    preco: `R$${PLANOS.CLINICA.preco}`,
-    periodo: '/dentista/mês',
-    minimo: `Mín. 3 dentistas · R$${PLANOS.CLINICA.preco * 3}/mês`,
-    badge: 'Popular',
-    icon: Building2,
-    features: [
-      'A partir de 3 dentistas',
-      'Secretária com visão unificada',
-      'WhatsApp integrado',
-      'Relatórios gerenciais',
-    ],
-  },
-] as const;
-
-// ── Schema ────────────────────────────────────────────────────────────────────
-
-const schema = z.object({
-  nome:            z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
-  cro:             z.string().min(1, 'Informe o CRO'),
-  especialidade:   especialidadesSchema,
-  nomeConsultorio: z.string().min(2, 'Informe o nome'),
+const cadastroSchema = z.object({
+  nome: z.string().trim().min(2, 'Informe seu nome completo.'),
+  nomeConsultorio: z.string().trim().min(2, 'Informe o nome da clínica.'),
+  cro: z.string().trim(),
+  especialidade: especialidadesSchema,
 });
 
-type FormData = z.infer<typeof schema>;
-
-// ── Próximos passos ───────────────────────────────────────────────────────────
-
-const PROXIMOS_PASSOS = [
-  {
-    icon: Calendar,
-    label: 'Primeira consulta',
-    desc:  'Agende sua primeira consulta e veja o modo de atendimento em ação.',
-    href:  '/dashboard/agendamentos',
-  },
-  {
-    icon: Users,
-    label: 'Adicionar paciente',
-    desc:  'Cadastre um paciente e comece a montar a ficha clínica.',
-    href:  '/dashboard/pacientes',
-  },
-  {
-    icon: Settings,
-    label: 'Configurações',
-    desc:  'Complete o endereço, horários e procedimentos.',
-    href:  '/dashboard/configuracoes',
-  },
-] as const;
-
-// ── Tipos ───────────────────────────────────────────────────────────────────────
-
-export type OnboardingStep = 'identidade' | 'dex' | 'aha' | 'plano' | 'procedimentos' | 'sucesso';
+type CadastroForm = z.infer<typeof cadastroSchema>;
+export type OnboardingStep = 'modalidade' | 'dados' | 'dex';
+type Modalidade = 'colaborativa' | 'gerida';
 
 interface OnboardingClientProps {
-  /** Passo inicial — 'plano' quando volta da demo (?step=plano); senão 'identidade'. */
   initialStep: OnboardingStep;
-  /** Persona já gravada (resumo da volta da demo) — alimenta a copy do sucesso. */
-  focoInicial: FocoPrincipal | null;
-  /** Primeiro nome do dentista (resumo da volta da demo) — saudação do sucesso. */
-  nomeInicial: string;
-  /** Flag resolvida no servidor: não expõe segredo e evita depender de env público. */
-  billingEnabled: boolean;
 }
 
-// ── Componente ────────────────────────────────────────────────────────────────
+const inputClass = 'w-full rounded-xl border border-border bg-surface-alt px-4 py-3 text-sm text-text-primary placeholder:text-text-secondary outline-none transition-colors focus:border-teal focus:ring-2 focus:ring-teal/20 disabled:cursor-not-allowed disabled:opacity-60';
 
-export function OnboardingClient({ initialStep, focoInicial, nomeInicial, billingEnabled }: OnboardingClientProps) {
+export function OnboardingClient({ initialStep }: OnboardingClientProps): React.JSX.Element {
   const router = useRouter();
-  const [step, setStep]               = useState<OnboardingStep>(initialStep);
-  const foco: FocoPrincipal           = focoInicial ?? 'economizar_tempo';
-  const [planoSelecionado, setPlano]  = useState<PlanoClinica>('SOLO');
-  const [nomeConfirmado, setNome]     = useState(nomeInicial);
-  const [isLoading, setIsLoading]     = useState(false);
-  const isSubmittingRef               = useRef(false);
-
-  const isClinica = planoSelecionado === 'CLINICA';
-
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    formState: { errors },
-  } = useForm<FormData>({
-    resolver: zodResolver(schema),
-    defaultValues: { nome: '', cro: '', nomeConsultorio: '', especialidade: [] },
+  const [step, setStep] = useState<OnboardingStep>(initialStep);
+  const [modalidade, setModalidade] = useState<Modalidade>('colaborativa');
+  const [criadorAtende, setCriadorAtende] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const submissionKey = useRef<string | null>(null);
+  const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<CadastroForm>({
+    resolver: zodResolver(cadastroSchema),
+    defaultValues: { nome: '', nomeConsultorio: '', cro: '', especialidade: [] },
   });
+  const especialidades = watch('especialidade');
 
-  const especialidadeValue = watch('especialidade');
+  function escolherModalidade(next: Modalidade): void {
+    setModalidade(next);
+    if (next === 'colaborativa') setCriadorAtende(true);
+  }
 
-  const inputClass =
-    'w-full font-sans text-sm px-4 py-3 rounded-xl border border-border bg-surface-alt text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-teal/20 focus:border-teal transition-all';
-
-  // ── identidade → cria clínica+dentista (trial/SOLO) + persona, vai pro aha ──
-  async function onSubmitIdentidade(data: FormData): Promise<void> {
-    if (isSubmittingRef.current) return;
-    isSubmittingRef.current = true;
+  async function salvarDados(data: CadastroForm): Promise<void> {
+    if (isLoading) return;
+    if (criadorAtende && (!data.cro || data.especialidade.length === 0)) {
+      toast.error('Informe o CRO e ao menos uma especialidade de quem atende.');
+      return;
+    }
     setIsLoading(true);
+    submissionKey.current ??= crypto.randomUUID();
     try {
-      const result = await iniciarOnboarding({
-        nome:            data.nome,
-        cro:             data.cro,
-        especialidade:   data.especialidade,
+      const result = await iniciarOnboardingModalidade({
+        nome: data.nome,
         nomeConsultorio: data.nomeConsultorio,
-        foco,
+        cro: criadorAtende ? data.cro : null,
+        especialidade: criadorAtende ? data.especialidade : [],
+        foco: criadorAtende ? 'economizar_tempo' : null,
+        modalidade,
+        criadorAtende,
+        chaveIdempotencia: submissionKey.current,
       });
-
-      if (result.alreadyOnboarded) {
-        router.replace('/dashboard');
+      if (!result.success) {
+        submissionKey.current = null;
+        toast.error(result.error ?? 'Não foi possível criar a clínica agora.');
         return;
       }
-      if (result.success) {
-        setNome(data.nome.trim().split(' ')[0]);
-        // Billing comercial é opt-in por flag. Quando ativo, plano e cartão vêm ANTES
-        // do Dex; quando desligado, o localhost continua no fluxo gratuito de teste.
-        if (billingEnabled) {
-          router.push('/planos?onboarding=1');
-          return;
-        }
-        setStep('dex');
-      } else {
-        toast.error(result.error ?? 'Erro ao salvar. Tente novamente.');
+      if (!criadorAtende) {
+        window.location.assign('/consultorio');
+        return;
       }
+      setStep('dex');
     } catch {
-      toast.error('Erro inesperado. Tente novamente.');
-    } finally {
-      isSubmittingRef.current = false;
-      setIsLoading(false);
-    }
-  }
-
-  async function entrarNoMeuDia(): Promise<void> {
-    if (isLoading) return;
-    setIsLoading(true);
-    try {
-      const { error } = await marcarOnboardingCompleto();
-      if (error) {
-        toast.error('Não foi possível concluir o cadastro. Tente novamente.');
-        return;
-      }
-      // A clínica acabou de mudar de estado no servidor. Em navegadores mobile/PWA,
-      // combinar uma transição App Router com refresh podia manter a apresentação do
-      // Dex renderizada, mesmo com onboarding_completo=true. Navegação de documento
-      // garante que o dashboard lê o estado novo antes de montar a tela.
-      window.location.assign('/dashboard/meu-dia');
+      submissionKey.current = null;
+      toast.error('Não foi possível criar a clínica agora.');
     } finally {
       setIsLoading(false);
     }
   }
-
-  // ── plano → grava plano definitivo, vai pros procedimentos ──
-  async function onConfirmarPlano(): Promise<void> {
-    if (isLoading) return;
-    setIsLoading(true);
-    try {
-      const { error } = await definirPlano(planoSelecionado);
-      if (error) {
-        toast.error('Erro ao salvar o plano. Tente novamente.');
-        return;
-      }
-      setStep('procedimentos');
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  // ── procedimentos → conclui onboarding, vai pro sucesso ──
-  async function finalizar(pendente: boolean): Promise<void> {
-    if (isLoading) return;
-    setIsLoading(true);
-    try {
-      await definirProcedimentosPendente(pendente);
-      await marcarOnboardingCompleto();
-      setStep('sucesso');
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  async function importarTabela(): Promise<void> {
-    await marcarOnboardingCompleto();
-    router.push('/dashboard/configuracoes?aba=procedimentos');
-  }
-
-  const personaCopy = getPersona(foco);
 
   return (
-    <div className={step === 'dex' ? 'w-full max-w-5xl' : 'w-full max-w-lg'}>
+    <div className={step === 'dex' ? 'w-full max-w-5xl' : 'w-full max-w-2xl'}>
       <AnimatePresence mode="wait">
+        {step === 'modalidade' && (
+          <motion.section key="modalidade" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.24 }}>
+            <div className="mx-auto mb-8 max-w-xl text-center">
+              <div className="mx-auto mb-5 flex size-14 items-center justify-center rounded-2xl bg-teal-pale text-teal-ink"><Building2 className="size-7" /></div>
+              <h1 className="font-heading text-3xl text-text-primary">Como sua clínica funciona?</h1>
+              <p className="mt-2 text-sm leading-6 text-text-secondary">Escolha a modalidade para organizar acessos, operação e financeiro desde o começo.</p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <ModeCard active={modalidade === 'colaborativa'} icon={<Users className="size-5" />} title="Colaborativa" description="Os dentistas pertencem à clínica, compartilham pacientes e estoque, e cada um acompanha seu próprio financeiro." onClick={() => escolherModalidade('colaborativa')} />
+              <ModeCard active={modalidade === 'gerida'} icon={<Stethoscope className="size-5" />} title="Gerida" description="A clínica centraliza a gestão. O proprietário acompanha equipe, operação, indicadores e os recebimentos da clínica." onClick={() => escolherModalidade('gerida')} />
+            </div>
+            <button type="button" onClick={() => setStep('dados')} className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/85"><span>Continuar</span><ChevronRight className="size-4" /></button>
+          </motion.section>
+        )}
 
-        {/* ── ETAPA 0 — Identidade profissional ── */}
-        {step === 'identidade' && (
-          <motion.div
-            key="identidade"
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -16 }}
-            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <div className="text-center mb-8">
-              <div
-                className="inline-flex w-14 h-14 rounded-2xl items-center justify-center mb-5"
-                style={{ background: 'color-mix(in srgb, var(--color-teal) 12%, transparent)' }}
-              >
-                <Stethoscope className="w-7 h-7" style={{ color: 'var(--color-teal)' }} />
+        {step === 'dados' && (
+          <motion.section key="dados" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.24 }}>
+            <div className="mx-auto mb-7 max-w-xl text-center">
+              <div className="mx-auto mb-5 flex size-14 items-center justify-center rounded-2xl bg-teal-pale text-teal-ink"><UserRound className="size-7" /></div>
+              <h1 className="font-heading text-3xl text-text-primary">Dados iniciais da clínica</h1>
+              <p className="mt-2 text-sm text-text-secondary">Você poderá completar os demais dados da operação depois.</p>
+            </div>
+            <form onSubmit={handleSubmit(salvarDados)} className="rounded-2xl border border-border bg-surface p-6 shadow-sm sm:p-8">
+              <div className="space-y-5">
+                <Field label="Seu nome" error={errors.nome?.message}><input className={inputClass} placeholder="Seu nome completo" disabled={isLoading} {...register('nome')} /></Field>
+                <Field label="Nome da clínica" error={errors.nomeConsultorio?.message}><input className={inputClass} placeholder="Ex: Clínica Sorriso" disabled={isLoading} {...register('nomeConsultorio')} /></Field>
+                {modalidade === 'gerida' && <div className="rounded-xl border border-border bg-surface-alt p-4"><p className="text-sm font-medium text-text-primary">Você também atende pacientes nesta clínica?</p><div className="mt-3 flex gap-2"><Choice active={criadorAtende} label="Sim, sou dentista" onClick={() => setCriadorAtende(true)} /><Choice active={!criadorAtende} label="Não, sou proprietário/gestor" onClick={() => setCriadorAtende(false)} /></div></div>}
+                {criadorAtende && <>
+                  <Field label="CRO" error={errors.cro?.message}><input className={inputClass} placeholder="CRO-SP 12345" disabled={isLoading} {...register('cro')} /></Field>
+                  <div><p className="mb-1.5 text-xs font-bold uppercase tracking-widest text-text-secondary">Especialidades</p><EspecialidadeChips selected={especialidades} onChange={(next) => setValue('especialidade', next, { shouldValidate: true })} disabled={isLoading} />{errors.especialidade && <p className="mt-1 text-xs text-destructive">{errors.especialidade.message}</p>}</div>
+                </>}
               </div>
-              <h1 className="font-heading text-3xl text-text-primary mb-2">
-                Vamos configurar seu consultório
-              </h1>
-              <p className="text-text-secondary text-sm">
-                Menos de 2 minutos. Sem cartão.
-              </p>
-            </div>
-
-            <div className="bg-surface rounded-3xl border border-border shadow-sm overflow-hidden">
-              <form onSubmit={handleSubmit(onSubmitIdentidade)} className="p-8 space-y-5">
-
-                {/* Nome completo */}
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest">
-                    Nome completo
-                  </label>
-                  <input
-                    placeholder="Dr. João Silva"
-                    disabled={isLoading}
-                    className={inputClass}
-                    {...register('nome')}
-                  />
-                  {errors.nome && <p className="text-xs text-coral">{errors.nome.message}</p>}
-                </div>
-
-                {/* CRO — 15/08: era metade de um `grid-cols-2` com Especialidades do lado.
-                    Oito chips de rótulo longo em ~216px não cabem de jeito nenhum; a linha
-                    própria abaixo dá os ~448px que eles precisam. O CRO é campo curto e não
-                    perde nada ocupando a linha inteira. */}
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest">
-                    CRO
-                  </label>
-                  <input
-                    placeholder="CRO-SP 12345"
-                    disabled={isLoading}
-                    className={inputClass}
-                    {...register('cro')}
-                  />
-                  {errors.cro && <p className="text-xs text-coral">{errors.cro.message}</p>}
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest">
-                    Especialidades
-                  </label>
-                  <EspecialidadeChips
-                    selected={especialidadeValue ?? []}
-                    onChange={(next) => setValue('especialidade', next, { shouldValidate: true })}
-                    disabled={isLoading}
-                  />
-                  {errors.especialidade && <p className="text-xs text-coral">{errors.especialidade.message}</p>}
-                </div>
-
-                {/* Nome do consultório */}
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest">
-                    Nome do consultório
-                  </label>
-                  <input
-                    placeholder="Ex: Consultório Oral Health"
-                    disabled={isLoading}
-                    className={inputClass}
-                    {...register('nomeConsultorio')}
-                  />
-                  {errors.nomeConsultorio && <p className="text-xs text-coral">{errors.nomeConsultorio.message}</p>}
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full mt-2 flex items-center justify-center gap-2 bg-gradient-to-r from-teal to-teal-lt text-white py-3.5 rounded-xl font-bold text-sm transition-all shadow-[0_6px_20px_rgba(47,156,133,0.35)] hover:-translate-y-0.5 hover:shadow-[0_10px_28px_rgba(47,156,133,0.45)] disabled:opacity-60 disabled:hover:translate-y-0"
-                >
-                  {isLoading
-                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Criando...</>
-                    : <>Continuar <ChevronRight className="w-4 h-4" /></>
-                  }
-                </button>
-              </form>
-            </div>
-          </motion.div>
+              <div className="mt-7 flex gap-3"><button type="button" disabled={isLoading} onClick={() => setStep('modalidade')} className="rounded-xl border border-border px-4 py-3 text-sm font-semibold text-text-primary hover:bg-surface-alt disabled:opacity-60">Voltar</button><button type="submit" disabled={isLoading} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/85 disabled:opacity-60">{isLoading ? <><Loader2 className="size-4 animate-spin" />Criando clínica...</> : <>Criar clínica<ChevronRight className="size-4" /></>}</button></div>
+            </form>
+          </motion.section>
         )}
 
-        {step === 'dex' && (
-          <DexApresentacao
-            key="dex"
-            pendente={isLoading}
-            onContinuar={() => { void entrarNoMeuDia(); }}
-            onPular={() => { void entrarNoMeuDia(); }}
-          />
-        )}
-
-        {/* ── ETAPA 1 (aha/demo) removida no R-72 — já estava inalcançável desde a Fase 1
-             (onSubmitIdentidade vai direto pro dashboard, nunca chama setStep('aha')) — e a
-             demonstração que ela levava (`/consulta/demo`) apontava pro modo consulta
-             aposentado. `personaCopy` continua vivo (`.sucesso` no copy da última etapa). */}
-
-        {/* ── ETAPA 2 — Seleção de plano ── */}
-        {step === 'plano' && (
-          <motion.div
-            key="plano"
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -16 }}
-            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <div className="text-center mb-8">
-              <div
-                className="inline-flex w-14 h-14 rounded-2xl items-center justify-center mb-5"
-                style={{ background: 'color-mix(in srgb, var(--color-teal) 12%, transparent)' }}
-              >
-                <Stethoscope className="w-7 h-7" style={{ color: 'var(--color-teal)' }} />
-              </div>
-              <h1 className="font-heading text-3xl text-text-primary mb-2">
-                Escolha seu plano
-              </h1>
-              <p className="text-text-secondary text-sm">
-                7 dias grátis. Sem cartão agora — você pode mudar depois.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 mb-6">
-              {PLANOS_CONFIG.map((p) => {
-                const Icon      = p.icon;
-                const selected  = planoSelecionado === p.id;
-                const hasBadge  = 'badge' in p && p.badge;
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => setPlano(p.id)}
-                    className={[
-                      'relative p-5 rounded-3xl border text-left transition-all duration-200 group',
-                      selected
-                        ? 'border-teal/40 bg-teal/5 ring-1 ring-teal/20 shadow-sm'
-                        : 'border-border bg-surface hover:border-teal/20 hover:bg-teal/[0.02]',
-                    ].join(' ')}
-                  >
-                    {/* Badge "Popular" — canto superior ESQUERDO (não colide com o ✓) */}
-                    {hasBadge && (
-                      <span className="absolute top-3.5 left-3.5 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider bg-teal/15 text-teal border border-teal/30">
-                        {p.badge}
-                      </span>
-                    )}
-
-                    {/* Checkmark quando selecionado — canto superior DIREITO */}
-                    {selected && (
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        className="absolute top-3.5 right-3.5 w-5 h-5 rounded-full flex items-center justify-center"
-                        style={{ background: 'var(--color-teal)' }}
-                      >
-                        <Check className="w-3 h-3 text-white stroke-[3]" />
-                      </motion.div>
-                    )}
-
-                    <div
-                      className={[
-                        'w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors',
-                        hasBadge ? 'mt-5' : '',
-                      ].join(' ')}
-                      style={{ background: 'color-mix(in srgb, var(--color-teal) 12%, transparent)' }}
-                    >
-                      <Icon className="w-5 h-5" style={{ color: 'var(--color-teal)' }} />
-                    </div>
-
-                    <p className="font-heading text-lg text-text-primary mb-0.5">{p.label}</p>
-                    <p className="text-[11px] text-text-secondary mb-4 leading-relaxed">{p.tagline}</p>
-
-                    <div className="mb-1">
-                      <span className="font-mono text-2xl font-bold text-text-primary">{p.preco}</span>
-                      <span className="text-[11px] text-text-secondary ml-1">{p.periodo}</span>
-                    </div>
-
-                    {p.minimo
-                      ? <p className="text-[10px] font-bold text-amber-500/80 mb-4">{p.minimo}</p>
-                      : <div className="mb-4" />}
-
-                    <ul className="space-y-1.5">
-                      {p.features.map((f) => (
-                        <li key={f} className="flex items-start gap-2 text-[11px] text-text-secondary">
-                          <div
-                            className="w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0 mt-0.5"
-                            style={{ background: 'color-mix(in srgb, var(--color-teal) 12%, transparent)' }}
-                          >
-                            <Check className="w-2 h-2 stroke-[3]" style={{ color: 'var(--color-teal)' }} />
-                          </div>
-                          {f}
-                        </li>
-                      ))}
-                    </ul>
-                  </button>
-                );
-              })}
-            </div>
-
-            {isClinica && (
-              <motion.p
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="text-center text-[11px] text-text-secondary mb-4"
-              >
-                Mínimo 3 dentistas · Cada dentista assina individualmente
-              </motion.p>
-            )}
-
-            <button
-              type="button"
-              onClick={onConfirmarPlano}
-              disabled={isLoading}
-              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-teal to-teal-lt text-white py-3.5 rounded-xl font-bold text-sm transition-all shadow-[0_6px_20px_rgba(47,156,133,0.35)] hover:-translate-y-0.5 hover:shadow-[0_10px_28px_rgba(47,156,133,0.45)] disabled:opacity-60 disabled:hover:translate-y-0"
-            >
-              {isLoading
-                ? <><Loader2 className="w-4 h-4 animate-spin" /> Salvando...</>
-                : <>Continuar com plano {planoSelecionado === 'SOLO' ? 'Solo' : 'Clínica'} <ChevronRight className="w-4 h-4" /></>
-              }
-            </button>
-          </motion.div>
-        )}
-
-        {/* ── ETAPA 3 — Procedimentos ── */}
-        {step === 'procedimentos' && (
-          <motion.div
-            key="procedimentos"
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -16 }}
-            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <div className="text-center mb-8">
-              <div
-                className="inline-flex w-14 h-14 rounded-2xl items-center justify-center mb-5"
-                style={{ background: 'color-mix(in srgb, var(--color-teal) 12%, transparent)' }}
-              >
-                <Settings className="w-7 h-7" style={{ color: 'var(--color-teal)' }} />
-              </div>
-              <h1 className="font-heading text-3xl text-text-primary mb-2">
-                Seus procedimentos
-              </h1>
-              <p className="text-text-secondary text-sm leading-relaxed max-w-sm mx-auto">
-                Já incluímos uma tabela padrão com os procedimentos mais comuns. Use agora e ajuste depois, ou importe sua própria tabela.
-              </p>
-            </div>
-
-            <div className="bg-surface rounded-3xl border border-border shadow-sm p-6 mb-4">
-              <div className="flex items-start gap-3 mb-4">
-                <div
-                  className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
-                  style={{ background: 'color-mix(in srgb, var(--color-teal) 12%, transparent)' }}
-                >
-                  <Check className="w-4 h-4" style={{ color: 'var(--color-teal)' }} />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-text-primary mb-0.5">Tabela padrão incluída</p>
-                  <p className="text-xs text-text-secondary leading-relaxed">
-                    Restaurações, exodontias, implantes, limpeza e mais 20 procedimentos prontos para uso.
-                  </p>
-                </div>
-              </div>
-              <p className="text-xs text-text-secondary leading-relaxed">
-                Você pode adicionar, editar ou remover procedimentos a qualquer momento em{' '}
-                <span className="font-semibold text-text-primary">Configurações → Procedimentos</span>.
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <button
-                type="button"
-                disabled={isLoading}
-                onClick={() => finalizar(false)}
-                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-teal to-teal-lt text-white py-3.5 rounded-xl font-bold text-sm transition-all shadow-[0_6px_20px_rgba(47,156,133,0.35)] hover:-translate-y-0.5 hover:shadow-[0_10px_28px_rgba(47,156,133,0.45)] disabled:opacity-60 disabled:hover:translate-y-0"
-              >
-                {isLoading
-                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Finalizando...</>
-                  : <>Usar tabela padrão <ChevronRight className="w-4 h-4" /></>
-                }
-              </button>
-
-              <button
-                type="button"
-                disabled={isLoading}
-                onClick={importarTabela}
-                className="w-full flex items-center justify-center gap-2 border border-border bg-surface hover:bg-surface-alt text-text-primary py-3.5 rounded-xl font-bold text-sm transition-all disabled:opacity-60"
-              >
-                Importar minha tabela
-              </button>
-
-              <button
-                type="button"
-                disabled={isLoading}
-                onClick={() => finalizar(true)}
-                className="w-full text-center text-sm font-semibold text-text-secondary hover:text-text-primary py-2 transition-colors disabled:opacity-60"
-              >
-                Configurar depois
-              </button>
-            </div>
-          </motion.div>
-        )}
-
-        {/* ── ETAPA 4 — Sucesso ── */}
-        {step === 'sucesso' && (
-          <motion.div
-            key="sucesso"
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            className="text-center"
-          >
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.15, type: 'spring', stiffness: 260, damping: 18 }}
-              className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
-              style={{ background: 'color-mix(in srgb, var(--color-teal) 15%, transparent)' }}
-            >
-              <CheckCircle2 className="w-10 h-10" style={{ color: 'var(--color-teal)' }} />
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.25 }}
-            >
-              <h1 className="font-heading text-3xl text-text-primary mb-2">
-                Tudo configurado{nomeConfirmado ? `, Dr. ${nomeConfirmado}` : ''}!
-              </h1>
-              <p className="text-text-secondary text-sm mb-8">
-                {personaCopy.sucesso}
-              </p>
-            </motion.div>
-
-            {isClinica && (
-              <motion.div
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.32 }}
-                className="mb-6 rounded-3xl border border-amber-500/25 bg-amber-500/5 p-6 text-left"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <p className="text-xs font-bold text-amber-500 uppercase tracking-widest mb-1">
-                      Ação necessária
-                    </p>
-                    <p className="font-heading text-lg text-text-primary">Monte sua equipe</p>
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {[1, 2, 3].map((n) => (
-                      <div
-                        key={n}
-                        className={[
-                          'w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-colors',
-                          n === 1
-                            ? 'border-teal bg-teal/10 text-teal'
-                            : 'border-border bg-surface-alt text-text-secondary',
-                        ].join(' ')}
-                      >
-                        {n === 1 ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : n}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <p className="text-sm text-text-secondary mb-1">
-                  O plano Clínica exige <span className="font-bold text-text-primary">mínimo 3 dentistas</span>. Você é o dentista 1.
-                </p>
-                <p className="text-sm text-text-secondary mb-5">
-                  A cobrança mínima será <span className="font-bold text-text-primary">R${PLANOS.CLINICA.preco * 3}/mês</span> (3 × R${PLANOS.CLINICA.preco}). Cada colega assina individualmente com o próprio cartão.
-                </p>
-
-                <a
-                  href="/dashboard/configuracoes?aba=equipe"
-                  className="inline-flex items-center gap-2 bg-gradient-to-r from-teal to-teal-lt text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-[0_4px_14px_rgba(47,156,133,0.3)] hover:-translate-y-0.5 transition-all"
-                >
-                  <Users className="w-4 h-4" />
-                  Convidar colegas agora
-                </a>
-              </motion.div>
-            )}
-
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-              className={isClinica ? 'grid grid-cols-2 gap-3 mb-8' : 'grid grid-cols-3 gap-3 mb-8'}
-            >
-              {(isClinica ? PROXIMOS_PASSOS.slice(0, 2) : PROXIMOS_PASSOS).map((item) => {
-                const Icon = item.icon;
-                return (
-                  <a
-                    key={item.href}
-                    href={item.href}
-                    className="bg-surface rounded-2xl border border-border p-4 flex flex-col items-center gap-2 text-center hover:border-teal/40 hover:bg-teal/5 transition-all group"
-                  >
-                    <div
-                      className="w-10 h-10 rounded-xl flex items-center justify-center"
-                      style={{ background: 'color-mix(in srgb, var(--color-teal) 12%, transparent)' }}
-                    >
-                      <Icon className="w-5 h-5 group-hover:scale-110 transition-transform" style={{ color: 'var(--color-teal)' }} />
-                    </div>
-                    <p className="text-xs font-semibold text-text-primary leading-tight">{item.label}</p>
-                    <p className="text-[11px] text-text-secondary leading-snug">{item.desc}</p>
-                  </a>
-                );
-              })}
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.45 }}
-            >
-              <a
-                href="/dashboard"
-                className="inline-flex items-center justify-center gap-2 w-full max-w-xs bg-gradient-to-r from-teal to-teal-lt text-white py-3.5 rounded-xl font-bold text-sm transition-all shadow-[0_6px_20px_rgba(47,156,133,0.35)] hover:-translate-y-0.5 hover:shadow-[0_10px_28px_rgba(47,156,133,0.45)]"
-              >
-                Ir para o dashboard
-                <ChevronRight className="w-4 h-4" />
-              </a>
-            </motion.div>
-          </motion.div>
-        )}
-
+        {step === 'dex' && <DexApresentacao key="dex" pendente={isLoading} onContinuar={() => { router.push('/dashboard/meu-dia'); }} onPular={() => { router.push('/dashboard/meu-dia'); }} />}
       </AnimatePresence>
     </div>
   );
+}
+
+function ModeCard({ active, icon, title, description, onClick }: { active: boolean; icon: React.ReactNode; title: string; description: string; onClick: () => void }): React.JSX.Element {
+  return <button type="button" onClick={onClick} className={`rounded-2xl border p-6 text-left transition-colors ${active ? 'border-teal bg-teal-pale/60 ring-1 ring-teal/20' : 'border-border bg-surface hover:bg-surface-alt'}`}><div className="mb-5 flex items-center justify-between"><span className="flex size-10 items-center justify-center rounded-xl bg-teal-pale text-teal-ink">{icon}</span>{active && <span className="flex size-5 items-center justify-center rounded-full bg-teal text-primary-foreground"><Check className="size-3" /></span>}</div><h2 className="font-heading text-xl text-text-primary">{title}</h2><p className="mt-2 text-sm leading-6 text-text-secondary">{description}</p></button>;
+}
+
+function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }): React.JSX.Element {
+  return <div><label className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-text-secondary">{label}</label>{children}{error && <p className="mt-1 text-xs text-destructive">{error}</p>}</div>;
+}
+
+function Choice({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }): React.JSX.Element {
+  return <button type="button" onClick={onClick} className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${active ? 'border-teal bg-teal-pale text-teal-ink' : 'border-border bg-surface text-text-secondary hover:bg-surface'}`}>{label}</button>;
 }

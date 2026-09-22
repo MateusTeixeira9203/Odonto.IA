@@ -56,15 +56,21 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const continuaFluxoDeAuth = next.startsWith('/convite/') || next === '/redefinir-senha';
   let destination = next;
   if (!continuaFluxoDeAuth) {
-    const { data: dentista } = await supabase
-      .from('dentistas')
-      .select('clinica_id')
-      .eq('user_id', user.id)
-      .limit(1)
-      .maybeSingle();
-    destination = dentista?.clinica_id
-      ? (requestedNext ? next : '/dashboard')
-      : '/onboarding';
+    const { data: activeUser } = await supabase
+      .from('users').select('active_clinica_id').eq('id', user.id).maybeSingle();
+    const activeClinicId = activeUser?.active_clinica_id;
+    const { data: membership } = activeClinicId
+      ? await supabase.from('clinica_usuarios').select('role, status')
+        .eq('usuario_id', user.id).eq('clinica_id', activeClinicId).eq('status', 'ativo').maybeSingle()
+      : { data: null };
+    if (!membership) {
+      destination = '/onboarding';
+    } else {
+      const { data: dentista } = await supabase.from('dentistas').select('id')
+        .eq('user_id', user.id).eq('clinica_id', activeClinicId!).eq('ativo', true).maybeSingle();
+      const entrada = dentista ? '/dashboard' : '/consultorio';
+      destination = requestedNext && (dentista || next.startsWith('/consultorio')) ? next : entrada;
+    }
   }
 
   const response = NextResponse.redirect(new URL(destination, origin));

@@ -21,7 +21,7 @@ function isAlwaysAllowedAuthRoute(pathname: string): boolean {
 
 function isProtectedRoute(pathname: string): boolean {
   return (
-    pathname.startsWith("/dashboard") || pathname.startsWith("/onboarding")
+    pathname.startsWith("/dashboard") || pathname.startsWith("/onboarding") || pathname.startsWith("/consultorio")
   );
 }
 

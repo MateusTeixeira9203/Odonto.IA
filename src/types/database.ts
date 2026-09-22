@@ -16,8 +16,8 @@ export interface User {
   updated_at: string;
 }
 
-export type ClinicaUsuarioRole   = 'admin' | 'dentista' | 'secretaria' | 'protetico';
-export type ClinicaUsuarioStatus = 'ativo' | 'removido' | 'pendente';
+export type ClinicaUsuarioRole   = 'admin' | 'dentista' | 'secretaria' | 'protetico' | 'gestor';
+export type ClinicaUsuarioStatus = 'ativo' | 'removido' | 'pendente' | 'suspenso';
 
 /** Fonte da verdade de membership multi-tenant */
 export interface ClinicaUsuario {

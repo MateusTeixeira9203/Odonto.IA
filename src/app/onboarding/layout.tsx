@@ -3,6 +3,7 @@ import { requireUser } from "@/server/auth/user";
 import { LogoMark } from "@/components/dentai/Logo";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { NeuralBackground } from "@/components/layout/NeuralBackground";
+import { getMemberContext } from '@/server/auth/member-context';
 
 export default async function OnboardingLayout({
   children,
@@ -10,6 +11,8 @@ export default async function OnboardingLayout({
   children: React.ReactNode;
 }): Promise<React.JSX.Element> {
   const { supabase, user } = await requireUser();
+  const member = await getMemberContext();
+  if (member.ok && !member.data.perfilClinico) redirect('/consultorio');
 
   // Guard: redireciona pro dashboard só quando o onboarding está CONCLUÍDO.
   // No fluxo novo o dentista é criado no meio (pra demo rodar), então "dentista
@@ -28,7 +31,7 @@ export default async function OnboardingLayout({
       .maybeSingle();
 
     if (clinica?.onboarding_completo) {
-      redirect("/dashboard");
+      redirect(member.ok && member.data.perfilClinico ? "/dashboard" : "/consultorio");
     }
   }
 
