@@ -70,6 +70,7 @@ export type OrcamentoComItens = {
   plano_forma?: string | null;
   desconto: number | null;
   created_at: string;
+  updated_at: string;
   validade_dias: number;
   condicoes_pagamento: string | null;
   /** R-38 — false esconde preço por item e Subtotal no PDF. Default true. */
@@ -150,7 +151,7 @@ export async function getPatientWorkspaceData({
           .from('orcamentos')
           .select(
             // R-114 — valor_acordado entra pro devido derivado (I1); itens ganham `aprovado`.
-            'id, status, total, valor_acordado, plano_forma, desconto, created_at, validade_dias, condicoes_pagamento, mostrar_valor_por_item, dentista_id, aprovado_em, aprovado_por:dentistas!orcamentos_aprovado_por_id_fkey(nome), itens:orcamento_itens(id, descricao, preco_total, quantidade, aprovado, composicao), pagamentos(id, cobranca_id, valor, status, forma_pagamento, data_pagamento, data_vencimento, parcela_numero, total_parcelas, marcado_por:dentistas!pagamentos_marcado_por_id_fkey(nome)), aceite:assinaturas!assinaturas_orcamento_id_fkey(id, assinado_por, cro_no_ato, assinatura_ref, assinado_em, termos_snapshot)'
+            'id, status, total, valor_acordado, plano_forma, desconto, created_at, updated_at, validade_dias, condicoes_pagamento, mostrar_valor_por_item, dentista_id, aprovado_em, aprovado_por:dentistas!orcamentos_aprovado_por_id_fkey(nome), itens:orcamento_itens(id, descricao, preco_total, quantidade, aprovado, composicao), pagamentos(id, cobranca_id, valor, status, forma_pagamento, data_pagamento, data_vencimento, parcela_numero, total_parcelas, marcado_por:dentistas!pagamentos_marcado_por_id_fkey(nome)), aceite:assinaturas!assinaturas_orcamento_id_fkey(id, assinado_por, cro_no_ato, assinatura_ref, assinado_em, termos_snapshot)'
           )
           .eq('paciente_id', patientId)
           .eq('clinica_id', clinicId)

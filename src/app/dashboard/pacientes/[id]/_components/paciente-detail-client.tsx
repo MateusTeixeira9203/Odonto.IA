@@ -71,6 +71,7 @@ import {
   excluirPagamento,
   estornarPagamento,
   editarOrcamento,
+  revisarOrcamento,
   excluirOrcamento,
   gerarParcelas,
   reorganizarParcelas,
@@ -304,6 +305,9 @@ export function PacienteDetailClient({
   // Edição de orçamento
   const [orcEditMode, setOrcEditMode] = useState(false);
   const [orcEditItens, setOrcEditItens] = useState<OrcEditItem[]>([]);
+  /** null preserva a diferença negociada ao recalcular pelo novo total dos itens. */
+  const [orcEditValorAcordado, setOrcEditValorAcordado] = useState<string | null>(null);
+  const [orcEditAceiteConfirmado, setOrcEditAceiteConfirmado] = useState(false);
   const [orcEditSaving, setOrcEditSaving] = useState(false);
   const [orcEditError, setOrcEditError] = useState<string | null>(null);
 
@@ -1167,6 +1171,8 @@ export function PacienteDetailClient({
         ),
       }))
     );
+    setOrcEditValorAcordado(null);
+    setOrcEditAceiteConfirmado(false);
     setOrcEditError(null);
     setOrcEditMode(true);
   };
@@ -1178,12 +1184,63 @@ export function PacienteDetailClient({
       setOrcEditError('Adicione ao menos um procedimento com descrição e valor.');
       return;
     }
+    const temHistoricoFinanceiro = detalheOrc.itens.some((item) => item.aprovado)
+      || detalheOrc.pagamentos.some((pagamento) => pagamento.status === 'pago')
+      || !!detalheOrc.aceite;
+    const subtotalNovo = itensValidos.reduce((sum, item) => sum + item.quantidade * parseValorBR(item.preco_unitario), 0);
+    const novoTotal = Math.max(0, subtotalNovo - (detalheOrc.desconto ?? 0));
+
+    if (temHistoricoFinanceiro && !orcEditAceiteConfirmado) {
+      setOrcEditError('Confirme que a paciente já aceitou esta revisão antes de salvar.');
+      return;
+    }
+
     setOrcEditSaving(true);
+    if (temHistoricoFinanceiro) {
+      const totalAnterior = detalheOrc.total ?? 0;
+      const acordoAnterior = detalheOrc.valor_acordado ?? totalAnterior;
+      const valorAcordado = orcEditValorAcordado === null
+        ? Math.max(0, Math.round((acordoAnterior + novoTotal - totalAnterior) * 100) / 100)
+        : parseValorBR(orcEditValorAcordado);
+      if (valorAcordado <= 0) {
+        setOrcEditError('Informe um valor final negociado maior que zero.');
+        setOrcEditSaving(false);
+        return;
+      }
+      if (!detalheOrc.updated_at) {
+        setOrcEditError('Não foi possível confirmar a versão deste orçamento. Recarregue a página.');
+        setOrcEditSaving(false);
+        return;
+      }
+      const result = await revisarOrcamento({
+        orcamentoId: detalheOrc.id,
+        itens: itensValidos.map((item) => ({
+          ...(item.id ? { id: item.id } : {}),
+          descricao: item.descricao.trim(),
+          quantidade: item.quantidade,
+          precoUnitario: parseValorBR(item.preco_unitario),
+        })),
+        valorAcordado,
+        versaoEsperada: detalheOrc.updated_at,
+        confirmarAceitePaciente: true,
+      });
+      if (!result.ok) {
+        setOrcEditError(result.error);
+      } else {
+        setOrcEditMode(false);
+        setOrcEditAceiteConfirmado(false);
+        setOrcEditValorAcordado(null);
+        toast.success('Revisão salva. Os recebimentos já registrados foram preservados.');
+        router.refresh();
+      }
+      setOrcEditSaving(false);
+      return;
+    }
+
     const result = await editarOrcamento(detalheOrc.id, itensValidos.map(i => ({ ...i, preco_unitario: parseValorBR(i.preco_unitario) })), detalheOrc.desconto ?? 0);
     if (result.error) {
       setOrcEditError(result.error);
     } else {
-      const novoTotal = itensValidos.reduce((sum, i) => sum + i.quantidade * parseValorBR(i.preco_unitario), 0);
       const novosItens: OrcamentoItem[] = itensValidos.map((i) => ({
         id: i.id ?? crypto.randomUUID(),
         descricao: i.descricao,
@@ -1939,6 +1996,8 @@ export function PacienteDetailClient({
           setDiferencasOrcamentoAberto(null);
           setPagError(null);
           setOrcEditMode(false);
+          setOrcEditAceiteConfirmado(false);
+          setOrcEditValorAcordado(null);
           setOrcEditError(null);
           setPagForm({ valor: '', formaPagamento: 'dinheiro', data: new Date().toISOString().split('T')[0], dataVencimento: '' });
           setClosingPagamentoId(null);
@@ -1972,6 +2031,10 @@ export function PacienteDetailClient({
         setOrcEditMode={setOrcEditMode}
         orcEditItens={orcEditItens}
         setOrcEditItens={setOrcEditItens}
+        orcEditValorAcordado={orcEditValorAcordado}
+        setOrcEditValorAcordado={setOrcEditValorAcordado}
+        orcEditAceiteConfirmado={orcEditAceiteConfirmado}
+        setOrcEditAceiteConfirmado={setOrcEditAceiteConfirmado}
         orcEditSaving={orcEditSaving}
         orcEditError={orcEditError}
         setOrcEditError={setOrcEditError}
