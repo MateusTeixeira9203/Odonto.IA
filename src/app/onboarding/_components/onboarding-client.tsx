@@ -8,14 +8,14 @@ import { AnimatePresence, motion } from 'motion/react';
 import { Building2, Check, ChevronLeft, ChevronRight, Loader2, Plus, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { criarConviteEquipeAction, iniciarOnboardingModalidade } from '../actions';
-import { especialidadesSchema } from '@/lib/especialidades';
+import type { Especialidade } from '@/lib/especialidades';
 import { EspecialidadeChips } from '@/components/ui/especialidade-chips';
 
 const schema = z.object({
   nome: z.string().trim().min(2, 'Informe seu nome completo.'),
   nomeConsultorio: z.string().trim().min(2, 'Informe o nome da clínica.'),
   cro: z.string().trim(),
-  especialidade: especialidadesSchema,
+  especialidade: z.array(z.string().trim().min(1)).max(12),
 });
 type FormData = z.infer<typeof schema>;
 export type OnboardingStep = 'modalidade' | 'previsao' | 'equipe';
@@ -68,7 +68,7 @@ export function OnboardingClient({ initialStep }: { initialStep: OnboardingStep 
     try {
       const result = await iniciarOnboardingModalidade({
         nome: values.nome, nomeConsultorio: values.nomeConsultorio, modalidade, criadorAtende,
-        cro: criadorAtende ? values.cro : null, especialidade: criadorAtende ? values.especialidade : [],
+        cro: criadorAtende ? values.cro : null, especialidade: criadorAtende ? values.especialidade as Especialidade[] : [],
         foco: criadorAtende ? 'economizar_tempo' : null, chaveIdempotencia: key.current,
         quantidadeDentistasPrevista: quantidade,
       });
@@ -114,7 +114,7 @@ export function OnboardingClient({ initialStep }: { initialStep: OnboardingStep 
           <Field label="Seu nome" error={form.formState.errors.nome?.message}><input className={inputClass} placeholder="Seu nome completo" {...form.register('nome')} /></Field>
           <Field label="Nome da clínica" error={form.formState.errors.nomeConsultorio?.message}><input className={inputClass} placeholder="Ex: Clínica Sorriso" {...form.register('nomeConsultorio')} /></Field>
           {modalidade === 'gerida' && <div className="mt-5 rounded-xl border border-border bg-surface-alt p-4"><p className="text-sm font-semibold text-text-primary">Você também atende nesta clínica?</p><div className="mt-3 flex gap-2"><Choice active={criadorAtende} label="Sim, sou dentista" onClick={() => { setCriadorAtende(true); setQuantidade((value) => Math.max(1, value)); }} /><Choice active={!criadorAtende} label="Não, sou proprietário" onClick={() => setCriadorAtende(false)} /></div></div>}
-          {criadorAtende && <div className="mt-5 space-y-5"><Field label="CRO" error={form.formState.errors.cro?.message}><input className={inputClass} placeholder="CRO-SP 12345" {...form.register('cro')} /></Field><div><Eyebrow>Especialidades</Eyebrow><div className="mt-2"><EspecialidadeChips selected={especialidades} onChange={(next) => form.setValue('especialidade', next, { shouldValidate: true })} /></div></div></div>}
+          {criadorAtende && <div className="mt-5 space-y-5"><Field label="CRO" error={form.formState.errors.cro?.message}><input className={inputClass} placeholder="CRO-SP 12345" {...form.register('cro')} /></Field><div><Eyebrow>Especialidades</Eyebrow><div className="mt-2"><EspecialidadeChips selected={especialidades as Especialidade[]} onChange={(next) => form.setValue('especialidade', next, { shouldValidate: true })} /></div></div></div>}
         </div><Footer primary="Continuar" onPrimary={() => void continueToForecast()} />
       </motion.section>}
 
