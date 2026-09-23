@@ -22,7 +22,13 @@
 
 | ID | Item | Estado |
 |---|---|---|
-| [**R-172**](specs/R-172-estoque-manual-producao.md) | **Estoque manual e kits no banco principal** — consumíveis, lotes, baixas auditáveis e registro de uso na ficha | 🔵 implementação em ramo isolado; migrations e validação de duas contas pendentes. |
+| [**R-163**](specs/R-163-financeiro-clinica.md) | **Financeiro da clínica** — caixa, previsão, margem operacional estimada e resultado por profissional na gestão | 🔵 implementação; mantém financeiro pessoal e exige titularidade financeira da clínica. |
+
+## No ar, aguardando validação dirigida
+
+| ID | Item | Estado |
+|---|---|---|
+| [**R-172**](specs/R-172-estoque-manual-producao.md) | **Estoque manual e kits no banco principal** — consumíveis, lotes, baixas auditáveis e registro de uso na ficha | 🟡 preview testado pelo usuário; falta validação de isolamento com duas contas e correção da abertura do detalhe. |
 
 ## Publicado, aguardando validação dirigida
 

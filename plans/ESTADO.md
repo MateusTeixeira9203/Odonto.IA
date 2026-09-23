@@ -2,25 +2,21 @@
 
 Atualizado em 23/09/2026.
 
-🔵 **R-172 — Estoque manual e kits no banco principal.**
+🔵 **R-163 — Financeiro da clínica.**
 
-Contrato: [R-172](specs/R-172-estoque-manual-producao.md). A implementação está em ramo isolado
-contra a baseline R-159 de governança; não foi aplicado SQL nem dado alterado no banco principal.
+Contrato: [R-163](specs/R-163-financeiro-clinica.md). O Financeiro pessoal atual permanece
+intacto, apenas realocado para o hub Meu Consultório. O financeiro da unidade usa titularidade
+da clínica e não pode somar os silos pessoais legados.
 
-Pronto para revisão:
+Contrato visual aprovado:
 
-- Estoque de consumíveis, lotes, recebimento, consumo, descarte, contagem e correção auditável.
-- Kits versionados e registro de uso na ficha após existir atendimento.
-- Entrada pelo dentista em **Meu Consultório** e pelo proprietário em **Minha Clínica**.
-- Migrations aditivas `20260923120000` a `20260923120800`, compatíveis com o catálogo atual de
-  48 permissões; a migration antiga que reduziria o catálogo foi descartada.
+- [Visão geral](artefatos/R-161-meu-consultorio-visao-geral-v1.html).
+- [Financeiro da clínica v2](artefatos/R-163-financeiro-clinica-v2.html), com resultado
+  operacional estimado, margem operacional e fôlego de caixa.
 
-Verificado localmente: typecheck, lint direcionado, 35 testes unitários e teste de paridade do
-catálogo SQL. Falta aplicar migrations, ativar apenas as clínicas de teste e validar duas contas
-no preview.
+Migration R-163 aplicada no banco principal em 23/09: titularidade financeira aditiva, custos
+fixos recorrentes e RPCs autorizadas. Estrutura e funções confirmadas por consulta de schema;
+as telas permanecem locais até preview e validação manual.
 
-Limite assumido: instrumentais reutilizáveis exigem ciclo de lavagem e esterilização; não entram
-como consumível nesta entrega.
-
-Próximo passo: revisão final do SQL e aplicação controlada no banco principal, seguida do roteiro
-manual de cadastro, entrada, baixa, ajuste, kit e ficha.
+R-172 está no preview e aguardará a validação de duas contas antes de liberar o estoque para
+outras clínicas.
