@@ -1289,6 +1289,90 @@ export async function editarOrcamento(
   return {};
 }
 
+const itemRevisaoOrcamentoSchema = z.object({
+  id: z.string().uuid().optional(),
+  descricao: z.string().trim().min(1).max(500),
+  quantidade: z.number().int().min(1).max(99),
+  precoUnitario: z.number().finite().min(0).multipleOf(0.01),
+});
+
+const revisarOrcamentoSchema = z.object({
+  orcamentoId: z.string().uuid(),
+  itens: z.array(itemRevisaoOrcamentoSchema).min(1).max(100),
+  valorAcordado: z.number().finite().positive().multipleOf(0.01),
+  versaoEsperada: z.string().datetime({ offset: true }),
+  confirmarAceitePaciente: z.literal(true),
+});
+
+export type RevisarOrcamentoInput = z.infer<typeof revisarOrcamentoSchema>;
+export type RevisarOrcamentoResult =
+  | { ok: true; total: number; valorAcordado: number; valorRecebido: number }
+  | { ok: false; error: string };
+
+/**
+ * R-172 — revisão comercial de orçamento que já tem aceite ou recebimento.
+ * A RPC preserva IDs/aprovações dos itens e cada pagamento histórico; o client só envia
+ * valores propostos e a versão que abriu. O aceite é uma confirmação explícita da operação,
+ * não uma aprovação implícita causada por editar um campo.
+ */
+export async function revisarOrcamento(
+  dados: RevisarOrcamentoInput,
+): Promise<RevisarOrcamentoResult> {
+  const parsed = revisarOrcamentoSchema.safeParse(dados);
+  if (!parsed.success) return { ok: false, error: 'Revise os procedimentos, o valor final e a confirmação do aceite.' };
+
+  const { supabase, clinicId } = await requireClinicContext();
+  const { data: orcamento } = await supabase
+    .from('orcamentos')
+    .select('paciente_id')
+    .eq('id', parsed.data.orcamentoId)
+    .eq('clinica_id', clinicId)
+    .maybeSingle();
+  if (!orcamento) return { ok: false, error: 'Orçamento não encontrado.' };
+
+  const rpc = supabase.rpc.bind(supabase) as unknown as RpcCall;
+  const { data, error } = await rpc('revisar_orcamento_aceito', {
+    p_orcamento_id: parsed.data.orcamentoId,
+    p_itens: parsed.data.itens.map((item) => ({
+      id: item.id ?? null,
+      descricao: item.descricao,
+      quantidade: item.quantidade,
+      preco_unitario: item.precoUnitario,
+    })),
+    p_valor_acordado: parsed.data.valorAcordado,
+    p_versao_esperada: parsed.data.versaoEsperada,
+  });
+
+  if (error) {
+    const mensagem = error.message ?? '';
+    if (mensagem.includes('sem_permissao')) return { ok: false, error: 'Você não tem permissão para revisar este orçamento.' };
+    if (mensagem.includes('conflito')) return { ok: false, error: 'Este orçamento mudou enquanto você revisava. Recarregue e confira os valores.' };
+    if (mensagem.includes('valor_menor_que_recebido')) return { ok: false, error: 'O novo valor final não pode ser menor que o total já recebido.' };
+    if (mensagem.includes('itens_incompletos')) return { ok: false, error: 'Esta revisão não pode remover procedimentos existentes.' };
+    if (mensagem.includes('item_invalido')) return { ok: false, error: 'Um procedimento não pertence mais a este orçamento. Recarregue e tente novamente.' };
+    if (mensagem.includes('itens_invalidos') || mensagem.includes('valor_invalido')) return { ok: false, error: 'Revise os procedimentos e os valores informados.' };
+    if (mensagem.includes('parcelas_nao_fecham_saldo')) return { ok: false, error: 'Não foi possível redistribuir as previsões. Recarregue e tente novamente.' };
+    console.error('[revisarOrcamento]', mensagem);
+    return { ok: false, error: 'Não foi possível salvar a revisão. Nenhuma alteração foi aplicada.' };
+  }
+
+  const resultado = Array.isArray(data) ? data[0] : null;
+  if (!resultado || typeof resultado !== 'object') {
+    return { ok: false, error: 'A revisão não retornou o novo resumo financeiro. Recarregue antes de continuar.' };
+  }
+  const valores = resultado as { total: number; valor_acordado: number; valor_recebido: number };
+
+  revalidatePath(`/dashboard/pacientes/${orcamento.paciente_id}`);
+  revalidatePath('/dashboard/orcamentos');
+  revalidatePath('/dashboard/financeiro');
+  return {
+    ok: true,
+    total: Number(valores.total),
+    valorAcordado: Number(valores.valor_acordado),
+    valorRecebido: Number(valores.valor_recebido),
+  };
+}
+
 /**
  * R-34 §7.1 — o atalho de 1 clique. Fecha a PRÓXIMA PARCELA ABERTA quando existe uma
  * (delega ao UPDATE de `marcarPagamentoPago` — nunca insere linha nova por cima de parcela

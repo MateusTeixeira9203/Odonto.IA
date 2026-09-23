@@ -61,6 +61,8 @@ export type OrcamentoComItens = {
   plano_forma?: string | null;
   desconto: number | null;
   created_at: string;
+  /** Versão otimista usada para não sobrescrever uma revisão salva em outra aba. */
+  updated_at: string;
   validade_dias: number;
   condicoes_pagamento: string | null;
   /** R-38 — false esconde preço por item e Subtotal no PDF. Default true. */
