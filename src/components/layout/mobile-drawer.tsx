@@ -3,11 +3,11 @@
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  LayoutDashboard, Users, Calendar, CalendarClock, Wallet, Settings,
+  LayoutDashboard, Users, Calendar, CalendarClock, Wallet, Settings, Building2,
   X, LogOut, Sun, Moon, Lock, Loader2,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { useState, useEffect } from 'react';
+import { useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { temFeature } from '@/lib/planos';
@@ -34,16 +34,17 @@ const NAV_ITEMS = [
   { href: '/dashboard/pacientes',    icon: Users,           label: 'Pacientes' },
   { href: '/dashboard/agendamentos', icon: Calendar,        label: 'Agenda' },
   { href: '/dashboard/financeiro',   icon: Wallet,          label: 'Financeiro', requiresFeature: 'financeiro' as const },
+  { href: '/dashboard/meu-consultorio/estoque', icon: Building2, label: 'Meu consultório', hideFromSecretaria: true },
   { href: '/dashboard/configuracoes',icon: Settings,        label: 'Configurações', hideFromSecretaria: true },
 ] as const;
+
+const subscribeMounted = () => () => {};
 
 export function MobileDrawer({ open, onClose, nome, clinicaNome, role, avatarUrl, plano }: MobileDrawerProps) {
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(subscribeMounted, () => true, () => false);
   const { logout, isLoggingOut } = useLogout();
-
-  useEffect(() => { setMounted(true); }, []);
 
   const avatarInitials = nome.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
   const financeiroLocked = !temFeature(plano ?? 'SOLO', 'financeiro');

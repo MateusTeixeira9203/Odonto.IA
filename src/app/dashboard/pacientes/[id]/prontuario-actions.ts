@@ -7,6 +7,20 @@ import {
   type RegistrarAtendimentoClinicoResult,
 } from '@/server/patients/registrar-atendimento-clinico';
 import { ortoManutencaoSchema } from '@/lib/especialidades/orto';
+import {
+  confirmarUsos,
+  corrigirUso,
+  declararUsos,
+  listarUsosDaFicha,
+  previsualizarConfirmacaoUsos,
+} from '@/app/dashboard/meu-consultorio/estoque/actions';
+import type {
+  CorrecaoUsoResultData,
+  KitUsageResult,
+  PrevisualizacaoConfirmacaoUsosResultData,
+  UsosListResultData,
+  UsosResultData,
+} from '@/server/estoque/kit-usage-contracts';
 import type { OdontogramaEventoDraft, OrtoManutencaoInfo } from '@/types/odontograma';
 
 const tipoRegistroSchema = z.enum([
@@ -106,4 +120,27 @@ export async function salvarAtendimentoDoProntuario(input: {
     revalidatePath(`/dashboard/pacientes/${parsed.data.pacienteId}`);
   }
   return result;
+}
+
+/** A ficha continua salvável separadamente; estas ações só registram ou conciliam o estoque. */
+export async function declararMateriaisDaFicha(input: unknown): Promise<KitUsageResult<UsosResultData>> {
+  return declararUsos(input);
+}
+
+export async function confirmarMateriaisDaFicha(input: unknown): Promise<KitUsageResult<UsosResultData>> {
+  return confirmarUsos(input);
+}
+
+export async function corrigirMaterialDaFicha(input: unknown): Promise<KitUsageResult<CorrecaoUsoResultData>> {
+  return corrigirUso(input);
+}
+
+export async function listarMateriaisDaFicha(input: unknown): Promise<KitUsageResult<UsosListResultData>> {
+  return listarUsosDaFicha(input);
+}
+
+export async function previsualizarConfirmacaoMateriaisDaFicha(
+  input: unknown,
+): Promise<KitUsageResult<PrevisualizacaoConfirmacaoUsosResultData>> {
+  return previsualizarConfirmacaoUsos(input);
 }

@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
 import {
-  LayoutDashboard, Users, Calendar, CalendarClock, Wallet, Settings,
+  LayoutDashboard, Users, Calendar, CalendarClock, Wallet, Settings, Building2,
   Sun, Moon, User, LogOut, Bot, Check, ChevronsUpDown, Loader2,
 } from 'lucide-react';
 import { OdontoIALogo } from '@/components/ui/dent-ia-logo';
@@ -42,6 +42,7 @@ const NAV_ITEMS = [
   { href: '/dashboard/pacientes',    icon: Users,           label: 'Pacientes',  id: 'pacientes' },
   { href: '/dashboard/agendamentos', icon: Calendar,        label: 'Agenda',     id: 'agenda' },
   { href: '/dashboard/financeiro',   icon: Wallet,          label: 'Financeiro', id: 'financeiro', requiresFeature: 'financeiro' as const },
+  { href: '/dashboard/meu-consultorio/estoque', icon: Building2, label: 'Meu consultório', id: 'consultorio', hideFromSecretaria: true },
   { href: '/dashboard/configuracoes',icon: Settings,        label: 'Config',     id: 'config',     hideFromSecretaria: true },
 ] as const;
 
