@@ -22,7 +22,7 @@
 
 | ID | Item | Estado |
 |---|---|---|
-| [**R-153**](specs/R-153-orcamento-ficha-fluxo-continuo.md) | **Orçamento da Ficha em fluxo contínuo** — uma Ficha por orçamento, catálogo confiável e continuidade no perfil do paciente | 🔵 integrada em `main`; aguarda confirmação do deploy e validação dirigida. |
+| [**R-172**](specs/R-172-estoque-manual-producao.md) | **Estoque manual e kits no banco principal** — consumíveis, lotes, baixas auditáveis e registro de uso na ficha | 🔵 implementação em ramo isolado; migrations e validação de duas contas pendentes. |
 
 ## Publicado, aguardando validação dirigida
 

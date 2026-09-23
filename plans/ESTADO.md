@@ -1,19 +1,26 @@
 # Estado — Odonto.IA
 
-Atualizado em 14/09/2026. Este checkout pertence ao pacote R169.
+Atualizado em 23/09/2026.
 
-🔵 **R169 — Dex, edição rápida da ficha e revisão do orçamento.** Todos os lotes implementados;
-[Preview Ready](https://odonto-742kqydnk-mateusteixeira9203s-projects.vercel.app), commit `25f6fd1`. Usuário fará os testes manuais.
+🔵 **R-172 — Estoque manual e kits no banco principal.**
 
-Contrato: [R169](specs/R-169-dex-ficha-edicao-rapida.md) e [R169b](specs/R-169b-ficha-orcamento-ajustes.md).
-Roteiro/evidências: [teste integrado](auditorias/2026-09-14-r169-ficha-orcamento-preview.md).
+Contrato: [R-172](specs/R-172-estoque-manual-producao.md). A implementação está em ramo isolado
+contra a baseline R-159 de governança; não foi aplicado SQL nem dado alterado no banco principal.
 
-Banco principal `zenfemoxvwerplrjgfqz` recebeu apenas SQL compatível R169. Nenhuma policy nova,
-nenhum teste gravou pacientes. Ambiente manual: clínica de teste, preview Vercel.
-Branch `codex/r169-dex-ficha`; produção do app não promovida.
+Pronto para revisão:
 
-Retorno manual: corrigidos clique/avisos repetidos do orçamento, contador após inclusão e ação
-Adicionar à ficha no rodapé. Novo preview Ready; roteiro curto no relatório de teste.
-Falta: reteste manual do usuário após essa publicação.
-Não reverter colunas/histórico de retirada ao voltar o app; guardas e rollback em `supabase/rollbacks/`.
-Outras frentes do checkout principal permanecem fora desta entrega.
+- Estoque de consumíveis, lotes, recebimento, consumo, descarte, contagem e correção auditável.
+- Kits versionados e registro de uso na ficha após existir atendimento.
+- Entrada pelo dentista em **Meu Consultório** e pelo proprietário em **Minha Clínica**.
+- Migrations aditivas `20260923120000` a `20260923120800`, compatíveis com o catálogo atual de
+  48 permissões; a migration antiga que reduziria o catálogo foi descartada.
+
+Verificado localmente: typecheck, lint direcionado, 35 testes unitários e teste de paridade do
+catálogo SQL. Falta aplicar migrations, ativar apenas as clínicas de teste e validar duas contas
+no preview.
+
+Limite assumido: instrumentais reutilizáveis exigem ciclo de lavagem e esterilização; não entram
+como consumível nesta entrega.
+
+Próximo passo: revisão final do SQL e aplicação controlada no banco principal, seguida do roteiro
+manual de cadastro, entrada, baixa, ajuste, kit e ficha.
