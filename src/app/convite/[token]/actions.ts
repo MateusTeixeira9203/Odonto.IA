@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { aceitarConvite } from '@/server/services/invites';
+import { acceptGovernanceInvite } from '@/server/services/governance-invites';
 
 export async function aceitarConviteAction(
   token: string,
@@ -27,4 +28,14 @@ export async function aceitarConviteAction(
   }
 
   redirect(result.role === 'dentista' ? '/onboarding' : '/dashboard');
+}
+
+export async function aceitarConviteGovernancaAction(input: {
+  token: string;
+  cro: string | null;
+  especialidade: string[];
+}): Promise<{ error?: string }> {
+  const result = await acceptGovernanceInvite(input);
+  if (!result.ok) return { error: result.error };
+  redirect(result.role === 'gestor' ? '/consultorio' : '/dashboard');
 }

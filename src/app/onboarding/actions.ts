@@ -4,6 +4,7 @@ import { requireUser } from "@/server/auth/user";
 import { requireClinicContext } from "@/server/auth/clinic";
 import { enviarEmailD0 } from "@/server/services/onboarding-emails";
 import { completeOnboardingModalidade } from "@/server/services/onboarding-modalidade";
+import { createTeamInvite } from '@/server/services/team-invites';
 import type { FocoPrincipal } from "@/lib/persona";
 import type { Especialidade } from "@/lib/especialidades";
 
@@ -18,6 +19,7 @@ export interface IniciarOnboardingModalidadeInput {
   modalidade: "colaborativa" | "gerida";
   criadorAtende: boolean;
   chaveIdempotencia: string;
+  quantidadeDentistasPrevista: number;
 }
 
 const LIMITE_POR_PLANO: Record<PlanoClinica, number> = { SOLO: 1, CLINICA: 5 };
@@ -28,7 +30,7 @@ const LIMITE_POR_PLANO: Record<PlanoClinica, number> = { SOLO: 1, CLINICA: 5 };
  */
 export async function iniciarOnboardingModalidade(
   data: IniciarOnboardingModalidadeInput,
-): Promise<{ success: boolean; criadorAtende?: boolean; error?: string }> {
+): Promise<{ success: boolean; criadorAtende?: boolean; clinicaId?: string; error?: string }> {
   const { user } = await requireUser();
 
   const result = await completeOnboardingModalidade({
@@ -41,6 +43,7 @@ export async function iniciarOnboardingModalidade(
     email: user.email ?? null,
     foco: data.foco,
     chaveIdempotencia: data.chaveIdempotencia,
+    quantidadeDentistasPrevista: data.quantidadeDentistasPrevista,
   });
 
   if (!result.ok) {
@@ -54,7 +57,17 @@ export async function iniciarOnboardingModalidade(
     });
   }
 
-  return { success: true, criadorAtende: result.data.criadorAtende };
+  return { success: true, criadorAtende: result.data.criadorAtende, clinicaId: result.data.clinicaId };
+}
+
+export async function criarConviteEquipeAction(input: unknown): Promise<{
+  success: boolean;
+  emailEnviado?: boolean;
+  error?: string;
+}> {
+  const result = await createTeamInvite(input);
+  if (!result.ok) return { success: false, error: result.mensagem };
+  return { success: true, emailEnviado: result.emailEnviado };
 }
 
 /**

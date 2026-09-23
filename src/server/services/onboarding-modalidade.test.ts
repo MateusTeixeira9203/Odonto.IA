@@ -19,6 +19,7 @@ function input(overrides: Record<string, unknown> = {}) {
     email: 'ana@aurora.test',
     foco: null,
     chaveIdempotencia: key,
+    quantidadeDentistasPrevista: 0,
     ...overrides,
   };
 }
@@ -29,7 +30,7 @@ test('aceita proprietário não clínico em clínica gerida', async () => {
     complete: async (value) => {
       request = value;
       return {
-        data: { ok: true, data: { clinicaId: clinicId, membroId: memberId, modalidade: 'gerida', criadorAtende: false, dentistaId: null } },
+        data: { ok: true, data: { clinicaId: clinicId, membroId: memberId, modalidade: 'gerida', criadorAtende: false, dentistaId: null, quantidadeDentistasPrevista: 0 } },
         error: null,
       };
     },
@@ -38,9 +39,9 @@ test('aceita proprietário não clínico em clínica gerida', async () => {
   assert.deepEqual(request, {
     p_nome_clinica: 'Clínica Aurora', p_modalidade: 'gerida', p_criador_atende: false,
     p_nome_usuario: 'Ana Souza', p_cro: null, p_especialidade: [], p_email: 'ana@aurora.test',
-    p_foco_principal: null, p_chave_idempotencia: key,
+    p_foco_principal: null, p_chave_idempotencia: key, p_quantidade_dentistas_prevista: 0,
   });
-  assert.deepEqual(result, { ok: true, data: { clinicaId: clinicId, membroId: memberId, modalidade: 'gerida', criadorAtende: false, dentistaId: null } });
+  assert.deepEqual(result, { ok: true, data: { clinicaId: clinicId, membroId: memberId, modalidade: 'gerida', criadorAtende: false, dentistaId: null, quantidadeDentistasPrevista: 0 } });
 });
 
 test('exige perfil clínico no cadastro colaborativo', async () => {
@@ -61,10 +62,10 @@ test('exige CRO e especialidade para criador que atende', async () => {
 
 test('aceita criador clínico e conserva resposta estruturada', async () => {
   const result = await completeOnboardingModalidade(input({
-    criadorAtende: true, cro: 'CRO-SP 12345', especialidade: ['Clínico Geral'], foco: 'economizar_tempo',
+    criadorAtende: true, cro: 'CRO-SP 12345', especialidade: ['Clínico Geral'], foco: 'economizar_tempo', quantidadeDentistasPrevista: 1,
   }), {
     complete: async () => ({
-      data: { ok: true, data: { clinicaId: clinicId, membroId: memberId, modalidade: 'gerida', criadorAtende: true, dentistaId: dentistId } },
+      data: { ok: true, data: { clinicaId: clinicId, membroId: memberId, modalidade: 'gerida', criadorAtende: true, dentistaId: dentistId, quantidadeDentistasPrevista: 1 } },
       error: null,
     }),
   });

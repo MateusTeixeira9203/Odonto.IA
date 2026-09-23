@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { Lock, Mail, User, Eye, EyeOff, ArrowRight } from 'lucide-react';
-import { aceitarConviteAction } from '../actions';
+import { aceitarConviteAction, aceitarConviteGovernancaAction } from '../actions';
 import { authCallbackUrl } from '@/lib/auth/return-path';
 import { GoogleIcone } from '@/components/landing/icones';
+import { EspecialidadeChips } from '@/components/ui/especialidade-chips';
+import type { Especialidade } from '@/lib/especialidades';
 
 interface Props {
   token: string;
@@ -249,17 +251,31 @@ export function InviteAuthClient({ token, inviteEmail }: Props) {
 
 interface AcceptProps {
   token: string;
+  governanceRole: 'gestor' | 'responsavel_tecnico' | null;
 }
 
-export function AcceptButton({ token }: AcceptProps) {
+export function AcceptButton({ token, governanceRole }: AcceptProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cro, setCro] = useState('');
+  const [especialidades, setEspecialidades] = useState<Especialidade[]>([]);
 
   async function handleAccept() {
     setLoading(true);
     setError(null);
-    const result = await aceitarConviteAction(token);
+    if (governanceRole === 'responsavel_tecnico' && (!cro.trim() || especialidades.length === 0)) {
+      setError('Informe CRO e ao menos uma especialidade para assumir como responsável técnico.');
+      setLoading(false);
+      return;
+    }
+    const result = governanceRole
+      ? await aceitarConviteGovernancaAction({
+        token,
+        cro: governanceRole === 'responsavel_tecnico' ? cro.trim() : null,
+        especialidade: governanceRole === 'responsavel_tecnico' ? especialidades : [],
+      })
+      : await aceitarConviteAction(token);
     if (result?.error) {
       setError(result.error);
       setLoading(false);
@@ -275,13 +291,30 @@ export function AcceptButton({ token }: AcceptProps) {
           {error}
         </p>
       )}
+      {governanceRole === 'responsavel_tecnico' && (
+        <div className="space-y-4 rounded-xl border border-border bg-surface-alt p-4">
+          <div>
+            <label className="block font-mono text-xs text-text-secondary uppercase tracking-widest mb-1.5">CRO</label>
+            <input
+              value={cro}
+              onChange={(event) => setCro(event.target.value)}
+              placeholder="CRO-SP 12345"
+              className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-text-primary outline-none focus:border-teal focus:ring-2 focus:ring-teal/20"
+            />
+          </div>
+          <div>
+            <label className="block font-mono text-xs text-text-secondary uppercase tracking-widest mb-1.5">Especialidades</label>
+            <EspecialidadeChips selected={especialidades} onChange={setEspecialidades} />
+          </div>
+        </div>
+      )}
       <button
         onClick={handleAccept}
         disabled={loading}
         className="w-full bg-teal-ink text-surface rounded-xl font-bold py-3.5 hover:opacity-90 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
         style={{ boxShadow: '0 10px 30px -10px rgba(47,156,133,0.4)' }}
       >
-        {loading ? 'Processando...' : (<>Aceitar convite <ArrowRight className="w-4 h-4" /></>)}
+            {loading ? 'Processando...' : (<>Aceitar convite <ArrowRight className="w-4 h-4" /></>)}
       </button>
     </div>
   );

@@ -407,11 +407,19 @@ export async function aceitarConvite(
   const clinicId = convite.clinica_id as string;
   const role = convite.role as string;
   const isDentistaConvidado = role === 'dentista';
+  const { data: governanca } = await db
+    .from('clinica_governanca')
+    .select('modalidade')
+    .eq('clinica_id', clinicId)
+    .maybeSingle<{ modalidade: string | null }>();
   const billingEnabled = process.env.STRIPE_BILLING_ENABLED === 'true';
   // R-92: apenas dentista convidado de clínica não-isenta espera o Checkout. Esta única
   // variável governa perfil, membership e redirecionamento; deixar um deles fora criava
   // o estado contraditório de isento com cartão obrigatório.
-  const exigeCheckout = billingEnabled && isDentistaConvidado && !clinicaIsentaDeCobranca(clinicId);
+  const exigeCheckout = billingEnabled
+    && isDentistaConvidado
+    && governanca?.modalidade !== 'gerida'
+    && !clinicaIsentaDeCobranca(clinicId);
 
   if (exigeCheckout) {
     const [{ data: clinicaPlano }, { data: formacao }] = await Promise.all([

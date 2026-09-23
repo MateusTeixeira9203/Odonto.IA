@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getConviteByToken } from '@/server/services/invites';
+import { getGovernanceInviteByToken } from '@/server/services/governance-invites';
 import { InviteAuthClient, AcceptButton, WrongAccountButton } from './_components/invite-client';
 import { AuthEntryShell } from '@/components/auth/auth-entry-shell';
 import { Building2, Clock, UserCheck, XCircle } from 'lucide-react';
@@ -11,7 +12,9 @@ interface Props {
 
 export default async function ConvitePage({ params }: Props) {
   const { token } = await params;
-  const invite = await getConviteByToken(token);
+  const inviteDentista = await getConviteByToken(token);
+  const inviteGovernanca = inviteDentista ? null : await getGovernanceInviteByToken(token);
+  const invite = inviteDentista ?? inviteGovernanca;
 
   // Convite expirado → página dedicada
   if (
@@ -62,7 +65,7 @@ export default async function ConvitePage({ params }: Props) {
                   Você foi convidado
                 </h1>
                 <p className="text-text-secondary text-sm">
-                  Para ingressar como dentista na clínica
+                  Para ingressar como {inviteGovernanca?.role === 'responsavel_tecnico' ? 'responsável técnico' : inviteGovernanca?.role === 'gestor' ? 'gestor' : 'dentista'} na clínica
                 </p>
               </div>
 
@@ -76,12 +79,12 @@ export default async function ConvitePage({ params }: Props) {
                   </div>
                 </div>
 
-                {invite.convidadoPorNome && (
+                {inviteDentista?.convidadoPorNome && (
                   <div className="flex items-center gap-3">
                     <UserCheck className="w-4 h-4 text-teal shrink-0" />
                     <div>
                       <p className="text-xs text-text-secondary font-mono uppercase tracking-widest">Convidado por</p>
-                      <p className="text-sm font-semibold text-text-primary">{invite.convidadoPorNome}</p>
+                      <p className="text-sm font-semibold text-text-primary">{inviteDentista.convidadoPorNome}</p>
                     </div>
                   </div>
                 )}
@@ -105,7 +108,7 @@ export default async function ConvitePage({ params }: Props) {
                   <p className="text-sm text-text-secondary text-center">
                     Logado como <span className="font-medium text-text-primary">{user.email}</span>
                   </p>
-                  <AcceptButton token={token} />
+                  <AcceptButton token={token} governanceRole={inviteGovernanca?.role ?? null} />
                 </div>
               )}
 

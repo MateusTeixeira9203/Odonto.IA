@@ -14,6 +14,7 @@ export const OnboardingModalidadeSchema = z.object({
   email: z.string().email().nullable(),
   foco: z.enum(['economizar_tempo', 'crescer']).nullable(),
   chaveIdempotencia: UuidSchema,
+  quantidadeDentistasPrevista: z.number().int().min(0).max(200),
 }).superRefine((input, context) => {
   if (input.modalidade === 'colaborativa' && !input.criadorAtende) {
     context.addIssue({ code: 'custom', path: ['criadorAtende'], message: 'A clínica colaborativa exige um dentista criador.' });
@@ -23,6 +24,9 @@ export const OnboardingModalidadeSchema = z.object({
   }
   if (input.criadorAtende && input.especialidade.length === 0) {
     context.addIssue({ code: 'custom', path: ['especialidade'], message: 'Informe ao menos uma especialidade.' });
+  }
+  if ((input.modalidade === 'colaborativa' || input.criadorAtende) && input.quantidadeDentistasPrevista < 1) {
+    context.addIssue({ code: 'custom', path: ['quantidadeDentistasPrevista'], message: 'Informe ao menos um dentista.' });
   }
 });
 
@@ -37,6 +41,7 @@ const RpcResultSchema = z.discriminatedUnion('ok', [
       modalidade: z.enum(['colaborativa', 'gerida']),
       criadorAtende: z.boolean(),
       dentistaId: UuidSchema.nullable(),
+      quantidadeDentistasPrevista: z.number().int().nonnegative(),
     }).strict(),
   }).strict(),
   z.object({ ok: z.literal(false), codigo: z.string(), mensagem: z.string() }).strict(),
@@ -57,6 +62,7 @@ export type OnboardingModalidadeDependencies = {
     p_email: string | null;
     p_foco_principal: 'economizar_tempo' | 'crescer' | null;
     p_chave_idempotencia: string;
+    p_quantidade_dentistas_prevista: number;
   }): Promise<{ data: unknown; error: { message: string } | null }>;
 };
 
@@ -66,7 +72,7 @@ function failure(codigo: 'INVALIDO' | 'INDISPONIVEL', mensagem: string): Onboard
 
 async function defaultDependencies(): Promise<OnboardingModalidadeDependencies> {
   const client = await createClient();
-  return { complete: (input) => client.rpc('complete_onboarding_modalidade', input) };
+  return { complete: async (input) => client.rpc('complete_onboarding_modalidade', input) };
 }
 
 /** Cria o primeiro vínculo de uma clínica com modalidade e autoria explícitas. */
@@ -89,6 +95,7 @@ export async function completeOnboardingModalidade(
       p_email: parsed.data.email,
       p_foco_principal: parsed.data.foco,
       p_chave_idempotencia: parsed.data.chaveIdempotencia,
+      p_quantidade_dentistas_prevista: parsed.data.quantidadeDentistasPrevista,
     });
     if (error) return failure('INDISPONIVEL', 'Não foi possível criar a clínica agora.');
 
