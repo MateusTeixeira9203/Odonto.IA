@@ -1426,6 +1426,7 @@ export async function revisarOrcamento(
     if (mensagem.includes('item_invalido')) return { ok: false, error: 'Um procedimento não pertence mais a este orçamento. Recarregue e tente novamente.' };
     if (mensagem.includes('itens_invalidos') || mensagem.includes('valor_invalido')) return { ok: false, error: 'Revise os procedimentos e os valores informados.' };
     if (mensagem.includes('parcelas_nao_fecham_saldo')) return { ok: false, error: 'Não foi possível redistribuir as previsões. Recarregue e tente novamente.' };
+    if (mensagem.includes('orcamentos_plano_parcelas_coerente')) return { ok: false, error: 'Este orçamento tem um plano de pagamento antigo inconsistente. Atualize a página e tente novamente.' };
     console.error('[revisarOrcamento]', mensagem);
     return { ok: false, error: 'Não foi possível salvar a revisão. Nenhuma alteração foi aplicada.' };
   }
