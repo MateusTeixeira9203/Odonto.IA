@@ -3,14 +3,13 @@
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  LayoutDashboard, Users, Calendar, CalendarClock, Wallet, Settings, Building2,
-  X, LogOut, Sun, Moon, Lock, Loader2,
+  LayoutDashboard, Users, Calendar, CalendarClock, Building2,
+  X, LogOut, Sun, Moon, Loader2,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { temFeature } from '@/lib/planos';
 import type { DentistaRole } from '@/types/database';
 import type { PlanoId } from '@/lib/planos';
 import { OdontoIALogo } from '@/components/ui/dent-ia-logo';
@@ -31,23 +30,20 @@ const NAV_ITEMS = [
   // R-46g (D7) — mesma razão do floating-dock: Meu dia é a porta, não pode faltar no mobile
   // (a barreira física — dentista longe do PC — é justamente o que já derrubou o modo consulta antes).
   { href: '/dashboard/meu-dia',       icon: CalendarClock,   label: 'Meu dia',    hideFromSecretaria: true },
+  { href: '/dashboard/meu-consultorio', icon: Building2,    label: 'Meu consultório', hideFromSecretaria: true },
   { href: '/dashboard/pacientes',    icon: Users,           label: 'Pacientes' },
   { href: '/dashboard/agendamentos', icon: Calendar,        label: 'Agenda' },
-  { href: '/dashboard/financeiro',   icon: Wallet,          label: 'Financeiro', requiresFeature: 'financeiro' as const },
-  { href: '/dashboard/meu-consultorio/estoque', icon: Building2, label: 'Meu consultório', hideFromSecretaria: true },
-  { href: '/dashboard/configuracoes',icon: Settings,        label: 'Configurações', hideFromSecretaria: true },
 ] as const;
 
 const subscribeMounted = () => () => {};
 
-export function MobileDrawer({ open, onClose, nome, clinicaNome, role, avatarUrl, plano }: MobileDrawerProps) {
+export function MobileDrawer({ open, onClose, nome, clinicaNome, role, avatarUrl }: MobileDrawerProps) {
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
   const mounted = useSyncExternalStore(subscribeMounted, () => true, () => false);
   const { logout, isLoggingOut } = useLogout();
 
   const avatarInitials = nome.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
-  const financeiroLocked = !temFeature(plano ?? 'SOLO', 'financeiro');
 
   // R-94 — protético só acessa /dashboard/protetico (gate em dashboard/layout.tsx);
   // nenhum destino da nav faz sentido pra ele.
@@ -121,26 +117,19 @@ export function MobileDrawer({ open, onClose, nome, clinicaNome, role, avatarUrl
                 const isActive = item.href === '/dashboard'
                   ? pathname === '/dashboard'
                   : pathname.startsWith(item.href);
-                const locked = 'requiresFeature' in item && item.requiresFeature === 'financeiro'
-                  ? financeiroLocked
-                  : false;
-
                 return (
                   <Link
                     key={item.href}
-                    href={locked ? '#' : item.href}
-                    onClick={() => { if (!locked) onClose(); }}
+                    href={item.href}
+                    onClick={onClose}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
                       isActive
                         ? 'bg-teal/10 text-teal'
-                        : locked
-                        ? 'cursor-not-allowed text-white/20'
                         : 'text-white/55 hover:bg-white/[0.05] hover:text-white/85'
                     }`}
                   >
                     <item.icon style={{ width: 18, height: 18 }} />
                     <span className="text-[14px] font-medium">{item.label}</span>
-                    {locked && <Lock className="w-3 h-3 ml-auto text-teal/30" />}
                   </Link>
                 );
               })}

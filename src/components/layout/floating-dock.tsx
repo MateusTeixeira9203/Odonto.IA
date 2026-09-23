@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
 import {
-  LayoutDashboard, Users, Calendar, CalendarClock, Wallet, Settings, Building2,
+  LayoutDashboard, Users, Calendar, CalendarClock, Building2,
   Sun, Moon, User, LogOut, Bot, Check, ChevronsUpDown, Loader2,
 } from 'lucide-react';
 import { OdontoIALogo } from '@/components/ui/dent-ia-logo';
@@ -11,7 +11,6 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useTheme } from 'next-themes';
 import { useEffect, useSyncExternalStore } from 'react';
 import Image from 'next/image';
-import { temFeature } from '@/lib/planos';
 import type { DentistaRole } from '@/types/database';
 import type { PlanoId } from '@/lib/planos';
 import { DockNavItem } from './dock-nav-item';
@@ -39,16 +38,14 @@ const NAV_ITEMS = [
   // R-46g (D7) — Meu dia é a porta principal agora; tem que existir onde o dentista está,
   // não só no hero do dashboard. hideFromSecretaria: agendamentos são silo por dentista_id.
   { href: '/dashboard/meu-dia',       icon: CalendarClock,   label: 'Meu dia',    id: 'meu-dia',    hideFromSecretaria: true },
+  { href: '/dashboard/meu-consultorio', icon: Building2,    label: 'Meu consultório', id: 'consultorio', hideFromSecretaria: true },
   { href: '/dashboard/pacientes',    icon: Users,           label: 'Pacientes',  id: 'pacientes' },
   { href: '/dashboard/agendamentos', icon: Calendar,        label: 'Agenda',     id: 'agenda' },
-  { href: '/dashboard/financeiro',   icon: Wallet,          label: 'Financeiro', id: 'financeiro', requiresFeature: 'financeiro' as const },
-  { href: '/dashboard/meu-consultorio/estoque', icon: Building2, label: 'Meu consultório', id: 'consultorio', hideFromSecretaria: true },
-  { href: '/dashboard/configuracoes',icon: Settings,        label: 'Config',     id: 'config',     hideFromSecretaria: true },
 ] as const;
 
 const subscribeMounted = () => () => {};
 
-export function FloatingDock({ nome, clinicaNome, activeClinicId, role, avatarUrl, plano }: FloatingDockProps) {
+export function FloatingDock({ nome, clinicaNome, activeClinicId, role, avatarUrl }: FloatingDockProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
@@ -69,7 +66,6 @@ export function FloatingDock({ nome, clinicaNome, activeClinicId, role, avatarUr
   const { logout, isLoggingOut } = useLogout();
 
   const avatarInitials = nome.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
-  const financeiroLocked = !temFeature(plano ?? 'SOLO', 'financeiro');
 
   // R-94 — protético só acessa /dashboard/protetico (gate em dashboard/layout.tsx);
   // nenhum destino da nav faz sentido pra ele.
@@ -107,10 +103,6 @@ export function FloatingDock({ nome, clinicaNome, activeClinicId, role, avatarUr
         const isActive = item.href === '/dashboard'
           ? pathname === '/dashboard'
           : pathname.startsWith(item.href);
-        const locked = 'requiresFeature' in item && item.requiresFeature === 'financeiro'
-          ? financeiroLocked
-          : false;
-
         return (
           <DockNavItem
             key={item.id}
@@ -118,7 +110,7 @@ export function FloatingDock({ nome, clinicaNome, activeClinicId, role, avatarUr
             icon={item.icon}
             label={item.label}
             isActive={isActive}
-            locked={locked}
+            locked={false}
           />
         );
       })}
