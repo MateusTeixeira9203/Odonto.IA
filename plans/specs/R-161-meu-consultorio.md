@@ -29,6 +29,10 @@ primeiro decisão, depois resultado, por fim aprofundamento por área.
 - `Minha equipe` concentra pessoas, papéis, acessos e convites. `Estoque` fica dentro do mesmo
   shell e mantém seus fluxos de materiais e kits.
 - Ações de reativação/remarcação levam a `Pacientes → Pendências`; o hub só mostra o contexto.
+- O seletor de tema permanece somente na navegação global. Em telas estreitas, as seções do hub
+  formam uma faixa horizontal com rolagem por toque; não viram uma grade de duas colunas que
+  empurra o conteúdo para baixo. As rotas exibem skeleton no conteúdo enquanto o layout e a
+  faixa de seções permanecem interativos.
 
 ## Referência visual
 
