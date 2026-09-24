@@ -3,12 +3,16 @@ import { AlertTriangle, CalendarClock, CircleDollarSign } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import type { ClinicFinancialData } from '@/server/financeiro/clinica';
+import type { ClinicRepassesData } from '@/server/financeiro/repasses';
 import { ClinicTransactionActions } from './clinic-transaction-actions';
+import { ClinicRepassePanel } from './clinic-repasse-panel';
 
 type Props = {
   basePath: '/dashboard/meu-consultorio' | '/consultorio';
   data: ClinicFinancialData | null;
   canWrite: boolean;
+  repasses: ClinicRepassesData | null;
+  canManageRepasses: boolean;
   mensagem?: string;
 };
 
@@ -22,7 +26,7 @@ function trend(current: number, previous: number): string | null {
   return (value >= 0 ? '+' : '') + value.toFixed(1).replace('.', ',') + '%';
 }
 
-export function ClinicFinancePanel({ basePath, data, canWrite, mensagem }: Props): React.JSX.Element {
+export function ClinicFinancePanel({ basePath, data, canWrite, repasses, canManageRepasses, mensagem }: Props): React.JSX.Element {
   if (!data) return <section role="alert" className="rounded-2xl border border-destructive/30 bg-destructive/10 p-5 text-sm text-foreground"><div className="flex gap-3"><AlertTriangle className="mt-0.5 size-5 shrink-0 text-destructive" /><p>{mensagem ?? 'O financeiro da clínica está indisponível agora. Os valores não foram substituídos por zero.'}</p></div></section>;
   const previous = data.chart.at(-2);
   const receiptTrend = previous ? trend(data.recebido, previous.recebido) : null;
@@ -68,6 +72,8 @@ export function ClinicFinancePanel({ basePath, data, canWrite, mensagem }: Props
         <Heading eyebrow="Equipe" title="Recebimentos por profissional" description="Produção aprovada e dinheiro que entrou são leituras separadas." />
         <Card className="mt-4 overflow-hidden"><CardContent className="overflow-x-auto p-0"><table className="w-full min-w-[640px] text-left text-sm"><thead className="bg-muted text-xs uppercase tracking-wider text-muted-foreground"><tr><th className="px-5 py-3 font-semibold">Profissional</th><th className="px-5 py-3 text-right font-semibold">Produção aprovada</th><th className="px-5 py-3 text-right font-semibold">Recebido vinculado</th><th className="px-5 py-3 text-right font-semibold">A receber</th></tr></thead><tbody>{data.profissionais.length === 0 ? <tr><td className="px-5 py-6 text-muted-foreground" colSpan={4}>Ainda não há produção clínica neste período.</td></tr> : data.profissionais.map((professional) => <tr className="border-t border-border" key={professional.dentistaId}><td className="px-5 py-4 font-semibold text-foreground">{professional.nome}</td><td className="px-5 py-4 text-right font-mono">{formatMoney(professional.producaoAprovada)}</td><td className="px-5 py-4 text-right font-mono text-teal">{formatMoney(professional.recebidoVinculado)}</td><td className="px-5 py-4 text-right font-mono">{formatMoney(professional.aReceber)}</td></tr>)}</tbody></table></CardContent></Card>
       </section>
+
+      <ClinicRepassePanel data={repasses} canManage={canManageRepasses} mes={data.mes} />
 
       <section className="grid gap-5 xl:grid-cols-[1.45fr_0.8fr]">
         <Card><CardHeader><CardTitle className="font-heading text-2xl font-normal">Extrato da clínica</CardTitle><CardDescription>Movimentações confirmadas no período.</CardDescription></CardHeader><CardContent className="space-y-3">{data.extrato.length === 0 ? <p className="py-3 text-sm text-muted-foreground">Sem lançamentos confirmados neste mês.</p> : data.extrato.map((item) => <div key={item.tipo + '-' + item.id} className="flex items-center justify-between gap-4 border-b border-border pb-3 last:border-0 last:pb-0"><div><p className="font-semibold text-foreground">{item.descricao}</p><p className="mt-1 text-xs text-muted-foreground">{item.tipo === 'despesa' ? 'Despesa' : item.tipo === 'receita_manual' ? 'Receita manual' : 'Recebimento'} · {shortDate.format(new Date(item.data + 'T12:00:00'))}</p></div><p className={item.valor < 0 ? 'font-mono text-destructive' : 'font-mono text-teal'}>{item.valor < 0 ? '− ' : '+ '}{formatMoney(Math.abs(item.valor))}</p></div>)}</CardContent></Card>

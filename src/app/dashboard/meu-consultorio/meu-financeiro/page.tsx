@@ -8,9 +8,12 @@ import { UpsellPage } from '@/components/upsell-page';
 import { getDentistaCached } from '@/lib/get-dentista';
 import { temFeature } from '@/lib/planos';
 import { createClient } from '@/lib/supabase/server';
+import { ManagedPersonalFinancePanel } from '@/components/consultorio/managed-personal-finance-panel';
+import { getClinicHubContext } from '@/server/consultorio/context';
+import { getManagedPersonalFinance } from '@/server/financeiro/repasses';
 
 export default async function MeuFinanceiroPage({ searchParams }: { searchParams: Promise<{ mes?: string }> }): Promise<React.JSX.Element> {
-  const dentista = await getDentistaCached();
+  const [dentista, context] = await Promise.all([getDentistaCached(), getClinicHubContext()]);
   if (!dentista) redirect('/login');
   if (dentista.role === 'secretaria' || dentista.role === 'protetico') redirect('/dashboard/meu-consultorio/financeiro-clinica');
   const auth = await createClient();
@@ -22,6 +25,10 @@ export default async function MeuFinanceiroPage({ searchParams }: { searchParams
   }
   const params = await searchParams;
   const mes = params.mes && /^\d{4}-(0[1-9]|1[0-2])$/.test(params.mes) ? params.mes : format(new Date(), 'yyyy-MM');
+  if (context.ok && context.data.governanca?.modalidade === 'gerida' && context.data.member.perfilClinico) {
+    const managed = await getManagedPersonalFinance({ clinicaIdEsperada: context.data.member.clinicaId, mes });
+    return <ManagedPersonalFinancePanel data={managed.ok ? managed.data : null} mensagem={managed.ok ? undefined : managed.mensagem} />;
+  }
   const [despesas, receitas, saldo, chart, hora, pagos, pendentes] = await Promise.all([
     listarDespesas(mes),
     listarReceitas(mes),

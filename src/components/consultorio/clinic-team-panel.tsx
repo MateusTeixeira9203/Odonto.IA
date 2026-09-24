@@ -8,10 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import type { ClinicTeamMember } from '@/server/consultorio/team';
+import type { ClinicRepassesData } from '@/server/financeiro/repasses';
 
 const initial: InviteState = { ok: false, message: '' };
 
-export function ClinicTeamPanel({ members, canInvite, message }: { members: ClinicTeamMember[]; canInvite: boolean; message?: string }): React.JSX.Element {
+export function ClinicTeamPanel({ members, canInvite, repasses, message }: { members: ClinicTeamMember[]; canInvite: boolean; repasses?: ClinicRepassesData | null; message?: string }): React.JSX.Element {
   const [inviteKind, setInviteKind] = useState<'dentista' | 'gestao' | null>(null);
   const [state, action, pending] = useActionState(inviteTeamMember, initial);
   return (
@@ -22,7 +23,7 @@ export function ClinicTeamPanel({ members, canInvite, message }: { members: Clin
       </div>
       {message && <section role="alert" className="rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground">{message}</section>}
       <section className="grid gap-4 lg:grid-cols-2">
-        {members.length === 0 && !message ? <div className="rounded-2xl border border-border bg-card p-8 text-sm text-muted-foreground">Nenhum membro ativo encontrado.</div> : members.map((member) => <article key={member.membroId} className="rounded-2xl border border-border bg-card p-5"><div className="flex items-start justify-between gap-4"><div className="flex min-w-0 gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-teal-pale text-teal">{roleIcon(member)}</span><div className="min-w-0"><h3 className="truncate font-semibold text-foreground">{member.nome}</h3><p className="mt-1 truncate text-sm text-muted-foreground">{member.email ?? 'E-mail não informado'}</p></div></div><span className={member.status === 'ativo' ? 'rounded-full bg-teal-pale px-2.5 py-1 text-xs font-semibold text-teal' : 'rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground'}>{member.status === 'ativo' ? 'Ativo' : member.status === 'convite_pendente' ? 'Convite pendente' : member.status}</span></div><div className="mt-5 flex flex-wrap gap-2"><Tag>{roleLabel(member)}</Tag>{member.atuaClinicamente && <Tag>Atende pacientes</Tag>}{member.proprietario && <Tag>Responsável pela clínica</Tag>}</div></article>)}
+        {members.length === 0 && !message ? <div className="rounded-2xl border border-border bg-card p-8 text-sm text-muted-foreground">Nenhum membro ativo encontrado.</div> : members.map((member) => { const agreement = member.dentistaId ? repasses?.profissionais.find((person) => person.dentistaId === member.dentistaId)?.acordo : null; return <article key={member.membroId} className="rounded-2xl border border-border bg-card p-5"><div className="flex items-start justify-between gap-4"><div className="flex min-w-0 gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-teal-pale text-teal">{roleIcon(member)}</span><div className="min-w-0"><h3 className="truncate font-semibold text-foreground">{member.nome}</h3><p className="mt-1 truncate text-sm text-muted-foreground">{member.email ?? 'E-mail não informado'}</p></div></div><span className={member.status === 'ativo' ? 'rounded-full bg-teal-pale px-2.5 py-1 text-xs font-semibold text-teal' : 'rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground'}>{member.status === 'ativo' ? 'Ativo' : member.status === 'convite_pendente' ? 'Convite pendente' : member.status}</span></div><div className="mt-5 flex flex-wrap gap-2"><Tag>{roleLabel(member)}</Tag>{member.atuaClinicamente && <Tag>Atende pacientes</Tag>}{member.proprietario && <Tag>Responsável pela clínica</Tag>}</div>{member.atuaClinicamente && member.status === 'ativo' && <div className="mt-5 border-t border-border pt-4"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Acordo de repasse</p><p className={agreement ? 'mt-1 text-sm font-medium text-teal' : 'mt-1 text-sm text-muted-foreground'}>{agreement ? repasseLabel(agreement) : 'Pendente de configuração'}</p></div>}</article>; })}
       </section>
 
       <Dialog open={inviteKind !== null} onOpenChange={(open) => !open && setInviteKind(null)}>
@@ -58,3 +59,4 @@ function roleLabel(member: ClinicTeamMember): string {
   return member.papel;
 }
 function Tag({ children }: { children: React.ReactNode }): React.JSX.Element { return <span className="rounded-full border border-border bg-muted/50 px-2.5 py-1 text-xs font-medium text-muted-foreground">{children}</span>; }
+function repasseLabel(acordo: NonNullable<ClinicRepassesData['profissionais'][number]['acordo']>): string { if (acordo.modalidade === 'percentual_recebido') return `${acordo.percentual?.toLocaleString('pt-BR')}% dos recebimentos confirmados`; if (acordo.modalidade === 'diaria') return `Diária de R$ ${(acordo.valorFixo ?? 0).toLocaleString('pt-BR')}`; return `Mensal de R$ ${(acordo.valorFixo ?? 0).toLocaleString('pt-BR')}`; }

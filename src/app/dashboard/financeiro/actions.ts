@@ -125,7 +125,7 @@ export async function listarDespesas(mesISO: string): Promise<Despesa[]> {
 
   // Admin e dentista têm escopo individual: veem apenas os próprios registros
   if (role !== 'secretaria') {
-    query = query.eq('dentista_id', dentistaId);
+    query = query.eq('dentista_id', dentistaId).eq('titular_financeiro', 'dentista');
   }
 
   const { data, error } = await query;
@@ -136,7 +136,7 @@ export async function listarDespesas(mesISO: string): Promise<Despesa[]> {
 export async function calcularSaldoMes(mesISO: string): Promise<SaldoMes> {
   const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
 
-  const { inicio, fim, inicioDate, fimDate } = mesWindow(mesISO);
+  const { inicioDate, fimDate } = mesWindow(mesISO);
   const scopado = role !== 'secretaria';
 
   let despesasQuery = supabase
@@ -166,9 +166,9 @@ export async function calcularSaldoMes(mesISO: string): Promise<SaldoMes> {
     .lt('data', fimDate);
 
   if (scopado) {
-    despesasQuery   = despesasQuery.eq('dentista_id', dentistaId);
-    pagamentosQuery = pagamentosQuery.eq('dentista_id', dentistaId);
-    receitasQuery   = receitasQuery.eq('dentista_id', dentistaId);
+    despesasQuery   = despesasQuery.eq('dentista_id', dentistaId).eq('titular_financeiro', 'dentista');
+    pagamentosQuery = pagamentosQuery.eq('dentista_id', dentistaId).eq('titular_financeiro', 'dentista');
+    receitasQuery   = receitasQuery.eq('dentista_id', dentistaId).eq('titular_financeiro', 'dentista');
   }
 
   const [
@@ -216,8 +216,8 @@ export async function listarUltimos7Dias(): Promise<DayPoint[]> {
     .gte('data_pagamento', inicioDate);
 
   if (scopado) {
-    despesas7Query  = despesas7Query.eq('dentista_id', dentistaId);
-    pagamentosQuery = pagamentosQuery.eq('dentista_id', dentistaId);
+    despesas7Query  = despesas7Query.eq('dentista_id', dentistaId).eq('titular_financeiro', 'dentista');
+    pagamentosQuery = pagamentosQuery.eq('dentista_id', dentistaId).eq('titular_financeiro', 'dentista');
   }
 
   const [{ data: pagamentos, error: errPag }, { data: despesasData, error: errDesp }] = await Promise.all([
@@ -267,8 +267,8 @@ export async function listarUltimosMeses(n = 6): Promise<ChartPoint[]> {
     .gte('data', inicioJanela.toISOString().split('T')[0]);
 
   if (scopado) {
-    pagamentosQuery = pagamentosQuery.eq('dentista_id', dentistaId);
-    despesasQuery   = despesasQuery.eq('dentista_id', dentistaId);
+    pagamentosQuery = pagamentosQuery.eq('dentista_id', dentistaId).eq('titular_financeiro', 'dentista');
+    despesasQuery   = despesasQuery.eq('dentista_id', dentistaId).eq('titular_financeiro', 'dentista');
   }
 
   const [{ data: pagamentos, error: errPag }, { data: despesasData, error: errDesp }] = await Promise.all([
@@ -378,7 +378,7 @@ export async function listarReceitas(mesISO: string): Promise<ReceitaManual[]> {
     .order('data', { ascending: false });
 
   if (role !== 'secretaria') {
-    query = query.eq('dentista_id', dentistaId);
+    query = query.eq('dentista_id', dentistaId).eq('titular_financeiro', 'dentista');
   }
 
   const { data, error } = await query;
@@ -524,9 +524,9 @@ export async function exportarFinanceiroCsv(
     .gte('data_pagamento', inicioDate).lt('data_pagamento', fimDate);
 
   if (scopado) {
-    despesasQ   = despesasQ.eq('dentista_id', dentistaId);
-    receitasQ   = receitasQ.eq('dentista_id', dentistaId);
-    pagamentosQ = pagamentosQ.eq('dentista_id', dentistaId);
+    despesasQ   = despesasQ.eq('dentista_id', dentistaId).eq('titular_financeiro', 'dentista');
+    receitasQ   = receitasQ.eq('dentista_id', dentistaId).eq('titular_financeiro', 'dentista');
+    pagamentosQ = pagamentosQ.eq('dentista_id', dentistaId).eq('titular_financeiro', 'dentista');
   }
 
   const [
@@ -594,7 +594,7 @@ export async function listarPagamentosPagos(mesISO: string): Promise<PagamentoPa
     .order('data_pagamento', { ascending: false });
 
   if (role !== 'secretaria') {
-    query = query.eq('dentista_id', dentistaId);
+    query = query.eq('dentista_id', dentistaId).eq('titular_financeiro', 'dentista');
   }
 
   const { data, error } = await query;
@@ -637,7 +637,7 @@ export async function listarPagamentosPendentes(): Promise<PagamentoPendente[]> 
     .order('data_vencimento', { ascending: true, nullsFirst: false });
 
   if (role !== 'secretaria') {
-    query = query.eq('dentista_id', dentistaId);
+    query = query.eq('dentista_id', dentistaId).eq('titular_financeiro', 'dentista');
   }
 
   const { data, error } = await query;

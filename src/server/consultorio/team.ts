@@ -5,6 +5,7 @@ import { getClinicHubContext } from './context';
 
 export type ClinicTeamMember = {
   membroId: string;
+  dentistaId: string | null;
   nome: string;
   email: string | null;
   papel: string;
@@ -30,7 +31,7 @@ export async function getClinicTeam(clinicaId: string): Promise<ClinicTeamResult
   const userIds = (memberships ?? []).map((item) => item.usuario_id as string);
   const [usersResult, dentistsResult, secretariesResult, governanceResult, dentistInvitesResult, governanceInvitesResult] = await Promise.all([
     userIds.length > 0 ? db.from('users').select('id, email').in('id', userIds) : Promise.resolve({ data: [], error: null }),
-    userIds.length > 0 ? db.from('dentistas').select('user_id, nome, ativo').eq('clinica_id', clinicaId).in('user_id', userIds) : Promise.resolve({ data: [], error: null }),
+    userIds.length > 0 ? db.from('dentistas').select('id, user_id, nome, ativo').eq('clinica_id', clinicaId).in('user_id', userIds) : Promise.resolve({ data: [], error: null }),
     userIds.length > 0 ? db.from('secretarias').select('usuario_id, nome').eq('clinica_id', clinicaId).in('usuario_id', userIds) : Promise.resolve({ data: [], error: null }),
     db.from('clinica_vinculos_governanca').select('membro_id, papel, estado').eq('clinica_id', clinicaId).eq('estado', 'ativo'),
     db.from('convites').select('id, nome_convidado, email, role').eq('clinica_id', clinicaId).eq('status', 'pendente').gt('expires_at', new Date().toISOString()),
@@ -48,7 +49,7 @@ export async function getClinicTeam(clinicaId: string): Promise<ClinicTeamResult
   const dentistInvites = dentistInvitesResult.data;
   const governanceInvites = governanceInvitesResult.data;
   const emails = new Map((users ?? []).map((item) => [item.id as string, item.email as string | null]));
-  const dentistByUser = new Map((dentists ?? []).map((item) => [item.user_id as string, { nome: item.nome as string, ativo: item.ativo as boolean }]));
+  const dentistByUser = new Map((dentists ?? []).map((item) => [item.user_id as string, { id: item.id as string, nome: item.nome as string, ativo: item.ativo as boolean }]));
   const secretaryByUser = new Map((secretaries ?? []).map((item) => [item.usuario_id as string, item.nome as string]));
   const governanceByMember = new Map((governance ?? []).map((item) => [item.membro_id as string, item.papel as string]));
   const activeMembers: ClinicTeamMember[] = (memberships ?? []).map((item) => {
@@ -58,6 +59,7 @@ export async function getClinicTeam(clinicaId: string): Promise<ClinicTeamResult
       const governanceRole = governanceByMember.get(memberId);
       return {
         membroId: memberId,
+        dentistaId: dentist?.id ?? null,
         nome: dentist?.nome ?? secretaryByUser.get(userId) ?? emails.get(userId) ?? 'Pessoa da equipe',
         email: emails.get(userId) ?? null,
         papel: governanceRole ?? (item.role as string),
@@ -69,6 +71,7 @@ export async function getClinicTeam(clinicaId: string): Promise<ClinicTeamResult
   const pendingMembers: ClinicTeamMember[] = [
     ...(dentistInvites ?? []).map((item) => ({
       membroId: item.id as string,
+      dentistaId: null,
       nome: (item.nome_convidado as string | null) ?? (item.email as string),
       email: item.email as string,
       papel: (item.role as string) || 'dentista',
@@ -78,6 +81,7 @@ export async function getClinicTeam(clinicaId: string): Promise<ClinicTeamResult
     })),
     ...(governanceInvites ?? []).map((item) => ({
       membroId: item.id as string,
+      dentistaId: null,
       nome: item.nome as string,
       email: item.email as string,
       papel: item.papel as string,
