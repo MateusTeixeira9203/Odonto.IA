@@ -22,7 +22,8 @@
 
 | ID | Item | Estado |
 |---|---|---|
-| [**R-163**](specs/R-163-financeiro-clinica.md) | **Financeiro da clínica** — caixa, previsão, margem operacional estimada e resultado por profissional na gestão | 🔵 implementação; mantém financeiro pessoal e exige titularidade financeira da clínica. |
+| [**R-163**](specs/R-163-financeiro-clinica.md) | **Financeiro da clínica** — caixa, previsão, margem operacional estimada e resultado por profissional na gestão | 🟡 no ar, aguardando validação dirigida com duas contas. |
+| [**R-164**](specs/R-164-repasses-e-financeiro-pessoal.md) | **Repasses e financeiro pessoal na clínica gerida** — acordo por profissional, obrigação auditável e separação entre caixa da clínica e ganho do dentista | 🔵 execução; contrato e artefato V1 aprovados. |
 
 ## No ar, aguardando validação dirigida
 
