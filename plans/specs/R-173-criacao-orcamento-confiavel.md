@@ -5,11 +5,11 @@
 
 ## 1. Problema
 
-Em produção, a criação de um orçamento a partir de ficha clínica retornou “Nenhum item foi salvo”. O erro da RPC não é classificado integralmente pela Server Action, o que impede a recuperação pelo dentista. A superfície de procedimentos também corta nomes extensos tanto na montagem quanto na escolha de itens para uma etapa.
+Em produção, a criação de um orçamento a partir de ficha clínica retornou “Nenhum item foi salvo”. A investigação no Preview confirmou o SQLSTATE `42703`: o trigger financeiro compartilhado lia `NEW.origem_lancamento` ao inserir em `orcamentos`, coluna que só existe nos lançamentos manuais. O erro da RPC não era classificado integralmente pela Server Action, o que impedia o diagnóstico. A superfície de procedimentos também cortava nomes extensos tanto na montagem quanto na escolha de itens para uma etapa.
 
 ## 2. Decisão
 
-Manter a criação transacional no banco. Unificar a regra de responsável financeiro usada pela tela e pelas RPCs/validadores: encaminhamento explícito, depois autor do evento, depois autor da ficha. A tela recebe somente mensagens seguras e acionáveis; detalhes técnicos ficam no log de servidor. O patch parte de `origin/main` e não inclui recursos de preview.
+Manter a criação transacional no banco. Corrigir o trigger financeiro para ler `origem_lancamento` de forma estruturalmente segura nas cinco tabelas atendidas. Unificar a regra de responsável financeiro usada pela tela e pelas RPCs/validadores: encaminhamento explícito, depois autor do evento, depois autor da ficha. A tela recebe somente mensagens seguras e acionáveis; detalhes técnicos ficam no log de servidor. O patch parte de `origin/main` e não inclui recursos de preview.
 
 ## 3. Objetivo
 
@@ -17,7 +17,8 @@ O dentista consegue criar orçamento para procedimentos válidos da própria fic
 
 ## 4. Contrato técnico
 
-- **Banco:** migration forward-only recria as funções de criação/adicionamento de orçamento e validadores de vínculo que comparam responsável de evento. Não altera tabelas, RLS, grants ou dados existentes.
+- **Banco:** migrations forward-only recriam as funções de criação/adicionamento de orçamento e validadores de vínculo que comparam responsável de evento, e corrigem o trigger financeiro compartilhado. Não alteram tabelas, RLS, grants ou dados existentes.
+- **Trigger financeiro:** `private.definir_titular_financeiro` extrai opcionalmente `origem_lancamento` com `to_jsonb(NEW)`, evitando referência a uma coluna inexistente quando o trigger recebe `orcamentos`, `pagamentos` ou cobranças.
 - **Responsável financeiro de evento:** `coalesce(encaminhado_para, dentista_id, ficha.dentista_id)`.
 - **Server Action:** `criarOrcamento` e a ação de adicionar itens convertem os códigos conhecidos `orcamento_*` em mensagens seguras. Erro desconhecido registra somente código/mensagem da RPC no servidor e retorna orientação de recarregar/tentar novamente.
 - **Catálogo:** quando existir procedimento do catálogo do responsável atual com o mesmo vínculo, o ID desse catálogo é enviado; um ID histórico incompatível não é priorizado.

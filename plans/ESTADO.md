@@ -12,14 +12,15 @@ Implementado:
 - ID do catálogo atual priorizado sobre vínculo histórico incompatível;
 - mensagens seguras e diagnóstico no servidor para recusas da RPC;
 - nomes longos legíveis na montagem e na seleção de itens da etapa;
-- migration forward-only `20260924110000_r173_responsavel_evento_orcamento.sql`.
+- migrations forward-only `20260924110000_r173_responsavel_evento_orcamento.sql` e
+  `20260924153000_r173_corrigir_trigger_titular_financeiro.sql`.
 
 Evidência: `tsc --noEmit`, lint focal e 3 testes unitários passaram. O build foi bloqueado
 apenas pela quota temporária de `/tmp` durante o cache do webpack; a tentativa com rede
 confirmou que as fontes externas já são alcançáveis. A navegação local chegou ao login e não
 há sessão de clínica de teste para validar a gravação sem usar dados reais.
 
-Produção registrou seis respostas 400 da RPC `criar_orcamento_com_eventos` entre 10:36 e
-10:52. O painel de logs não expõe a exceção do Postgres; o próximo Preview passará a registrá-la
-no servidor sem dados de paciente. Falta: aprovação para commits separados, push/Preview,
-aplicação manual da migration e reteste manual do fluxo.
+O Preview registrou a causa das respostas 400: `NEW.origem_lancamento` inexistente dentro do
+trigger financeiro ao inserir um orçamento. A nova migration usa `to_jsonb(NEW)` para manter
+o mesmo trigger compatível com as cinco tabelas. Falta: aplicar a segunda migration e retestar
+a criação no Preview.
