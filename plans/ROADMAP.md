@@ -22,7 +22,8 @@
 
 | ID | Item | Estado |
 |---|---|---|
-| [**R-164**](specs/R-164-repasses-e-financeiro-pessoal.md) | **Financeiro pessoal, gestão clínica e repasses V3** — fecha custos recorrentes, hora clínica, projeção e desempenho sem misturar caixa ou inventar base | 🔵 auditoria e contrato de cálculo em andamento. |
+| [**R-174**](specs/R-174-calculos-financeiros-confiaveis.md) | **Cálculos financeiros confiáveis** — fecha competências recorrentes, custo/h, projeção e desempenho sem misturar caixa ou inventar base | 🔵 contrato técnico aguardando aprovação. |
+| [**R-164**](specs/R-164-repasses-e-financeiro-pessoal.md) | **Financeiro pessoal, gestão clínica e repasses** — base visual e separação de titularidade que o R-174 completa | 🟡 migration aplicada e interface em preview pendente de validação dirigida. |
 | [**R-173**](specs/R-173-criacao-orcamento-confiavel.md) | **Criação de orçamento confiável** — corrigir rejeição indevida, diagnóstico acionável e leitura de procedimentos/etapas | 🟡 integrado à base de preview; confirmar os objetos no banco e a gravação dirigida. |
 | [**R-163**](specs/R-163-financeiro-clinica.md) | **Financeiro da clínica** — titularidade da unidade, custos recorrentes e visão de gestão | 🟡 no ar; os cálculos consolidados seguem no R-164. |
 | [**R-172**](specs/R-172-estoque-manual-producao.md) | **Estoque manual e kits no banco principal** — consumíveis, lotes, baixas auditáveis e registro de uso na ficha | 🟡 preview testado pelo usuário; falta validação de isolamento com duas contas e correção da abertura do detalhe. |

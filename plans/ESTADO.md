@@ -2,18 +2,18 @@
 
 Atualizado em 24/09/2026.
 
-🔵 **R-164 — Financeiro pessoal, financeiro da clínica e repasses.**
+🔵 **R-174 — Cálculos financeiros confiáveis.**
 
-O artefato V5 e a estrutura visual seguem aprovados. A migration
+O artefato V5 e a estrutura visual do R-164 seguem aprovados. A migration
 `20260924023000_r164_painel_operacional_financeiro.sql` foi aplicada no banco principal e
-os seus objetos foram conferidos no SQL Editor. Typecheck, lint focal e 307 testes passaram
-antes do preview.
+os seus objetos foram conferidos no SQL Editor. A base local foi integrada com `origin/main`;
+310 testes passaram depois da integração.
 
 **Estado técnico agora**
 
-- A branch do Meu Consultório estava 35 commits atrás de `origin/main`. A integração local da
-  base de produção trouxe R-172 e R-173, inclusive a correção do gatilho financeiro de orçamento.
-  Falta concluir o merge, testar e publicar a base unificada.
+- A branch do Meu Consultório estava 35 commits atrás de `origin/main`. O merge local trouxe
+  R-172 e R-173, inclusive a correção do gatilho financeiro de orçamento, e foi concluído no
+  commit `022d42d`. Ainda não foi reenviado.
 - A auditoria de cálculo encontrou uma lacuna real: o novo Meu Financeiro aceita saída pessoal
   apenas como variável, enquanto a hora clínica soma custos fixos do mês. Logo, o custo/h pode
   permanecer zero mesmo com custo lançado.
@@ -29,7 +29,7 @@ antes do preview.
 
 **Próximo passo concreto**
 
-Fechar a integração de `origin/main`, registrar o contrato V3 dos cálculos e implementar:
-recorrência por competência, custo/h pessoal e da clínica com base explícita, projeção de caixa,
-desempenho por profissional e testes de duas contas. Não aplicar nova migration nem subir preview
-antes da verificação do banco e dos gates desse contrato.
+Obter aprovação do contrato R-174 e então implementar: recorrência por competência, custo/h
+pessoal e da clínica com base explícita, projeção de caixa, desempenho por profissional e testes
+de duas contas. Não aplicar nova migration nem subir preview antes da verificação do banco e dos
+gates desse contrato.
