@@ -12,6 +12,7 @@ import { hojeBRT } from "@/lib/hora-brt";
 import { ERRO_ORCAMENTO_SEM_APROVACAO } from "@/server/orcamentos/pagamento-guards";
 import { criarDocumentoAceiteOrcamento } from '@/server/legal/documentos-aceite';
 import { normalizarNomeProcedimento } from '@/lib/arcadas';
+import { erroCriacaoOrcamento } from '@/lib/orcamentos/erros-criacao';
 
 export type FormaPagamento =
   | "dinheiro"
@@ -757,20 +758,8 @@ export async function criarOrcamento(dados: z.input<typeof criarOrcamentoSchema>
   });
 
   if (error || !orcamentoId) {
-    const mensagem = error?.message ?? '';
-    if (error?.code === '23505' || mensagem.includes('orcamento_evento_ja_orcado') || mensagem.includes('orcamento_evento_duplicado')) {
-      return { error: 'Um dos procedimentos já entrou em outro orçamento. Recarregue a lista e tente novamente.' };
-    }
-    if (mensagem.includes('orcamento_evento_invalido')) {
-      return { error: 'Um dos procedimentos não está mais disponível para este orçamento. Recarregue a lista.' };
-    }
-    if (mensagem.includes('orcamento_evento_ficha_invalido')) {
-      return { error: 'Os procedimentos precisam pertencer à ficha selecionada. Reabra a ficha e tente novamente.' };
-    }
-    if (mensagem.includes('orcamento_procedimento_de_outro_dentista')) {
-      return { error: 'O procedimento escolhido pertence a outro dentista. Recarregue o catálogo antes de continuar.' };
-    }
-    return { error: 'Não foi possível criar o orçamento. Nenhum item foi salvo.' };
+    console.error('[criarOrcamento]', { code: error?.code, message: error?.message, hint: error?.hint });
+    return { error: erroCriacaoOrcamento(error, 'criar') };
   }
 
   revalidatePath(`/dashboard/pacientes/${entrada.pacienteId}`);
@@ -1119,24 +1108,8 @@ export async function adicionarItensAoOrcamento(
   });
 
   if (error) {
-    const mensagem = error.message ?? '';
-    if (error.code === '23505' || mensagem.includes('orcamento_evento_ja_orcado') || mensagem.includes('orcamento_evento_duplicado')) {
-      return { error: 'Um dos procedimentos já entrou em um orçamento. Recarregue a ficha antes de continuar.' };
-    }
-    if (mensagem.includes('orcamento_evento_invalido')) {
-      return { error: 'Um dos procedimentos não está mais disponível para este orçamento. Recarregue a ficha.' };
-    }
-    if (mensagem.includes('orcamento_evento_ficha_invalido')) {
-      return { error: 'Os procedimentos adicionais precisam pertencer à mesma ficha do orçamento.' };
-    }
-    if (mensagem.includes('orcamento_procedimento_de_outro_dentista')) {
-      return { error: 'O procedimento escolhido pertence a outro dentista. Recarregue o catálogo antes de continuar.' };
-    }
-    if (mensagem.includes('orcamento_sem_permissao')) {
-      return { error: 'Você não tem permissão para alterar este orçamento.' };
-    }
-    console.error('[adicionarItensAoOrcamento]', mensagem);
-    return { error: 'Não foi possível adicionar os procedimentos. Nenhuma alteração foi salva.' };
+    console.error('[adicionarItensAoOrcamento]', { code: error.code, message: error.message, hint: error.hint });
+    return { error: erroCriacaoOrcamento(error, 'adicionar') };
   }
 
   registrarLog(supabase, {

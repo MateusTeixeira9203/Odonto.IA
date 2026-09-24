@@ -519,7 +519,7 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
                 </div>
                 <div className="space-y-1.5">
                   {itensEditaveis.map((item) => (
-                    <label key={item.id} className="flex items-center gap-2 rounded-lg bg-surface px-2.5 py-2 text-xs text-text-primary">
+                    <label key={item.id} className="flex items-start gap-2 rounded-lg bg-surface px-2.5 py-2 text-xs text-text-primary">
                       <input
                         type="checkbox"
                         checked={itensEtapaEditados.includes(item.id)}
@@ -527,8 +527,8 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
                         disabled={saving}
                         className="accent-teal"
                       />
-                      <span className="min-w-0 flex-1 truncate">{item.descricao ?? 'Procedimento'}</span>
-                      <span className="font-mono">R$ {fmt(item.preco_total ?? 0)}</span>
+                      <span className="min-w-0 flex-1 break-words leading-relaxed">{item.descricao ?? 'Procedimento'}</span>
+                      <span className="shrink-0 whitespace-nowrap font-mono">R$ {fmt(item.preco_total ?? 0)}</span>
                     </label>
                   ))}
                 </div>
@@ -623,10 +623,10 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
             {alterandoSelecao && (
               <div className="space-y-1.5 rounded-xl border border-border bg-card p-2">
                 {itensElegiveis.map((item) => (
-                  <label key={item.id} className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-text-primary hover:bg-surface-alt">
+                  <label key={item.id} className="flex items-start gap-2 rounded-lg px-2.5 py-2 text-xs text-text-primary hover:bg-surface-alt">
                     <input type="checkbox" checked={itemIds.includes(item.id)} onChange={() => toggleItem(item.id)} disabled={saving} className="accent-teal" />
-                    <span className="min-w-0 flex-1 truncate">{item.descricao ?? 'Procedimento'}</span>
-                    <span className="font-mono">R$ {fmt(item.preco_total ?? 0)}</span>
+                    <span className="min-w-0 flex-1 break-words leading-relaxed">{item.descricao ?? 'Procedimento'}</span>
+                    <span className="shrink-0 whitespace-nowrap font-mono">R$ {fmt(item.preco_total ?? 0)}</span>
                   </label>
                 ))}
               </div>

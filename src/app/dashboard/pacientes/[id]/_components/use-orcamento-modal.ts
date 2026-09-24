@@ -261,7 +261,7 @@ export function useOrcamentoModal({
         : null;
 
       return {
-        procedimentoId: primeiro.procedimento_id ?? match?.id ?? '',
+        procedimentoId: match?.id ?? primeiro.procedimento_id ?? '',
         descricao: descricaoPonte ?? (alcance ? `${rotulo} — ${alcance}` : rotulo),
         quantidade,
         preco: match?.preco_padrao != null ? formatValorBR(match.preco_padrao) : '',
