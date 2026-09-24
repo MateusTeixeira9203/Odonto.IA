@@ -261,7 +261,7 @@ export function useOrcamentoModal({
         : null;
 
       return {
-        procedimentoId: primeiro.procedimento_id ?? match?.id ?? '',
+        procedimentoId: match?.id ?? primeiro.procedimento_id ?? '',
         descricao: descricaoPonte ?? (alcance ? `${rotulo} — ${alcance}` : rotulo),
         quantidade,
         preco: match?.preco_padrao != null ? formatValorBR(match.preco_padrao) : '',
@@ -690,7 +690,7 @@ export function useOrcamentoModal({
     const supabase = createClient();
     const { data, error } = await supabase
       .from('orcamentos')
-      .select('id, status, total, valor_acordado, plano_forma, desconto, created_at, validade_dias, condicoes_pagamento, mostrar_valor_por_item, dentista_id, aprovado_em, aprovado_por:dentistas!orcamentos_aprovado_por_id_fkey(nome), itens:orcamento_itens(id, descricao, preco_total, quantidade, aprovado, composicao), pagamentos(id, cobranca_id, valor, status, forma_pagamento, data_pagamento, data_vencimento, parcela_numero, total_parcelas, marcado_por:dentistas!pagamentos_marcado_por_id_fkey(nome)), aceite:assinaturas!assinaturas_orcamento_id_fkey(id, assinado_por, cro_no_ato, assinatura_ref, assinado_em, termos_snapshot), cobrancas:orcamento_cobrancas(id, subtotal, desconto, valor_final, numero_parcelas, primeiro_vencimento, situacao, created_at, itens:orcamento_cobranca_itens!orcamento_cobranca_itens_cobranca_id_fkey(orcamento_item_id, preco_total_snapshot), pagamentos:pagamentos!pagamentos_cobranca_id_fkey(id, cobranca_id, valor, status, forma_pagamento, data_pagamento, data_vencimento, parcela_numero, total_parcelas, marcado_por:dentistas!pagamentos_marcado_por_id_fkey(nome)))')
+      .select('id, status, total, valor_acordado, plano_forma, desconto, created_at, updated_at, validade_dias, condicoes_pagamento, mostrar_valor_por_item, dentista_id, aprovado_em, aprovado_por:dentistas!orcamentos_aprovado_por_id_fkey(nome), itens:orcamento_itens(id, descricao, preco_total, quantidade, aprovado, composicao), pagamentos(id, cobranca_id, valor, status, forma_pagamento, data_pagamento, data_vencimento, parcela_numero, total_parcelas, marcado_por:dentistas!pagamentos_marcado_por_id_fkey(nome)), aceite:assinaturas!assinaturas_orcamento_id_fkey(id, assinado_por, cro_no_ato, assinatura_ref, assinado_em, termos_snapshot), cobrancas:orcamento_cobrancas(id, subtotal, desconto, valor_final, numero_parcelas, primeiro_vencimento, situacao, created_at, itens:orcamento_cobranca_itens!orcamento_cobranca_itens_cobranca_id_fkey(orcamento_item_id, preco_total_snapshot), pagamentos:pagamentos!pagamentos_cobranca_id_fkey(id, cobranca_id, valor, status, forma_pagamento, data_pagamento, data_vencimento, parcela_numero, total_parcelas, marcado_por:dentistas!pagamentos_marcado_por_id_fkey(nome)))')
       .is('itens.retirado_em', null)
       .eq('id', orcamentoId)
       .eq('paciente_id', pacienteId)
@@ -840,6 +840,7 @@ export function useOrcamentoModal({
           valor_acordado: null,
           desconto: descontoValor,
           created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
           validade_dias: 30,
           condicoes_pagamento: null,
           mostrar_valor_por_item: false,

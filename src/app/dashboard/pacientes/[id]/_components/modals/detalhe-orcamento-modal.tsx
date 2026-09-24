@@ -95,6 +95,11 @@ interface Props {
   setOrcEditMode: (v: boolean) => void;
   orcEditItens: OrcEditItem[];
   setOrcEditItens: React.Dispatch<React.SetStateAction<OrcEditItem[]>>;
+  /** null preserva a diferença entre proposta e acordo ao recalcular os itens. */
+  orcEditValorAcordado: string | null;
+  setOrcEditValorAcordado: React.Dispatch<React.SetStateAction<string | null>>;
+  orcEditAceiteConfirmado: boolean;
+  setOrcEditAceiteConfirmado: React.Dispatch<React.SetStateAction<boolean>>;
   orcEditSaving: boolean;
   orcEditError: string | null;
   setOrcEditError: (v: string | null) => void;
@@ -514,7 +519,7 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
                 </div>
                 <div className="space-y-1.5">
                   {itensEditaveis.map((item) => (
-                    <label key={item.id} className="flex items-center gap-2 rounded-lg bg-surface px-2.5 py-2 text-xs text-text-primary">
+                    <label key={item.id} className="flex items-start gap-2 rounded-lg bg-surface px-2.5 py-2 text-xs text-text-primary">
                       <input
                         type="checkbox"
                         checked={itensEtapaEditados.includes(item.id)}
@@ -522,8 +527,8 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
                         disabled={saving}
                         className="accent-teal"
                       />
-                      <span className="min-w-0 flex-1 truncate">{item.descricao ?? 'Procedimento'}</span>
-                      <span className="font-mono">R$ {fmt(item.preco_total ?? 0)}</span>
+                      <span className="min-w-0 flex-1 break-words leading-relaxed">{item.descricao ?? 'Procedimento'}</span>
+                      <span className="shrink-0 whitespace-nowrap font-mono">R$ {fmt(item.preco_total ?? 0)}</span>
                     </label>
                   ))}
                 </div>
@@ -618,10 +623,10 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
             {alterandoSelecao && (
               <div className="space-y-1.5 rounded-xl border border-border bg-card p-2">
                 {itensElegiveis.map((item) => (
-                  <label key={item.id} className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-text-primary hover:bg-surface-alt">
+                  <label key={item.id} className="flex items-start gap-2 rounded-lg px-2.5 py-2 text-xs text-text-primary hover:bg-surface-alt">
                     <input type="checkbox" checked={itemIds.includes(item.id)} onChange={() => toggleItem(item.id)} disabled={saving} className="accent-teal" />
-                    <span className="min-w-0 flex-1 truncate">{item.descricao ?? 'Procedimento'}</span>
-                    <span className="font-mono">R$ {fmt(item.preco_total ?? 0)}</span>
+                    <span className="min-w-0 flex-1 break-words leading-relaxed">{item.descricao ?? 'Procedimento'}</span>
+                    <span className="shrink-0 whitespace-nowrap font-mono">R$ {fmt(item.preco_total ?? 0)}</span>
                   </label>
                 ))}
               </div>
@@ -681,6 +686,8 @@ export function DetalheOrcamentoModal({
   pagForm, setPagForm, pagSaving, pagError,
   parcelasMode, setParcelasMode, parcelasForm, setParcelasForm, parcelasSaving, parcelasError, onGerarParcelas,
   orcEditMode, setOrcEditMode, orcEditItens, setOrcEditItens,
+  orcEditValorAcordado, setOrcEditValorAcordado,
+  orcEditAceiteConfirmado, setOrcEditAceiteConfirmado,
   orcEditSaving, orcEditError, setOrcEditError,
   onOpenEditOrc, onSalvarEdicaoOrc,
   onAlternarAprovacaoItem, onAprovarTodosItens, onRegistrarPagamento,
@@ -735,6 +742,7 @@ export function DetalheOrcamentoModal({
     'pagamento.excluido': 'Pagamento excluído',
     'pagamento.estornado': 'Recebimento estornado',
     'pagamento.previsao_reorganizada': 'Cobrança reorganizada',
+    'orcamento.editado': 'Orçamento revisado',
     'cobranca.etapa_criada': 'Cobrança por etapa criada',
     'cobranca.etapa_editada': 'Cobrança por etapa editada',
     'cobranca.etapa_cancelada': 'Cobrança por etapa cancelada',
@@ -779,6 +787,18 @@ export function DetalheOrcamentoModal({
   const temPlanoParcelado = detalheOrc?.plano_forma === 'parcelado'
     || detalheOrc?.pagamentos.some((pagamento) => pagamento.parcela_numero !== null) === true;
   const temItensAprovados = valorAprovado > 0;
+  const revisaoObrigatoria = temItensAprovados || totalPago > 0 || !!detalheOrc?.aceite;
+  const totalItensEmEdicao = orcEditItens.reduce(
+    (soma, item) => soma + item.quantidade * parseValorBR(item.preco_unitario),
+    0,
+  );
+  const totalEmEdicao = Math.max(0, totalItensEmEdicao - (detalheOrc?.desconto ?? 0));
+  const totalAnteriorEdicao = detalheOrc?.total ?? 0;
+  const acordoAnteriorEdicao = detalheOrc?.valor_acordado ?? totalAnteriorEdicao;
+  const valorAcordadoRevisao = orcEditValorAcordado === null
+    ? Math.max(0, Math.round((acordoAnteriorEdicao + totalEmEdicao - totalAnteriorEdicao) * 100) / 100)
+    : parseValorBR(orcEditValorAcordado);
+  const saldoRevisao = Math.max(0, Math.round((valorAcordadoRevisao - totalPago) * 100) / 100);
   const podeEscolherRecebimento = temItensAprovados && !quitado && !closingPagamentoId;
   const podeConfigurarRecebimento = temItensAprovados && !quitado && !closingPagamentoId;
   // Orçamentos já em negociação legada seguem na superfície anterior. Assim que não há dinheiro
@@ -947,13 +967,15 @@ export function DetalheOrcamentoModal({
                                 }}
                                 className="rounded-lg bg-surface border-border text-text-primary text-sm font-mono h-9"
                               />
-                              <button
-                                onClick={() => setOrcEditItens(prev => prev.filter((_, i) => i !== idx))}
-                                className="p-1.5 rounded-lg hover:bg-coral-pale text-coral-ink transition-colors"
-                                aria-label="Remover procedimento"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              {(!revisaoObrigatoria || !item.id) ? (
+                                <button
+                                  onClick={() => setOrcEditItens(prev => prev.filter((_, i) => i !== idx))}
+                                  className="p-1.5 rounded-lg hover:bg-coral-pale text-coral-ink transition-colors"
+                                  aria-label="Remover procedimento"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              ) : <span aria-hidden="true" />}
                             </div>
                           ))}
                           <button
@@ -1131,13 +1153,48 @@ export function DetalheOrcamentoModal({
                     <>
                   {orcEditMode ? (
                     <div className="rounded-2xl border border-teal/25 p-5 text-center">
-                      <p className="text-xs font-bold uppercase tracking-widest text-teal-ink">Novo total</p>
+                      <p className="text-xs font-bold uppercase tracking-widest text-teal-ink">{revisaoObrigatoria ? 'Revisão do orçamento' : 'Novo total'}</p>
                       <p className="font-mono text-3xl font-semibold text-teal-ink mt-1">
-                        R$ {fmt(orcEditItens.reduce((s, i) => s + i.quantidade * parseValorBR(i.preco_unitario), 0))}
+                        R$ {fmt(totalEmEdicao)}
                       </p>
-                      <p className="text-xs text-text-secondary mt-2">
-                        Salve as alterações na aba Procedimentos para registrar pagamentos.
-                      </p>
+                      {revisaoObrigatoria ? (
+                        <div className="mt-4 space-y-3 text-left">
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div className="rounded-lg border border-border bg-surface-alt/40 p-2.5">
+                              <p className="text-text-secondary">Total anterior</p>
+                              <p className="mt-1 font-mono font-semibold text-text-primary">R$ {fmt(totalAnteriorEdicao)}</p>
+                            </div>
+                            <div className="rounded-lg border border-border bg-surface-alt/40 p-2.5">
+                              <p className="text-text-secondary">Recebido</p>
+                              <p className="mt-1 font-mono font-semibold text-text-primary">R$ {fmt(totalPago)}</p>
+                            </div>
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Novo valor final negociado</Label>
+                            <Input
+                              type="text"
+                              inputMode="decimal"
+                              value={orcEditValorAcordado ?? formatValorBR(valorAcordadoRevisao)}
+                              onChange={(event) => setOrcEditValorAcordado(event.target.value)}
+                              className="font-mono"
+                            />
+                            <p className="text-[11px] text-text-secondary">Novo saldo: <span className="font-mono font-semibold text-text-primary">R$ {fmt(saldoRevisao)}</span>. O recebido não será alterado.</p>
+                          </div>
+                          <label className="flex items-start gap-2 rounded-lg border border-warning/25 bg-warning-pale/40 p-2.5 text-xs text-text-secondary">
+                            <input
+                              type="checkbox"
+                              checked={orcEditAceiteConfirmado}
+                              onChange={(event) => setOrcEditAceiteConfirmado(event.target.checked)}
+                              className="mt-0.5 accent-teal"
+                            />
+                            <span>Confirmo que a paciente já aceitou esta revisão.</span>
+                          </label>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-text-secondary mt-2">
+                          Salve as alterações na aba Procedimentos para registrar pagamentos.
+                        </p>
+                      )}
                     </div>
                   ) : (
                     <div className="space-y-4">
@@ -1644,7 +1701,7 @@ export function DetalheOrcamentoModal({
                   )}
                   <Button
                     variant="outline"
-                    onClick={() => { setOrcEditMode(false); setOrcEditError(null); }}
+                    onClick={() => { setOrcEditMode(false); setOrcEditError(null); setOrcEditAceiteConfirmado(false); setOrcEditValorAcordado(null); }}
                     disabled={orcEditSaving}
                     className="rounded-xl border-border text-text-primary hover:bg-surface-alt"
                   >
@@ -1657,7 +1714,7 @@ export function DetalheOrcamentoModal({
                   >
                     {orcEditSaving
                       ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Salvando...</>
-                      : 'Salvar alterações'
+                      : revisaoObrigatoria ? 'Salvar revisão' : 'Salvar alterações'
                     }
                   </Button>
                 </>
@@ -1677,12 +1734,12 @@ export function DetalheOrcamentoModal({
                     <Button
                       variant="outline"
                       onClick={onOpenEditOrc}
-                      disabled={detalheOrc.itens.some((item) => item.composicao?.length)}
-                      title={detalheOrc.itens.some((item) => item.composicao?.length) ? "A composição dos grupos é preservada após salvar." : undefined}
+                      disabled={!revisaoObrigatoria && detalheOrc.itens.some((item) => item.composicao?.length)}
+                      title={!revisaoObrigatoria && detalheOrc.itens.some((item) => item.composicao?.length) ? "A composição dos grupos é preservada após salvar." : undefined}
                       className="rounded-xl border-border text-text-primary hover:bg-surface-alt"
                     >
                       <Edit2 className="w-4 h-4 mr-1.5" />
-                      Editar
+                      {revisaoObrigatoria ? 'Revisar orçamento' : 'Editar'}
                     </Button>
                     <div
                       className="hidden sm:flex items-center gap-1.5 text-xs text-text-secondary"

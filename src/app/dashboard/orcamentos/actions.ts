@@ -12,6 +12,7 @@ import { hojeBRT } from "@/lib/hora-brt";
 import { ERRO_ORCAMENTO_SEM_APROVACAO } from "@/server/orcamentos/pagamento-guards";
 import { criarDocumentoAceiteOrcamento } from '@/server/legal/documentos-aceite';
 import { normalizarNomeProcedimento } from '@/lib/arcadas';
+import { erroCriacaoOrcamento } from '@/lib/orcamentos/erros-criacao';
 
 export type FormaPagamento =
   | "dinheiro"
@@ -757,20 +758,8 @@ export async function criarOrcamento(dados: z.input<typeof criarOrcamentoSchema>
   });
 
   if (error || !orcamentoId) {
-    const mensagem = error?.message ?? '';
-    if (error?.code === '23505' || mensagem.includes('orcamento_evento_ja_orcado') || mensagem.includes('orcamento_evento_duplicado')) {
-      return { error: 'Um dos procedimentos já entrou em outro orçamento. Recarregue a lista e tente novamente.' };
-    }
-    if (mensagem.includes('orcamento_evento_invalido')) {
-      return { error: 'Um dos procedimentos não está mais disponível para este orçamento. Recarregue a lista.' };
-    }
-    if (mensagem.includes('orcamento_evento_ficha_invalido')) {
-      return { error: 'Os procedimentos precisam pertencer à ficha selecionada. Reabra a ficha e tente novamente.' };
-    }
-    if (mensagem.includes('orcamento_procedimento_de_outro_dentista')) {
-      return { error: 'O procedimento escolhido pertence a outro dentista. Recarregue o catálogo antes de continuar.' };
-    }
-    return { error: 'Não foi possível criar o orçamento. Nenhum item foi salvo.' };
+    console.error('[criarOrcamento]', { code: error?.code, message: error?.message, hint: error?.hint });
+    return { error: erroCriacaoOrcamento(error, 'criar') };
   }
 
   revalidatePath(`/dashboard/pacientes/${entrada.pacienteId}`);
@@ -1119,24 +1108,8 @@ export async function adicionarItensAoOrcamento(
   });
 
   if (error) {
-    const mensagem = error.message ?? '';
-    if (error.code === '23505' || mensagem.includes('orcamento_evento_ja_orcado') || mensagem.includes('orcamento_evento_duplicado')) {
-      return { error: 'Um dos procedimentos já entrou em um orçamento. Recarregue a ficha antes de continuar.' };
-    }
-    if (mensagem.includes('orcamento_evento_invalido')) {
-      return { error: 'Um dos procedimentos não está mais disponível para este orçamento. Recarregue a ficha.' };
-    }
-    if (mensagem.includes('orcamento_evento_ficha_invalido')) {
-      return { error: 'Os procedimentos adicionais precisam pertencer à mesma ficha do orçamento.' };
-    }
-    if (mensagem.includes('orcamento_procedimento_de_outro_dentista')) {
-      return { error: 'O procedimento escolhido pertence a outro dentista. Recarregue o catálogo antes de continuar.' };
-    }
-    if (mensagem.includes('orcamento_sem_permissao')) {
-      return { error: 'Você não tem permissão para alterar este orçamento.' };
-    }
-    console.error('[adicionarItensAoOrcamento]', mensagem);
-    return { error: 'Não foi possível adicionar os procedimentos. Nenhuma alteração foi salva.' };
+    console.error('[adicionarItensAoOrcamento]', { code: error.code, message: error.message, hint: error.hint });
+    return { error: erroCriacaoOrcamento(error, 'adicionar') };
   }
 
   registrarLog(supabase, {
@@ -1287,6 +1260,91 @@ export async function editarOrcamento(
 
   revalidatePath("/dashboard/orcamentos");
   return {};
+}
+
+const itemRevisaoOrcamentoSchema = z.object({
+  id: z.string().uuid().optional(),
+  descricao: z.string().trim().min(1).max(500),
+  quantidade: z.number().int().min(1).max(99),
+  precoUnitario: z.number().finite().min(0).multipleOf(0.01),
+});
+
+const revisarOrcamentoSchema = z.object({
+  orcamentoId: z.string().uuid(),
+  itens: z.array(itemRevisaoOrcamentoSchema).min(1).max(100),
+  valorAcordado: z.number().finite().positive().multipleOf(0.01),
+  versaoEsperada: z.string().datetime({ offset: true }),
+  confirmarAceitePaciente: z.literal(true),
+});
+
+export type RevisarOrcamentoInput = z.infer<typeof revisarOrcamentoSchema>;
+export type RevisarOrcamentoResult =
+  | { ok: true; total: number; valorAcordado: number; valorRecebido: number }
+  | { ok: false; error: string };
+
+/**
+ * R-172 — revisão comercial de orçamento que já tem aceite ou recebimento.
+ * A RPC preserva IDs/aprovações dos itens e cada pagamento histórico; o client só envia
+ * valores propostos e a versão que abriu. O aceite é uma confirmação explícita da operação,
+ * não uma aprovação implícita causada por editar um campo.
+ */
+export async function revisarOrcamento(
+  dados: RevisarOrcamentoInput,
+): Promise<RevisarOrcamentoResult> {
+  const parsed = revisarOrcamentoSchema.safeParse(dados);
+  if (!parsed.success) return { ok: false, error: 'Revise os procedimentos, o valor final e a confirmação do aceite.' };
+
+  const { supabase, clinicId } = await requireClinicContext();
+  const { data: orcamento } = await supabase
+    .from('orcamentos')
+    .select('paciente_id')
+    .eq('id', parsed.data.orcamentoId)
+    .eq('clinica_id', clinicId)
+    .maybeSingle();
+  if (!orcamento) return { ok: false, error: 'Orçamento não encontrado.' };
+
+  const rpc = supabase.rpc.bind(supabase) as unknown as RpcCall;
+  const { data, error } = await rpc('revisar_orcamento_aceito', {
+    p_orcamento_id: parsed.data.orcamentoId,
+    p_itens: parsed.data.itens.map((item) => ({
+      id: item.id ?? null,
+      descricao: item.descricao,
+      quantidade: item.quantidade,
+      preco_unitario: item.precoUnitario,
+    })),
+    p_valor_acordado: parsed.data.valorAcordado,
+    p_versao_esperada: parsed.data.versaoEsperada,
+  });
+
+  if (error) {
+    const mensagem = error.message ?? '';
+    if (mensagem.includes('sem_permissao')) return { ok: false, error: 'Você não tem permissão para revisar este orçamento.' };
+    if (mensagem.includes('conflito')) return { ok: false, error: 'Este orçamento mudou enquanto você revisava. Recarregue e confira os valores.' };
+    if (mensagem.includes('valor_menor_que_recebido')) return { ok: false, error: 'O novo valor final não pode ser menor que o total já recebido.' };
+    if (mensagem.includes('itens_incompletos')) return { ok: false, error: 'Esta revisão não pode remover procedimentos existentes.' };
+    if (mensagem.includes('item_invalido')) return { ok: false, error: 'Um procedimento não pertence mais a este orçamento. Recarregue e tente novamente.' };
+    if (mensagem.includes('itens_invalidos') || mensagem.includes('valor_invalido')) return { ok: false, error: 'Revise os procedimentos e os valores informados.' };
+    if (mensagem.includes('parcelas_nao_fecham_saldo')) return { ok: false, error: 'Não foi possível redistribuir as previsões. Recarregue e tente novamente.' };
+    if (mensagem.includes('orcamentos_plano_parcelas_coerente')) return { ok: false, error: 'Este orçamento tem um plano de pagamento antigo inconsistente. Atualize a página e tente novamente.' };
+    console.error('[revisarOrcamento]', mensagem);
+    return { ok: false, error: 'Não foi possível salvar a revisão. Nenhuma alteração foi aplicada.' };
+  }
+
+  const resultado = Array.isArray(data) ? data[0] : null;
+  if (!resultado || typeof resultado !== 'object') {
+    return { ok: false, error: 'A revisão não retornou o novo resumo financeiro. Recarregue antes de continuar.' };
+  }
+  const valores = resultado as { total: number; valor_acordado: number; valor_recebido: number };
+
+  revalidatePath(`/dashboard/pacientes/${orcamento.paciente_id}`);
+  revalidatePath('/dashboard/orcamentos');
+  revalidatePath('/dashboard/financeiro');
+  return {
+    ok: true,
+    total: Number(valores.total),
+    valorAcordado: Number(valores.valor_acordado),
+    valorRecebido: Number(valores.valor_recebido),
+  };
 }
 
 /**
