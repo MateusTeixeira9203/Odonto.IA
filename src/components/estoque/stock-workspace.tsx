@@ -38,7 +38,10 @@ export function StockWorkspace({ initialContext, ports }: { initialContext: Stoc
       </select><Button type="submit" variant="outline" className="min-h-11" disabled={stock.loading}>Buscar</Button>
     </form>
     <p role="status" className="mb-3 text-sm text-muted-foreground">{notice}</p>
-    {stock.error ? <section role="alert" className="rounded-2xl border border-border bg-card p-6"><p>{stock.error}</p><Button className="mt-4 min-h-11" variant="outline" onClick={() => void stock.load()}>Tentar novamente</Button></section>
+    {stock.detailLoading && !stock.detail && <p role="status" className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">Carregando detalhe do material…</p>}
+    {stock.detailError && <section role="alert" className="rounded-2xl border border-border bg-card p-5"><p className="text-sm text-destructive">{stock.detailError}</p>{stock.selectedItemId && <Button type="button" variant="outline" className="mt-4 min-h-11" disabled={stock.detailLoading} onClick={() => { const itemId = stock.selectedItemId; if (itemId) void stock.openDetail(itemId); }}>Tentar novamente</Button>}</section>}
+    {stock.detail && <StockDetail data={stock.detail} permissions={permissions} busy={stock.detailLoading} onClose={stock.closeDetail} onAction={(action, movement) => setForm({ action, movement })} onMore={() => { if (stock.detail) void stock.openDetail(stock.detail.item.id, stock.detail.proximoCursor); }} />}
+    {!stock.detail && !stock.detailLoading && !stock.detailError && (stock.error ? <section role="alert" className="rounded-2xl border border-border bg-card p-6"><p>{stock.error}</p><Button className="mt-4 min-h-11" variant="outline" onClick={() => void stock.load()}>Tentar novamente</Button></section>
       : <section aria-label={`${scopeName}: materiais`} aria-busy={stock.loading} className="overflow-hidden rounded-2xl border border-border bg-card">
         <div className="hidden grid-cols-[minmax(0,1fr)_120px_170px_24px] gap-4 bg-muted px-5 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:grid"><span>Material</span><span className="text-right">Saldo</span><span>Situação</span><span /></div>
         {stock.loading && !stock.list ? <div role="status" aria-label="Carregando materiais" className="space-y-4 p-5">{[0, 1, 2].map((row) => <div key={row} className="h-12 animate-pulse rounded-md bg-muted motion-reduce:animate-none" />)}</div>
@@ -49,12 +52,9 @@ export function StockWorkspace({ initialContext, ports }: { initialContext: Stoc
             <span className="col-start-1 text-sm text-muted-foreground sm:col-start-auto">{!item.ativo ? 'Arquivado' : compareStockQuantity(item.saldo, '0') < 0 ? 'Saldo divergente' : compareStockQuantity(item.saldo, item.minimo) <= 0 ? 'Estoque baixo' : 'Em estoque'}</span>
             <ChevronRight aria-hidden="true" className="hidden size-4 text-muted-foreground sm:block" />
           </button>)}
-      </section>}
-    {stock.list && <div className="mt-4 flex items-center justify-between gap-3"><p className="text-sm text-muted-foreground">{stock.list.total} {stock.list.total === 1 ? 'material' : 'materiais'}</p>{stock.list.proximoCursor && <Button variant="outline" className="min-h-11" disabled={stock.loading} onClick={() => void stock.load(stock.list?.proximoCursor)}>{stock.loading ? 'Carregando…' : 'Mais materiais'}</Button>}</div>}
-    {stock.detailLoading && !stock.detail && <p role="status" className="mt-6 text-sm text-muted-foreground">Carregando detalhe do material…</p>}
-    {stock.detailError && <section role="alert" className="mt-6 rounded-2xl border border-border bg-card p-5"><p className="text-sm text-destructive">{stock.detailError}</p>{stock.selectedItemId && <Button type="button" variant="outline" className="mt-4 min-h-11" disabled={stock.detailLoading} onClick={() => { const itemId = stock.selectedItemId; if (itemId) void stock.openDetail(itemId); }}>Tentar novamente</Button>}</section>}
-    {stock.detail && <StockDetail data={stock.detail} permissions={permissions} busy={stock.detailLoading} onClose={stock.closeDetail} onAction={(action, movement) => setForm({ action, movement })} onMore={() => { if (stock.detail) void stock.openDetail(stock.detail.item.id, stock.detail.proximoCursor); }} />}
-    {permissions.includes('estoque.gerir') && stock.list && <StockKitsPanel clinicaId={stock.context.clinicaId} titular={stock.titular} itens={stock.list.itens} />}
+      </section>)}
+    {!stock.detail && stock.list && <div className="mt-4 flex items-center justify-between gap-3"><p className="text-sm text-muted-foreground">{stock.list.total} {stock.list.total === 1 ? 'material' : 'materiais'}</p>{stock.list.proximoCursor && <Button variant="outline" className="min-h-11" disabled={stock.loading} onClick={() => void stock.load(stock.list?.proximoCursor)}>{stock.loading ? 'Carregando…' : 'Mais materiais'}</Button>}</div>}
+    {!stock.detail && permissions.includes('estoque.gerir') && stock.list && <StockKitsPanel clinicaId={stock.context.clinicaId} titular={stock.titular} itens={stock.list.itens} />}
     {form && (form.action === 'cadastrarItem' || stock.detail) && <StockForm action={form.action} clinicId={stock.context.clinicaId} titular={stock.titular} item={form.action === 'cadastrarItem' ? undefined : stock.detail?.item} lots={stock.detail?.lotes ?? []} movement={form.movement} ports={ports} onClose={() => setForm(null)} onRefresh={stock.refresh} onSaved={async () => { setNotice('Registro confirmado.'); await stock.refresh(); }} />}
   </div>;
 }

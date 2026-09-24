@@ -21,7 +21,7 @@ export function StockDetail({ data, permissions, busy, onAction, onClose, onMore
   onAction(action: StockMutation, movement?: MovimentoResumo): void;
   onClose(): void; onMore(): void;
 }) {
-  return <section aria-label={`Detalhe de ${data.item.nome}`} className="mt-6 rounded-2xl border border-border bg-card p-4 sm:p-6">
+  return <section aria-label={`Detalhe de ${data.item.nome}`} className="rounded-2xl border border-border bg-card p-4 sm:p-6">
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div className="min-w-0"><h3 className="break-words font-heading text-2xl text-foreground">{data.item.nome}</h3>
         <p className="mt-1 text-sm text-muted-foreground">{data.item.titular.tipo === 'clinica' ? 'Materiais da clínica' : 'Meu estoque'} · Saldo: <span className="font-mono text-foreground">{formatStockQuantity(data.item.saldo)} {STOCK_UNITS[data.item.unidadeBase]}</span></p>
