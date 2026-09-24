@@ -7,7 +7,7 @@ import { useActionState, useState, type ReactNode } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import type { ClinicOverviewData } from '@/server/consultorio/overview';
 import type { ClinicFinancialData } from '@/server/financeiro/clinica';
-import { interpolateWhatsAppTemplate, type WhatsAppTemplates } from '@/server/consultorio/whatsapp-templates';
+import { interpolateWhatsAppTemplate, type WhatsAppTemplates } from '@/lib/whatsapp/operational-templates';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { saveOperationalWhatsAppTemplates, type WhatsAppTemplateState } from '@/app/consultorio/whatsapp-actions';
