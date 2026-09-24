@@ -12,12 +12,14 @@ export type ClinicOverviewData = {
   pacientesComOrcamento: number;
   pacientesComAprovacao: number;
   retornosAgendados: number;
-  orcamentosSemRetorno: { quantidade: number; valor: number };
+  orcamentosPendentes: { quantidade: number; valor: number };
   pacientesParaReativar: number;
   pagamentosVencidos: { quantidade: number; valor: number };
   filas: {
     reativacao: QueuePatient[];
-    orcamentosSemRetorno: QueueBudget[];
+    atendimentosSemOrcamento: QueuePatient[];
+    orcamentosEnviados: QueueBudget[];
+    aprovadosSemCobranca: QueueBudget[];
     pagamentosVencidos: QueuePayment[];
   };
 };
@@ -48,15 +50,17 @@ export async function getClinicOverview(clinicaId: string, mes: string): Promise
   const readsWholeClinic = context.data.governanca?.papeis.some((role) => role === 'proprietario' || role === 'gestor') === true;
   const client = readsWholeClinic ? createServiceClient() : await createClient();
 
-  const [patientsResult, budgetsResult, staleBudgetsResult, followupsResult, overdueResult] = await Promise.all([
+  const [patientsResult, budgetsResult, staleBudgetsResult, approvedBudgetsResult, completedAppointmentsResult, followupsResult, overdueResult] = await Promise.all([
     client.from('pacientes').select('id').eq('clinica_id', clinicaId).gte('created_at', inicio).lte('created_at', fim),
     client.from('orcamentos').select('paciente_id, status').eq('clinica_id', clinicaId).gte('created_at', inicio).lte('created_at', fim),
-    client.from('orcamentos').select('id, paciente_id, total').eq('clinica_id', clinicaId).eq('status', 'enviado').lt('enviado_em', seteDiasAtras).limit(100),
-    client.from('pacientes').select('id, nome, telefone').eq('clinica_id', clinicaId).eq('followup_pendente', true).limit(100),
-    client.from('pagamentos').select('id, paciente_id, valor, data_vencimento').eq('clinica_id', clinicaId).eq('status', 'pendente').lt('data_vencimento', hojeISO).limit(100),
+    client.from('orcamentos').select('id, paciente_id, total, valor_acordado').eq('clinica_id', clinicaId).eq('status', 'enviado').lt('enviado_em', seteDiasAtras).order('enviado_em', { ascending: true }).limit(100),
+    client.from('orcamentos').select('id, paciente_id, total, valor_acordado').eq('clinica_id', clinicaId).eq('status', 'aprovado').gte('aprovado_em', inicio).lte('aprovado_em', fim).order('aprovado_em', { ascending: true }).limit(100),
+    client.from('agendamentos').select('paciente_id').eq('clinica_id', clinicaId).eq('status', 'completed').gte('data_hora', inicio).lte('data_hora', fim).order('data_hora', { ascending: false }).limit(100),
+    client.from('pacientes').select('id, nome, telefone').eq('clinica_id', clinicaId).eq('followup_pendente', true).order('updated_at', { ascending: true }).limit(100),
+    client.from('pagamentos').select('id, paciente_id, valor, data_vencimento').eq('clinica_id', clinicaId).eq('status', 'pendente').lt('data_vencimento', hojeISO).order('data_vencimento', { ascending: true }).limit(100),
   ]);
 
-  const firstError = patientsResult.error ?? budgetsResult.error ?? staleBudgetsResult.error ?? followupsResult.error ?? overdueResult.error;
+  const firstError = patientsResult.error ?? budgetsResult.error ?? staleBudgetsResult.error ?? approvedBudgetsResult.error ?? completedAppointmentsResult.error ?? followupsResult.error ?? overdueResult.error;
   if (firstError) {
     console.error('[consultorio/overview] consulta falhou:', firstError.message);
     return { ok: false, mensagem: 'Não foi possível carregar os indicadores da clínica agora.' };
@@ -90,6 +94,8 @@ export async function getClinicOverview(clinicaId: string, mes: string): Promise
   const queuePatientIds = [...new Set([
     ...followupCandidates.map((item) => item.id),
     ...(staleBudgetsResult.data ?? []).map((item) => item.paciente_id as string),
+    ...(approvedBudgetsResult.data ?? []).map((item) => item.paciente_id as string),
+    ...(completedAppointmentsResult.data ?? []).map((item) => item.paciente_id as string),
     ...(overdueResult.data ?? []).map((item) => item.paciente_id as string),
   ])];
   const patientDetails = queuePatientIds.length === 0
@@ -111,12 +117,39 @@ export async function getClinicOverview(clinicaId: string, mes: string): Promise
   const reactivationQueue = followupCandidates.filter((item) => !scheduledPatientIds.has(item.id));
   const staleBudgetQueue = (staleBudgetsResult.data ?? []).flatMap((item) => {
     const patient = patientById.get(item.paciente_id as string);
-    return patient ? [{ ...patient, orcamentoId: item.id as string, valor: Number(item.total ?? 0) }] : [];
+    return patient ? [{ ...patient, orcamentoId: item.id as string, valor: Number(item.valor_acordado ?? item.total ?? 0) }] : [];
   });
   const overdueQueue = (overdueResult.data ?? []).flatMap((item) => {
     const patient = patientById.get(item.paciente_id as string);
     return patient ? [{ ...patient, pagamentoId: item.id as string, valor: Number(item.valor ?? 0), vencimento: item.data_vencimento == null ? null : String(item.data_vencimento) }] : [];
   });
+  const completedPatientIds = [...new Set((completedAppointmentsResult.data ?? []).map((item) => item.paciente_id as string))];
+  const completedBudgetResult = completedPatientIds.length === 0
+    ? { data: [], error: null }
+    : await client.from('orcamentos').select('paciente_id').eq('clinica_id', clinicaId).in('paciente_id', completedPatientIds);
+  if (completedBudgetResult.error) {
+    console.error('[consultorio/overview] orçamentos de atendimentos falharam:', completedBudgetResult.error.message);
+    return { ok: false, mensagem: 'Não foi possível carregar os indicadores da clínica agora.' };
+  }
+  const completedPatientsWithBudget = new Set((completedBudgetResult.data ?? []).map((item) => item.paciente_id as string));
+  const noBudgetQueue = completedPatientIds.flatMap((patientId) => {
+    const patient = patientById.get(patientId);
+    return patient && !completedPatientsWithBudget.has(patientId) ? [patient] : [];
+  });
+  const approvedBudgetIds = (approvedBudgetsResult.data ?? []).map((item) => item.id as string);
+  const chargeResult = approvedBudgetIds.length === 0
+    ? { data: [], error: null }
+    : await client.from('orcamento_cobrancas').select('orcamento_id').eq('clinica_id', clinicaId).in('orcamento_id', approvedBudgetIds);
+  if (chargeResult.error) {
+    console.error('[consultorio/overview] cobranças de orçamentos falharam:', chargeResult.error.message);
+    return { ok: false, mensagem: 'Não foi possível carregar os indicadores da clínica agora.' };
+  }
+  const budgetIdsWithCharge = new Set((chargeResult.data ?? []).map((item) => item.orcamento_id as string));
+  const approvedWithoutChargeQueue = (approvedBudgetsResult.data ?? []).flatMap((item) => {
+    const patient = patientById.get(item.paciente_id as string);
+    return patient && !budgetIdsWithCharge.has(item.id as string) ? [{ ...patient, orcamentoId: item.id as string, valor: Number(item.valor_acordado ?? item.total ?? 0) }] : [];
+  });
+  const pendingBudgetValue = [...staleBudgetQueue, ...approvedWithoutChargeQueue].reduce((sum, item) => sum + item.valor, 0);
 
   return {
     ok: true,
@@ -125,16 +158,16 @@ export async function getClinicOverview(clinicaId: string, mes: string): Promise
       pacientesComOrcamento: budgetPatients.size,
       pacientesComAprovacao: approvedPatients.size,
       retornosAgendados: returns,
-      orcamentosSemRetorno: {
-        quantidade: (staleBudgetsResult.data ?? []).length,
-        valor: (staleBudgetsResult.data ?? []).reduce((sum, item) => sum + Number(item.total ?? 0), 0),
+      orcamentosPendentes: {
+        quantidade: noBudgetQueue.length + staleBudgetQueue.length + approvedWithoutChargeQueue.length,
+        valor: pendingBudgetValue,
       },
       pacientesParaReativar: reactivationQueue.length,
       pagamentosVencidos: {
         quantidade: (overdueResult.data ?? []).length,
         valor: (overdueResult.data ?? []).reduce((sum, item) => sum + Number(item.valor ?? 0), 0),
       },
-      filas: { reativacao: reactivationQueue, orcamentosSemRetorno: staleBudgetQueue, pagamentosVencidos: overdueQueue },
+      filas: { reativacao: reactivationQueue, atendimentosSemOrcamento: noBudgetQueue, orcamentosEnviados: staleBudgetQueue, aprovadosSemCobranca: approvedWithoutChargeQueue, pagamentosVencidos: overdueQueue },
     },
   };
 }

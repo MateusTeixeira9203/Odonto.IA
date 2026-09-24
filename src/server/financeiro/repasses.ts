@@ -56,6 +56,12 @@ const ManagedPersonalDataSchema = z.strictObject({
   orcamentosAprovados: MonetarySchema,
   atendimentosRealizados: z.number().int().nonnegative(),
   recebidoVinculado: MonetarySchema,
+  recebidoPorHora: MonetarySchema.nullable(),
+  producaoPorHora: MonetarySchema.nullable(),
+  ocupacaoRealizada: MonetarySchema.nullable(),
+  ticketAprovado: MonetarySchema.nullable(),
+  ticketRecebidoPorPaciente: MonetarySchema.nullable(),
+  conversaoOrcamentos: MonetarySchema.nullable(),
   repassePrevisto: MonetarySchema,
   repassePago: MonetarySchema,
   serieMensal: z.array(z.strictObject({

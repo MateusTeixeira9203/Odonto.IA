@@ -22,7 +22,8 @@ function data() {
     movimentoLiquido: 33620,
     margemOperacional: 69.7,
     saldoCaixa: 41800,
-    saldoBancarioConciliado: null,
+    saldoBancarioInformado: null,
+    saldoBancarioInformadoEm: null,
     aReceber: 17980,
     vencido: 4820,
     despesasFixas: 7200,
@@ -57,6 +58,10 @@ function data() {
       horasDisponiveis: 48,
       custoDireto: null,
       custoPorHoraClinica: 80,
+      recebidoPorHora: 32,
+      ocupacaoRealizada: 5.2,
+      ticketAprovado: 100,
+      ticketRecebidoPorPaciente: 80,
     }],
     extrato: [{
       id: '66666666-6666-4666-8666-666666666666',
@@ -65,6 +70,7 @@ function data() {
       data: '2026-09-20',
       valor: 100,
     }],
+    recebidoPorModalidade: [],
   };
 }
 

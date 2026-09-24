@@ -15,6 +15,7 @@ export function ClinicHubLayout({ context, children }: { context: ClinicHubConte
           nomeClinica={context.nomeClinica}
           title={context.titulo}
           hasPersonalFinance={context.member.perfilClinico !== null}
+          isSecretary={context.member.role === 'secretaria'}
           currentMonth={format(new Date(), 'yyyy-MM')}
         />
         <main>{children}</main>

@@ -13,6 +13,10 @@ const RecurringExpenseSchema = z.strictObject({
   diaVencimento: z.number().int().min(1).max(28),
   ativo: z.boolean(),
 });
+const ReceiptMethodSchema = z.strictObject({
+  forma: z.enum(['pix', 'dinheiro', 'transferencia', 'cartao_credito', 'cartao_debito', 'boleto', 'outro']),
+  valor: MonetarySchema,
+});
 
 const ClinicFinancialDataSchema = z.strictObject({
   clinicaId: UuidSchema,
@@ -23,7 +27,8 @@ const ClinicFinancialDataSchema = z.strictObject({
   movimentoLiquido: MonetarySchema,
   margemOperacional: MonetarySchema.nullable(),
   saldoCaixa: MonetarySchema,
-  saldoBancarioConciliado: MonetarySchema.nullable(),
+  saldoBancarioInformado: MonetarySchema.nullable(),
+  saldoBancarioInformadoEm: z.string().date().nullable(),
   aReceber: MonetarySchema,
   vencido: MonetarySchema,
   despesasFixas: MonetarySchema,
@@ -51,6 +56,10 @@ const ClinicFinancialDataSchema = z.strictObject({
     horasDisponiveis: MonetarySchema,
     custoDireto: MonetarySchema.nullable(),
     custoPorHoraClinica: MonetarySchema.nullable(),
+    recebidoPorHora: MonetarySchema.nullable(),
+    ocupacaoRealizada: MonetarySchema.nullable(),
+    ticketAprovado: MonetarySchema.nullable(),
+    ticketRecebidoPorPaciente: MonetarySchema.nullable(),
   })).max(200),
   extrato: z.array(z.strictObject({
     id: UuidSchema,
@@ -59,6 +68,7 @@ const ClinicFinancialDataSchema = z.strictObject({
     data: z.string().date(),
     valor: MonetarySchema,
   })).max(8),
+  recebidoPorModalidade: z.array(ReceiptMethodSchema).max(7),
 });
 
 const RpcResultSchema = z.discriminatedUnion('ok', [
@@ -77,9 +87,11 @@ export type ClinicFinancialResult =
 
 type RpcInput = { p_clinica_id_esperada: string; p_mes_referencia: string };
 type RpcResponse = Promise<{ data: unknown; error: { message: string } | null }>;
+type ReceiptMethodsResponse = Promise<{ data: unknown; error: { message: string } | null }>;
 
 export type ClinicFinancialDependencies = {
   get(input: RpcInput): RpcResponse;
+  getReceiptMethods?(input: RpcInput): ReceiptMethodsResponse;
 };
 
 const FAILURE_MESSAGE = 'Não foi possível consultar o financeiro da clínica agora.';
@@ -88,6 +100,7 @@ async function defaultDependencies(): Promise<ClinicFinancialDependencies> {
   const client = await createClient();
   return {
     get: async (input) => client.rpc('obter_financeiro_clinica_painel', input),
+    getReceiptMethods: async (input) => client.rpc('obter_recebido_por_modalidade_clinica', input),
   };
 }
 
@@ -107,13 +120,17 @@ export async function getClinicFinancial(
 
   try {
     const source = dependencies ?? await defaultDependencies();
-    const { data, error } = await source.get({
+    const request = {
       p_clinica_id_esperada: clinicaId.data,
       p_mes_referencia: `${mes.data}-01`,
-    });
+    };
+    const [{ data, error }, receiptMethodsResult] = await Promise.all([
+      source.get(request), source.getReceiptMethods?.(request) ?? Promise.resolve({ data: { ok: true, data: [] }, error: null }),
+    ]);
     if (error) return { ok: false, codigo: 'INDISPONIVEL', mensagem: FAILURE_MESSAGE };
-
-    const result = RpcResultSchema.safeParse(data);
+    const methods = z.object({ ok: z.literal(true), data: z.array(ReceiptMethodSchema) }).safeParse(receiptMethodsResult.data);
+    if (receiptMethodsResult.error || !methods.success) return { ok: false, codigo: 'INDISPONIVEL', mensagem: FAILURE_MESSAGE };
+    const result = RpcResultSchema.safeParse({ ...(typeof data === 'object' && data !== null ? data : {}), data: typeof data === 'object' && data !== null && 'data' in data && typeof data.data === 'object' && data.data !== null ? { ...data.data, recebidoPorModalidade: methods.data.data } : undefined });
     if (!result.success) return { ok: false, codigo: 'INDISPONIVEL', mensagem: FAILURE_MESSAGE };
     return result.data;
   } catch {

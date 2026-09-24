@@ -12,6 +12,7 @@ type ClinicHubHeaderProps = {
   nomeClinica: string;
   title: 'Meu Consultório' | 'Minha Clínica';
   hasPersonalFinance: boolean;
+  isSecretary: boolean;
   currentMonth: string;
 };
 
@@ -31,7 +32,7 @@ function pageTitle(pathname: string, title: ClinicHubHeaderProps['title']): stri
   return title;
 }
 
-export function ClinicHubHeader({ basePath, nomeClinica, title, hasPersonalFinance, currentMonth }: ClinicHubHeaderProps): React.JSX.Element {
+export function ClinicHubHeader({ basePath, nomeClinica, title, hasPersonalFinance, isSecretary, currentMonth }: ClinicHubHeaderProps): React.JSX.Element {
   const pathname = usePathname();
   return (
     <header className="space-y-4 sm:space-y-7">
@@ -51,7 +52,7 @@ export function ClinicHubHeader({ basePath, nomeClinica, title, hasPersonalFinan
       </div>
       <nav aria-label={`Seções de ${title}`} className="-mx-4 overflow-x-auto border-y border-border bg-card px-4 py-1.5 [scroll-snap-type:x_proximity] [scrollbar-width:none] sm:mx-0 sm:rounded-2xl sm:border sm:p-1.5 [&::-webkit-scrollbar]:hidden">
         <div className="flex min-w-max gap-1 sm:min-w-0 sm:w-full">
-          {tabs.filter((tab) => !('personal' in tab) || hasPersonalFinance).map((tab) => {
+          {tabs.filter((tab) => (!('personal' in tab) || hasPersonalFinance) && (!isSecretary || tab.id === 'overview' || tab.id === 'clinic-finance')).map((tab) => {
             const href = `${basePath}${tab.path}`;
             const active = tab.path ? pathname.startsWith(href) : pathname === basePath;
             const Icon = tab.icon;

@@ -5,6 +5,7 @@ import { ClinicOverviewPanel } from '@/components/consultorio/clinic-overview-pa
 import { getClinicHubContext } from '@/server/consultorio/context';
 import { getClinicOverview } from '@/server/consultorio/overview';
 import { getClinicFinancial } from '@/server/financeiro/clinica';
+import { getOperationalWhatsAppTemplates } from '@/server/consultorio/whatsapp-templates';
 
 export default async function MeuConsultorioPage({ searchParams }: { searchParams: Promise<{ mes?: string }> }): Promise<React.JSX.Element> {
   const context = await getClinicHubContext();
@@ -12,9 +13,10 @@ export default async function MeuConsultorioPage({ searchParams }: { searchParam
   if (!context.data.member.perfilClinico) redirect('/consultorio');
   const params = await searchParams;
   const mes = params.mes && /^\d{4}-(0[1-9]|1[0-2])$/.test(params.mes) ? params.mes : format(new Date(), 'yyyy-MM');
-  const [financeiro, overview] = await Promise.all([
+  const [financeiro, overview, whatsappTemplates] = await Promise.all([
     getClinicFinancial({ clinicaIdEsperada: context.data.member.clinicaId, mes }),
     getClinicOverview(context.data.member.clinicaId, mes),
+    getOperationalWhatsAppTemplates(context.data.member.clinicaId),
   ]);
-  return <ClinicOverviewPanel basePath={context.data.basePath} financeiro={financeiro.ok ? financeiro.data : null} overview={overview.ok ? overview.data : null} mensagem={!financeiro.ok ? financeiro.mensagem : !overview.ok ? overview.mensagem : undefined} />;
+  return <ClinicOverviewPanel basePath={context.data.basePath} financeiro={financeiro.ok ? financeiro.data : null} overview={overview.ok ? overview.data : null} whatsappTemplates={whatsappTemplates} nomeClinica={context.data.nomeClinica} canManageWhatsAppTemplates={context.data.governanca?.papeis.some((role) => role === 'proprietario' || role === 'gestor') === true} mensagem={!financeiro.ok ? financeiro.mensagem : !overview.ok ? overview.mensagem : undefined} />;
 }

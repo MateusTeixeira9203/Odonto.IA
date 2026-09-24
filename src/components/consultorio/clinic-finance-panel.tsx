@@ -11,8 +11,11 @@ type Props = {
   basePath: '/dashboard/meu-consultorio' | '/consultorio';
   data: ClinicFinancialData | null;
   canWrite: boolean;
+  canManageBalance: boolean;
   repasses: ClinicRepassesData | null;
   canManageRepasses: boolean;
+  professionals: { id: string; nome: string }[];
+  operationalOnly?: boolean;
   mensagem?: string;
 };
 
@@ -26,7 +29,16 @@ function trend(current: number, previous: number): string | null {
   return (value >= 0 ? '+' : '') + value.toFixed(1).replace('.', ',') + '%';
 }
 
-export function ClinicFinancePanel({ basePath, data, canWrite, repasses, canManageRepasses, mensagem }: Props): React.JSX.Element {
+export function ClinicFinancePanel({ basePath, data, canWrite, canManageBalance, repasses, canManageRepasses, professionals, operationalOnly = false, mensagem }: Props): React.JSX.Element {
+  if (operationalOnly) {
+    return <div className="space-y-6">
+      <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-card p-5">
+        <div><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-teal">Operação financeira</p><h2 className="mt-2 font-heading text-2xl font-normal text-foreground">Registrar movimentação</h2><p className="mt-2 max-w-2xl text-sm text-muted-foreground">Registre entradas e saídas da clínica. Indicadores, repasses e configurações permanecem com a gestão.</p></div>
+        <ClinicTransactionActions canWrite={canWrite} canManageBalance={canManageBalance} professionals={professionals} />
+      </section>
+      <section className="rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground">Recebimentos do orçamento devem continuar vinculados ao paciente. Use o lançamento manual somente quando o recebimento ou gasto ainda não estiver registrado no sistema.</section>
+    </div>;
+  }
   if (!data) return <section role="alert" className="rounded-2xl border border-destructive/30 bg-destructive/10 p-5 text-sm text-foreground"><div className="flex gap-3"><AlertTriangle className="mt-0.5 size-5 shrink-0 text-destructive" /><p>{mensagem ?? 'O financeiro da clínica está indisponível agora. Os valores não foram substituídos por zero.'}</p></div></section>;
   const previous = data.chart.at(-2);
   const receiptTrend = previous ? trend(data.recebido, previous.recebido) : null;
@@ -37,12 +49,12 @@ export function ClinicFinancePanel({ basePath, data, canWrite, repasses, canMana
     <div className="space-y-10">
       <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-card p-5">
         <div><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-teal">Movimentações da clínica</p><p className="mt-2 max-w-2xl text-sm text-muted-foreground">Pagamentos de pacientes vêm do orçamento. Registre aqui as demais entradas e despesas da unidade.</p></div>
-        <ClinicTransactionActions canWrite={canWrite} />
+        <ClinicTransactionActions canWrite={canWrite} canManageBalance={canManageBalance} professionals={professionals} />
       </section>
 
       <section className="rounded-[18px] border border-teal/30 bg-teal-pale p-5 sm:p-7">
         <div className="flex flex-col gap-7 lg:flex-row lg:items-end lg:justify-between">
-          <div><p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-teal"><CircleDollarSign className="size-4" />Movimento líquido registrado</p><p className="mt-3 font-mono text-4xl font-semibold text-foreground">{formatMoney(data.movimentoLiquido)}</p><p className="mt-2 text-sm text-muted-foreground">Entradas confirmadas menos despesas do período. Não substitui saldo bancário conciliado.</p></div>
+          <div><p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-teal"><CircleDollarSign className="size-4" />Movimento líquido registrado</p><p className="mt-3 font-mono text-4xl font-semibold text-foreground">{formatMoney(data.movimentoLiquido)}</p><p className="mt-2 text-sm text-muted-foreground">Entradas confirmadas menos despesas do período. Saldo informado da conta não é saldo ao vivo.</p></div>
           <div className="grid grid-cols-2 gap-5 sm:grid-cols-4"><InlineMetric label="Recebido" value={formatMoney(data.recebido)} /><InlineMetric label="Despesas" value={formatMoney(data.despesas)} /><InlineMetric label="Resultado" value={formatMoney(data.resultadoOperacional)} /><InlineMetric label="Margem" value={data.margemOperacional == null ? '—' : data.margemOperacional.toFixed(1).replace('.', ',') + '%'} /></div>
         </div>
       </section>
@@ -52,7 +64,7 @@ export function ClinicFinancePanel({ basePath, data, canWrite, repasses, canMana
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Metric label="Resultado do período" value={formatMoney(data.movimentoLiquido)} detail="Recebido menos despesas" tone={data.movimentoLiquido >= 0 ? 'positive' : 'negative'} />
           <Metric label="Margem operacional" value={data.margemOperacional == null ? '—' : data.margemOperacional.toFixed(1).replace('.', ',') + '%'} detail={data.baseDeCustosValidada ? 'Resultado sobre o recebido' : 'Registre custos para calcular'} />
-          <Metric label="Fôlego de caixa" value={data.folegoCaixaMeses == null ? '—' : data.folegoCaixaMeses.toFixed(1).replace('.', ',') + ' meses'} detail="Exige saldo bancário conciliado" />
+          <Metric label="Fôlego de caixa" value={data.folegoCaixaMeses == null ? '—' : data.folegoCaixaMeses.toFixed(1).replace('.', ',') + ' meses'} detail={data.saldoBancarioInformadoEm ? `Saldo informado em ${shortDate.format(new Date(`${data.saldoBancarioInformadoEm}T12:00:00`))}` : 'Informe o saldo da conta para calcular'} />
           <Metric label="A receber" value={formatMoney(data.aReceber)} detail={data.vencido > 0 ? formatMoney(data.vencido) + ' vencidos' : 'Sem cobranças vencidas'} />
         </div>
       </section>
@@ -69,8 +81,15 @@ export function ClinicFinancePanel({ basePath, data, canWrite, repasses, canMana
       </section>
 
       <section>
+        <Heading eyebrow="Recebimentos" title="Por modalidade" description="Somente valores confirmados no período." />
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {data.recebidoPorModalidade.length === 0 ? <Card><CardContent className="p-5 text-sm text-muted-foreground">Nenhum recebimento confirmado neste período.</CardContent></Card> : data.recebidoPorModalidade.map((item) => <Metric key={item.forma} label={receiptMethodLabel(item.forma)} value={formatMoney(item.valor)} detail={data.recebido > 0 ? `${((item.valor / data.recebido) * 100).toFixed(1).replace('.', ',')}% do recebido` : 'Sem total no período'} />)}
+        </div>
+      </section>
+
+      <section>
         <Heading eyebrow="Equipe" title="Recebimentos por profissional" description="Produção aprovada e dinheiro que entrou são leituras separadas." />
-        <Card className="mt-4 overflow-hidden"><CardContent className="overflow-x-auto p-0"><table className="w-full min-w-[860px] text-left text-sm"><thead className="bg-muted text-xs uppercase tracking-wider text-muted-foreground"><tr><th className="px-5 py-3 font-semibold">Profissional</th><th className="px-5 py-3 text-right font-semibold">Orçamentos aprovados</th><th className="px-5 py-3 text-right font-semibold">Atendimentos</th><th className="px-5 py-3 text-right font-semibold">Recebido</th><th className="px-5 py-3 text-right font-semibold">Custo/hora</th></tr></thead><tbody>{data.profissionais.length === 0 ? <tr><td className="px-5 py-6 text-muted-foreground" colSpan={5}>Ainda não há profissionais clínicos ativos nesta unidade.</td></tr> : data.profissionais.map((professional) => <tr className="border-t border-border" key={professional.dentistaId}><td className="px-5 py-4 font-semibold text-foreground">{professional.nome}<p className="mt-1 text-xs font-normal text-muted-foreground">{professional.horasAtendidas.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} h atendidas</p></td><td className="px-5 py-4 text-right font-mono">{formatMoney(professional.producaoAprovada)}</td><td className="px-5 py-4 text-right font-mono">{professional.atendimentosRealizados}</td><td className="px-5 py-4 text-right font-mono text-teal">{formatMoney(professional.recebidoVinculado)}</td><td className="px-5 py-4 text-right font-mono">{professional.custoPorHoraClinica == null ? '—' : `${formatMoney(professional.custoPorHoraClinica)}/h`}</td></tr>)}</tbody></table></CardContent></Card>
+        <Card className="mt-4 overflow-hidden"><CardContent className="overflow-x-auto p-0"><table className="w-full min-w-[860px] text-left text-sm"><thead className="bg-muted text-xs uppercase tracking-wider text-muted-foreground"><tr><th className="px-5 py-3 font-semibold">Profissional</th><th className="px-5 py-3 text-right font-semibold">Orçamentos aprovados</th><th className="px-5 py-3 text-right font-semibold">Atendimentos</th><th className="px-5 py-3 text-right font-semibold">Recebido</th><th className="px-5 py-3 text-right font-semibold">Hora clínica</th></tr></thead><tbody>{data.profissionais.length === 0 ? <tr><td className="px-5 py-6 text-muted-foreground" colSpan={5}>Ainda não há profissionais clínicos ativos nesta unidade.</td></tr> : data.profissionais.map((professional) => <tr className="border-t border-border" key={professional.dentistaId}><td className="px-5 py-4 font-semibold text-foreground">{professional.nome}<p className="mt-1 text-xs font-normal text-muted-foreground">{professional.horasAtendidas.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} h atendidas</p></td><td className="px-5 py-4 text-right font-mono">{formatMoney(professional.producaoAprovada)}</td><td className="px-5 py-4 text-right font-mono">{professional.atendimentosRealizados}</td><td className="px-5 py-4 text-right font-mono text-teal">{formatMoney(professional.recebidoVinculado)}</td><td className="px-5 py-4 text-right font-mono">{professional.recebidoPorHora == null ? '—' : `${formatMoney(professional.recebidoPorHora)}/h`}</td></tr>)}</tbody></table></CardContent></Card>
       </section>
 
       <ClinicRepassePanel data={repasses} canManage={canManageRepasses} mes={data.mes} />
@@ -87,4 +106,5 @@ function Heading({ eyebrow, title, description }: { eyebrow: string; title: stri
   return <div><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-teal">{eyebrow}</p><h2 className="mt-1 font-heading text-2xl font-normal text-foreground sm:text-[28px]">{title}</h2><p className="mt-1 text-sm text-muted-foreground">{description}</p></div>;
 }
 function InlineMetric({ label, value }: { label: string; value: string }): React.JSX.Element { return <div><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 font-mono text-sm font-semibold text-foreground">{value}</p></div>; }
+function receiptMethodLabel(method: ClinicFinancialData['recebidoPorModalidade'][number]['forma']): string { return { pix: 'PIX', cartao_credito: 'Cartão de crédito', cartao_debito: 'Cartão de débito', dinheiro: 'Dinheiro', boleto: 'Boleto', transferencia: 'Transferência', outro: 'Outro' }[method]; }
 function Metric({ label, value, detail, tone = 'default' }: { label: string; value: string; detail: string; tone?: 'default' | 'positive' | 'negative' }): React.JSX.Element { const color = tone === 'positive' ? 'text-teal' : tone === 'negative' ? 'text-destructive' : 'text-foreground'; return <div className="rounded-2xl border border-border bg-card p-5"><p className="text-xs font-semibold text-muted-foreground">{label}</p><p className={'mt-3 font-mono text-xl font-semibold ' + color}>{value}</p><p className="mt-2 text-xs text-muted-foreground">{detail}</p></div>; }
