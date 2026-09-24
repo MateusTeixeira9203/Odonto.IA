@@ -1,0 +1,463 @@
+<!-- ARTEFATO · R-161 · rota: /dashboard/meu-consultorio/* · componente: MeuConsultorioShell · 2026-09-23 · status: aprovado -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Meu Consultório · Hub completo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Serif+Display:ital@0;1&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --amber: #d6a84b;
+      --bg: #0d0d0e;
+      --coral: #ef9a9a;
+      --line: #27272a;
+      --line-soft: #202023;
+      --muted: #a1a1aa;
+      --soft: #71717a;
+      --surface: #111112;
+      --surface-alt: #1c1c1e;
+      --teal: #2f9c85;
+      --teal-light: #5dbeb0;
+      --teal-wash: rgba(47, 156, 133, .12);
+      --text: #fafafa;
+      --surface-glass: rgba(17, 17, 18, .94);
+      --surface-quiet: rgba(28, 28, 30, .74);
+      --hero-stat-bg: rgba(13, 13, 14, .52);
+      --shadow: 0 24px 70px rgba(0, 0, 0, .28);
+    }
+
+    html[data-theme="light"] {
+      --bg: #f5f4f1;
+      --line: #d9d7d1;
+      --line-soft: #e8e6e0;
+      --muted: #65645f;
+      --soft: #85837c;
+      --surface: #ffffff;
+      --surface-alt: #eeece7;
+      --teal: #237d6b;
+      --teal-light: #237d6b;
+      --teal-wash: rgba(35, 125, 107, .10);
+      --text: #171716;
+      --surface-glass: rgba(255, 255, 255, .96);
+      --surface-quiet: rgba(238, 236, 231, .82);
+      --hero-stat-bg: rgba(255, 255, 255, .78);
+      --shadow: 0 20px 60px rgba(51, 48, 41, .10);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--text);
+      background-color: var(--bg);
+      font-family: Outfit, system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.45;
+    }
+    button { font: inherit; }
+    .frame { width: min(1220px, calc(100% - 48px)); margin: 0 auto; padding: 42px 0 150px; }
+    .eyebrow { color: var(--teal-light); font-size: 11px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+    .page-head { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; margin-bottom: 28px; }
+    .identity { display: flex; align-items: flex-start; gap: 15px; }
+    .identity-mark {
+      width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid rgba(93, 190, 176, .22);
+      border-radius: 14px; color: var(--teal-light); background: var(--teal-wash); font-family: 'DM Mono', monospace; font-size: 13px;
+    }
+    h1, h2, h3, p { margin: 0; }
+    h1 { margin-top: 2px; font-family: 'DM Serif Display', Georgia, serif; font-size: clamp(36px, 4vw, 46px); font-weight: 400; letter-spacing: -.035em; line-height: .96; }
+    h2 { font-family: 'DM Serif Display', Georgia, serif; font-size: 27px; font-weight: 400; letter-spacing: -.025em; line-height: 1.05; }
+    h3 { font-family: 'DM Serif Display', Georgia, serif; font-size: 21px; font-weight: 400; letter-spacing: -.02em; line-height: 1.1; }
+    .subtitle { color: var(--muted); margin-top: 8px; }
+    .head-actions { display: flex; align-items: center; gap: 8px; }
+    .theme-toggle,
+    .period {
+      display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; color: var(--text);
+      background: var(--surface-glass); border: 1px solid var(--line); border-radius: 12px; cursor: pointer; white-space: nowrap;
+    }
+    .theme-toggle { width: 44px; justify-content: center; padding: 0; }
+    .theme-toggle svg { width: 18px; height: 18px; }
+    .period:hover, .theme-toggle:hover { border-color: var(--soft); }
+    .period small { color: var(--muted); }
+
+    .section-nav {
+      display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; overflow-x: auto; padding: 8px; margin-bottom: 38px;
+      background: var(--surface-glass); border: 1px solid var(--line); border-radius: 17px; box-shadow: var(--shadow);
+    }
+    .section-nav button {
+      min-height: 60px; border: 1px solid var(--line-soft); border-radius: 12px; padding: 0 14px; background: var(--surface); color: var(--muted); cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 14px; font-weight: 600; white-space: nowrap; transition: .18s ease;
+    }
+    .section-nav svg { width: 19px; height: 19px; flex: 0 0 auto; }
+    .section-nav button:hover { color: var(--text); background: var(--surface-alt); }
+    .section-nav button.is-active { background: var(--teal-wash); border-color: rgba(93,190,176,.34); color: var(--teal-light); box-shadow: inset 0 0 0 1px rgba(93,190,176,.12); }
+
+    .view { display: none; animation: enter .24s ease both; }
+    .view.is-active { display: block; }
+    @keyframes enter { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    .section-heading { display: flex; justify-content: space-between; align-items: end; gap: 18px; margin: 42px 0 16px; }
+    .section-heading:first-child { margin-top: 0; }
+    .section-heading p { color: var(--muted); font-size: 14px; margin-top: 6px; }
+    .section-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .text-link { appearance: none; border: 0; background: transparent; color: var(--teal-light); padding: 0; cursor: pointer; font-size: 13px; font-weight: 600; white-space: nowrap; }
+    .text-link:hover { color: var(--text); }
+
+    .action-grid { display: grid; grid-template-columns: 1.15fr 1fr 1fr; gap: 12px; }
+    .action-card {
+      min-height: 152px; padding: 20px; border: 1px solid var(--line); border-radius: 17px; background: var(--surface-glass); display: flex; flex-direction: column;
+    }
+    .action-card.urgent { border-color: rgba(214,168,75,.34); }
+    .action-card .card-top { display: flex; justify-content: space-between; gap: 16px; color: var(--muted); font-size: 13px; }
+    .badge { display: inline-grid; place-items: center; min-width: 27px; height: 24px; padding: 0 8px; border-radius: 999px; background: rgba(214,168,75,.12); color: var(--amber); font-family: 'DM Mono', monospace; font-size: 12px; }
+    .badge.teal { color: var(--teal-light); background: var(--teal-wash); }
+    .action-value { margin: 12px 0 3px; font-family: 'DM Serif Display', Georgia, serif; font-size: 28px; line-height: 1; }
+    .action-card p { color: var(--muted); font-size: 13px; }
+    .action-card .text-link { margin-top: auto; padding-top: 15px; }
+
+    .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .metric {
+      min-height: 132px; padding: 19px 18px; border: 1px solid var(--line); border-radius: 15px; background: var(--surface-glass);
+    }
+    .metric label { display: block; color: var(--muted); font-size: 12px; }
+    .metric strong { display: block; margin: 11px 0 5px; font-family: 'DM Mono', monospace; font-size: 21px; letter-spacing: -.05em; }
+    .metric small { color: var(--soft); font-size: 12px; }
+    .metric.emphasis { border-color: rgba(93,190,176,.26); background: rgba(47,156,133,.08); }
+    .metric.emphasis strong { color: var(--teal-light); }
+
+    .two-col { display: grid; grid-template-columns: 1.55fr 1fr; gap: 14px; }
+    .panel { padding: 22px; border: 1px solid var(--line); border-radius: 17px; background: var(--surface-glass); }
+    .panel-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 19px; }
+    .panel-header p { color: var(--muted); font-size: 13px; margin-top: 5px; }
+    .legend { display: flex; gap: 12px; color: var(--muted); font-size: 11px; white-space: nowrap; }
+    .legend i { width: 7px; height: 7px; display: inline-block; margin-right: 5px; border-radius: 50%; background: var(--teal); }
+    .legend i.coral { background: var(--coral); }
+    .chart { position: relative; height: 195px; border-bottom: 1px solid var(--line); overflow: hidden; }
+    .chart::before { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(to bottom, transparent 0, transparent 47px, var(--line-soft) 48px); }
+    .chart svg { position: absolute; inset: 15px 0 0; width: 100%; height: calc(100% - 15px); overflow: visible; }
+    .months { display: flex; justify-content: space-between; padding-top: 9px; color: var(--soft); font-family: 'DM Mono', monospace; font-size: 11px; }
+
+    .flow-table { display: grid; gap: 13px; }
+    .flow-row { display: grid; grid-template-columns: 34px 1fr 1fr; gap: 12px; align-items: center; }
+    .flow-month { color: var(--muted); font-family: 'DM Mono', monospace; font-size: 11px; }
+    .flow-value { display: grid; grid-template-columns: minmax(70px, auto) 1fr; gap: 9px; align-items: center; }
+    .flow-value b { font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; white-space: nowrap; }
+    .flow-track { height: 8px; overflow: hidden; border-radius: 999px; background: var(--line-soft); }
+    .flow-track i { display: block; height: 100%; border-radius: inherit; background: var(--teal); }
+    .flow-value.expense .flow-track i { background: var(--coral); }
+    .flow-caption { display: grid; grid-template-columns: 34px 1fr 1fr; gap: 12px; margin-bottom: 12px; color: var(--soft); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+    .flow-caption span:first-child { grid-column: 2; }
+
+    .signal-list { display: grid; gap: 1px; border: 1px solid var(--line); border-radius: 13px; overflow: hidden; background: var(--line); }
+    .signal { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; padding: 15px; background: var(--surface); }
+    .signal strong { display: block; font-size: 14px; }
+    .signal span { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .signal b { color: var(--teal-light); font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 500; }
+    .signal b.amber { color: var(--amber); }
+
+    .management-grid { display: grid; grid-template-columns: 1.45fr 1fr; gap: 14px; }
+    .journey { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; }
+    .journey-step { position: relative; min-height: 124px; padding: 16px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); }
+    .journey-step:not(:last-child)::after { content: '→'; position: absolute; z-index: 2; top: 50%; right: -14px; transform: translateY(-50%); color: var(--soft); }
+    .journey-step span { display: block; color: var(--muted); font-size: 11px; }
+    .journey-step strong { display: block; margin: 12px 0 5px; font-family: 'DM Mono', monospace; font-size: 22px; }
+    .journey-step small { color: var(--soft); font-size: 11px; }
+    .journey-step.attention { border-color: rgba(214,168,75,.30); }
+    .progress { height: 6px; margin-top: 13px; overflow: hidden; border-radius: 999px; background: var(--line-soft); }
+    .progress i { display: block; height: 100%; border-radius: inherit; background: var(--teal); }
+
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 16px; background: var(--surface-glass); }
+    table { width: 100%; min-width: 700px; border-collapse: collapse; }
+    th { padding: 14px 16px; color: var(--soft); border-bottom: 1px solid var(--line); text-align: left; font-size: 11px; letter-spacing: .06em; font-weight: 600; }
+    td { padding: 16px; border-bottom: 1px solid var(--line-soft); font-size: 13px; vertical-align: middle; }
+    tr:last-child td { border-bottom: 0; }
+    td.mono { font-family: 'DM Mono', monospace; font-size: 12px; }
+    .person { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+    .avatar { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; color: var(--teal-light); background: var(--teal-wash); font-size: 11px; }
+    .role-pill { display: inline-flex; padding: 4px 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 11px; }
+    .status { color: var(--teal-light); font-size: 12px; }
+
+    .cash-hero { display: grid; grid-template-columns: 1.25fr repeat(3, .65fr); gap: 12px; align-items: stretch; padding: 26px; border: 1px solid rgba(93,190,176,.28); border-radius: 18px; background: rgba(47,156,133,.08); }
+    .cash-hero .hero-label { color: var(--teal-light); font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+    .cash-hero .hero-value { margin-top: 12px; font-family: 'DM Serif Display', Georgia, serif; font-size: 46px; letter-spacing: -.045em; line-height: .9; }
+    .cash-hero .hero-note { margin-top: 10px; color: var(--muted); font-size: 12px; max-width: 310px; }
+    .hero-stat { display: flex; flex-direction: column; justify-content: center; padding: 15px; border: 1px solid rgba(93,190,176,.14); border-radius: 13px; background: var(--hero-stat-bg); }
+    .hero-stat span { color: var(--muted); font-size: 11px; }
+    .hero-stat b { margin-top: 7px; font-family: 'DM Mono', monospace; font-size: 16px; }
+    .hero-stat b.teal { color: var(--teal-light); }
+
+    .finance-top { display: grid; grid-template-columns: 1.5fr 1fr; gap: 14px; }
+    .finance-summary { padding: 23px; border: 1px solid var(--line); border-radius: 17px; background: var(--surface-glass); }
+    .finance-summary .summary-number { margin: 12px 0 6px; font-family: 'DM Serif Display', Georgia, serif; font-size: 36px; line-height: 1; }
+    .finance-summary p { color: var(--muted); font-size: 13px; }
+    .mini-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 21px; }
+    .mini-metrics div { padding: 12px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); }
+    .mini-metrics span { display: block; color: var(--soft); font-size: 11px; }
+    .mini-metrics b { display: block; margin-top: 5px; font-family: 'DM Mono', monospace; font-size: 13px; }
+    .forecast-list { display: grid; gap: 12px; }
+    .forecast-item { display: flex; gap: 11px; align-items: flex-start; }
+    .forecast-dot { flex: 0 0 auto; width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: var(--amber); }
+    .forecast-dot.teal { background: var(--teal); }
+    .forecast-item strong { display: block; font-size: 13px; }
+    .forecast-item p { margin-top: 2px; color: var(--muted); font-size: 12px; }
+    .formula { margin-top: 17px; padding-top: 13px; border-top: 1px solid var(--line); color: var(--soft); font-size: 11px; }
+
+    .profile-card { display: grid; grid-template-columns: 1fr auto; gap: 16px; padding: 24px; border: 1px solid var(--line); border-radius: 17px; background: var(--surface-glass); }
+    .profile-card p { margin-top: 8px; color: var(--muted); font-size: 13px; }
+    .profile-card .profile-number { color: var(--teal-light); font-family: 'DM Serif Display', Georgia, serif; font-size: 41px; line-height: 1; }
+
+    .team-layout { display: grid; grid-template-columns: 1.55fr 1fr; gap: 14px; }
+    .team-summary { display: grid; gap: 11px; }
+    .team-summary > div { padding: 16px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); }
+    .team-summary b { display: block; font-family: 'DM Mono', monospace; font-size: 18px; }
+    .team-summary span { color: var(--muted); font-size: 12px; }
+    .role-card { padding: 17px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); }
+    .role-card + .role-card { margin-top: 10px; }
+    .role-card strong { font-size: 13px; }
+    .role-card p { color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+    .stock-head { display: flex; justify-content: space-between; align-items: end; gap: 16px; margin-bottom: 16px; }
+    .button-row { display: flex; gap: 9px; }
+    .button { min-height: 38px; border: 1px solid var(--line); border-radius: 10px; padding: 0 13px; color: var(--text); background: var(--surface); cursor: pointer; font-size: 13px; font-weight: 600; }
+    .button.primary { color: var(--bg); background: var(--teal-light); border-color: var(--teal-light); }
+    .button:hover { border-color: var(--soft); }
+    .stock-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 14px; }
+    .stock-summary > div { padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-glass); }
+    .stock-summary b { display: block; margin-bottom: 4px; font-family: 'DM Mono', monospace; font-size: 20px; }
+    .stock-summary span { color: var(--muted); font-size: 12px; }
+    .stock-list { display: grid; gap: 1px; overflow: hidden; border: 1px solid var(--line); border-radius: 16px; background: var(--line); }
+    .stock-item { display: grid; grid-template-columns: 1fr auto auto; gap: 24px; align-items: center; padding: 16px 18px; background: var(--surface); }
+    .stock-item strong { display: block; font-size: 14px; }
+    .stock-item span { color: var(--muted); font-size: 12px; }
+    .stock-item .qty { font-family: 'DM Mono', monospace; font-size: 13px; }
+    .stock-item .critical { color: var(--amber); }
+    .kit-list { display: grid; gap: 10px; }
+    .kit { display: grid; grid-template-columns: 1fr auto; gap: 12px; padding: 15px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); }
+    .kit p { color: var(--muted); font-size: 12px; margin-top: 3px; }
+
+    .dock { position: fixed; z-index: 10; bottom: 24px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 3px; padding: 7px; border: 1px solid var(--line); border-radius: 17px; background: var(--surface-glass); box-shadow: var(--shadow); backdrop-filter: blur(14px); }
+    .dock .brand { padding: 0 14px 0 11px; color: var(--text); font-family: 'DM Serif Display', Georgia, serif; font-size: 16px; white-space: nowrap; }
+    .dock a { padding: 10px 12px; color: var(--soft); font-size: 11px; font-weight: 700; text-decoration: none; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+    .dock a.active { border-radius: 10px; color: var(--teal-light); background: var(--teal-wash); }
+    .toast { position: fixed; z-index: 30; right: 28px; bottom: 106px; max-width: 320px; padding: 12px 14px; border: 1px solid rgba(93,190,176,.25); border-radius: 12px; color: var(--text); background: var(--surface-alt); box-shadow: var(--shadow); opacity: 0; transform: translateY(8px); pointer-events: none; transition: .2s ease; font-size: 13px; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 900px) {
+      .action-grid, .metric-grid, .cash-hero, .stock-summary { grid-template-columns: repeat(2, 1fr); }
+      .two-col, .finance-top, .team-layout, .management-grid { grid-template-columns: 1fr; }
+      .cash-hero .hero-block { grid-column: 1 / -1; }
+      .section-nav { grid-template-columns: repeat(5, minmax(168px, 1fr)); }
+      .dock { width: calc(100% - 24px); overflow-x: auto; justify-content: flex-start; }
+      .dock .brand { display: none; }
+    }
+    @media (max-width: 620px) {
+      .frame { width: min(calc(100% - 28px), 1220px); padding-top: 25px; }
+      .page-head { flex-direction: column; }
+      .action-grid, .metric-grid, .cash-hero, .stock-summary { grid-template-columns: 1fr; }
+      .section-heading { align-items: flex-start; flex-direction: column; }
+      .mini-metrics { grid-template-columns: 1fr; }
+      .journey { grid-template-columns: 1fr 1fr; }
+      .journey-step::after { display: none; }
+      .stock-head { align-items: flex-start; flex-direction: column; }
+      .flow-row, .flow-caption { grid-template-columns: 30px 1fr; }
+      .flow-value.expense { grid-column: 2; }
+      .flow-caption span:last-child { display: none; }
+      .stock-item { grid-template-columns: 1fr auto; gap: 8px; }
+      .stock-item span { grid-column: 1; }
+    }
+  </style>
+</head>
+<body>
+  <main class="frame">
+    <header class="page-head">
+      <div class="identity">
+        <div class="identity-mark">MC</div>
+        <div>
+          <div class="eyebrow">Meu consultório · Clínica Horizonte</div>
+          <h1 id="page-title">Visão geral</h1>
+          <p class="subtitle" id="page-subtitle">O que pede decisão na clínica, sem perder o contexto.</p>
+        </div>
+      </div>
+      <div class="head-actions">
+        <button class="theme-toggle" id="theme-toggle" aria-label="Alternar tema" title="Alternar tema">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9c0-.5-.04-1-.12-1.48A7 7 0 0 1 12 3Z"/></svg>
+        </button>
+        <button class="period" data-toast="O período controla todos os números do Meu Consultório."><small>Período</small> Setembro de 2026&nbsp;⌄</button>
+      </div>
+    </header>
+
+    <nav class="section-nav" aria-label="Seções do Meu Consultório">
+      <button class="is-active" data-tab="overview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Visão geral</button>
+      <button data-tab="personal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 7.5h14.5A1.5 1.5 0 0 1 20 9v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h12"/><path d="M16 12h5v4h-5a2 2 0 0 1 0-4Z"/></svg>Meu financeiro</button>
+      <button data-tab="clinic-finance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 21h18M5 21V8l7-4 7 4v13M9 21v-5h6v5M8 11h2M14 11h2"/></svg>Financeiro da clínica</button>
+      <button data-tab="team"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>Minha equipe</button>
+      <button data-tab="stock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m21 8-9 5-9-5 9-5 9 5Z"/><path d="m3 8 9 5 9-5v8l-9 5-9-5V8Z"/></svg>Estoque</button>
+    </nav>
+
+    <section class="view is-active" data-view="overview">
+      <div class="section-heading">
+        <div><h2>Hoje na clínica</h2><p>Três sinais para escolher o que merece atenção primeiro.</p></div>
+        <button class="text-link" data-go="clinic-finance">Ver leitura financeira →</button>
+      </div>
+      <div class="action-grid">
+        <article class="action-card urgent">
+          <div class="card-top"><span>Orçamentos aguardando retorno</span><b class="badge">8</b></div>
+          <div class="action-value">R$ 12.480</div>
+          <p>Propostas sem resposta há mais de 7 dias.</p>
+          <button class="text-link" data-toast="Abre Pacientes → Pendências, já filtrado por orçamento sem retorno.">Ver orçamentos →</button>
+        </article>
+        <article class="action-card">
+          <div class="card-top"><span>Pacientes sem retorno</span><b class="badge">12</b></div>
+          <div class="action-value">12 pacientes</div>
+          <p>Sem próxima consulta agendada.</p>
+          <button class="text-link" data-toast="Abre Pacientes → Pendências, já filtrado por retorno clínico.">Abrir pendências →</button>
+        </article>
+        <article class="action-card">
+          <div class="card-top"><span>Estoque em atenção</span><b class="badge teal">3</b></div>
+          <div class="action-value">3 materiais</div>
+          <p>Abaixo do nível mínimo definido.</p>
+          <button class="text-link" data-go="stock">Abrir estoque →</button>
+        </article>
+      </div>
+
+      <div class="section-heading">
+        <div><h2>Resultado do período</h2><p>Caixa confirmado separado de previsão e das despesas já lançadas.</p></div>
+        <button class="text-link" data-go="clinic-finance">Abrir financeiro da clínica →</button>
+      </div>
+      <div class="metric-grid">
+        <article class="metric"><label>Recebido pela clínica</label><strong>R$ 48.240</strong><small>+12,4% contra agosto</small></article>
+        <article class="metric"><label>A receber</label><strong>R$ 17.980</strong><small>Cobranças ativas no período</small></article>
+        <article class="metric"><label>Despesas registradas</label><strong>R$ 14.620</strong><small>Fixas e variáveis lançadas</small></article>
+        <article class="metric emphasis"><label>Saldo de caixa</label><strong>R$ 33.620</strong><small>Entradas confirmadas menos despesas</small></article>
+      </div>
+
+      <div class="section-heading"><div><h2>Jornada do paciente</h2><p>Da entrada à continuidade do cuidado: onde a clínica está convertendo e onde está perdendo pacientes.</p></div><button class="text-link" data-toast="Abre a análise completa da jornada e das pendências de pacientes.">Ver análise completa →</button></div>
+      <div class="management-grid">
+        <article class="panel">
+          <div class="panel-header"><div><h3>Do primeiro contato ao retorno</h3><p>Funil do período selecionado.</p></div><div class="legend"><span><i></i>Conversão entre etapas</span></div></div>
+          <div class="journey">
+            <div class="journey-step"><span>Novos pacientes</span><strong>42</strong><small>+8 contra agosto</small><div class="progress"><i style="width:100%"></i></div></div>
+            <div class="journey-step"><span>Com orçamento</span><strong>38</strong><small>90% dos novos</small><div class="progress"><i style="width:90%"></i></div></div>
+            <div class="journey-step"><span>Orçamento aprovado</span><strong>31</strong><small>74% dos novos</small><div class="progress"><i style="width:74%"></i></div></div>
+            <div class="journey-step attention"><span>Retorno agendado</span><strong>29</strong><small>69% dos novos</small><div class="progress"><i style="width:69%"></i></div></div>
+          </div>
+        </article>
+        <article class="panel">
+          <div class="panel-header"><div><h3>Leitura do gestor</h3><p>O que esses números pedem.</p></div></div>
+          <div class="signal-list">
+            <div class="signal"><div><strong>Conversão de orçamento</strong><span>31 aprovados de 38 apresentados</span></div><b>82%</b></div>
+            <div class="signal"><div><strong>Continuidade após aprovação</strong><span>2 pacientes ainda sem retorno</span></div><b class="amber">94%</b></div>
+            <div class="signal"><div><strong>Tempo médio até o retorno</strong><span>Meta da clínica: até 30 dias</span></div><b>24 dias</b></div>
+          </div>
+        </article>
+      </div>
+
+      <div class="section-heading"><div><h2>Equipe no período</h2><p>Contexto para conduzir a operação; comparação detalhada fica na aba de equipe.</p></div><button class="text-link" data-go="team">Abrir minha equipe →</button></div>
+      <div class="table-wrap"><table><thead><tr><th>PROFISSIONAL</th><th>ATENDIMENTOS</th><th>PRODUÇÃO APROVADA</th><th>A RECEBER</th><th>RETORNOS PENDENTES</th></tr></thead><tbody>
+        <tr><td><div class="person"><span class="avatar">MA</span>Dra. Marina Alves</div></td><td class="mono">48</td><td class="mono">R$ 23.500</td><td class="mono">R$ 4.860</td><td class="mono">2</td></tr>
+        <tr><td><div class="person"><span class="avatar">LR</span>Dr. Lucas Reis</div></td><td class="mono">37</td><td class="mono">R$ 16.200</td><td class="mono">R$ 1.300</td><td class="mono">5</td></tr>
+        <tr><td><div class="person"><span class="avatar">BC</span>Dra. Beatriz Costa</div></td><td class="mono">31</td><td class="mono">R$ 12.480</td><td class="mono">R$ 2.780</td><td class="mono">4</td></tr>
+      </tbody></table></div>
+    </section>
+
+    <section class="view" data-view="personal">
+      <div class="section-heading" style="margin-top:0"><div><h2>Meu financeiro</h2><p>Produção, recebimentos e custos da sua atuação clínica.</p></div><div class="section-actions"><button class="button" data-toast="Registra uma saída pessoal. Não altera o caixa da clínica.">− Saída pessoal</button><button class="button primary" data-toast="Registra uma entrada pessoal. Não altera o caixa da clínica.">+ Entrada pessoal</button></div></div>
+      <div class="cash-hero">
+        <div class="hero-block"><div class="hero-label">Meu custo por hora clínica</div><div class="hero-value">R$ 184<small style="font-family:Outfit,system-ui,sans-serif;font-size:17px;color:var(--muted)"> / hora</small></div><p class="hero-note">Quanto cada hora disponível precisa gerar para cobrir os custos pessoais configurados.</p></div>
+        <div class="hero-stat"><span>Custos fixos pessoais</span><b>R$ 12.600</b></div>
+        <div class="hero-stat"><span>Capacidade no mês</span><b>68 horas</b></div>
+        <div class="hero-stat"><span>Ocupação da agenda</span><b class="teal">73%</b></div>
+      </div>
+      <div class="section-heading"><div><h2>Meu resultado no período</h2><p>Valores ligados à sua produção. Eles não se confundem com o caixa da clínica.</p></div><button class="text-link" data-toast="Abre a configuração de custos e horários usada no cálculo.">Revisar custo por hora →</button></div>
+      <div class="metric-grid">
+        <article class="metric emphasis"><label>Recebido vinculado</label><strong>R$ 18.640</strong><small>Confirmações do período</small></article>
+        <article class="metric"><label>Produção aprovada</label><strong>R$ 23.500</strong><small>Propostas aceitas</small></article>
+        <article class="metric"><label>Saldo a receber</label><strong>R$ 4.860</strong><small>Cobranças em aberto</small></article>
+        <article class="metric"><label>Resultado pessoal estimado</label><strong>R$ 6.040</strong><small>Recebido menos despesas pessoais</small></article>
+      </div>
+      <div class="section-heading"><div><h2>Minha produção e recebimentos</h2><p>O que já entrou, o que está previsto e onde há continuidade pendente.</p></div></div>
+      <div class="two-col">
+        <article class="panel"><div class="panel-header"><div><h3>Evolução mensal</h3><p>Valor recebido, com número visível em cada mês.</p></div></div><div class="flow-caption"><span>Recebido</span><span></span></div><div class="flow-table"><div class="flow-row"><span class="flow-month">Abr</span><div class="flow-value"><b>R$ 11,8 mil</b><div class="flow-track"><i style="width:63%"></i></div></div></div><div class="flow-row"><span class="flow-month">Mai</span><div class="flow-value"><b>R$ 13,2 mil</b><div class="flow-track"><i style="width:71%"></i></div></div></div><div class="flow-row"><span class="flow-month">Jun</span><div class="flow-value"><b>R$ 12,6 mil</b><div class="flow-track"><i style="width:68%"></i></div></div></div><div class="flow-row"><span class="flow-month">Jul</span><div class="flow-value"><b>R$ 15,1 mil</b><div class="flow-track"><i style="width:81%"></i></div></div></div><div class="flow-row"><span class="flow-month">Ago</span><div class="flow-value"><b>R$ 16,4 mil</b><div class="flow-track"><i style="width:88%"></i></div></div></div><div class="flow-row"><span class="flow-month">Set</span><div class="flow-value"><b>R$ 18,6 mil</b><div class="flow-track"><i style="width:100%"></i></div></div></div></div></article>
+        <article class="panel"><div class="panel-header"><div><h3>Próximas ações</h3><p>Seu fluxo individual.</p></div></div><div class="signal-list"><div class="signal"><div><strong>3 cobranças em aberto</strong><span>R$ 4.860 para acompanhar</span></div><b class="amber">3</b></div><div class="signal"><div><strong>2 pacientes sem retorno</strong><span>Revisar em Pendências</span></div><b>2</b></div><div class="signal"><div><strong>Agenda da semana</strong><span>18 atendimentos confirmados</span></div><b>18</b></div></div></article>
+      </div>
+      <div class="section-heading"><div><h2>Movimentações recentes</h2><p>Fatos financeiros pessoais no período selecionado.</p></div><button class="text-link" data-toast="Abre o extrato completo do financeiro pessoal.">Ver extrato completo →</button></div>
+      <div class="table-wrap"><table><thead><tr><th>DATA</th><th>ORIGEM</th><th>FORMA</th><th>VALOR</th><th>SITUAÇÃO</th></tr></thead><tbody><tr><td class="mono">23 set</td><td>Tratamento · Marina Souza</td><td>PIX</td><td class="mono">R$ 2.400</td><td><span class="status">Confirmado</span></td></tr><tr><td class="mono">19 set</td><td>Tratamento · Caio Lima</td><td>Cartão</td><td class="mono">R$ 1.120</td><td><span class="status">Confirmado</span></td></tr><tr><td class="mono">15 set</td><td>Etapa · Júlia Monte</td><td>Boleto</td><td class="mono">R$ 860</td><td><span class="role-pill">A receber</span></td></tr></tbody></table></div>
+    </section>
+
+    <section class="view" data-view="clinic-finance">
+      <div class="section-heading" style="margin-top:0"><div><h2>Leitura financeira do mês</h2><p>Caixa confirmado, previsão e operação da unidade em uma sequência de leitura.</p></div><div class="section-actions"><button class="text-link" data-toast="Abertura do extrato da clínica preserva os filtros do período.">Ver extrato →</button><button class="button" data-toast="Registra uma saída no caixa da clínica. Disponível para a equipe com permissão financeira.">− Registrar saída</button><button class="button primary" data-toast="Registra uma entrada no caixa da clínica. Disponível para a equipe com permissão financeira.">+ Registrar entrada</button></div></div>
+      <div class="cash-hero">
+        <div class="hero-block"><div class="hero-label">Caixa da clínica</div><div class="hero-value">R$ 33.620</div><p class="hero-note">Saldo confirmado no período. Não representa lucro contábil.</p></div>
+        <div class="hero-stat"><span>Recebido</span><b>R$ 48.240</b></div>
+        <div class="hero-stat"><span>Despesas</span><b>R$ 14.620</b></div>
+        <div class="hero-stat"><span>A receber</span><b class="teal">R$ 17.980</b></div>
+      </div>
+      <div class="finance-top" style="margin-top:14px">
+        <article class="finance-summary"><div class="eyebrow">Resultado operacional estimado</div><div class="summary-number">R$ 33.620</div><p>Recebido confirmado menos despesas operacionais registradas. Impostos, depreciação e repasses ainda não cadastrados não entram nesta leitura.</p><div class="mini-metrics"><div><span>Margem estimada</span><b>69,7%</b></div><div><span>Fôlego de caixa</span><b>4,6 meses</b></div><div><span>Variação mensal</span><b>+12,4%</b></div></div></article>
+        <article class="panel"><div class="panel-header"><div><h3>O que acompanhar</h3><p>Previsão não entra no caixa.</p></div></div><div class="forecast-list"><div class="forecast-item"><i class="forecast-dot"></i><div><strong>R$ 4.820 em cobranças vencidas</strong><p>Precisam de contato ou revisão da negociação.</p></div></div><div class="forecast-item"><i class="forecast-dot teal"></i><div><strong>R$ 7.200 em custos fixos previstos</strong><p>Recorrências configuradas para setembro.</p></div></div><div class="forecast-item"><i class="forecast-dot"></i><div><strong>3 despesas sem categoria</strong><p>Classificação melhora a leitura de margem.</p></div></div></div><p class="formula">Fôlego = saldo de caixa ÷ despesas fixas mensais previstas.</p></article>
+      </div>
+      <div class="section-heading"><div><h2>Fluxo e previsão</h2><p>Uma leitura histórica para entender a direção do caixa e uma camada separada de previsão.</p></div></div>
+      <div class="two-col"><article class="panel"><div class="panel-header"><div><h3>Fluxo de caixa</h3><p>Recebido e despesas com os valores visíveis mês a mês.</p></div></div><div class="flow-caption"><span>Recebido</span><span>Despesas</span></div><div class="flow-table"><div class="flow-row"><span class="flow-month">Abr</span><div class="flow-value"><b>R$ 34,2 mil</b><div class="flow-track"><i style="width:71%"></i></div></div><div class="flow-value expense"><b>R$ 13,4 mil</b><div class="flow-track"><i style="width:28%"></i></div></div></div><div class="flow-row"><span class="flow-month">Mai</span><div class="flow-value"><b>R$ 38,8 mil</b><div class="flow-track"><i style="width:80%"></i></div></div><div class="flow-value expense"><b>R$ 15,1 mil</b><div class="flow-track"><i style="width:31%"></i></div></div></div><div class="flow-row"><span class="flow-month">Jun</span><div class="flow-value"><b>R$ 36,5 mil</b><div class="flow-track"><i style="width:76%"></i></div></div><div class="flow-value expense"><b>R$ 18,2 mil</b><div class="flow-track"><i style="width:38%"></i></div></div></div><div class="flow-row"><span class="flow-month">Jul</span><div class="flow-value"><b>R$ 44,1 mil</b><div class="flow-track"><i style="width:91%"></i></div></div><div class="flow-value expense"><b>R$ 15,7 mil</b><div class="flow-track"><i style="width:33%"></i></div></div></div><div class="flow-row"><span class="flow-month">Ago</span><div class="flow-value"><b>R$ 42,9 mil</b><div class="flow-track"><i style="width:89%"></i></div></div><div class="flow-value expense"><b>R$ 15,3 mil</b><div class="flow-track"><i style="width:32%"></i></div></div></div><div class="flow-row"><span class="flow-month">Set</span><div class="flow-value"><b>R$ 48,2 mil</b><div class="flow-track"><i style="width:100%"></i></div></div><div class="flow-value expense"><b>R$ 14,6 mil</b><div class="flow-track"><i style="width:30%"></i></div></div></div></div></article><article class="panel"><div class="panel-header"><div><h3>Composição da previsão</h3><p>Fora do saldo atual.</p></div></div><div class="signal-list"><div class="signal"><div><strong>Cobranças ativas</strong><span>Valor líquido ainda a receber</span></div><b>R$ 17.980</b></div><div class="signal"><div><strong>Custos recorrentes</strong><span>Previsão mensal configurada</span></div><b class="amber">R$ 7.200</b></div><div class="signal"><div><strong>Fatos sem classificação</strong><span>Não usar na análise por categoria</span></div><b class="amber">3</b></div></div><div class="formula">Entradas e saídas desta área pertencem à clínica. A secretária não lança valores no financeiro pessoal de um dentista.</div></article></div>
+      <div class="section-heading"><div><h2>Recebimentos por profissional</h2><p>Autoria da produção permanece identificada, enquanto o caixa pertence à clínica.</p></div><button class="text-link" data-go="team">Abrir equipe →</button></div>
+      <div class="table-wrap"><table><thead><tr><th>PROFISSIONAL</th><th>PRODUÇÃO APROVADA</th><th>RECEBIDO VINCULADO</th><th>A RECEBER</th><th>VARIAÇÃO MENSAL</th></tr></thead><tbody><tr><td><div class="person"><span class="avatar">MA</span>Dra. Marina Alves</div></td><td class="mono">R$ 23.500</td><td class="mono">R$ 18.640</td><td class="mono">R$ 4.860</td><td class="mono" style="color:var(--teal-light)">+18%</td></tr><tr><td><div class="person"><span class="avatar">LR</span>Dr. Lucas Reis</div></td><td class="mono">R$ 16.200</td><td class="mono">R$ 14.900</td><td class="mono">R$ 1.300</td><td class="mono" style="color:var(--teal-light)">+7%</td></tr><tr><td><div class="person"><span class="avatar">BC</span>Dra. Beatriz Costa</div></td><td class="mono">R$ 12.480</td><td class="mono">R$ 9.700</td><td class="mono">R$ 2.780</td><td class="mono" style="color:var(--coral)">−3%</td></tr></tbody></table></div>
+      <div class="section-heading"><div><h2>Custos recorrentes</h2><p>Configurações de previsão. Elas não criam uma despesa no caixa.</p></div><button class="text-link" data-toast="Abre o gerenciamento de custos recorrentes da unidade.">Gerenciar custos fixos →</button></div>
+      <div class="signal-list"><div class="signal"><div><strong>Aluguel da unidade</strong><span>Todo dia 05 · despesa fixa prevista</span></div><b>R$ 5.200</b></div><div class="signal"><div><strong>Internet e sistemas</strong><span>Todo dia 10 · despesa fixa prevista</span></div><b>R$ 840</b></div><div class="signal"><div><strong>Limpeza e manutenção</strong><span>Todo dia 15 · despesa fixa prevista</span></div><b>R$ 1.160</b></div></div>
+    </section>
+
+    <section class="view" data-view="team">
+      <div class="section-heading" style="margin-top:0"><div><h2>Minha equipe</h2><p>Pessoas, papéis e acessos que sustentam a operação.</p></div><button class="button primary" data-toast="Abre o convite simples: nome, e-mail e papel.">Adicionar pessoa</button></div>
+      <div class="team-layout"><article class="panel"><div class="panel-header"><div><h3>Equipe ativa</h3><p>8 pessoas participam da clínica.</p></div><button class="text-link" data-toast="Filtra para mostrar somente os convites pendentes.">2 convites pendentes →</button></div><div class="table-wrap"><table><thead><tr><th>PESSOA</th><th>PAPEL</th><th>ACESSO</th><th>ESTADO</th></tr></thead><tbody><tr><td><div class="person"><span class="avatar">MA</span>Dra. Marina Alves</div></td><td>Proprietária · Dentista</td><td><span class="role-pill">Total</span></td><td><span class="status">Ativa</span></td></tr><tr><td><div class="person"><span class="avatar">LR</span>Dr. Lucas Reis</div></td><td>Dentista</td><td><span class="role-pill">Própria produção</span></td><td><span class="status">Ativo</span></td></tr><tr><td><div class="person"><span class="avatar">CS</span>Camila Souza</div></td><td>Gestora</td><td><span class="role-pill">Operação</span></td><td><span class="status">Ativa</span></td></tr><tr><td><div class="person"><span class="avatar">NR</span>Dr. Natan Rocha</div></td><td>Responsável técnico</td><td><span class="role-pill">Clínico</span></td><td><span class="status">Ativo</span></td></tr></tbody></table></div></article><aside class="team-summary"><div><b>4</b><span>Dentistas ativos</span></div><div><b>2</b><span>Secretárias e assistentes</span></div><div><b>2</b><span>Convites aguardando aceite</span></div></aside></div>
+      <div class="section-heading"><div><h2>Papéis de gestão</h2><p>Responsabilidades distintas, mesmo quando uma mesma pessoa acumula funções.</p></div></div>
+      <div class="two-col"><article class="panel"><div class="role-card"><strong>Proprietária</strong><p>Vê a clínica inteira, equipe, estoque e financeiro da unidade.</p></div><div class="role-card"><strong>Gestora</strong><p>Opera equipe, agenda, pacientes e permissões atribuídas sem precisar atender.</p></div><div class="role-card"><strong>Responsável técnico</strong><p>Responde pela operação clínica e pela conformidade assistencial.</p></div></article><article class="panel"><div class="panel-header"><div><h3>Convites pendentes</h3><p>A pessoa define a própria senha ao aceitar.</p></div></div><div class="signal-list"><div class="signal"><div><strong>Dra. Beatriz Costa</strong><span>Dentista · convite enviado hoje</span></div><b>Enviar</b></div><div class="signal"><div><strong>Rafaela Moura</strong><span>Secretária · convite enviado ontem</span></div><b>Enviar</b></div></div></article></div>
+    </section>
+
+    <section class="view" data-view="stock">
+      <div class="stock-head"><div><h2>Estoque</h2><p class="subtitle">Materiais da clínica e do seu consultório, com rastreabilidade de cada movimentação.</p></div><div class="button-row"><button class="button" data-toast="Abre a criação de um kit com materiais e quantidades.">Novo kit</button><button class="button primary" data-toast="Abre o cadastro rápido de material.">Novo material</button></div></div>
+      <div class="stock-summary"><div><b>126</b><span>Materiais cadastrados</span></div><div><b style="color:var(--amber)">3</b><span>Abaixo do mínimo</span></div><div><b>14</b><span>Kits ativos</span></div></div>
+      <div class="two-col"><article class="panel"><div class="panel-header"><div><h3>Materiais que pedem reposição</h3><p>Use, saldo e situação na mesma linha.</p></div><button class="text-link" data-toast="Abre a lista completa de materiais com filtro por situação.">Ver todos →</button></div><div class="stock-list"><div class="stock-item"><div><strong>Resina A2</strong><span>Consumível · clínica</span></div><span class="qty critical">2 un.</span><span class="critical">Abaixo do mínimo</span></div><div class="stock-item"><div><strong>Luvas nitrílicas P</strong><span>Consumível · clínica</span></div><span class="qty critical">4 cx.</span><span class="critical">Abaixo do mínimo</span></div><div class="stock-item"><div><strong>Broca diamantada 1014</strong><span>Reutilizável · esterilização</span></div><span class="qty critical">3 un.</span><span class="critical">Abaixo do mínimo</span></div></div></article><article class="panel"><div class="panel-header"><div><h3>Kits mais usados</h3><p>A composição é versionada e o uso fica ligado ao atendimento.</p></div></div><div class="kit-list"><div class="kit"><div><strong>Kit restauração em resina</strong><p>4 itens · versão 3</p></div><span class="role-pill">24 usos</span></div><div class="kit"><div><strong>Kit profilaxia</strong><p>5 itens · versão 2</p></div><span class="role-pill">18 usos</span></div><div class="kit"><div><strong>Kit endodontia</strong><p>7 itens · versão 1</p></div><span class="role-pill">11 usos</span></div></div></article></div>
+      <div class="section-heading"><div><h2>Movimentações recentes</h2><p>Entrada, consumo e correção preservam a origem e a pessoa que registrou.</p></div><button class="text-link" data-toast="Abre o histórico completo de movimentações do estoque.">Ver histórico →</button></div>
+      <div class="table-wrap"><table><thead><tr><th>DATA</th><th>MATERIAL</th><th>MOVIMENTAÇÃO</th><th>ORIGEM</th><th>QUANTIDADE</th></tr></thead><tbody><tr><td class="mono">23 set · 13:42</td><td>Resina A2</td><td><span class="status">Entrada</span></td><td>Nota de compra · Marina Alves</td><td class="mono">+20 un.</td></tr><tr><td class="mono">23 set · 10:18</td><td>Kit profilaxia</td><td>Uso em atendimento</td><td>Paciente Rafael Lima · Dr. Lucas Reis</td><td class="mono">−1 kit</td></tr><tr><td class="mono">22 set · 18:05</td><td>Broca diamantada 1014</td><td>Correção de inventário</td><td>Conferência · Camila Souza</td><td class="mono">−1 un.</td></tr></tbody></table></div>
+    </section>
+  </main>
+
+  <nav class="dock" aria-label="Navegação global"><span class="brand">Odonto.IA</span><a href="#">Início</a><a href="#">Meu dia</a><a class="active" href="#">Meu consultório</a><a href="#">Pacientes</a><a href="#">Agenda</a></nav>
+  <div class="toast" role="status" aria-live="polite"></div>
+  <script>
+    const titles = {
+      overview: ['Visão geral', 'O que pede decisão na clínica, sem perder o contexto.'],
+      personal: ['Meu financeiro', 'Sua leitura pessoal dentro da operação da clínica.'],
+      'clinic-finance': ['Financeiro da clínica', 'Caixa confirmado, previsão e despesas da unidade.'],
+      team: ['Minha equipe', 'Pessoas, papéis e acessos da clínica.'],
+      stock: ['Estoque', 'Materiais, kits e rastreabilidade da operação.']
+    };
+    const tabs = document.querySelectorAll('[data-tab]');
+    const views = document.querySelectorAll('[data-view]');
+    const title = document.getElementById('page-title');
+    const subtitle = document.getElementById('page-subtitle');
+    function activate(target) {
+      tabs.forEach(tab => tab.classList.toggle('is-active', tab.dataset.tab === target));
+      views.forEach(view => view.classList.toggle('is-active', view.dataset.view === target));
+      title.textContent = titles[target][0];
+      subtitle.textContent = titles[target][1];
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    tabs.forEach(tab => tab.addEventListener('click', () => activate(tab.dataset.tab)));
+    document.querySelectorAll('[data-go]').forEach(button => button.addEventListener('click', () => activate(button.dataset.go)));
+    const themeToggle = document.getElementById('theme-toggle');
+    themeToggle.addEventListener('click', () => {
+      const nextTheme = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+      document.documentElement.dataset.theme = nextTheme;
+      themeToggle.setAttribute('aria-label', nextTheme === 'light' ? 'Usar tema escuro' : 'Usar tema claro');
+    });
+    const toast = document.querySelector('.toast');
+    let toastTimer;
+    document.querySelectorAll('[data-toast]').forEach(button => button.addEventListener('click', () => {
+      toast.textContent = button.dataset.toast;
+      toast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('show'), 3000);
+    }));
+  </script>
+</body>
+</html>
