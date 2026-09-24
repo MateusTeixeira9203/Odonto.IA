@@ -22,7 +22,8 @@
 
 | ID | Item | Estado |
 |---|---|---|
-| [**R-153**](specs/R-153-orcamento-ficha-fluxo-continuo.md) | **Orçamento da Ficha em fluxo contínuo** — uma Ficha por orçamento, catálogo confiável e continuidade no perfil do paciente | 🔵 integrada em `main`; aguarda confirmação do deploy e validação dirigida. |
+| [**R-173**](specs/R-173-criacao-orcamento-confiavel.md) | **Criação de orçamento confiável** — corrigir rejeição indevida, diagnóstico acionável e leitura de procedimentos/etapas | 🔵 incidente de produção informado em 24/09; correção isolada autorizada. |
+| [**R-153**](specs/R-153-orcamento-ficha-fluxo-continuo.md) | **Orçamento da Ficha em fluxo contínuo** — uma Ficha por orçamento, catálogo confiável e continuidade no perfil do paciente | 🟡 no ar; validação dirigida segue pendente. |
 
 ## Publicado, aguardando validação dirigida
 

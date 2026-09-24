@@ -1,19 +1,25 @@
 # Estado — Odonto.IA
 
-Atualizado em 14/09/2026. Este checkout pertence ao pacote R169.
+Atualizado em 24/09/2026.
 
-🔵 **R169 — Dex, edição rápida da ficha e revisão do orçamento.** Todos os lotes implementados;
-[Preview Ready](https://odonto-742kqydnk-mateusteixeira9203s-projects.vercel.app), commit `25f6fd1`. Usuário fará os testes manuais.
+🔵 **R173 — Criação de orçamento confiável.** Patch isolado em
+`codex/r173-orcamento-criacao`, baseado em `origin/main` (`ab3883b`), sem recursos que
+estão apenas em Preview.
 
-Contrato: [R169](specs/R-169-dex-ficha-edicao-rapida.md) e [R169b](specs/R-169b-ficha-orcamento-ajustes.md).
-Roteiro/evidências: [teste integrado](auditorias/2026-09-14-r169-ficha-orcamento-preview.md).
+Implementado:
 
-Banco principal `zenfemoxvwerplrjgfqz` recebeu apenas SQL compatível R169. Nenhuma policy nova,
-nenhum teste gravou pacientes. Ambiente manual: clínica de teste, preview Vercel.
-Branch `codex/r169-dex-ficha`; produção do app não promovida.
+- regra de responsável de evento igual na UI e no banco;
+- ID do catálogo atual priorizado sobre vínculo histórico incompatível;
+- mensagens seguras e diagnóstico no servidor para recusas da RPC;
+- nomes longos legíveis na montagem e na seleção de itens da etapa;
+- migration forward-only `20260924110000_r173_responsavel_evento_orcamento.sql`.
 
-Retorno manual: corrigidos clique/avisos repetidos do orçamento, contador após inclusão e ação
-Adicionar à ficha no rodapé. Novo preview Ready; roteiro curto no relatório de teste.
-Falta: reteste manual do usuário após essa publicação.
-Não reverter colunas/histórico de retirada ao voltar o app; guardas e rollback em `supabase/rollbacks/`.
-Outras frentes do checkout principal permanecem fora desta entrega.
+Evidência: `tsc --noEmit`, lint focal e 3 testes unitários passaram. O build foi bloqueado
+apenas pela quota temporária de `/tmp` durante o cache do webpack; a tentativa com rede
+confirmou que as fontes externas já são alcançáveis. A navegação local chegou ao login e não
+há sessão de clínica de teste para validar a gravação sem usar dados reais.
+
+Produção registrou seis respostas 400 da RPC `criar_orcamento_com_eventos` entre 10:36 e
+10:52. O painel de logs não expõe a exceção do Postgres; o próximo Preview passará a registrá-la
+no servidor sem dados de paciente. Falta: aprovação para commits separados, push/Preview,
+aplicação manual da migration e reteste manual do fluxo.
