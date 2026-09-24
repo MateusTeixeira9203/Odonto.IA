@@ -34,7 +34,7 @@ export function MonthPicker({ mes }: { mes: string }): React.JSX.Element {
         onChange={(event) => {
           const params = new URLSearchParams(searchParams.toString());
           params.set('mes', event.target.value);
-          router.push(`${pathname}?${params.toString()}`);
+          router.replace(`${pathname}?${params.toString()}`);
         }}
         className="appearance-none bg-transparent pr-4 text-sm font-medium text-foreground outline-none"
       >

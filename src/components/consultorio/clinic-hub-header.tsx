@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Building2, Landmark, LayoutDashboard, Package, Users, WalletCards } from 'lucide-react';
 
-import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { cn } from '@/lib/utils';
 import { MonthPicker } from './month-picker';
 
@@ -35,8 +34,8 @@ function pageTitle(pathname: string, title: ClinicHubHeaderProps['title']): stri
 export function ClinicHubHeader({ basePath, nomeClinica, title, hasPersonalFinance, currentMonth }: ClinicHubHeaderProps): React.JSX.Element {
   const pathname = usePathname();
   return (
-    <header className="space-y-7">
-      <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+    <header className="space-y-4 sm:space-y-7">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-5">
         <div className="flex items-start gap-4">
           <span className="flex size-11 shrink-0 items-center justify-center rounded-[14px] border border-teal/20 bg-teal-pale text-teal-ink">
             <Building2 className="size-5" aria-hidden="true" />
@@ -46,23 +45,24 @@ export function ClinicHubHeader({ basePath, nomeClinica, title, hasPersonalFinan
             <h1 className="mt-1 font-heading text-4xl font-normal tracking-tight text-foreground sm:text-[44px]">{pageTitle(pathname, title)}</h1>
           </div>
         </div>
-        <div className="flex items-center gap-2 self-end sm:self-auto">
+        <div className="self-start sm:self-auto">
           <MonthPicker mes={currentMonth} />
-          <ThemeToggle />
         </div>
       </div>
-      <nav aria-label={`Seções de ${title}`} className={cn('grid gap-1 rounded-2xl border border-border bg-card p-1.5', hasPersonalFinance ? 'grid-cols-2 sm:grid-cols-5' : 'grid-cols-2 sm:grid-cols-4')}>
-        {tabs.filter((tab) => !('personal' in tab) || hasPersonalFinance).map((tab) => {
-          const href = `${basePath}${tab.path}`;
-          const active = tab.path ? pathname.startsWith(href) : pathname === basePath;
-          const Icon = tab.icon;
-          return (
-            <Link key={tab.id} href={href} aria-current={active ? 'page' : undefined} className={cn('flex min-h-14 items-center justify-center gap-2 rounded-xl px-3 text-center text-sm font-semibold transition-colors', active ? 'bg-muted text-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground')}>
-              <Icon className={cn('size-4 shrink-0', active && 'text-teal')} aria-hidden="true" />
-              <span>{tab.label}</span>
-            </Link>
-          );
-        })}
+      <nav aria-label={`Seções de ${title}`} className="-mx-4 overflow-x-auto border-y border-border bg-card px-4 py-1.5 [scroll-snap-type:x_proximity] [scrollbar-width:none] sm:mx-0 sm:rounded-2xl sm:border sm:p-1.5 [&::-webkit-scrollbar]:hidden">
+        <div className="flex min-w-max gap-1 sm:min-w-0 sm:w-full">
+          {tabs.filter((tab) => !('personal' in tab) || hasPersonalFinance).map((tab) => {
+            const href = `${basePath}${tab.path}`;
+            const active = tab.path ? pathname.startsWith(href) : pathname === basePath;
+            const Icon = tab.icon;
+            return (
+              <Link key={tab.id} href={href} aria-current={active ? 'page' : undefined} className={cn('flex min-h-11 shrink-0 snap-start items-center gap-2 rounded-xl px-3.5 text-sm font-semibold whitespace-nowrap transition-[background-color,color,transform] duration-150 motion-reduce:transition-none sm:min-h-14 sm:flex-1 sm:justify-center', active ? 'bg-muted text-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground active:scale-[0.98]', 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal focus-visible:ring-offset-2 focus-visible:ring-offset-background')}>
+                <Icon className={cn('size-4 shrink-0', active && 'text-teal')} aria-hidden="true" />
+                <span>{tab.label}</span>
+              </Link>
+            );
+          })}
+        </div>
       </nav>
     </header>
   );
