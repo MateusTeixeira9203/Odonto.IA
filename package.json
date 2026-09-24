@@ -8,8 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test",
-    "test:watch": "tsx --test --watch src/**/*.test.ts"
+    "test": "tsx --test $(find src -name '*.test.ts')",
+    "test:watch": "tsx --test --watch $(find src -name '*.test.ts')"
   },
   "dependencies": {
     "@base-ui/react": "^1.2.0",
