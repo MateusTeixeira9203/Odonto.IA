@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { FloatingDock } from "@/components/layout/floating-dock";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { MobileDrawer } from "@/components/layout/mobile-drawer";
@@ -27,6 +27,8 @@ interface DashboardShellProps {
 
 export function DashboardShell({ children, nome, clinicaNome, activeClinicId, role, avatarUrl, plano }: DashboardShellProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const isClinicHub = pathname.startsWith('/dashboard/meu-consultorio');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [hasMountedPalette, setHasMountedPalette] = useState(false);
@@ -72,7 +74,7 @@ export function DashboardShell({ children, nome, clinicaNome, activeClinicId, ro
 
   return (
     <div className="relative min-h-screen overflow-x-hidden">
-      <BrandBackground variant="product" position="fixed" />
+      {isClinicHub ? <div aria-hidden="true" className="fixed inset-0 z-0 bg-background" /> : <BrandBackground variant="product" position="fixed" />}
 
       <MobileHeader onOpenDrawer={() => setIsDrawerOpen(true)} />
 

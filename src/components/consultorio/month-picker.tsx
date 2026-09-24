@@ -1,6 +1,7 @@
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
+import { CalendarDays } from 'lucide-react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 const MONTH_FORMATTER = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' });
 
@@ -20,21 +21,24 @@ function label(month: string): string {
 
 export function MonthPicker({ mes }: { mes: string }): React.JSX.Element {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
+  const selectedMonth = searchParams.get('mes') ?? mes;
 
   return (
-    <label className="sr-only">
-      Mês de referência
+    <label className="relative flex min-h-11 items-center gap-2 rounded-xl border border-border bg-card px-3 text-sm font-medium text-foreground">
+      <CalendarDays className="size-4 text-muted-foreground" aria-hidden="true" />
+      <span className="sr-only">Mês de referência</span>
       <select
-        value={mes}
+        value={selectedMonth}
         onChange={(event) => {
           const params = new URLSearchParams(searchParams.toString());
           params.set('mes', event.target.value);
-          router.push(`?${params.toString()}`);
+          router.push(`${pathname}?${params.toString()}`);
         }}
-        className="h-9 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-text-primary outline-none focus:border-teal"
+        className="appearance-none bg-transparent pr-4 text-sm font-medium text-foreground outline-none"
       >
-        {getMonths(mes).map((month) => <option key={month} value={month}>{label(month)}</option>)}
+        {getMonths(selectedMonth).map((month) => <option key={month} value={month}>{label(month)}</option>)}
       </select>
     </label>
   );
