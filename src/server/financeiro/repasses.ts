@@ -45,11 +45,25 @@ const ClinicRepassesDataSchema = z.strictObject({
 const ManagedPersonalDataSchema = z.strictObject({
   clinicaId: UuidSchema,
   mes: MonthSchema,
-  producaoAprovada: MonetarySchema,
-  pagamentosVinculados: MonetarySchema,
+  entradasPessoais: MonetarySchema,
+  custosProfissionais: MonetarySchema,
+  resultadoPessoal: MonetarySchema,
+  horasAtendidas: MonetarySchema,
+  horasDisponiveisConfiguradas: MonetarySchema,
+  custosFixosProprios: MonetarySchema,
+  custosFixosEstruturaAtribuidos: MonetarySchema,
+  custoPorHoraClinica: MonetarySchema.nullable(),
+  orcamentosAprovados: MonetarySchema,
+  atendimentosRealizados: z.number().int().nonnegative(),
+  recebidoVinculado: MonetarySchema,
   repassePrevisto: MonetarySchema,
   repassePago: MonetarySchema,
-  acordo: AgreementSchema.nullable(),
+  serieMensal: z.array(z.strictObject({
+    mesISO: MonthSchema,
+    mes: z.string().min(1),
+    entradas: MonetarySchema,
+    despesas: MonetarySchema,
+  })).length(6),
   repasses: z.array(RepasseSchema.omit({ dentistaId: true, nome: true })).max(500),
 });
 

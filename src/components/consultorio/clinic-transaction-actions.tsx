@@ -25,7 +25,7 @@ export function ClinicTransactionActions({ canWrite }: { canWrite: boolean }): R
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{type === 'saida' ? 'Registrar saída da clínica' : 'Registrar entrada da clínica'}</DialogTitle>
-            <DialogDescription>Este lançamento pertence ao caixa da unidade e aparecerá no extrato da clínica.</DialogDescription>
+            <DialogDescription>{type === 'saida' ? 'Compras de estoque entram como saída uma vez. O consumo não cria outra saída de caixa.' : 'Recebimentos de pacientes vêm do orçamento. Use esta entrada para receitas avulsas da unidade.'}</DialogDescription>
           </DialogHeader>
           {type && <form action={action} className="space-y-4">
             <input type="hidden" name="tipo" value={type} />

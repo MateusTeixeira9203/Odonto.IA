@@ -20,14 +20,18 @@ const ClinicFinancialDataSchema = z.strictObject({
   recebido: MonetarySchema,
   despesas: MonetarySchema,
   resultadoOperacional: MonetarySchema,
+  movimentoLiquido: MonetarySchema,
   margemOperacional: MonetarySchema.nullable(),
   saldoCaixa: MonetarySchema,
+  saldoBancarioConciliado: MonetarySchema.nullable(),
   aReceber: MonetarySchema,
   vencido: MonetarySchema,
   despesasFixas: MonetarySchema,
   despesasFixasPrevistas: MonetarySchema,
   folegoCaixaMeses: MonetarySchema.nullable(),
+  pontoEquilibrio: MonetarySchema.nullable(),
   temBaseDeCustos: z.boolean(),
+  baseDeCustosValidada: z.boolean(),
   podeGerirCustos: z.boolean(),
   recorrencias: z.array(RecurringExpenseSchema).max(200),
   chart: z.array(z.strictObject({
@@ -42,6 +46,11 @@ const ClinicFinancialDataSchema = z.strictObject({
     producaoAprovada: MonetarySchema,
     recebidoVinculado: MonetarySchema,
     aReceber: MonetarySchema,
+    atendimentosRealizados: z.number().int().nonnegative(),
+    horasAtendidas: MonetarySchema,
+    horasDisponiveis: MonetarySchema,
+    custoDireto: MonetarySchema.nullable(),
+    custoPorHoraClinica: MonetarySchema.nullable(),
   })).max(200),
   extrato: z.array(z.strictObject({
     id: UuidSchema,
@@ -78,7 +87,7 @@ const FAILURE_MESSAGE = 'Não foi possível consultar o financeiro da clínica a
 async function defaultDependencies(): Promise<ClinicFinancialDependencies> {
   const client = await createClient();
   return {
-    get: async (input) => client.rpc('obter_financeiro_clinica', input),
+    get: async (input) => client.rpc('obter_financeiro_clinica_painel', input),
   };
 }
 

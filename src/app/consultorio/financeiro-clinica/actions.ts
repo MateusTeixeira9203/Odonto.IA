@@ -47,6 +47,7 @@ export async function createClinicTransaction(_: ClinicTransactionState, formDat
       tipo: 'variavel',
       data: parsed.data.data,
       descricao: parsed.data.descricao,
+      origem_lancamento: 'clinica',
     })
     : client.from('receitas_manuais').insert({
       clinica_id: context.data.member.clinicaId,
@@ -55,6 +56,7 @@ export async function createClinicTransaction(_: ClinicTransactionState, formDat
       forma: parsed.data.forma ?? 'outro',
       data: parsed.data.data,
       descricao: parsed.data.descricao,
+      origem_lancamento: 'clinica',
     });
   const { error } = await query;
   if (error) {

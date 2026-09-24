@@ -15,7 +15,16 @@ export type ClinicOverviewData = {
   orcamentosSemRetorno: { quantidade: number; valor: number };
   pacientesParaReativar: number;
   pagamentosVencidos: { quantidade: number; valor: number };
+  filas: {
+    reativacao: QueuePatient[];
+    orcamentosSemRetorno: QueueBudget[];
+    pagamentosVencidos: QueuePayment[];
+  };
 };
+
+export type QueuePatient = { id: string; nome: string; telefone: string | null };
+export type QueueBudget = QueuePatient & { orcamentoId: string; valor: number };
+export type QueuePayment = QueuePatient & { pagamentoId: string; valor: number; vencimento: string | null };
 
 export type ClinicOverviewResult =
   | { ok: true; data: ClinicOverviewData }
@@ -42,9 +51,9 @@ export async function getClinicOverview(clinicaId: string, mes: string): Promise
   const [patientsResult, budgetsResult, staleBudgetsResult, followupsResult, overdueResult] = await Promise.all([
     client.from('pacientes').select('id').eq('clinica_id', clinicaId).gte('created_at', inicio).lte('created_at', fim),
     client.from('orcamentos').select('paciente_id, status').eq('clinica_id', clinicaId).gte('created_at', inicio).lte('created_at', fim),
-    client.from('orcamentos').select('id, total').eq('clinica_id', clinicaId).eq('status', 'enviado').lt('enviado_em', seteDiasAtras),
-    client.from('pacientes').select('id', { count: 'exact', head: true }).eq('clinica_id', clinicaId).eq('followup_pendente', true),
-    client.from('pagamentos').select('id, valor').eq('clinica_id', clinicaId).eq('status', 'pendente').lt('data_vencimento', hojeISO),
+    client.from('orcamentos').select('id, paciente_id, total').eq('clinica_id', clinicaId).eq('status', 'enviado').lt('enviado_em', seteDiasAtras).limit(100),
+    client.from('pacientes').select('id, nome, telefone').eq('clinica_id', clinicaId).eq('followup_pendente', true).limit(100),
+    client.from('pagamentos').select('id, paciente_id, valor, data_vencimento').eq('clinica_id', clinicaId).eq('status', 'pendente').lt('data_vencimento', hojeISO).limit(100),
   ]);
 
   const firstError = patientsResult.error ?? budgetsResult.error ?? staleBudgetsResult.error ?? followupsResult.error ?? overdueResult.error;
@@ -77,6 +86,38 @@ export async function getClinicOverview(clinicaId: string, mes: string): Promise
     returns = new Set((appointments.data ?? []).map((item) => item.paciente_id as string)).size;
   }
 
+  const followupCandidates = (followupsResult.data ?? []).map((item) => ({ id: item.id as string, nome: String(item.nome ?? 'Paciente'), telefone: item.telefone == null ? null : String(item.telefone) }));
+  const queuePatientIds = [...new Set([
+    ...followupCandidates.map((item) => item.id),
+    ...(staleBudgetsResult.data ?? []).map((item) => item.paciente_id as string),
+    ...(overdueResult.data ?? []).map((item) => item.paciente_id as string),
+  ])];
+  const patientDetails = queuePatientIds.length === 0
+    ? { data: [], error: null }
+    : await client.from('pacientes').select('id, nome, telefone').eq('clinica_id', clinicaId).in('id', queuePatientIds);
+  if (patientDetails.error) {
+    console.error('[consultorio/overview] filas falharam:', patientDetails.error.message);
+    return { ok: false, mensagem: 'Não foi possível carregar os indicadores da clínica agora.' };
+  }
+  const patientById = new Map((patientDetails.data ?? []).map((item) => [item.id as string, { id: item.id as string, nome: String(item.nome ?? 'Paciente'), telefone: item.telefone == null ? null : String(item.telefone) }]));
+  const futureAppointments = followupCandidates.length === 0
+    ? { data: [], error: null }
+    : await client.from('agendamentos').select('paciente_id').eq('clinica_id', clinicaId).in('paciente_id', followupCandidates.map((item) => item.id)).gte('data_hora', hoje.toISOString()).not('status', 'in', '(cancelado,faltou,cancelled,no_show)');
+  if (futureAppointments.error) {
+    console.error('[consultorio/overview] retornos de fila falharam:', futureAppointments.error.message);
+    return { ok: false, mensagem: 'Não foi possível carregar os indicadores da clínica agora.' };
+  }
+  const scheduledPatientIds = new Set((futureAppointments.data ?? []).map((item) => item.paciente_id as string));
+  const reactivationQueue = followupCandidates.filter((item) => !scheduledPatientIds.has(item.id));
+  const staleBudgetQueue = (staleBudgetsResult.data ?? []).flatMap((item) => {
+    const patient = patientById.get(item.paciente_id as string);
+    return patient ? [{ ...patient, orcamentoId: item.id as string, valor: Number(item.total ?? 0) }] : [];
+  });
+  const overdueQueue = (overdueResult.data ?? []).flatMap((item) => {
+    const patient = patientById.get(item.paciente_id as string);
+    return patient ? [{ ...patient, pagamentoId: item.id as string, valor: Number(item.valor ?? 0), vencimento: item.data_vencimento == null ? null : String(item.data_vencimento) }] : [];
+  });
+
   return {
     ok: true,
     data: {
@@ -88,11 +129,12 @@ export async function getClinicOverview(clinicaId: string, mes: string): Promise
         quantidade: (staleBudgetsResult.data ?? []).length,
         valor: (staleBudgetsResult.data ?? []).reduce((sum, item) => sum + Number(item.total ?? 0), 0),
       },
-      pacientesParaReativar: followupsResult.count ?? 0,
+      pacientesParaReativar: reactivationQueue.length,
       pagamentosVencidos: {
         quantidade: (overdueResult.data ?? []).length,
         valor: (overdueResult.data ?? []).reduce((sum, item) => sum + Number(item.valor ?? 0), 0),
       },
+      filas: { reativacao: reactivationQueue, orcamentosSemRetorno: staleBudgetQueue, pagamentosVencidos: overdueQueue },
     },
   };
 }
