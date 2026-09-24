@@ -1,8 +1,6 @@
 import { redirect } from 'next/navigation';
 import { format } from 'date-fns';
 
-import { PageContainer } from '@/components/layout/page-container';
-import { PageTransition } from '@/components/layout/page-transition';
 import { ClinicFinancePanel } from '@/components/consultorio/clinic-finance-panel';
 import { getClinicHubContext } from '@/server/consultorio/context';
 import { getClinicFinancial } from '@/server/financeiro/clinica';
@@ -18,13 +16,15 @@ export default async function ClinicFinancePage({ searchParams }: { searchParams
   const mes = params.mes && /^\d{4}-(0[1-9]|1[0-2])$/.test(params.mes) ? params.mes : format(new Date(), 'yyyy-MM');
   const financeiro = await getClinicFinancial({ clinicaIdEsperada: context.data.member.clinicaId, mes });
 
-  return <PageTransition><PageContainer variant="wide"><ClinicFinancePanel
+  const canWrite = context.data.governanca?.modalidade === 'gerida' && (
+    context.data.member.role === 'secretaria'
+    || context.data.member.role === 'admin'
+    || context.data.governanca.papeis.some((role) => role === 'proprietario' || role === 'gestor')
+  );
+  return <ClinicFinancePanel
     basePath={context.data.basePath}
-    nomeClinica={context.data.nomeClinica}
-    title={context.data.titulo}
-    hasPersonalFinance
-    mes={mes}
+    canWrite={canWrite}
     data={financeiro.ok ? financeiro.data : null}
     mensagem={financeiro.ok ? undefined : financeiro.mensagem}
-  /></PageContainer></PageTransition>;
+  />;
 }

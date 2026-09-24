@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { createClient } from '@/lib/supabase/client';
 import { motion, AnimatePresence } from 'motion/react';
-import { PageContainer } from '@/components/layout/page-container';
 import { format, parseISO, addMonths, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -117,6 +116,7 @@ interface Props {
   pagamentosPendentesIniciais: PagamentoPendente[];
   /** Dentista pré-selecionado vindo da URL (?dentista=id) — persiste ao trocar de mês */
   initialDentistaFiltro?: string;
+  embedded?: boolean;
 }
 
 type SheetMode = 'saida' | 'entrada' | null;
@@ -128,6 +128,7 @@ export function FinanceiroClient({
   chartData, horaClinica, role, plano, dentistaId, dentistasClinica,
   pagamentosPagosIniciais, pagamentosPendentesIniciais,
   initialDentistaFiltro = '',
+  embedded = false,
 }: Props) {
   const router = useRouter();
   const [despesas, setDespesas] = useState<Despesa[]>(despesasIniciais);
@@ -251,9 +252,6 @@ export function FinanceiroClient({
   const [removendoReceita, setRemovendoReceita] = useState<string | null>(null);
 
   const mesDate = parseISO(`${mesAtual}-01`);
-  const mesLabel = format(mesDate, "MMMM 'de' yyyy", { locale: ptBR });
-
-  const priv = (v: number) => isPrivacy ? '••••••' : fmt(v);
 
   type LancamentoUnif =
     | { kind: 'saida';     id: string; data: string; item: Despesa }
@@ -375,16 +373,17 @@ export function FinanceiroClient({
   const margemPct = saldo.receita > 0
     ? (saldo.saldo / saldo.receita) * 100
     : null;
+  const chartMax = Math.max(1, ...chartData.flatMap((point) => [point.receita, point.despesas]));
 
   return (
-    <PageContainer variant="wide">
+    <div className={embedded ? '' : 'mx-auto w-full max-w-screen-2xl p-4 sm:p-6 lg:p-8'}>
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
       {/* ── Cabeçalho ──────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between mb-6 sm:mb-8 flex-wrap gap-4">
+      {!embedded && <div className="flex items-center justify-between mb-6 sm:mb-8 flex-wrap gap-4">
         <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-start">
           <div className="w-10 h-10 rounded-xl bg-teal/10 flex items-center justify-center">
             <Wallet className="w-5 h-5 text-teal" />
@@ -441,14 +440,15 @@ export function FinanceiroClient({
             </button>
           </div>
         </div>
-      </div>
+      </div>}
 
       <PlanGuard plano={plano} feature="financeiro" featureName="Módulo Financeiro" requiredPlan="CLINICA">
         <>
+          {embedded && <div className="mb-6 flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-text-secondary">Seu caixa, seus custos e sua capacidade clínica.</p><div className="flex gap-2"><Button variant="outline" className="min-h-11" onClick={() => setSheetMode('saida')}><ArrowUpRight className="size-4" />Saída pessoal</Button><Button className="min-h-11" onClick={() => setSheetMode('entrada')}><ArrowDownLeft className="size-4" />Entrada pessoal</Button></div></div>}
           {showSummary && (
             <>
               {/* ── Inteligência: indicadores derivados ────────────────────── */}
-              <div className="grid grid-cols-1 gap-3 mb-6 sm:grid-cols-3">
+              {!embedded && <div className="grid grid-cols-1 gap-3 mb-6 sm:grid-cols-3">
                 <IntelCard
                   label="Tendência receita"
                   value={receitaTrend != null ? `${receitaTrend >= 0 ? '+' : ''}${receitaTrend.toFixed(1)}%` : '—'}
@@ -470,15 +470,15 @@ export function FinanceiroClient({
                   positive={margemPct != null ? margemPct >= 0 : null}
                   isPrivacy={isPrivacy}
                 />
-              </div>
+              </div>}
 
               {/* ── Zona 1: Hero — Custo por Hora ──────────────────────────── */}
               <div
-                className="rounded-3xl border border-teal/25 bg-gradient-to-br from-teal/8 via-surface to-surface p-5 sm:p-8 mb-6 relative overflow-hidden"
-                style={{ boxShadow: '0 10px 40px -12px color-mix(in srgb, var(--color-teal) 18%, transparent)' }}
+                className={embedded ? 'relative mb-6 overflow-hidden rounded-[18px] border border-teal/25 bg-teal-pale p-5 sm:p-8' : 'relative mb-6 overflow-hidden rounded-3xl border border-teal/25 bg-gradient-to-br from-teal/8 via-surface to-surface p-5 sm:p-8'}
+                style={embedded ? undefined : { boxShadow: '0 10px 40px -12px color-mix(in srgb, var(--color-teal) 18%, transparent)' }}
               >
                 {/* Decoração de fundo */}
-                <div className="absolute right-6 top-6 w-24 h-24 rounded-full bg-teal/5 blur-2xl pointer-events-none" />
+                {!embedded && <div className="absolute right-6 top-6 w-24 h-24 rounded-full bg-teal/5 blur-2xl pointer-events-none" />}
 
                 <div className="flex items-start justify-between gap-6 flex-wrap">
                   <div>
@@ -567,9 +567,7 @@ export function FinanceiroClient({
                     </span>
                   </div>
                 </div>
-                <div className="h-[200px]">
-                  <GanhosDespesasChart data={chartData} />
-                </div>
+                {embedded ? <div className="space-y-5">{chartData.map((point) => <div key={point.mesISO}><div className="mb-2 flex items-center justify-between gap-4 text-sm"><span className="font-semibold text-text-primary">{point.mes}</span><span className="font-mono text-xs text-text-secondary">R$ {fmt(point.receita)} entradas · R$ {fmt(point.despesas)} saídas</span></div><div className="space-y-1.5"><div className="h-2 overflow-hidden rounded-full bg-surface-alt"><div className="h-full rounded-full bg-teal" style={{ width: String(Math.max(2, (point.receita / chartMax) * 100)) + '%' }} /></div><div className="h-2 overflow-hidden rounded-full bg-surface-alt"><div className="h-full rounded-full bg-coral" style={{ width: String(Math.max(2, (point.despesas / chartMax) * 100)) + '%' }} /></div></div></div>)}</div> : <div className="h-[200px]"><GanhosDespesasChart data={chartData} /></div>}
               </div>
             </>
           )}
@@ -604,7 +602,7 @@ export function FinanceiroClient({
                   className="h-11 rounded-xl border-border text-text-secondary hover:text-coral hover:border-coral/40 hover:bg-coral/5 gap-1.5 text-xs font-semibold"
                 >
                   <ArrowUpRight className="w-3.5 h-3.5" />
-                  Saída
+                  {embedded ? 'Saída pessoal' : 'Saída'}
                 </Button>
                 <Button
                   size="sm"
@@ -612,7 +610,7 @@ export function FinanceiroClient({
                   className="h-11 rounded-xl bg-teal hover:bg-teal-lt text-white gap-1.5 text-xs font-semibold"
                 >
                   <ArrowDownLeft className="w-3.5 h-3.5" />
-                  Entrada
+                  {embedded ? 'Entrada pessoal' : 'Entrada'}
                 </Button>
               </div>
             </div>
@@ -803,14 +801,14 @@ export function FinanceiroClient({
                   <div className="w-7 h-7 rounded-lg bg-coral/10 flex items-center justify-center">
                     <ArrowUpRight className="w-4 h-4 text-coral" />
                   </div>
-                  Registrar Saída
+                  {embedded ? 'Registrar saída pessoal' : 'Registrar Saída'}
                 </>
               ) : (
                 <>
                   <div className="w-7 h-7 rounded-lg bg-teal/10 flex items-center justify-center">
                     <ArrowDownLeft className="w-4 h-4 text-teal" />
                   </div>
-                  Registrar Entrada
+                  {embedded ? 'Registrar entrada pessoal' : 'Registrar Entrada'}
                 </>
               )}
             </SheetTitle>
@@ -955,8 +953,8 @@ export function FinanceiroClient({
               {(sheetMode === 'saida' ? salvando : salvandoReceita)
                 ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 : sheetMode === 'saida'
-                  ? <><ArrowUpRight className="w-4 h-4 mr-2" />Registrar Saída</>
-                  : <><ArrowDownLeft className="w-4 h-4 mr-2" />Registrar Entrada</>
+                  ? <><ArrowUpRight className="w-4 h-4 mr-2" />{embedded ? 'Registrar saída pessoal' : 'Registrar Saída'}</>
+                  : <><ArrowDownLeft className="w-4 h-4 mr-2" />{embedded ? 'Registrar entrada pessoal' : 'Registrar Entrada'}</>
               }
             </Button>
           </div>
@@ -1151,7 +1149,7 @@ export function FinanceiroClient({
         </SheetContent>
       </Sheet>
     </motion.div>
-    </PageContainer>
+    </div>
   );
 }
 
