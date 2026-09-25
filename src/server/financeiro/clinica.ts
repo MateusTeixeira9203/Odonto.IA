@@ -17,6 +17,14 @@ const ReceiptMethodSchema = z.strictObject({
   forma: z.enum(['pix', 'dinheiro', 'transferencia', 'cartao_credito', 'cartao_debito', 'boleto', 'outro']),
   valor: MonetarySchema,
 });
+const StatementEntrySchema = z.strictObject({
+  id: UuidSchema,
+  tipo: z.enum(['recebimento', 'receita_manual', 'despesa']),
+  descricao: z.string().min(1),
+  data: z.string().date(),
+  valor: MonetarySchema,
+  forma: z.enum(['pix', 'dinheiro', 'transferencia', 'cartao_credito', 'cartao_debito', 'boleto', 'outro']).nullable().default(null),
+});
 
 const ClinicFinancialDataSchema = z.strictObject({
   clinicaId: UuidSchema,
@@ -61,13 +69,7 @@ const ClinicFinancialDataSchema = z.strictObject({
     ticketAprovado: MonetarySchema.nullable(),
     ticketRecebidoPorPaciente: MonetarySchema.nullable(),
   })).max(200),
-  extrato: z.array(z.strictObject({
-    id: UuidSchema,
-    tipo: z.enum(['recebimento', 'receita_manual', 'despesa']),
-    descricao: z.string().min(1),
-    data: z.string().date(),
-    valor: MonetarySchema,
-  })).max(8),
+  extrato: z.array(StatementEntrySchema).max(200),
   recebidoPorModalidade: z.array(ReceiptMethodSchema).max(7),
 });
 
@@ -88,10 +90,12 @@ export type ClinicFinancialResult =
 type RpcInput = { p_clinica_id_esperada: string; p_mes_referencia: string };
 type RpcResponse = Promise<{ data: unknown; error: { message: string } | null }>;
 type ReceiptMethodsResponse = Promise<{ data: unknown; error: { message: string } | null }>;
+type StatementResponse = Promise<{ data: unknown; error: { message: string } | null }>;
 
 export type ClinicFinancialDependencies = {
   get(input: RpcInput): RpcResponse;
   getReceiptMethods?(input: RpcInput): ReceiptMethodsResponse;
+  getStatement?(input: RpcInput): StatementResponse;
 };
 
 const FAILURE_MESSAGE = 'Não foi possível consultar o financeiro da clínica agora.';
@@ -101,6 +105,7 @@ async function defaultDependencies(): Promise<ClinicFinancialDependencies> {
   return {
     get: async (input) => client.rpc('obter_financeiro_clinica_painel', input),
     getReceiptMethods: async (input) => client.rpc('obter_recebido_por_modalidade_clinica', input),
+    getStatement: async (input) => client.rpc('obter_extrato_financeiro_clinica', input),
   };
 }
 
@@ -124,13 +129,18 @@ export async function getClinicFinancial(
       p_clinica_id_esperada: clinicaId.data,
       p_mes_referencia: `${mes.data}-01`,
     };
-    const [{ data, error }, receiptMethodsResult] = await Promise.all([
+    const [{ data, error }, receiptMethodsResult, statementResult] = await Promise.all([
       source.get(request), source.getReceiptMethods?.(request) ?? Promise.resolve({ data: { ok: true, data: [] }, error: null }),
+      source.getStatement?.(request) ?? Promise.resolve({ data: null, error: null }),
     ]);
     if (error) return { ok: false, codigo: 'INDISPONIVEL', mensagem: FAILURE_MESSAGE };
     const methods = z.object({ ok: z.literal(true), data: z.array(ReceiptMethodSchema) }).safeParse(receiptMethodsResult.data);
     if (receiptMethodsResult.error || !methods.success) return { ok: false, codigo: 'INDISPONIVEL', mensagem: FAILURE_MESSAGE };
-    const result = RpcResultSchema.safeParse({ ...(typeof data === 'object' && data !== null ? data : {}), data: typeof data === 'object' && data !== null && 'data' in data && typeof data.data === 'object' && data.data !== null ? { ...data.data, recebidoPorModalidade: methods.data.data } : undefined });
+    const statement = statementResult.data === null
+      ? null
+      : z.object({ ok: z.literal(true), data: z.array(StatementEntrySchema) }).safeParse(statementResult.data);
+    if (statementResult.error || (statement !== null && !statement.success)) return { ok: false, codigo: 'INDISPONIVEL', mensagem: FAILURE_MESSAGE };
+    const result = RpcResultSchema.safeParse({ ...(typeof data === 'object' && data !== null ? data : {}), data: typeof data === 'object' && data !== null && 'data' in data && typeof data.data === 'object' && data.data !== null ? { ...data.data, recebidoPorModalidade: methods.data.data, ...(statement?.success ? { extrato: statement.data.data } : {}) } : undefined });
     if (!result.success) return { ok: false, codigo: 'INDISPONIVEL', mensagem: FAILURE_MESSAGE };
     return result.data;
   } catch {

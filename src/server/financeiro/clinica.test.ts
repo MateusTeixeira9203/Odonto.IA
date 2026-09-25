@@ -69,6 +69,7 @@ function data() {
       descricao: 'Paciente',
       data: '2026-09-20',
       valor: 100,
+      forma: null,
     }],
     recebidoPorModalidade: [],
   };
