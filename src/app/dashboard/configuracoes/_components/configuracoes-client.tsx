@@ -26,6 +26,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { UsuariosClient } from '../usuarios/_components/usuarios-client';
+import { OperationalWhatsAppSettings } from './operational-whatsapp-settings';
 import {
   salvarClinica,
   salvarHorarios,
@@ -43,6 +44,7 @@ import {
   continuarClinicaBloqueadaAction,
   migrarParaConsultorioAction,
 } from '../plano-actions';
+import type { WhatsAppTemplates } from '@/lib/whatsapp/operational-templates';
 
 type UsuarioRow = { id: string; nome: string; email: string | null; role: DentistaRole; ativo: boolean; created_at: string };
 type ConvitePendente = { id: string; email: string; role: DentistaRole; expires_at: string; created_at: string };
@@ -58,7 +60,7 @@ const DIAS_SEMANA = [
   { label: 'Sábado', value: 6 },
 ];
 
-type Aba = 'perfil' | 'clinica' | 'horarios' | 'procedimentos' | 'plano';
+type Aba = 'perfil' | 'clinica' | 'horarios' | 'procedimentos' | 'mensagens' | 'plano';
 
 interface Props {
   plano?: PlanoId;
@@ -85,9 +87,11 @@ interface Props {
   abrirFormacaoInicial?: boolean;
   procedimentosPendente?: boolean;
   clinicId?: string;
+  whatsappTemplates?: WhatsAppTemplates;
+  canManageWhatsAppTemplates?: boolean;
 }
 
-export function ConfiguracoesClient({ plano, dentista, config, horarios, procedimentos: procedimentosIniciais, abaInicial, equipe, estadoComercial, formacao, elegibilidade, abrirFormacaoInicial = false, procedimentosPendente = false, clinicId }: Props) {
+export function ConfiguracoesClient({ plano, dentista, config, horarios, procedimentos: procedimentosIniciais, abaInicial, equipe, estadoComercial, formacao, elegibilidade, abrirFormacaoInicial = false, procedimentosPendente = false, clinicId, whatsappTemplates, canManageWhatsAppTemplates = false }: Props) {
   const labelContexto = getLabelContexto(plano); // "Consultório" (SOLO) ou "Clínica" (CLINICA)
   const isSolo = !plano || plano === 'SOLO' || (plano as string) === 'BASICO';
   const planoConfig = getPlano(plano);
@@ -99,12 +103,14 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
     { id: 'clinica'       as const, label: labelContexto,      icon: isSolo ? Stethoscope : Building2 },
     { id: 'horarios'      as const, label: 'Horários',         icon: Clock       },
     { id: 'procedimentos' as const, label: 'Procedimentos',    icon: Stethoscope },
+    { id: 'mensagens'     as const, label: 'WhatsApp',         icon: MessageCircle },
     { id: 'plano'         as const, label: 'Plano',            icon: CreditCard  },
   ];
   const podeGerirClinica = dentista.role === 'admin' || dentista.role === 'dentista';
-  const ABAS = podeGerirClinica
-    ? ABAS_TODAS
-    : ABAS_TODAS.filter((aba) => aba.id !== 'clinica');
+  const ABAS = ABAS_TODAS.filter((aba) =>
+    (podeGerirClinica || aba.id !== 'clinica')
+    && (canManageWhatsAppTemplates || aba.id !== 'mensagens')
+  );
   const abaPadrao: Aba = ABAS[0]?.id ?? 'perfil';
   const router = useRouter();
   const [abaAtiva, setAbaAtiva] = useState<Aba>((ABAS.some(a => a.id === abaInicial) ? abaInicial : abaPadrao) as Aba);
@@ -914,6 +920,10 @@ export function ConfiguracoesClient({ plano, dentista, config, horarios, procedi
                 </button>
               </div>
             </div>
+          )}
+
+          {abaAtiva === 'mensagens' && whatsappTemplates && canManageWhatsAppTemplates && (
+            <OperationalWhatsAppSettings templates={whatsappTemplates} />
           )}
 
           {/* === ABA: PROCEDIMENTOS === */}

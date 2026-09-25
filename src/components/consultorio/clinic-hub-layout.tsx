@@ -16,6 +16,7 @@ export function ClinicHubLayout({ context, children }: { context: ClinicHubConte
           title={context.titulo}
           hasPersonalFinance={context.member.perfilClinico !== null}
           isSecretary={context.member.role === 'secretaria'}
+          canManageSettings={Boolean(context.governanca?.papeis.some((papel) => papel === 'proprietario' || papel === 'gestor'))}
           currentMonth={format(new Date(), 'yyyy-MM')}
         />
         <main>{children}</main>

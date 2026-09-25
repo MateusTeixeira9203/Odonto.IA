@@ -6,6 +6,8 @@ import type { PlanoId } from '@/lib/planos';
 import { createServiceClient } from '@/lib/supabase/service';
 import { clinicaIsentaDeCobranca } from '@/lib/billing/exemptions';
 import { resolverEstadoComercial } from '@/lib/billing/estado-comercial';
+import { getGovernanceContext } from '@/server/auth/governance-context';
+import { getOperationalWhatsAppTemplates } from '@/server/consultorio/whatsapp-templates';
 
 export default async function ConfiguracoesPage({
   searchParams,
@@ -31,6 +33,8 @@ export default async function ConfiguracoesPage({
     { data: usuariosRaw },
     { data: convitesRaw },
     { data: clinicaRaw },
+    governanca,
+    whatsappTemplates,
   ] = await Promise.all([
     supabase.from('configuracoes_clinica').select('*').eq('clinica_id', clinicId).maybeSingle(),
     supabase.from('horarios_disponiveis').select('*').eq('dentista_id', dentistaPerfil?.id ?? '').order('dia_semana', { ascending: true }),
@@ -38,7 +42,11 @@ export default async function ConfiguracoesPage({
     supabase.from('dentistas').select('id, nome, email, role, ativo, created_at').eq('clinica_id', clinicId).order('created_at', { ascending: true }),
     supabase.from('convites').select('id, email, role, expires_at, created_at').eq('clinica_id', clinicId).gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false }),
     supabase.from('clinicas').select('limite_dentistas, plano, status_assinatura, trial_ends_at, procedimentos_pendente').eq('id', clinicId).single(),
+    getGovernanceContext(clinicId),
+    getOperationalWhatsAppTemplates(clinicId),
   ]);
+  const canManageWhatsAppTemplates = governanca.ok
+    && governanca.data.papeis.some((papel) => papel === 'proprietario' || papel === 'gestor');
 
   const clinicaData = clinicaRaw as {
     limite_dentistas: number;
@@ -123,6 +131,8 @@ export default async function ConfiguracoesPage({
         abrirFormacaoInicial={params.criar === 'clinica'}
         procedimentosPendente={procedimentosPendente}
         clinicId={clinicId}
+        whatsappTemplates={whatsappTemplates}
+        canManageWhatsAppTemplates={canManageWhatsAppTemplates}
         dentista={{
           id: dentistaPerfil?.id ?? '',
           nome: (dentistaPerfil?.nome as string) ?? '',

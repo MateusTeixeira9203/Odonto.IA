@@ -1,4 +1,4 @@
-import { AlertTriangle, CalendarDays, Clock3, FileCheck2, ReceiptText, WalletCards } from 'lucide-react';
+import { AlertTriangle, CalendarDays, FileCheck2, ReceiptText, WalletCards } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import type { ManagedPersonalData } from '@/server/financeiro/repasses';
@@ -16,7 +16,7 @@ export function ManagedPersonalFinancePanel({ data, mensagem }: { data: ManagedP
     </section>
 
     <section className="rounded-[18px] border border-teal/30 bg-teal-pale p-5 sm:p-7">
-      <div className="flex flex-col gap-7 lg:flex-row lg:items-end lg:justify-between"><div><p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-teal"><Clock3 className="size-4" />Hora clínica</p><p className="mt-3 font-mono text-4xl font-semibold text-foreground">{data.recebidoPorHora == null ? '—' : `${formatMoney(data.recebidoPorHora)}/h`}</p><p className="mt-2 max-w-xl text-sm text-muted-foreground">Recebimentos confirmados vinculados a você divididos pelas horas de atendimento realizadas.</p></div><div className="grid grid-cols-2 gap-x-8 gap-y-5"><Inline label="Horas atendidas" value={`${data.horasAtendidas.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} h`} /><Inline label="Ocupação realizada" value={data.ocupacaoRealizada == null ? '—' : `${data.ocupacaoRealizada.toLocaleString('pt-BR')}%`} /><Inline label="Produção por hora" value={data.producaoPorHora == null ? '—' : `${formatMoney(data.producaoPorHora)}/h`} /><Inline label="Recebido vinculado" value={formatMoney(data.recebidoVinculado)} /></div></div>
+      <div className="flex flex-col gap-7 lg:flex-row lg:items-end lg:justify-between"><div><p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-teal"><WalletCards className="size-4" />Seu repasse</p><p className="mt-3 font-mono text-4xl font-semibold text-foreground">{formatMoney(data.repassePago)}</p><p className="mt-2 max-w-xl text-sm text-muted-foreground">O valor só vira resultado pessoal quando a clínica confirma o pagamento do seu repasse.</p></div><div className="grid grid-cols-2 gap-x-8 gap-y-5"><Inline label="Repasse previsto" value={formatMoney(data.repassePrevisto)} /><Inline label="Horas atendidas" value={`${data.horasAtendidas.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} h`} /><Inline label="Ocupação realizada" value={data.ocupacaoRealizada == null ? '—' : `${data.ocupacaoRealizada.toLocaleString('pt-BR')}%`} /><Inline label="Recebido vinculado" value={formatMoney(data.recebidoVinculado)} /></div></div>
     </section>
 
     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

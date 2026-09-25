@@ -10,8 +10,8 @@ import { ClinicRepassePanel } from './clinic-repasse-panel';
 type Props = {
   basePath: '/dashboard/meu-consultorio' | '/consultorio';
   data: ClinicFinancialData | null;
-  canWrite: boolean;
-  canManageBalance: boolean;
+  canRegisterIncome: boolean;
+  canRegisterCost: boolean;
   repasses: ClinicRepassesData | null;
   canManageRepasses: boolean;
   professionals: { id: string; nome: string }[];
@@ -29,12 +29,12 @@ function trend(current: number, previous: number): string | null {
   return (value >= 0 ? '+' : '') + value.toFixed(1).replace('.', ',') + '%';
 }
 
-export function ClinicFinancePanel({ basePath, data, canWrite, canManageBalance, repasses, canManageRepasses, professionals, operationalOnly = false, mensagem }: Props): React.JSX.Element {
+export function ClinicFinancePanel({ basePath, data, canRegisterIncome, canRegisterCost, repasses, canManageRepasses, professionals, operationalOnly = false, mensagem }: Props): React.JSX.Element {
   if (operationalOnly) {
     return <div className="space-y-6">
       <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-card p-5">
         <div><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-teal">Operação financeira</p><h2 className="mt-2 font-heading text-2xl font-normal text-foreground">Registrar movimentação</h2><p className="mt-2 max-w-2xl text-sm text-muted-foreground">Registre entradas e saídas da clínica. Indicadores, repasses e configurações permanecem com a gestão.</p></div>
-        <ClinicTransactionActions canWrite={canWrite} canManageBalance={canManageBalance} professionals={professionals} />
+        <ClinicTransactionActions canRegisterIncome={canRegisterIncome} canRegisterCost={canRegisterCost} professionals={professionals} />
       </section>
       <section className="rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground">Recebimentos do orçamento devem continuar vinculados ao paciente. Use o lançamento manual somente quando o recebimento ou gasto ainda não estiver registrado no sistema.</section>
     </div>;
@@ -49,12 +49,12 @@ export function ClinicFinancePanel({ basePath, data, canWrite, canManageBalance,
     <div className="space-y-10">
       <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-card p-5">
         <div><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-teal">Movimentações da clínica</p><p className="mt-2 max-w-2xl text-sm text-muted-foreground">Pagamentos de pacientes vêm do orçamento. Registre aqui as demais entradas e despesas da unidade.</p></div>
-        <ClinicTransactionActions canWrite={canWrite} canManageBalance={canManageBalance} professionals={professionals} />
+        <ClinicTransactionActions canRegisterIncome={canRegisterIncome} canRegisterCost={canRegisterCost} professionals={professionals} />
       </section>
 
       <section className="rounded-[18px] border border-teal/30 bg-teal-pale p-5 sm:p-7">
         <div className="flex flex-col gap-7 lg:flex-row lg:items-end lg:justify-between">
-          <div><p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-teal"><CircleDollarSign className="size-4" />Movimento líquido registrado</p><p className="mt-3 font-mono text-4xl font-semibold text-foreground">{formatMoney(data.movimentoLiquido)}</p><p className="mt-2 text-sm text-muted-foreground">Entradas confirmadas menos despesas do período. Saldo informado da conta não é saldo ao vivo.</p></div>
+          <div><p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-teal"><CircleDollarSign className="size-4" />Movimento líquido registrado</p><p className="mt-3 font-mono text-4xl font-semibold text-foreground">{formatMoney(data.movimentoLiquido)}</p><p className="mt-2 text-sm text-muted-foreground">Entradas confirmadas menos despesas do período. Não representa o saldo bancário.</p></div>
           <div className="grid grid-cols-2 gap-5 sm:grid-cols-4"><InlineMetric label="Recebido" value={formatMoney(data.recebido)} /><InlineMetric label="Despesas" value={formatMoney(data.despesas)} /><InlineMetric label="Resultado" value={formatMoney(data.resultadoOperacional)} /><InlineMetric label="Margem" value={data.margemOperacional == null ? '—' : data.margemOperacional.toFixed(1).replace('.', ',') + '%'} /></div>
         </div>
       </section>
@@ -64,7 +64,6 @@ export function ClinicFinancePanel({ basePath, data, canWrite, canManageBalance,
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Metric label="Resultado do período" value={formatMoney(data.movimentoLiquido)} detail="Recebido menos despesas" tone={data.movimentoLiquido >= 0 ? 'positive' : 'negative'} />
           <Metric label="Margem operacional" value={data.margemOperacional == null ? '—' : data.margemOperacional.toFixed(1).replace('.', ',') + '%'} detail={data.baseDeCustosValidada ? 'Resultado sobre o recebido' : 'Registre custos para calcular'} />
-          <Metric label="Fôlego de caixa" value={data.folegoCaixaMeses == null ? '—' : data.folegoCaixaMeses.toFixed(1).replace('.', ',') + ' meses'} detail={data.saldoBancarioInformadoEm ? `Saldo informado em ${shortDate.format(new Date(`${data.saldoBancarioInformadoEm}T12:00:00`))}` : 'Informe o saldo da conta para calcular'} />
           <Metric label="A receber" value={formatMoney(data.aReceber)} detail={data.vencido > 0 ? formatMoney(data.vencido) + ' vencidos' : 'Sem cobranças vencidas'} />
         </div>
       </section>

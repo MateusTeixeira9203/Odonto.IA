@@ -2,15 +2,14 @@
 
 import Link from 'next/link';
 import { ArrowRight, CalendarClock, CircleDollarSign, FileClock, UserRoundCheck } from 'lucide-react';
-import { useActionState, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import { Card, CardContent } from '@/components/ui/card';
 import type { ClinicOverviewData } from '@/server/consultorio/overview';
 import type { ClinicFinancialData } from '@/server/financeiro/clinica';
 import { interpolateWhatsAppTemplate, type WhatsAppTemplates } from '@/lib/whatsapp/operational-templates';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { saveOperationalWhatsAppTemplates, type WhatsAppTemplateState } from '@/app/consultorio/whatsapp-actions';
+import { ClinicTransactionActions } from './clinic-transaction-actions';
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 
@@ -20,12 +19,14 @@ type Props = {
   overview: ClinicOverviewData | null;
   whatsappTemplates: WhatsAppTemplates;
   nomeClinica: string;
-  canManageWhatsAppTemplates: boolean;
   operationalOnly?: boolean;
+  canRegisterIncome?: boolean;
+  canRegisterCost?: boolean;
+  professionals?: Array<{ id: string; nome: string }>;
   mensagem?: string;
 };
 
-export function ClinicOverviewPanel({ basePath, financeiro, overview, whatsappTemplates, nomeClinica, canManageWhatsAppTemplates, operationalOnly = false, mensagem }: Props): React.JSX.Element {
+export function ClinicOverviewPanel({ basePath, financeiro, overview, whatsappTemplates, nomeClinica, operationalOnly = false, canRegisterIncome = false, canRegisterCost = false, professionals = [], mensagem }: Props): React.JSX.Element {
   const [queue, setQueue] = useState<'reativacao' | 'orcamentos' | 'pagamentos' | null>(null);
   if (!overview || (!operationalOnly && !financeiro)) {
     return <section role="alert" className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">{mensagem ?? 'Os indicadores da clínica estão indisponíveis agora.'}</section>;
@@ -39,7 +40,19 @@ export function ClinicOverviewPanel({ basePath, financeiro, overview, whatsappTe
 
   return (
     <div className="space-y-10">
-      <SectionHeading eyebrow="Prioridades" title="Hoje na clínica" description="O que pede ação antes de aprofundar os números." />
+      {!operationalOnly && <section className="rounded-2xl border border-border bg-card p-5 sm:p-7">
+        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-teal">Saúde do negócio</p>
+        <h2 className="mt-2 font-heading text-3xl font-normal tracking-tight text-foreground sm:text-4xl">{managementFinanceiro.movimentoLiquido >= 0 ? 'O mês gerou caixa para a clínica.' : 'O mês pede correção de caixa.'}</h2>
+        <p className="mt-3 max-w-2xl text-sm text-muted-foreground">O resultado é caixa confirmado: o que entrou menos custos e repasses já pagos. Não é saldo bancário nem lucro contábil.</p>
+        <div className="mt-7 grid gap-x-6 gap-y-5 border-t border-border pt-6 sm:grid-cols-2 xl:grid-cols-4">
+          <Metric label="Recebido" value={money.format(managementFinanceiro.recebido)} detail="confirmado" />
+          <Metric label="Saídas pagas" value={money.format(managementFinanceiro.despesas)} detail="custos + repasses" />
+          <Metric label="Resultado de caixa" value={money.format(managementFinanceiro.movimentoLiquido)} detail="não é lucro contábil" tone={managementFinanceiro.movimentoLiquido >= 0 ? 'positive' : 'negative'} />
+          <Metric label="Margem de caixa" value={managementFinanceiro.baseDeCustosValidada && managementFinanceiro.margemOperacional != null ? `${managementFinanceiro.margemOperacional.toFixed(1).replace('.', ',')}%` : '—'} detail={managementFinanceiro.baseDeCustosValidada ? 'base validada' : 'sem base de custos'} />
+        </div>
+      </section>}
+
+      <SectionHeading eyebrow="Ações do dia" title="O que precisa andar" description="Cada ação abre a lista que explica o motivo e o próximo passo." />
       <section className="grid gap-3 lg:grid-cols-3" aria-label="Pendências da clínica">
         <AttentionCard icon={FileClock} label="Orçamentos pendentes" value={String(overview.orcamentosPendentes.quantidade)} detail={money.format(overview.orcamentosPendentes.valor) + ' com acompanhamento pendente'} onClick={() => setQueue('orcamentos')} />
         <AttentionCard icon={UserRoundCheck} label="Pacientes para reativar" value={String(overview.pacientesParaReativar)} detail="Follow-ups sem retorno futuro agendado" onClick={() => setQueue('reativacao')} />
@@ -48,20 +61,10 @@ export function ClinicOverviewPanel({ basePath, financeiro, overview, whatsappTe
 
       {operationalOnly && <>
         <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
-          <SectionHeading eyebrow="Operação" title="Acompanhe e encaminhe" description="Abra a lista, prepare a mensagem no WhatsApp e use a agenda para registrar o próximo passo." action={<Link href={basePath + '/financeiro-clinica'} className="inline-flex items-center gap-1 text-sm font-semibold text-teal">Registrar movimentação <ArrowRight className="size-4" /></Link>} />
+          <SectionHeading eyebrow="Operação" title="Acompanhe e encaminhe" description="Abra a lista, prepare a mensagem no WhatsApp e use a agenda para registrar o próximo passo." action={<ClinicTransactionActions canRegisterIncome={canRegisterIncome} canRegisterCost={canRegisterCost} professionals={professionals} />} />
         </section>
         <QueueDialog queue={queue} onOpenChange={(open) => !open && setQueue(null)} data={overview} templates={whatsappTemplates} nomeClinica={nomeClinica} />
       </>}
-
-      {!operationalOnly && <section>
-        <SectionHeading eyebrow="Financeiro" title="Resultado do período" description="Caixa confirmado e valores que ainda dependem de recebimento." action={<Link href={basePath + '/financeiro-clinica'} className="inline-flex items-center gap-1 text-sm font-semibold text-teal">Abrir financeiro <ArrowRight className="size-4" /></Link>} />
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Metric label="Recebido pela clínica" value={money.format(managementFinanceiro.recebido)} detail="Recebimentos confirmados" />
-          <Metric label="A receber" value={money.format(managementFinanceiro.aReceber)} detail="Cobranças ativas" />
-          <Metric label="Despesas registradas" value={money.format(managementFinanceiro.despesas)} detail="Fixas e variáveis" />
-          <Metric label="Saldo de caixa" value={money.format(managementFinanceiro.saldoCaixa)} detail="Entradas confirmadas menos saídas" emphasis />
-        </div>
-      </section>}
 
       {!operationalOnly && <section className="grid gap-5 xl:grid-cols-[1.45fr_0.8fr]">
         <Card>
@@ -97,18 +100,9 @@ export function ClinicOverviewPanel({ basePath, financeiro, overview, whatsappTe
         </Card>
       </section>}
       {!operationalOnly && <QueueDialog queue={queue} onOpenChange={(open) => !open && setQueue(null)} data={overview} templates={whatsappTemplates} nomeClinica={nomeClinica} />}
-      {canManageWhatsAppTemplates && <WhatsAppTemplateDialog templates={whatsappTemplates} />}
     </div>
   );
 }
-
-const initialTemplateState: WhatsAppTemplateState = { ok: false, message: '' };
-function WhatsAppTemplateDialog({ templates }: { templates: WhatsAppTemplates }): React.JSX.Element {
-  const [open, setOpen] = useState(false);
-  const [state, action, pending] = useActionState(saveOperationalWhatsAppTemplates, initialTemplateState);
-  return <><Button type="button" variant="outline" className="min-h-11" onClick={() => setOpen(true)}>Editar mensagens de WhatsApp</Button><Dialog open={open} onOpenChange={setOpen}><DialogContent className="max-w-xl"><DialogHeader><DialogTitle>Mensagens operacionais</DialogTitle><DialogDescription>Use {'{{nome_paciente}}'} e {'{{nome_clinica}}'}. O sistema prepara a mensagem; o envio continua no WhatsApp.</DialogDescription></DialogHeader><form action={action} className="space-y-4"><TemplateField name="reativacao" label="Reativação" value={templates.reativacao} /><TemplateField name="cobranca" label="Cobrança" value={templates.cobranca} /><TemplateField name="orcamento" label="Orçamento" value={templates.orcamento} />{state.message && <p role="status" className={state.ok ? 'text-sm text-teal' : 'text-sm text-destructive'}>{state.message}</p>}<Button className="w-full" disabled={pending} type="submit">{pending ? 'Salvando…' : 'Salvar mensagens'}</Button></form></DialogContent></Dialog></>;
-}
-function TemplateField({ name, label, value }: { name: 'reativacao' | 'cobranca' | 'orcamento'; label: string; value: string }): React.JSX.Element { return <label className="block text-sm font-medium text-foreground">{label}<textarea name={name} defaultValue={value} minLength={10} maxLength={1000} required className="mt-2 min-h-24 w-full rounded-md border border-input bg-background p-3 text-sm text-foreground" /></label>; }
 
 function SectionHeading({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action?: ReactNode }): React.JSX.Element {
   return <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-teal">{eyebrow}</p><h2 className="mt-1 font-heading text-2xl font-normal text-foreground sm:text-[28px]">{title}</h2><p className="mt-1 text-sm text-muted-foreground">{description}</p></div>{action}</div>;
@@ -118,8 +112,10 @@ function AttentionCard({ icon: Icon, label, value, detail, onClick }: { icon: ty
   return <button type="button" onClick={onClick} className="group rounded-2xl border border-border bg-card p-5 text-left transition-colors hover:border-teal/40"><div className="flex items-center justify-between"><Icon className="size-5 text-amber" /><ArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" /></div><p className="mt-5 text-sm font-semibold text-foreground">{label}</p><p className="mt-2 font-mono text-3xl font-semibold text-foreground">{value}</p><p className="mt-1 text-xs text-muted-foreground">{detail}</p></button>;
 }
 
-function Metric({ label, value, detail, emphasis = false }: { label: string; value: string; detail: string; emphasis?: boolean }): React.JSX.Element {
-  return <div className={emphasis ? 'rounded-2xl border border-teal/30 bg-teal-pale p-5' : 'rounded-2xl border border-border bg-card p-5'}><p className="text-xs font-semibold text-muted-foreground">{label}</p><p className={emphasis ? 'mt-3 font-mono text-2xl font-semibold text-teal' : 'mt-3 font-mono text-2xl font-semibold text-foreground'}>{value}</p><p className="mt-2 text-xs text-muted-foreground">{detail}</p></div>;
+function Metric({ label, value, detail, tone = 'default' }: { label: string; value: string; detail: string; tone?: 'default' | 'positive' | 'negative' }): React.JSX.Element {
+  const valueClass = tone === 'positive' ? 'text-teal' : tone === 'negative' ? 'text-destructive' : 'text-foreground';
+  const cardClass = tone === 'positive' ? 'border-teal/30 bg-teal-pale' : tone === 'negative' ? 'border-destructive/30 bg-destructive/10' : 'border-border bg-card';
+  return <div className={`rounded-2xl border p-5 ${cardClass}`}><p className="text-xs font-semibold text-muted-foreground">{label}</p><p className={`mt-3 font-mono text-2xl font-semibold ${valueClass}`}>{value}</p><p className="mt-2 text-xs text-muted-foreground">{detail}</p></div>;
 }
 
 function JourneyStep({ label, value, last = false }: { label: string; value: number; last?: boolean }): React.JSX.Element {

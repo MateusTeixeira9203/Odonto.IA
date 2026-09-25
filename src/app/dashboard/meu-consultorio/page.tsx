@@ -18,5 +18,5 @@ export default async function MeuConsultorioPage({ searchParams }: { searchParam
     getClinicOverview(context.data.member.clinicaId, mes),
     getOperationalWhatsAppTemplates(context.data.member.clinicaId),
   ]);
-  return <ClinicOverviewPanel basePath={context.data.basePath} financeiro={financeiro.ok ? financeiro.data : null} overview={overview.ok ? overview.data : null} whatsappTemplates={whatsappTemplates} nomeClinica={context.data.nomeClinica} canManageWhatsAppTemplates={context.data.governanca?.papeis.some((role) => role === 'proprietario' || role === 'gestor') === true} mensagem={!financeiro.ok ? financeiro.mensagem : !overview.ok ? overview.mensagem : undefined} />;
+  return <ClinicOverviewPanel basePath={context.data.basePath} financeiro={financeiro.ok ? financeiro.data : null} overview={overview.ok ? overview.data : null} whatsappTemplates={whatsappTemplates} nomeClinica={context.data.nomeClinica} mensagem={!financeiro.ok ? financeiro.mensagem : !overview.ok ? overview.mensagem : undefined} />;
 }
