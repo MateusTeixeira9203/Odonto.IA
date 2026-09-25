@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   LayoutDashboard, Users, Calendar, CalendarClock, Building2,
-  X, LogOut, Sun, Moon, Loader2,
+  X, LogOut, Sun, Moon, Loader2, Settings,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useSyncExternalStore } from 'react';
@@ -23,6 +23,7 @@ interface MobileDrawerProps {
   role: DentistaRole;
   avatarUrl?: string | null;
   plano?: PlanoId;
+  canManageSettings: boolean;
 }
 
 const NAV_ITEMS = [
@@ -37,7 +38,7 @@ const NAV_ITEMS = [
 
 const subscribeMounted = () => () => {};
 
-export function MobileDrawer({ open, onClose, nome, clinicaNome, role, avatarUrl }: MobileDrawerProps) {
+export function MobileDrawer({ open, onClose, nome, clinicaNome, role, avatarUrl, canManageSettings }: MobileDrawerProps) {
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
   const mounted = useSyncExternalStore(subscribeMounted, () => true, () => false);
@@ -133,6 +134,20 @@ export function MobileDrawer({ open, onClose, nome, clinicaNome, role, avatarUrl
                   </Link>
                 );
               })}
+              {canManageSettings && role !== 'protetico' && (
+                <Link
+                  href="/dashboard/configuracoes"
+                  onClick={onClose}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
+                    pathname.startsWith('/dashboard/configuracoes')
+                      ? 'bg-teal/10 text-teal'
+                      : 'text-white/55 hover:bg-white/[0.05] hover:text-white/85'
+                  }`}
+                >
+                  <Settings style={{ width: 18, height: 18 }} aria-hidden="true" />
+                  <span className="text-[14px] font-medium">Configurações</span>
+                </Link>
+              )}
             </nav>
 
             {/* Footer */}

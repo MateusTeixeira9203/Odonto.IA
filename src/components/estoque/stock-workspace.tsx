@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronRight, Search } from 'lucide-react';
+import { AlertTriangle, ChevronRight, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -21,8 +21,20 @@ export function StockWorkspace({ initialContext, ports }: { initialContext: Stoc
   const [notice, setNotice] = useState('');
   const permissions = stock.scope === 'dentista' ? stock.context.permissoesPessoais : stock.context.permissoesCompartilhadas;
   const scopeName = stock.scope === 'dentista' ? 'Meu estoque' : 'Materiais da clínica';
+  const items = stock.list?.itens ?? [];
+  const lowStockItems = items.filter((item) => item.ativo && compareStockQuantity(item.saldo, item.minimo) <= 0);
+  const divergentItems = items.filter((item) => item.ativo && compareStockQuantity(item.saldo, '0') < 0);
 
-  return <div>
+  return <div className="space-y-5">
+    {!stock.loading && (lowStockItems.length > 0 || divergentItems.length > 0) && (
+      <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-card p-4 sm:px-5" aria-label="Alertas de estoque">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground"><AlertTriangle className="size-4" aria-hidden="true" /></span>
+          <div><p className="text-sm font-semibold text-foreground">O estoque pede atenção</p><p className="mt-1 text-xs text-muted-foreground">{lowStockItems.length > 0 ? `${lowStockItems.length} material(is) no mínimo ou abaixo dele` : 'Sem materiais abaixo do mínimo'}{divergentItems.length > 0 ? ` · ${divergentItems.length} com saldo divergente` : ''}.</p></div>
+        </div>
+        <Button variant="outline" className="min-h-10" onClick={() => stock.setQuery({ ...stock.query, filtro: divergentItems.length > 0 ? 'divergente' : 'baixo' })}>Ver alertas</Button>
+      </section>
+    )}
     <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
       <div><h2 className="font-heading text-2xl font-bold text-foreground">Estoque</h2><p className="mt-1 text-sm text-muted-foreground">Materiais sob seus cuidados, com cada movimentação registrada.</p></div>
       {permissions.includes('estoque.gerir') && <Button className="min-h-11" onClick={() => setForm({ action: 'cadastrarItem' })}>Novo material</Button>}

@@ -7,16 +7,24 @@ import type { ClinicHubContext } from '@/server/consultorio/context';
 import { ClinicHubHeader } from './clinic-hub-header';
 
 export function ClinicHubLayout({ context, children }: { context: ClinicHubContext; children: ReactNode }): React.JSX.Element {
+  const governanceRoles = context.governanca?.papeis ?? [];
+  const roleLabel = governanceRoles.includes('proprietario')
+    ? 'Visão do proprietário'
+    : governanceRoles.includes('gestor')
+      ? 'Visão do gestor'
+      : context.member.role === 'secretaria'
+        ? 'Visão da secretária'
+        : 'Visão do dentista';
+
   return (
     <PageTransition>
       <PageContainer variant="wide" className="space-y-8 pb-32">
         <ClinicHubHeader
           basePath={context.basePath}
           nomeClinica={context.nomeClinica}
-          title={context.titulo}
           hasPersonalFinance={context.member.perfilClinico !== null}
           isSecretary={context.member.role === 'secretaria'}
-          canManageSettings={Boolean(context.governanca?.papeis.some((papel) => papel === 'proprietario' || papel === 'gestor'))}
+          roleLabel={roleLabel}
           currentMonth={format(new Date(), 'yyyy-MM')}
         />
         <main>{children}</main>

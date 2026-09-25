@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Landmark, LayoutDashboard, Package, Settings, Users, WalletCards } from 'lucide-react';
+import { Landmark, LayoutDashboard, Package, Users, WalletCards } from 'lucide-react';
 
 import { OdontoIALogo } from '@/components/ui/dent-ia-logo';
 import { cn } from '@/lib/utils';
@@ -11,10 +11,9 @@ import { MonthPicker } from './month-picker';
 type ClinicHubHeaderProps = {
   basePath: '/dashboard/meu-consultorio' | '/consultorio';
   nomeClinica: string;
-  title: 'Meu Consultório' | 'Minha Clínica';
   hasPersonalFinance: boolean;
   isSecretary: boolean;
-  canManageSettings: boolean;
+  roleLabel: string;
   currentMonth: string;
 };
 
@@ -24,20 +23,27 @@ const tabs = [
   { id: 'clinic-finance', label: 'Financeiro da clínica', path: '/financeiro-clinica', icon: Landmark },
   { id: 'team', label: 'Minha equipe', path: '/equipe', icon: Users },
   { id: 'stock', label: 'Estoque', path: '/estoque', icon: Package },
-  { id: 'settings', label: 'Configurações', path: '/configuracoes', icon: Settings, settings: true },
 ] as const;
 
-function pageTitle(pathname: string, title: ClinicHubHeaderProps['title']): string {
-  if (pathname.includes('/meu-financeiro')) return 'Meu financeiro';
-  if (pathname.includes('/financeiro-clinica')) return 'Financeiro da clínica';
-  if (pathname.includes('/equipe')) return 'Minha equipe';
-  if (pathname.includes('/estoque')) return 'Estoque';
-  if (pathname.includes('/configuracoes')) return 'Configurações';
-  return title;
+function pageMetadata(pathname: string): { title: string; subtitle: string } {
+  if (pathname.includes('/meu-financeiro')) {
+    return { title: 'Meu financeiro', subtitle: 'O que pertence ao dentista muda conforme o modelo e o contrato.' };
+  }
+  if (pathname.includes('/financeiro-clinica')) {
+    return { title: 'Financeiro da clínica', subtitle: 'Resultado, previsão e fatos — sem saldo inventado.' };
+  }
+  if (pathname.includes('/equipe')) {
+    return { title: 'Minha equipe', subtitle: 'Contratos, pessoas e permissões.' };
+  }
+  if (pathname.includes('/estoque')) {
+    return { title: 'Estoque', subtitle: 'Alertas, reposição e entrada de materiais.' };
+  }
+  return { title: 'Visão geral', subtitle: 'O que merece sua atenção — antes dos relatórios.' };
 }
 
-export function ClinicHubHeader({ basePath, nomeClinica, title, hasPersonalFinance, isSecretary, canManageSettings, currentMonth }: ClinicHubHeaderProps): React.JSX.Element {
+export function ClinicHubHeader({ basePath, nomeClinica, hasPersonalFinance, isSecretary, roleLabel, currentMonth }: ClinicHubHeaderProps): React.JSX.Element {
   const pathname = usePathname();
+  const page = pageMetadata(pathname);
   return (
     <header className="space-y-4 sm:space-y-7">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-5">
@@ -46,18 +52,20 @@ export function ClinicHubHeader({ basePath, nomeClinica, title, hasPersonalFinan
             <OdontoIALogo className="size-5 text-teal" aria-hidden="true" />
           </span>
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-teal">{title} · {nomeClinica}</p>
-            <h1 className="mt-1 font-heading text-4xl font-normal tracking-tight text-foreground sm:text-[44px]">{pageTitle(pathname, title)}</h1>
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-teal">Meu consultório · {nomeClinica}</p>
+            <h1 className="mt-1 font-heading text-4xl font-normal tracking-tight text-foreground sm:text-[44px]">{page.title}</h1>
+            <p className="mt-1.5 max-w-2xl text-sm text-muted-foreground">{page.subtitle}</p>
           </div>
         </div>
-        <div className="self-start sm:self-auto">
+        <div className="flex items-center gap-3 self-start sm:self-auto">
+          <span className="hidden text-xs font-medium text-muted-foreground sm:inline">{roleLabel}</span>
           <MonthPicker mes={currentMonth} />
         </div>
       </div>
-      <nav aria-label={`Seções de ${title}`} className="-mx-4 overflow-x-auto border-y border-border bg-card px-4 py-1.5 [scroll-snap-type:x_proximity] [scrollbar-width:none] sm:mx-0 sm:rounded-2xl sm:border sm:p-1.5 [&::-webkit-scrollbar]:hidden">
+      <nav aria-label="Seções do meu consultório" className="-mx-4 overflow-x-auto border-y border-border bg-card px-4 py-1.5 [scroll-snap-type:x_proximity] [scrollbar-width:none] sm:mx-0 sm:rounded-2xl sm:border sm:p-1.5 [&::-webkit-scrollbar]:hidden">
         <div className="flex min-w-max gap-1 sm:min-w-0 sm:w-full">
-          {tabs.filter((tab) => (!('personal' in tab) || hasPersonalFinance) && (!('settings' in tab) || canManageSettings) && (!isSecretary || tab.id === 'overview')).map((tab) => {
-            const href = tab.id === 'settings' && basePath === '/dashboard/meu-consultorio' ? '/dashboard/configuracoes' : `${basePath}${tab.path}`;
+          {tabs.filter((tab) => (!('personal' in tab) || hasPersonalFinance) && (!isSecretary || tab.id === 'overview')).map((tab) => {
+            const href = `${basePath}${tab.path}`;
             const active = tab.path ? pathname.startsWith(href) : pathname === basePath;
             const Icon = tab.icon;
             return (

@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
 import {
   LayoutDashboard, Users, Calendar, CalendarClock, Building2,
-  Sun, Moon, User, LogOut, Bot, Check, ChevronsUpDown, Loader2,
+  Sun, Moon, User, LogOut, Bot, Check, ChevronsUpDown, Loader2, Settings,
 } from 'lucide-react';
 import { OdontoIALogo } from '@/components/ui/dent-ia-logo';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
@@ -25,6 +25,7 @@ interface FloatingDockProps {
   role: DentistaRole;
   avatarUrl?: string | null;
   plano?: PlanoId;
+  canManageSettings: boolean;
 }
 
 const ROLE_PT: Record<string, string> = {
@@ -45,7 +46,7 @@ const NAV_ITEMS = [
 
 const subscribeMounted = () => () => {};
 
-export function FloatingDock({ nome, clinicaNome, activeClinicId, role, avatarUrl }: FloatingDockProps) {
+export function FloatingDock({ nome, clinicaNome, activeClinicId, role, avatarUrl, canManageSettings }: FloatingDockProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
@@ -151,6 +152,17 @@ export function FloatingDock({ nome, clinicaNome, activeClinicId, role, avatarUr
           : <Moon style={{ width: 18, height: 18 }} />
         }
       </button>
+
+      {canManageSettings && (
+        <button
+          title="Configurações"
+          onClick={() => router.push('/dashboard/configuracoes')}
+          className="w-9 h-9 xl:w-11 xl:h-11 rounded-lg xl:rounded-xl flex items-center justify-center shrink-0 text-white/45 hover:text-white/80 hover:bg-white/[0.07] transition-all mx-0.5 outline-none"
+        >
+          <Settings className="size-[18px]" aria-hidden="true" />
+          <span className="sr-only">Configurações</span>
+        </button>
+      )}
 
       {/* ── Separador direita ── */}
       <div className="w-px h-6 bg-white/[0.07] mx-1 shrink-0" />

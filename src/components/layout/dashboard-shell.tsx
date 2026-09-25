@@ -23,9 +23,10 @@ interface DashboardShellProps {
   avatarUrl?: string | null;
   plano?: PlanoId;
   dentistaId: string;
+  canManageSettings: boolean;
 }
 
-export function DashboardShell({ children, nome, clinicaNome, activeClinicId, role, avatarUrl, plano }: DashboardShellProps) {
+export function DashboardShell({ children, nome, clinicaNome, activeClinicId, role, avatarUrl, plano, canManageSettings }: DashboardShellProps) {
   const router = useRouter();
   const pathname = usePathname();
   const isClinicHub = pathname.startsWith('/dashboard/meu-consultorio');
@@ -89,6 +90,7 @@ export function DashboardShell({ children, nome, clinicaNome, activeClinicId, ro
         role={role}
         avatarUrl={avatarUrl}
         plano={plano}
+        canManageSettings={canManageSettings}
       />
 
       <MobileDrawer
@@ -99,6 +101,7 @@ export function DashboardShell({ children, nome, clinicaNome, activeClinicId, ro
         role={role}
         avatarUrl={avatarUrl}
         plano={plano}
+        canManageSettings={canManageSettings}
       />
 
       {/* FASE 1: guia desativado — ver roadmap-3-fases A2 */}

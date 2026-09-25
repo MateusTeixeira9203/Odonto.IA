@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight, CalendarClock, CircleDollarSign, FileClock, UserRoundCheck } from 'lucide-react';
+import { ArrowRight, CalendarClock, CircleDollarSign, FileClock, Package, UserRoundCheck } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
 import { Card, CardContent } from '@/components/ui/card';
@@ -53,10 +53,15 @@ export function ClinicOverviewPanel({ basePath, financeiro, overview, whatsappTe
       </section>}
 
       <SectionHeading eyebrow="Ações do dia" title="O que precisa andar" description="Cada ação abre a lista que explica o motivo e o próximo passo." />
-      <section className="grid gap-3 lg:grid-cols-3" aria-label="Pendências da clínica">
-        <AttentionCard icon={FileClock} label="Orçamentos pendentes" value={String(overview.orcamentosPendentes.quantidade)} detail={money.format(overview.orcamentosPendentes.valor) + ' com acompanhamento pendente'} onClick={() => setQueue('orcamentos')} />
-        <AttentionCard icon={UserRoundCheck} label="Pacientes para reativar" value={String(overview.pacientesParaReativar)} detail="Follow-ups sem retorno futuro agendado" onClick={() => setQueue('reativacao')} />
-        <AttentionCard icon={CalendarClock} label="Pagamentos vencidos" value={String(overview.pagamentosVencidos.quantidade)} detail={money.format(overview.pagamentosVencidos.valor) + ' em atraso'} onClick={() => setQueue('pagamentos')} />
+      <section className="overflow-hidden rounded-2xl border border-border bg-card" aria-label="Pendências da clínica">
+        <AttentionRow icon={CalendarClock} label="Cobrar pagamentos vencidos" value={String(overview.pagamentosVencidos.quantidade)} detail={money.format(overview.pagamentosVencidos.valor) + ' em atraso'} onClick={() => setQueue('pagamentos')} />
+        <AttentionRow icon={FileClock} label="Retomar orçamentos sem decisão" value={String(overview.orcamentosPendentes.quantidade)} detail={money.format(overview.orcamentosPendentes.valor) + ' com acompanhamento pendente'} onClick={() => setQueue('orcamentos')} />
+        <AttentionRow icon={UserRoundCheck} label="Pacientes sem retorno há 60 dias" value={String(overview.pacientesParaReativar)} detail="Follow-ups sem retorno futuro agendado" onClick={() => setQueue('reativacao')} />
+        <Link href={`${basePath}/estoque`} className="group flex min-h-20 items-center gap-4 border-t border-border px-5 py-4 text-left transition-colors hover:bg-muted/50">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground"><Package className="size-4" aria-hidden="true" /></span>
+          <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-foreground">Repor materiais críticos</span><span className="mt-1 block text-xs text-muted-foreground">Confira estoque baixo, validade e saldo divergente.</span></span>
+          <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+        </Link>
       </section>
 
       {operationalOnly && <>
@@ -69,7 +74,7 @@ export function ClinicOverviewPanel({ basePath, financeiro, overview, whatsappTe
       {!operationalOnly && <section className="grid gap-5 xl:grid-cols-[1.45fr_0.8fr]">
         <Card>
           <CardContent className="p-5 sm:p-6">
-            <SectionHeading eyebrow="Conversão" title="Jornada do paciente" description="Do primeiro cadastro ao retorno já marcado." />
+            <SectionHeading eyebrow="Por que mudou?" title="Leitura do período" description="O que explica o resultado antes de abrir relatórios maiores." />
             <div className="mt-7 grid gap-3 sm:grid-cols-4">
               <JourneyStep label="Novos pacientes" value={overview.novosPacientes} />
               <JourneyStep label="Com orçamento" value={overview.pacientesComOrcamento} />
@@ -108,8 +113,8 @@ function SectionHeading({ eyebrow, title, description, action }: { eyebrow: stri
   return <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-teal">{eyebrow}</p><h2 className="mt-1 font-heading text-2xl font-normal text-foreground sm:text-[28px]">{title}</h2><p className="mt-1 text-sm text-muted-foreground">{description}</p></div>{action}</div>;
 }
 
-function AttentionCard({ icon: Icon, label, value, detail, onClick }: { icon: typeof CircleDollarSign; label: string; value: string; detail: string; onClick(): void }): React.JSX.Element {
-  return <button type="button" onClick={onClick} className="group rounded-2xl border border-border bg-card p-5 text-left transition-colors hover:border-teal/40"><div className="flex items-center justify-between"><Icon className="size-5 text-amber" /><ArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" /></div><p className="mt-5 text-sm font-semibold text-foreground">{label}</p><p className="mt-2 font-mono text-3xl font-semibold text-foreground">{value}</p><p className="mt-1 text-xs text-muted-foreground">{detail}</p></button>;
+function AttentionRow({ icon: Icon, label, value, detail, onClick }: { icon: typeof CircleDollarSign; label: string; value: string; detail: string; onClick(): void }): React.JSX.Element {
+  return <button type="button" onClick={onClick} className="group flex min-h-20 w-full items-center gap-4 border-b border-border px-5 py-4 text-left transition-colors hover:bg-muted/50"><span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground"><Icon className="size-4" aria-hidden="true" /></span><span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-foreground">{label}</span><span className="mt-1 block text-xs text-muted-foreground">{detail}</span></span><span className="text-right"><span className="block font-mono text-xl font-semibold text-foreground">{value}</span><ArrowRight className="ml-auto mt-1 size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden="true" /></span></button>;
 }
 
 function Metric({ label, value, detail, tone = 'default' }: { label: string; value: string; detail: string; tone?: 'default' | 'positive' | 'negative' }): React.JSX.Element {

@@ -8,6 +8,7 @@ import { createServiceClient } from '@/lib/supabase/service';
 import { clinicaIsentaDeCobranca } from '@/lib/billing/exemptions';
 import { resolverEstadoComercial } from '@/lib/billing/estado-comercial';
 import { obterAcessoFormacaoClinica } from '@/server/services/formacao-clinica';
+import { getGovernanceContext } from '@/server/auth/governance-context';
 
 const ROTA_PROTETICO = "/dashboard/protetico";
 
@@ -19,7 +20,10 @@ export default async function DashboardLayout({
   const { clinicId, user, supabase } = await requireClinicContext();
   const pathname = (await headers()).get('x-pathname') ?? '/dashboard';
 
-  const dentista = await getDentistaCached();
+  const [dentista, governance] = await Promise.all([
+    getDentistaCached(),
+    getGovernanceContext(clinicId),
+  ]);
 
   if (!dentista) {
     redirect("/onboarding");
@@ -123,6 +127,7 @@ export default async function DashboardLayout({
       avatarUrl={dentista.avatar_url}
       plano={dentista.plano}
       dentistaId={dentista.id}
+      canManageSettings={governance.ok && governance.data.papeis.some((papel) => papel === 'proprietario' || papel === 'gestor')}
     >
       {children}
       <WelcomeModal clinicaNome={dentista.clinica} />
