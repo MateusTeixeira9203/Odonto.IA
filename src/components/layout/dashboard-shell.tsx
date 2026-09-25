@@ -10,7 +10,6 @@ import { DexWidget } from "@/components/layout/dex-widget";
 // import { DexGuide } from "@/components/onboarding/dex-guide";
 import { BrandBackground } from "@/components/layout/brand-background";
 import { CommandPalette } from "@/components/command-palette/command-palette";
-import { ConsultorioRail } from '@/components/consultorio/consultorio-rail';
 import { useSessionGuard } from "@/hooks/use-session-guard";
 import type { DentistaRole } from "@/types/database";
 import type { PlanoId } from "@/lib/planos";
@@ -30,7 +29,6 @@ interface DashboardShellProps {
 export function DashboardShell({ children, nome, clinicaNome, activeClinicId, role, avatarUrl, plano, canManageSettings }: DashboardShellProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const isClinicHub = pathname.startsWith('/dashboard/meu-consultorio');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [hasMountedPalette, setHasMountedPalette] = useState(false);
@@ -76,25 +74,23 @@ export function DashboardShell({ children, nome, clinicaNome, activeClinicId, ro
 
   return (
     <div className="relative min-h-screen overflow-x-hidden">
-      {isClinicHub ? <div aria-hidden="true" className="fixed inset-0 z-0 bg-bg" /> : <BrandBackground variant="product" position="fixed" />}
+      <BrandBackground variant="product" position="fixed" />
 
       <MobileHeader onOpenDrawer={() => setIsDrawerOpen(true)} />
 
-      <main className={isClinicHub ? 'relative z-[1] flex min-h-screen w-full flex-col overflow-y-auto pb-24 pt-14 lg:pl-[72px] lg:pt-0' : 'relative z-[1] flex min-h-screen w-full flex-col overflow-y-auto pb-28 pt-14 md:pt-0'}>
+      <main className="relative z-[1] flex min-h-screen w-full flex-col overflow-y-auto pb-28 pt-14 md:pt-0">
         {children}
       </main>
 
-      {isClinicHub
-        ? <ConsultorioRail canManageSettings={canManageSettings} />
-        : <FloatingDock
-            nome={nome}
-            clinicaNome={clinicaNome}
-            activeClinicId={activeClinicId}
-            role={role}
-            avatarUrl={avatarUrl}
-            plano={plano}
-            canManageSettings={canManageSettings}
-          />}
+      <FloatingDock
+        nome={nome}
+        clinicaNome={clinicaNome}
+        activeClinicId={activeClinicId}
+        role={role}
+        avatarUrl={avatarUrl}
+        plano={plano}
+        canManageSettings={canManageSettings}
+      />
 
       <MobileDrawer
         open={isDrawerOpen}
