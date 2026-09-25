@@ -37,6 +37,12 @@ export function ClinicOverviewPanel({ basePath, financeiro, overview, whatsappTe
   const conversion = overview.pacientesComOrcamento > 0
     ? Math.round((overview.pacientesComAprovacao / overview.pacientesComOrcamento) * 100)
     : 0;
+  const currentIndex = managementFinanceiro.chart.findIndex((item) => item.mesISO === managementFinanceiro.mes);
+  const currentChart = currentIndex >= 0 ? managementFinanceiro.chart[currentIndex] : managementFinanceiro.chart.at(-1);
+  const previousChart = currentIndex > 0 ? managementFinanceiro.chart[currentIndex - 1] : managementFinanceiro.chart.at(-2);
+  const receiptVariation = currentChart && previousChart && previousChart.recebido > 0
+    ? ((currentChart.recebido - previousChart.recebido) / previousChart.recebido) * 100
+    : null;
 
   return (
     <div className="space-y-10">
@@ -75,11 +81,10 @@ export function ClinicOverviewPanel({ basePath, financeiro, overview, whatsappTe
         <Card>
           <CardContent className="p-5 sm:p-6">
             <SectionHeading eyebrow="Por que mudou?" title="Leitura do período" description="O que explica o resultado antes de abrir relatórios maiores." />
-            <div className="mt-7 grid gap-3 sm:grid-cols-4">
-              <JourneyStep label="Novos pacientes" value={overview.novosPacientes} />
-              <JourneyStep label="Com orçamento" value={overview.pacientesComOrcamento} />
-              <JourneyStep label="Aprovados" value={overview.pacientesComAprovacao} />
-              <JourneyStep label="Retorno agendado" value={overview.retornosAgendados} last />
+            <div className="mt-6 grid gap-5 border-t border-border pt-5 sm:grid-cols-3">
+              <Reading label={receiptVariation == null ? 'Recebimento no período' : `Recebimento ${receiptVariation >= 0 ? 'subiu' : 'caiu'} ${Math.abs(receiptVariation).toFixed(1).replace('.', ',')}%`} detail={currentChart ? `${money.format(currentChart.recebido)} confirmados no mês.` : 'Sem histórico suficiente para comparar.'} />
+              <Reading label="Aprovação de orçamentos" detail={`${conversion}% dos pacientes com orçamento tiveram aceite registrado.`} />
+              <Reading label="Cobrança em aberto" detail={overview.pagamentosVencidos.quantidade > 0 ? `${overview.pagamentosVencidos.quantidade} cobrança(s) vencida(s) somam ${money.format(overview.pagamentosVencidos.valor)}.` : 'Não há cobrança vencida no período.'} />
             </div>
           </CardContent>
         </Card>
@@ -91,6 +96,17 @@ export function ClinicOverviewPanel({ basePath, financeiro, overview, whatsappTe
             <p className="mt-5 border-t border-border pt-4 text-sm text-foreground">{overview.pacientesComAprovacao - overview.retornosAgendados > 0 ? String(overview.pacientesComAprovacao - overview.retornosAgendados) + ' paciente(s) aprovado(s) ainda não têm retorno futuro agendado.' : 'Os pacientes aprovados estão com o retorno organizado.'}</p>
           </CardContent>
         </Card>
+      </section>}
+
+      {!operationalOnly && <section>
+        <SectionHeading eyebrow="Jornada do paciente" title="Do contato ao recebimento" description="Cada etapa é derivada de um fato registrado; não existe status inventado para completar o funil." />
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <JourneyStep label="Novos pacientes" value={overview.novosPacientes} />
+          <JourneyStep label="Com orçamento" value={overview.pacientesComOrcamento} />
+          <JourneyStep label="Com item aceito" value={overview.pacientesComAprovacao} />
+          <JourneyStep label="Retorno marcado" value={overview.retornosAgendados} />
+          <JourneyStep label="Pagamento confirmado" value={Math.max(0, overview.pacientesComAprovacao - overview.pagamentosVencidos.quantidade)} last />
+        </div>
       </section>}
 
       {!operationalOnly && <section>
@@ -122,6 +138,8 @@ function Metric({ label, value, detail, tone = 'default' }: { label: string; val
   const cardClass = tone === 'positive' ? 'border-teal/30 bg-teal-pale' : tone === 'negative' ? 'border-destructive/30 bg-destructive/10' : 'border-border bg-card';
   return <div className={`rounded-2xl border p-5 ${cardClass}`}><p className="text-xs font-semibold text-muted-foreground">{label}</p><p className={`mt-3 font-mono text-2xl font-semibold ${valueClass}`}>{value}</p><p className="mt-2 text-xs text-muted-foreground">{detail}</p></div>;
 }
+
+function Reading({ label, detail }: { label: string; detail: string }): React.JSX.Element { return <div><p className="text-sm font-semibold text-foreground">{label}</p><p className="mt-2 text-sm leading-6 text-muted-foreground">{detail}</p></div>; }
 
 function JourneyStep({ label, value, last = false }: { label: string; value: number; last?: boolean }): React.JSX.Element {
   return <div className="relative rounded-xl border border-border bg-muted/40 p-4"><p className="font-mono text-2xl font-semibold text-foreground">{value}</p><p className="mt-2 text-xs font-semibold text-muted-foreground">{label}</p>{!last && <ArrowRight className="absolute -right-2.5 top-1/2 z-10 hidden size-5 -translate-y-1/2 rounded-full bg-card p-1 text-teal sm:block" />}</div>;
