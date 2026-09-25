@@ -58,17 +58,10 @@ export function ClinicOverviewPanel({ basePath, financeiro, overview, whatsappTe
         </div>
       </section>}
 
-      <SectionHeading eyebrow="Ações do dia" title="O que precisa andar" description="Cada ação abre a lista que explica o motivo e o próximo passo." />
-      <section className="overflow-hidden rounded-2xl border border-border bg-card" aria-label="Pendências da clínica">
-        <AttentionRow icon={CalendarClock} label="Cobrar pagamentos vencidos" value={String(overview.pagamentosVencidos.quantidade)} detail={money.format(overview.pagamentosVencidos.valor) + ' em atraso'} onClick={() => setQueue('pagamentos')} />
-        <AttentionRow icon={FileClock} label="Retomar orçamentos sem decisão" value={String(overview.orcamentosPendentes.quantidade)} detail={money.format(overview.orcamentosPendentes.valor) + ' com acompanhamento pendente'} onClick={() => setQueue('orcamentos')} />
-        <AttentionRow icon={UserRoundCheck} label="Pacientes sem retorno há 60 dias" value={String(overview.pacientesParaReativar)} detail="Follow-ups sem retorno futuro agendado" onClick={() => setQueue('reativacao')} />
-        <Link href={`${basePath}/estoque`} className="group flex min-h-20 items-center gap-4 border-t border-border px-5 py-4 text-left transition-colors hover:bg-muted/50">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground"><Package className="size-4" aria-hidden="true" /></span>
-          <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-foreground">Repor materiais críticos</span><span className="mt-1 block text-xs text-muted-foreground">Confira estoque baixo, validade e saldo divergente.</span></span>
-          <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
-        </Link>
-      </section>
+      {!operationalOnly && <section className="grid gap-5 xl:grid-cols-[1.35fr_0.85fr]">
+        <div><SectionHeading eyebrow="Ações do dia" title="O que precisa andar" description="Cada ação abre a lista que explica o motivo e o próximo passo." /><div className="mt-4 overflow-hidden rounded-2xl border border-border bg-surface" aria-label="Pendências da clínica"><AttentionRow icon={CalendarClock} label="Cobrar pagamentos vencidos" value={String(overview.pagamentosVencidos.quantidade)} detail={money.format(overview.pagamentosVencidos.valor) + ' em atraso'} onClick={() => setQueue('pagamentos')} /><AttentionRow icon={FileClock} label="Retomar orçamentos sem decisão" value={String(overview.orcamentosPendentes.quantidade)} detail={money.format(overview.orcamentosPendentes.valor) + ' com acompanhamento pendente'} onClick={() => setQueue('orcamentos')} /><AttentionRow icon={UserRoundCheck} label="Pacientes sem retorno há 60 dias" value={String(overview.pacientesParaReativar)} detail="Follow-ups sem retorno futuro agendado" onClick={() => setQueue('reativacao')} /><Link href={`${basePath}/estoque`} className="group flex min-h-20 items-center gap-4 border-t border-border px-5 py-4 text-left transition-colors hover:bg-surface-alt/60"><span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-surface-alt text-foreground"><Package className="size-4" aria-hidden="true" /></span><span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-foreground">Repor materiais críticos</span><span className="mt-1 block text-xs text-muted-foreground">Confira estoque baixo, validade e saldo divergente.</span></span><ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden="true" /></Link></div></div>
+        <div><SectionHeading eyebrow="Por que mudou?" title="Leitura do período" description="" /><Card className="mt-4 bg-surface"><CardContent className="space-y-5 p-5 sm:p-6"><Reading label={receiptVariation == null ? 'Recebimento no período' : `Recebimento ${receiptVariation >= 0 ? 'subiu' : 'caiu'} ${Math.abs(receiptVariation).toFixed(1).replace('.', ',')}%`} detail={currentChart ? `${money.format(currentChart.recebido)} confirmados no mês.` : 'Sem histórico suficiente para comparar.'} /><Reading label="Aprovação de orçamentos" detail={`${conversion}% dos pacientes com orçamento tiveram aceite registrado.`} /><Reading label="Cobrança em aberto" detail={overview.pagamentosVencidos.quantidade > 0 ? `${overview.pagamentosVencidos.quantidade} cobrança(s) vencida(s) somam ${money.format(overview.pagamentosVencidos.valor)}.` : 'Não há cobrança vencida no período.'} /></CardContent></Card></div>
+      </section>}
 
       {operationalOnly && <>
         <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
@@ -77,26 +70,6 @@ export function ClinicOverviewPanel({ basePath, financeiro, overview, whatsappTe
         <QueueDialog queue={queue} onOpenChange={(open) => !open && setQueue(null)} data={overview} templates={whatsappTemplates} nomeClinica={nomeClinica} />
       </>}
 
-      {!operationalOnly && <section className="grid gap-5 xl:grid-cols-[1.45fr_0.8fr]">
-        <Card>
-          <CardContent className="p-5 sm:p-6">
-            <SectionHeading eyebrow="Por que mudou?" title="Leitura do período" description="O que explica o resultado antes de abrir relatórios maiores." />
-            <div className="mt-6 grid gap-5 border-t border-border pt-5 sm:grid-cols-3">
-              <Reading label={receiptVariation == null ? 'Recebimento no período' : `Recebimento ${receiptVariation >= 0 ? 'subiu' : 'caiu'} ${Math.abs(receiptVariation).toFixed(1).replace('.', ',')}%`} detail={currentChart ? `${money.format(currentChart.recebido)} confirmados no mês.` : 'Sem histórico suficiente para comparar.'} />
-              <Reading label="Aprovação de orçamentos" detail={`${conversion}% dos pacientes com orçamento tiveram aceite registrado.`} />
-              <Reading label="Cobrança em aberto" detail={overview.pagamentosVencidos.quantidade > 0 ? `${overview.pagamentosVencidos.quantidade} cobrança(s) vencida(s) somam ${money.format(overview.pagamentosVencidos.valor)}.` : 'Não há cobrança vencida no período.'} />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-teal/25 bg-teal-pale">
-          <CardContent className="p-5 sm:p-6">
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-teal">Leitura do gestor</p>
-            <p className="mt-4 font-heading text-3xl text-foreground">{conversion}%</p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">dos pacientes que receberam orçamento no período tiveram uma aprovação registrada.</p>
-            <p className="mt-5 border-t border-border pt-4 text-sm text-foreground">{overview.pacientesComAprovacao - overview.retornosAgendados > 0 ? String(overview.pacientesComAprovacao - overview.retornosAgendados) + ' paciente(s) aprovado(s) ainda não têm retorno futuro agendado.' : 'Os pacientes aprovados estão com o retorno organizado.'}</p>
-          </CardContent>
-        </Card>
-      </section>}
 
       {!operationalOnly && <section>
         <SectionHeading eyebrow="Jornada do paciente" title="Do contato ao recebimento" description="Cada etapa é derivada de um fato registrado; não existe status inventado para completar o funil." />
