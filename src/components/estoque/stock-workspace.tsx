@@ -36,9 +36,10 @@ export function StockWorkspace({ initialContext, ports }: { initialContext: Stoc
       </section>
     )}
     <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
-      <div><h2 className="font-heading text-2xl font-bold text-foreground">Estoque</h2><p className="mt-1 text-sm text-muted-foreground">Materiais sob seus cuidados, com cada movimentação registrada.</p></div>
+      <div><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-teal">Estoque</p><h2 className="mt-1 font-heading text-[28px] font-normal text-foreground">Reponha antes de parar atendimento</h2><p className="mt-1 text-sm text-muted-foreground">Alertas primeiro; lista e movimentações continuam disponíveis.</p></div>
       {permissions.includes('estoque.gerir') && <Button className="min-h-11" onClick={() => setForm({ action: 'cadastrarItem' })}>Novo material</Button>}
     </header>
+    {!stock.loading && stock.list && <section className="grid gap-4 rounded-2xl border border-border bg-surface p-5 sm:grid-cols-3"><StockMetric label="Abaixo do mínimo" value={lowStockItems.length} /><StockMetric label="Divergência de inventário" value={divergentItems.length} /><StockMetric label="Materiais monitorados" value={stock.list.total} /></section>}
     <div className="flex flex-wrap gap-2" role="group" aria-label="Origem dos materiais">
       {stock.context.dentistaId && <Button variant="outline" className={cn('min-h-11', stock.scope === 'dentista' && 'bg-muted font-semibold')} aria-pressed={stock.scope === 'dentista'} onClick={() => stock.changeScope('dentista')}>Meu estoque</Button>}
       <Button variant="outline" className={cn('min-h-11', stock.scope === 'clinica' && 'bg-muted font-semibold')} aria-pressed={stock.scope === 'clinica'} onClick={() => stock.changeScope('clinica')}>Materiais da clínica</Button>
@@ -70,3 +71,5 @@ export function StockWorkspace({ initialContext, ports }: { initialContext: Stoc
     {form && (form.action === 'cadastrarItem' || stock.detail) && <StockForm action={form.action} clinicId={stock.context.clinicaId} titular={stock.titular} item={form.action === 'cadastrarItem' ? undefined : stock.detail?.item} lots={stock.detail?.lotes ?? []} movement={form.movement} ports={ports} onClose={() => setForm(null)} onRefresh={stock.refresh} onSaved={async () => { setNotice('Registro confirmado.'); await stock.refresh(); }} />}
   </div>;
 }
+
+function StockMetric({ label, value }: { label: string; value: number }): React.JSX.Element { return <div><p className="text-xs font-semibold text-muted-foreground">{label}</p><p className="mt-2 font-mono text-2xl font-semibold text-foreground">{value}</p></div>; }
