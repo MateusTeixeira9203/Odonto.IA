@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Landmark, LayoutDashboard, Package, Users, WalletCards } from 'lucide-react';
 
-import { OdontoIALogo } from '@/components/ui/dent-ia-logo';
 import { cn } from '@/lib/utils';
 import { MonthPicker } from './month-picker';
 
@@ -47,22 +46,17 @@ export function ClinicHubHeader({ basePath, nomeClinica, hasPersonalFinance, isS
   return (
     <header className="space-y-4 sm:space-y-7">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-5">
-        <div className="flex items-start gap-4">
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-[14px] border border-teal/20 bg-teal-pale text-teal-ink shadow-sm">
-            <OdontoIALogo className="size-5 text-teal" aria-hidden="true" />
-          </span>
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-teal">Meu consultório · {nomeClinica}</p>
-            <h1 className="mt-1 font-heading text-4xl font-normal tracking-tight text-foreground sm:text-[44px]">{page.title}</h1>
-            <p className="mt-1.5 max-w-2xl text-sm text-muted-foreground">{page.subtitle}</p>
-          </div>
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-teal">Meu consultório · {nomeClinica}</p>
+          <h1 className="mt-1 font-heading text-4xl font-normal tracking-tight text-foreground sm:text-[44px]">{page.title}</h1>
+          <p className="mt-1.5 max-w-2xl text-sm text-muted-foreground">{page.subtitle}</p>
         </div>
         <div className="flex items-center gap-3 self-start sm:self-auto">
-          <span className="hidden text-xs font-medium text-muted-foreground sm:inline">{roleLabel}</span>
+          <span className="hidden rounded-xl border border-border bg-surface px-3 py-2 text-xs font-semibold text-foreground sm:inline">{roleLabel}</span>
           <MonthPicker mes={currentMonth} />
         </div>
       </div>
-      <nav aria-label="Seções do meu consultório" className="-mx-4 overflow-x-auto border-y border-border bg-card px-4 py-1.5 [scroll-snap-type:x_proximity] [scrollbar-width:none] sm:mx-0 sm:rounded-2xl sm:border sm:p-1.5 [&::-webkit-scrollbar]:hidden">
+      <nav aria-label="Seções do meu consultório" className="-mx-4 overflow-x-auto border-y border-border bg-surface px-4 py-1.5 [scroll-snap-type:x_proximity] [scrollbar-width:none] sm:mx-0 sm:rounded-2xl sm:border sm:p-1.5 [&::-webkit-scrollbar]:hidden">
         <div className="flex min-w-max gap-1 sm:min-w-0 sm:w-full">
           {tabs.filter((tab) => (!('personal' in tab) || hasPersonalFinance) && (!isSecretary || tab.id === 'overview')).map((tab) => {
             const href = `${basePath}${tab.path}`;

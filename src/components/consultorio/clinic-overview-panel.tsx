@@ -46,7 +46,7 @@ export function ClinicOverviewPanel({ basePath, financeiro, overview, whatsappTe
 
   return (
     <div className="space-y-10">
-      {!operationalOnly && <section className="rounded-2xl border border-border bg-card p-5 sm:p-7">
+      {!operationalOnly && <section className="rounded-2xl border border-teal/25 bg-teal-pale p-5 sm:p-7">
         <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-teal">Saúde do negócio</p>
         <h2 className="mt-2 font-heading text-3xl font-normal tracking-tight text-foreground sm:text-4xl">{managementFinanceiro.movimentoLiquido >= 0 ? 'O mês gerou caixa para a clínica.' : 'O mês pede correção de caixa.'}</h2>
         <p className="mt-3 max-w-2xl text-sm text-muted-foreground">O resultado é caixa confirmado: o que entrou menos custos e repasses já pagos. Não é saldo bancário nem lucro contábil.</p>
@@ -135,7 +135,7 @@ function AttentionRow({ icon: Icon, label, value, detail, onClick }: { icon: typ
 
 function Metric({ label, value, detail, tone = 'default' }: { label: string; value: string; detail: string; tone?: 'default' | 'positive' | 'negative' }): React.JSX.Element {
   const valueClass = tone === 'positive' ? 'text-teal' : tone === 'negative' ? 'text-destructive' : 'text-foreground';
-  const cardClass = tone === 'positive' ? 'border-teal/30 bg-teal-pale' : tone === 'negative' ? 'border-destructive/30 bg-destructive/10' : 'border-border bg-card';
+  const cardClass = tone === 'positive' ? 'border-teal/30 bg-surface' : tone === 'negative' ? 'border-destructive/30 bg-destructive/10' : 'border-border bg-surface';
   return <div className={`rounded-2xl border p-5 ${cardClass}`}><p className="text-xs font-semibold text-muted-foreground">{label}</p><p className={`mt-3 font-mono text-2xl font-semibold ${valueClass}`}>{value}</p><p className="mt-2 text-xs text-muted-foreground">{detail}</p></div>;
 }
 

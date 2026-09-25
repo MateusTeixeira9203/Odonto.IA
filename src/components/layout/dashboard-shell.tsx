@@ -10,6 +10,7 @@ import { DexWidget } from "@/components/layout/dex-widget";
 // import { DexGuide } from "@/components/onboarding/dex-guide";
 import { BrandBackground } from "@/components/layout/brand-background";
 import { CommandPalette } from "@/components/command-palette/command-palette";
+import { ConsultorioRail } from '@/components/consultorio/consultorio-rail';
 import { useSessionGuard } from "@/hooks/use-session-guard";
 import type { DentistaRole } from "@/types/database";
 import type { PlanoId } from "@/lib/planos";
@@ -75,23 +76,25 @@ export function DashboardShell({ children, nome, clinicaNome, activeClinicId, ro
 
   return (
     <div className="relative min-h-screen overflow-x-hidden">
-      {isClinicHub ? <div aria-hidden="true" className="fixed inset-0 z-0 bg-background" /> : <BrandBackground variant="product" position="fixed" />}
+      {isClinicHub ? <div aria-hidden="true" className="fixed inset-0 z-0 bg-bg" /> : <BrandBackground variant="product" position="fixed" />}
 
       <MobileHeader onOpenDrawer={() => setIsDrawerOpen(true)} />
 
-      <main className="relative z-[1] w-full flex flex-col min-h-screen overflow-y-auto pt-14 md:pt-0 pb-28">
+      <main className={isClinicHub ? 'relative z-[1] flex min-h-screen w-full flex-col overflow-y-auto pb-24 pt-14 lg:pl-[72px] lg:pt-0' : 'relative z-[1] flex min-h-screen w-full flex-col overflow-y-auto pb-28 pt-14 md:pt-0'}>
         {children}
       </main>
 
-      <FloatingDock
-        nome={nome}
-        clinicaNome={clinicaNome}
-        activeClinicId={activeClinicId}
-        role={role}
-        avatarUrl={avatarUrl}
-        plano={plano}
-        canManageSettings={canManageSettings}
-      />
+      {isClinicHub
+        ? <ConsultorioRail canManageSettings={canManageSettings} />
+        : <FloatingDock
+            nome={nome}
+            clinicaNome={clinicaNome}
+            activeClinicId={activeClinicId}
+            role={role}
+            avatarUrl={avatarUrl}
+            plano={plano}
+            canManageSettings={canManageSettings}
+          />}
 
       <MobileDrawer
         open={isDrawerOpen}

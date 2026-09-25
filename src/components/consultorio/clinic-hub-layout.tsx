@@ -18,7 +18,7 @@ export function ClinicHubLayout({ context, children }: { context: ClinicHubConte
 
   return (
     <PageTransition>
-      <PageContainer variant="wide" className="space-y-8 pb-32">
+      <PageContainer variant="wide" className="max-w-[1180px] space-y-9 pb-16 pt-7 sm:px-8 lg:pt-10">
         <ClinicHubHeader
           basePath={context.basePath}
           nomeClinica={context.nomeClinica}
