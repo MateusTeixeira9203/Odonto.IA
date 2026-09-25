@@ -5,6 +5,8 @@ import { defaultOperationalWhatsAppTemplates, type WhatsAppTemplates } from '@/l
 
 const TemplateSchema = z.string().trim().min(10).max(1000);
 const TemplatesSchema = z.strictObject({
+  confirmacao: TemplateSchema,
+  lembrete_24h: TemplateSchema,
   reativacao: TemplateSchema,
   cobranca: TemplateSchema,
   orcamento: TemplateSchema,
