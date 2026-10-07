@@ -1,12 +1,12 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import { Search, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { criarProcedimento } from '@/app/dashboard/configuracoes/actions';
 import { casarProcedimentoLocal, type SugestaoLocal } from '@/lib/odontograma/casar-procedimento-local';
 import {
-  CHIPS_LOTE, FACES_LOTE,
+  CHIPS_LOTE, FACES_LOTE, acrescentarRestauracoesDoLote,
   eventosDoLote, eventosDoLoteAusente, eventosDoLoteAvulso, eventosDoLoteRestauracao,
 } from '@/lib/odontograma/lote-multidente';
 import type { ContextoLancamento } from '@/lib/odontograma/criar-eventos-contextuais';
@@ -39,7 +39,9 @@ export interface FaixaLoteProps {
   /** Dentes selecionados. A faixa aparece com 1+; com vários, aplica em lote. */
   dentes: number[];
   eventosDraft: OdontogramaEventoDraft[];
-  onEventosDraftChange: (eventos: OdontogramaEventoDraft[]) => void;
+  onEventosDraftChange: Dispatch<SetStateAction<OdontogramaEventoDraft[]>>;
+  /** Autor da aplicação nova; usado apenas para distinguir intenções clínicas do lote. */
+  autorDentistaId?: string;
   catalogoProcedimentos: MeuDiaCatalogoProcedimento[];
   /** 'YYYY-MM-DD' — `realizado_em` dos eventos criados em lote. */
   dataPadrao: string;
@@ -55,7 +57,7 @@ export interface FaixaLoteProps {
 }
 
 export function FaixaLote({
-  dentes, eventosDraft, onEventosDraftChange, catalogoProcedimentos, dataPadrao,
+  dentes, eventosDraft, onEventosDraftChange, autorDentistaId, catalogoProcedimentos, dataPadrao,
   modoLancamento, onModoLancamentoChange, onLimpar, onModoMultidenteChange, onAbrirDetalheDental,
   onIniciarPonte,
 }: FaixaLoteProps) {
@@ -125,9 +127,9 @@ export function FaixaLote({
     if (facesSelecionadas.length === 0) return;
     const contextoAtual = contexto();
     const novos = facesSelecionadas.flatMap((face) => (
-      eventosDoLoteRestauracao(face, dentes, dataPadrao, contextoAtual)
+      eventosDoLoteRestauracao(face, dentes, dataPadrao, contextoAtual, autorDentistaId)
     ));
-    onEventosDraftChange([...eventosDraft, ...novos]);
+    onEventosDraftChange((atuais) => acrescentarRestauracoesDoLote(atuais, novos));
     setFacesSelecionadas([]);
     setFacePendente(false);
     onModoMultidenteChange(false);

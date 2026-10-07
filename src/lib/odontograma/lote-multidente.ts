@@ -59,21 +59,56 @@ export function eventosDoLote(
  * estaria errado na metade dos casos (R-107d §2). Face diferente por dente continua fora,
  * dente a dente.
  *
- * Sem guard de duplicata, igual ao original: a face escolhida distingue, e o dentista pode
- * legitimamente restaurar 2 faces do mesmo dente na mesma rodada.
+ * A identidade da intenção é comparada na entrada do draft, não por dedup global no save.
  */
 export function eventosDoLoteRestauracao(
   face: FaceDental,
   dentes: number[],
   dataPadrao: string,
   contexto: ContextoLancamento,
+  autorDentistaId?: string,
 ): OdontogramaEventoDraft[] {
   return criarEventosContextuais({
     tipo: 'carie_restauracao',
     dataPadrao,
     contexto,
     ancoras: dentes.map((d) => ({ nivel: 'face', dente: d, faces: [face] })),
-  });
+  }).map((evento) => ({ ...evento, autorDentistaId, dataIntencao: dataPadrao }));
+}
+
+/** Só propostas do lote; nunca remove nem reescreve eventos já no rascunho. */
+export function acrescentarRestauracoesDoLote(
+  atuais: OdontogramaEventoDraft[],
+  propostas: OdontogramaEventoDraft[],
+): OdontogramaEventoDraft[] {
+  const chaves = new Set(atuais.filter((evento) => !evento.assinaturaId).map(chaveIntencaoRestauracao).filter((chave) => chave !== null));
+  const novos: OdontogramaEventoDraft[] = [];
+  for (const evento of propostas) {
+    const chave = chaveIntencaoRestauracao(evento);
+    if (chave !== null && chaves.has(chave)) continue;
+    if (chave !== null) chaves.add(chave);
+    novos.push(evento);
+  }
+  return novos.length > 0 ? [...atuais, ...novos] : atuais;
+}
+
+function chaveIntencaoRestauracao(evento: OdontogramaEventoDraft): string | null {
+  if (evento.tipo !== 'carie_restauracao' || evento.ancora.nivel !== 'face' ||
+      evento.ancora.dente == null || !evento.autorDentistaId) return null;
+  // Em evento realizado na clínica, a data clínica pode ser editada após criar o lote.
+  // A intenção atual deve acompanhar essa edição; dataIntencao guarda só a data inicial.
+  const data = evento.status === 'realizado' && evento.origem === 'clinica'
+    ? evento.realizado_em
+    : evento.dataIntencao ?? evento.realizado_em ?? evento.registrado_em;
+  if (!data) return null;
+  return JSON.stringify([
+    evento.tipo, evento.ancora.dente, [...(evento.ancora.faces ?? [])].sort(),
+    data, evento.status, evento.origem, evento.momento_planejado,
+    evento.autorDentistaId, evento.encaminhadoParaId ?? null,
+    evento.procedimentoId ?? null, evento.procedimentoNome ?? null,
+    evento.grupo_id, evento.papel_no_grupo,
+    evento.observacao, evento.detalhe ?? null,
+  ]);
 }
 
 /**

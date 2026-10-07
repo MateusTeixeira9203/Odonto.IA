@@ -52,7 +52,7 @@
 // linha ficava sem fundo, "flutuando"). `ToothDetailPanel` sem esse prop já renderiza a
 // tabela de especialidade inline, dentro do próprio card do perfil (555px).
 
-import { useEffect, useEffectEvent, useState, type ReactNode } from 'react';
+import { useEffect, useEffectEvent, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { Check, AlertTriangle, CalendarPlus, FileText, Loader2, ScanLine, X } from 'lucide-react';
@@ -133,7 +133,7 @@ interface RegistrarPainelProps {
   catalogoProcedimentos: MeuDiaCatalogoProcedimento[];
   /** C1 (§5.4) — dono é `meu-dia-client`; "Nesta sessão" (direita) lê o mesmo estado. */
   eventosDraft: OdontogramaEventoDraft[];
-  onEventosDraftChange: (eventos: OdontogramaEventoDraft[]) => void;
+  onEventosDraftChange: Dispatch<SetStateAction<OdontogramaEventoDraft[]>>;
   /** C7 (04/08) — dono continua em `meu-dia-client`, que agora é quem renderiza o
    *  `ToothDetailPanel` (3º bloco da direita). Lido aqui só pra saber se mostra o slot da
    *  tabela de especialidade (`onTabelaContainerRef` abaixo) e pra `onToothToggle` escrever. */
@@ -757,6 +757,7 @@ export function useRegistrarPainel({
               dentes={onde.dentes}
               eventosDraft={eventosDraft}
               onEventosDraftChange={setEventosDraft}
+              autorDentistaId={dentistaId}
               catalogoProcedimentos={catalogoProcedimentos}
               dataPadrao={dataPadrao}
               modoLancamento={modoLancamento}

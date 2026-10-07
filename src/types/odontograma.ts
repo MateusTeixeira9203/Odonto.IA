@@ -349,6 +349,9 @@ export interface OdontogramaEventoDraft extends OdontogramaEventoInput {
   encaminhadoParaId?: string | null;
   /** R-125a — identidade estável dentro de uma mesma captura explícita. */
   chaveCaptura?: string;
+  /** R-185 — identidade transitória do lote de restauração; não vai à RPC. */
+  autorDentistaId?: string;
+  dataIntencao?: string;
   /** R-49 — proveniência e dúvidas são só da revisão deste rascunho; montarRowsEventos não
    * as envia ao banco. O detalhe clínico continua sendo o único dado persistido. */
   endo_revisao?: {
