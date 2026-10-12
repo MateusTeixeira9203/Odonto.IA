@@ -3,6 +3,17 @@
 > **SPEC** · **R-92** · 🟡 fluxo no ar; ciclo real controlado pendente
 > **Aberto:** 2026-08-18 · **Replanejado:** 2026-08-20 · **Revisado:** 2026-09-03
 
+## Emenda QA — 2026-10-11
+
+O usuário autorizou liberar a clínica sintética QA B para testar com billing ativo.
+`STRIPE_BILLING_QA_EXEMPT_CLINIC_ID` adiciona uma única clínica QA à isenção, sem
+substituir `STRIPE_BILLING_EXEMPT_CLINIC_IDS`, cujo valor publicado é protegido como
+segredo. Não criar assinatura fictícia, não desligar billing globalmente e não incluir
+ID de clínica real nessa variável. Critérios: a clínica QA entra sem Checkout; as
+isenções anteriores continuam; uma clínica sem isenção segue bloqueada sem assinatura.
+Primeiro validar localmente com billing ligado; a versão publicada exige publicação
+separada e verificação após o deploy. Nenhum dado/schema de produção muda neste item.
+
 ## Emenda de ativação — 2026-09-03
 
 ### Decisão de lançamento

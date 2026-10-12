@@ -83,3 +83,41 @@ bloco real. Transição de opacidade curta, sem deslocamento de 14 px em toda na
 
 - CDN, troca de banco, Redis/caching especulativo e reescrita do Supabase.
 - Zerar todos os avisos antigos do repositório.
+
+## Evidência nova de auditoria — 11/10/2026
+
+**CONFIRMED S2, HID-01, sem correção neste ensaio.** Com conta QA B no site publicado,
+Agenda e Pacientes emitiram `React #418` em desktop claro e celular escuro. Em navegador
+UTC, ambas carregaram sem esse erro; em `America/Sao_Paulo`, ambas o reproduziram.
+No localhost com servidor UTC e navegador BRT, o diagnóstico de desenvolvimento
+apontou o primeiro texto divergente: `PacientesTable` mostrou data de cadastro
+`04/10/2026` no servidor e `03/10/2026` no cliente; `WeekView` mostrou horário de
+agendamento `15:30` no servidor e `12:30` no cliente. O React regenerou as árvores.
+O impacto de interação não foi medido. Recorte de correção: estabilizar o fuso da
+formatação no primeiro render, sem mudar timestamps persistidos nem regras de agenda;
+repetir os dois fusos e preservar data/hora clínica esperada. [Evidência](../auditorias/2026-10-11-auditoria-ampla-inicio.md).
+
+### Execução local HID-01 — 11/10/2026
+
+- `hora-brt` agora expõe partes, data e hora de um instante sempre em
+  `America/Sao_Paulo`. `PacientesTable` usa a data para cadastro; `WeekView` usa as partes
+  para texto, agrupamento e posição dos cards, sem alterar timestamps ou regras de busca.
+- **PASSA (teste focal):** `hora-brt.test.ts` passou com processo em `TZ=UTC` e
+  `TZ=America/Sao_Paulo`, cobrindo os valores da reprodução (`03/10/2026` e `12:30`).
+  ESLint dos quatro arquivos e `git diff --check` também passaram.
+- **NÃO TESTADO:** render/hidratação no navegador dos dois fusos e ausência de `React #418`;
+  não foi iniciado servidor ou usada conta QA neste despacho.
+- **PASSA (após saneamento do ambiente):** o primeiro typecheck foi bloqueado por tipos
+  gerados obsoletos em `.next/types/app` que citavam rotas ausentes. A pasta gerada foi
+  preservada fora do checkout; `next typegen` refez os tipos e `tsc --noEmit` passou.
+
+### Gate de integração local — 11/10/2026
+
+Com servidor Next dev em `TZ=UTC`, conta QA B autenticada e navegador isolado em UTC
+e `America/Sao_Paulo`, Pacientes e Agenda responderam 200 nas rotas esperadas.
+As fixtures que antes divergiam estavam visíveis (`03/10/2026` e `12:30`), e os quatro
+casos tiveram zero erros de hidratação ou outros erros de console. **PASSA apenas no
+recorte local HID-01.** [Matriz](../auditorias/evidencias-2026-10-11-auditoria-ampla/hid-01-local-gate.json).
+O site publicado ainda executa o código anterior; lá o achado continua aberto até
+publicação autorizada e novo gate. DayView/MonthView e outros consumidores do helper
+permanecem fora deste recorte.
