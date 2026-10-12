@@ -47,6 +47,11 @@ import {
   type SuperficieProntuario,
 } from '@/lib/prontuario/superficie';
 import {
+  proximoStatusEncaminhadoLocal,
+  refletirStatusEncaminhadoLocal,
+  type StatusEncaminhadoLocal,
+} from '@/lib/prontuario/status-encaminhado-local';
+import {
   deletarFicha,
   prepararExclusaoFicha,
   type ResumoExclusaoFicha,
@@ -161,6 +166,7 @@ export function ProntuarioTab({
   onAbrirArquivos,
 }: ProntuarioTabProps) {
   const router = useRouter();
+  const [statusLocalEncaminhado, setStatusLocalEncaminhado] = useState<StatusEncaminhadoLocal | null>(null);
   const [superficie, setSuperficie] = useState<SuperficieProntuario>({
     tipo: 'resumo',
     contexto: CONTEXTO_TIMELINE_INICIAL,
@@ -199,6 +205,11 @@ export function ProntuarioTab({
   const [carregandoExclusao, setCarregandoExclusao] = useState(false);
   const [apagandoFicha, setApagandoFicha] = useState(false);
   const assinaturaPadRef = useRef<SignaturePadLib | null>(null);
+
+  const dadosLocais = useMemo(
+    () => refletirStatusEncaminhadoLocal(dados, statusLocalEncaminhado),
+    [dados, statusLocalEncaminhado],
+  );
 
   const novoRegistroAberto = superficie.tipo === 'editor';
 
@@ -248,7 +259,7 @@ export function ProntuarioTab({
     temFichaHoje: false,
     fichaRascunhoId: null,
     destinoNovos: destinoNovoRegistroId,
-    boca: dados.boca,
+    boca: dadosLocais.boca,
     detalheEspecialidadeAberto,
     onAbrirPickerOrcamento: () => {
       toast.info('Salve o atendimento antes de gerar o orçamento. Assim o orçamento fica ligado à ficha correta.');
@@ -285,9 +296,9 @@ export function ProntuarioTab({
     },
   });
 
-  const atendimentos = useMemo(() => dados.atendimentos, [dados.atendimentos]);
+  const atendimentos = useMemo(() => dadosLocais.atendimentos, [dadosLocais.atendimentos]);
   const fichaAberta = superficie.tipo === 'ficha'
-    ? dados.fichas.find((ficha) => ficha.id === superficie.fichaId) ?? null
+    ? dadosLocais.fichas.find((ficha) => ficha.id === superficie.fichaId) ?? null
     : null;
   const atendimentoAberto = superficie.tipo === 'ficha'
     ? fichaAberta?.atendimentos.find((atendimento) => atendimento.id === superficie.atendimentoId)
@@ -299,11 +310,11 @@ export function ProntuarioTab({
   const atendimentosVisiveis = atendimentos.filter((atendimento) => (
     filtroClinico === 'tudo' || atendimento.eventos.some((evento) => evento.status === filtroClinico)
   ));
-  const todasFichas = dados.fichas;
+  const todasFichas = dadosLocais.fichas;
   const eventosClinicosUnicos = Array.from(new Map(
-    dados.fichas.flatMap((ficha) => ficha.eventos).map((evento) => [evento.id, evento] as const),
+    dadosLocais.fichas.flatMap((ficha) => ficha.eventos).map((evento) => [evento.id, evento] as const),
   ).values());
-  const fichasPorId = new Map(dados.fichas.map((ficha) => [ficha.id, ficha]));
+  const fichasPorId = new Map(dadosLocais.fichas.map((ficha) => [ficha.id, ficha]));
   const eventosPendentes = eventosClinicosUnicos.filter((evento) => evento.status === 'indicado');
   const pendencias = eventosPendentes.length;
 
@@ -356,14 +367,23 @@ export function ProntuarioTab({
   async function atualizarStatusGrupo(grupo: GrupoProcedimento, novoStatus: 'indicado' | 'realizado'): Promise<void> {
     const eventoIds = grupo.eventos.map((evento) => evento.id);
     const encaminhadoAoAtual = grupo.eventos.every((evento) => evento.encaminhadoParaId === dentistaId);
+    const concluindoEncaminhado = encaminhadoAoAtual && !grupo.eventos.every((evento) => evento.dentistaId === dentistaId);
     setAcaoProcedimento(`${grupo.chave}:status`);
-    const resultado = encaminhadoAoAtual && !grupo.eventos.every((evento) => evento.dentistaId === dentistaId)
+    const resultado = concluindoEncaminhado
       ? await atualizarStatusEncaminhado({ eventoIds, novoStatus })
       : await alternarStatusRegistro({ eventoIds, novoStatus });
     setAcaoProcedimento(null);
     if (!resultado.ok) {
       toast.error(resultado.error);
       return;
+    }
+    if (concluindoEncaminhado) {
+      setStatusLocalEncaminhado((statusAtual) => proximoStatusEncaminhadoLocal(
+        dados,
+        statusAtual,
+        eventoIds,
+        novoStatus,
+      ));
     }
     toast.success(novoStatus === 'realizado' ? 'Procedimento marcado como realizado.' : 'Procedimento voltou para A fazer.');
     router.refresh();
@@ -1411,11 +1431,11 @@ export function ProntuarioTab({
         ))}
       </div>
 
-      {dados.errosParciais.length > 0 && (
+      {dadosLocais.errosParciais.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-coral/30 bg-coral/5 px-3 py-2.5">
           <p className="flex items-center gap-2 text-xs text-text-primary">
             <AlertTriangle className="h-4 w-4 shrink-0 text-coral-ink" aria-hidden />
-            Não foi possível carregar: {dados.errosParciais.join(', ')}. O restante do prontuário continua disponível.
+            Não foi possível carregar: {dadosLocais.errosParciais.join(', ')}. O restante do prontuário continua disponível.
           </p>
           <Button variant="ghost" size="sm" onClick={() => router.refresh()}>Atualizar</Button>
         </div>
