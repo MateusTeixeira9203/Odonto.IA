@@ -1,6 +1,6 @@
 # R-182 — auditoria dirigida de estabilização
 
-STATUS: R-197 PREVIEW PASSA; R-195 PREVIEW PASSA; R-196 PREVIEW PASSA; R-199 390×844 PREVIEW PASSA; R-200 PRODUÇÃO REPRESENTATIVO PASSA / RESULTADO INCERTO NÃO TESTADO
+STATUS: FASE ENCERRADA OPERACIONALMENTE COM TESTES ADIADOS; R-197/195/196/199 PREVIEW PASSA; R-200 E AC-10 NOS RECORTES DESCRITOS PASSAM
 OWNER: Auditor — evidência; Coordenação — integração; Executor — correção após despacho
 LAST_REVIEWED: 2026-10-12
 CANONICAL_FOR: evidência desta execução dirigida do R-182 no candidato `2c52879`
@@ -1115,3 +1115,196 @@ definitivo e negativa de permissão; esses cenários permaneceram nas evidência
 **Próxima ação:** nenhuma correção nova para o Executor a partir deste gate. A Coordenação pode
 registrar o fluxo normal representativo como publicado e verificado, sem encerrar o risco específico
 de resultado incerto até existir fault injection segura.
+
+
+### 12.17 Infra Upstash — correção de configuração e gate publicado
+
+Responsável: Coordenação; diagnóstico em papel de Auditor, configuração autorizada
+como Executor, integração documental em seguida. Autorização explícita do usuário:
+atualizar somente `UPSTASH_REDIS_REST_URL` e `UPSTASH_REDIS_REST_TOKEN` e republicar
+o mesmo commit `a1722c4`, sem banco nem contratação paga.
+
+O endpoint antigo `frank-sponge-87179.upstash.io` retornou `ENOTFOUND`, com DNS geral
+funcional. O usuário criou `odontoia-ratelimit` no plano Free, região `sa-east-1`,
+endpoint `moved-mudfish-228291.upstash.io`. O painel mostrou plano gratuito e custo
+US$ 0,00; nenhum upgrade ou recurso pago foi contratado. Credenciais não constam
+neste repositório ou relatório.
+
+| Critério | Estado | Evidência e limite |
+| --- | --- | --- |
+| Conexão e limite isolado | **PASSA** | SDKs existentes: PING PONG; janela sintética de 2 solicitações/10s aceitou duas e negou a terceira. Prefixo QA exclusivo, com expiração; sem registros clínicos. |
+| Configuração publicada | **PASSA** | Somente as duas variáveis Upstash atualizadas, preservando os targets existentes production/preview. Produção republicada sem latest commit. |
+| Versão e alias | **PASSA** | Deployment `dpl_3LzHS31AvnGY6hertJtgChPJfyCb`, READY, SHA `a1722c47c346a4a80c84ad6cd5efd0ee42afbf08`, alias `odontoia.app` confirmado. |
+| Consumidor real | **PASSA** | Em 12/10 às 20:53:32 UTC, GET público `/api/dex/alerts?modo=badge` retornou 200 e `{count:0}`; no novo Redis, contador antes ausente passou a 1, TTL 121s. Hash parcial da chave `99d14e51db94ca45`, sem expor IP. A rota executa o limitador antes da autenticação. |
+| Sanidade e logs | **PASSA no recorte** | `/login` HTTP 200; consulta de warning/error do novo deployment entre 20:43:39 e 20:53:39 UTC não retornou registros. Não equivale a monitoramento contínuo. |
+| Jornadas autenticadas e demais consumidores | **NÃO TESTADO nesta rodada** | Sem carga, bloqueio forçado em produção ou repetição da auditoria clínica/financeira. Limite efetivo exercitado diretamente com chave sintética, não com 61 requisições à produção. |
+
+**Resultado:** falha de endpoint corrigida e integração Redis verificada em produção;
+R-182 permanece aberta pelos outros critérios. Não houve alteração de código,
+migration, dados reais ou novo commit. Evidência técnica sem segredo preservada
+localmente em `~/.local/share/odontoia-qa/upstash-production-gate-20261012.json`.
+
+**Reversão/contenção:** o endpoint anterior não é uma reversão funcional. Se houver
+regressão, inspecionar o serviço/configuração atual e o fallback já existente; não
+restaurar automaticamente o endpoint quebrado nem desativar proteções. Tokens
+permanecem privados; Preview receberá os valores novos em sua próxima publicação.
+
+
+### 12.18 AC-10 — ambiente local gratuito preparado, restauração pendente
+
+O usuário recusou gasto adicional. A opção de restore para novo projeto mostrou
+US$ 10,18/mês estimados e cópia de dados reais; diálogo cancelado, nenhum clone
+criado. Backup físico diário mais recente observado: 12/10/2026 04:32:04 UTC,
+COMPLETED. Disponibilidade de backup não é evidência de recuperação. Backups
+físicos não fornecem dump lógico para download e não incluem os arquivos do Storage.
+
+A alternativa oficial [runtime nativo](https://supabase.com/docs/guides/local-development/docker-and-native-runtimes)
+funcionou neste Linux, sem Docker, sudo ou contratação. CLI oficial `v2.120.0`,
+archive Linux amd64 validado contra checksums da mesma release, instalado fora
+do repositório em `~/.local/share/odontoia-qa/native-supabase/`. É experimental,
+portanto não se presume paridade com a plataforma hospedada.
+
+Laboratório: `~/.local/share/odontoia-qa/restore-lab-20261012/`, stack
+`41f92c656af7c620596fa568f3880e711c82f148af32ee9fc9cef83a0b8ee95e`,
+PostgreSQL **17.11**, escutando somente `127.0.0.1:25904`. Produção informa
+**17.6.1.084**: mesma versão principal, não build idêntico. Consulta SQL local
+funcionou e mostrou zero tabelas públicas. `pg_stat_statements 1.11`,
+`pgcrypto 1.3`, `plpgsql 1.0`, `supabase_vault 0.3.1` e `uuid-ossp 1.1`
+coincidem com as versões listadas no catálogo real. Isso não comprova igualdade
+de schema, políticas, grants ou configurações. Auth/REST/Storage e demais serviços
+ficaram desabilitados nesta preparação; nenhum dado real foi copiado.
+
+**PASSA:** instalação verificada, inicialização nativa e conexão SQL local.
+**NÃO TESTADO:** AC-10, reprodução fiel do schema, restauração representativa,
+paridade de políticas/grants, Auth/REST e fluxos após recuperação. Não executar
+a cadeia histórica de migrations como se fosse uma reprodução do banco publicado.
+
+**Bloqueio remanescente:** falta conexão direta autenticada para exportação lógica
+com `pg_dump`. O usuário já informou não ter a senha atual; ela não foi redefinida.
+O conector de catálogo não foi tratado como equivalente a um dump completo.
+Próxima etapa: obter exportação schema-only segura, congelar manifesto/checksum,
+reproduzir apenas no laboratório e comparar o catálogo antes de fixtures sintéticas.
+Não restaurar backup sobre produção nem contratar clone pago.
+
+
+### 12.19 AC-10 — exportação real e recuperação representativa local
+
+**Atualização de 12/10/2026, 18:07 BRT:** substitui o bloqueio de acesso descrito no
+§12.18. Usuário concluiu login CLI e autorizou exportação e restauração local.
+Coordenação executou preparação e auditoria dirigida conforme AC-10; não houve
+correção de código ou migração de produção. A CLI forneceu credencial temporária;
+`pg_dump` nativo 17.11 conectou ao projeto `zenfemoxvwerplrjgfqz` (Postgres 17.6)
+com SSL e `default_transaction_read_only=on`. Exportação **schema-only**, zero
+entradas TABLE DATA. Não foi redefinida senha nem copiado registro de usuário real.
+
+| Critério | Resultado | Evidência |
+| --- | --- | --- |
+| Exportação e integridade | **PASSA** | Archive de schema de 1.383.640 bytes; SHA-256 `01c25eafc2053a9e538616e025eeea769886d7df5c88feced8ad43e2510ca0c2`. Inclui schemas gerenciados e aplicação; não usa migrations locais para inferir o estado publicado. |
+| Catálogo da aplicação reproduzido | **PASSA** | 2.271 entradas de `public`/`private`, zero diferenças: definições, colunas, constraints, índices, triggers, policies, owners e ACLs comparados. Manifesto total de 3.318 entradas, 11 schemas, 111 policies, 275 funções e 81 triggers não internos. |
+| Equivalência integral da plataforma | **NÃO PASSA como cópia idêntica** | 54 diferenças conhecidas de owner/ACL em três extensões, 49 funções e duas views de extensões: runtime nativo usa `supabase_admin`, origem usa `postgres`. Não se alteraram catálogos de sistema para forçar equivalência. Builds, arquitetura, globals e configurações de servidor não são idênticos. |
+| Backup sintético completo | **PASSA** | Duas clínicas, usuários, dentistas, pacientes, Fichas, eventos e orçamentos fictícios; três parcelas de R$ 100,00 e um recebimento de R$ 100,00 pela RPC real. 26 linhas em 124 tabelas inspecionadas. Backup local completo SHA-256 `62288b40f0616a9cb98faf4db80a9f526e76e8609232556c2b732f527b95839e`. |
+| Restauração em banco vazio separado | **PASSA** | `pg_restore --single-transaction --exit-on-error`, exit 0, para `r182_recovered_20261012`; nenhuma restauração sobre produção ou sobre o banco local de origem. |
+| Dados e schema recuperados | **PASSA** | Contagens e hashes de todas as 124 tabelas iguais; 26 linhas e 3.318 entradas de catálogo iguais entre origem local e recuperado. SHA-256 dos dois manifestos de linhas: `cd5dde9d76c26017370c375ffde79cced1cf43bf1632f491d74e44267ad22afd`. |
+| Replay após recuperação | **PASSA no banco** | Mesma `operacao_id` retorna o mesmo pagamento com `repetida=true`; snapshot de todas as tabelas permanece idêntico, sem novo pagamento/log. |
+| Isolamento após recuperação | **PASSA em contextos SQL simulados** | A/B em clínicas distintas: leitura cruzada zero, update cruzado zero; RPC financeira de B sobre orçamento de A rejeita `sem_permissao`, sem alteração de snapshot. `SET LOCAL ROLE authenticated` e claims sintéticos em conexões distintas; **não** equivale a duas sessões Supabase Auth logadas. |
+| Retomada após recuperação | **PASSA no banco** | Nova operação paga segunda parcela; devido R$ 300,00, recebido R$ 200,00, saldo R$ 100,00 em conexão nova. Atualização da anotação da Ficha sobrevive à reconexão; origem local permanece com o snapshot original. |
+| Backup físico real, Storage e UI/Auth | **NÃO TESTADO** | Não restaurado backup hospedado ou arquivos reais; Auth/REST/UI e integrações externas não foram executados. AC-02 não é encerrado por simulação de claims. |
+
+**Resultado AC-10:** **PASSA no ensaio representativo local de recuperação lógica
+com dados sintéticos**, com limites explícitos acima. Não declara recuperação
+integral do ambiente de produção, perda zero sob qualquer incidente ou conclusão
+da R-182. R-200 no componente/UI e revisão manual continuam separados.
+
+**Procedimento e diferenças:** comparações usam `search_path` vazio, ordinal lógico
+de colunas (sem lacunas físicas de colunas apagadas), ACLs ordenadas com defaults
+efetivos e nomes textuais completos. O dump conserva políticas de auth/storage.
+Grants dos dois schemas GraphQL, ausentes na primeira reprodução do dump,
+foram reproduzidos **somente no laboratório** a partir do catálogo observado.
+Bootstrap local preparou extensões; uma elevação de `postgres` a superuser foi
+limitada à transação local e revertida a NOSUPERUSER. As diferenças de owner de
+extensão permaneceram registradas; não houve terceira tentativa de remendo.
+
+**Evidências e retomada:** `~/.local/share/odontoia-qa/restore-lab-20261012/` contém
+`production-schema.dump`, `catalog-manifest.sql`, `source-manifest.json`,
+`schema-differences-final.json`, `local-bootstrap.sql`, `local-platform-acl.sql`,
+`recovery-test.py`, `synthetic-full-backup.dump`, logs e `recovery-summary.json`.
+Arquivos privados, fora do Git. Harness fixado a `127.0.0.1:25904`, bancos
+`r182_source_20261012`/`r182_recovered_20261012`; bloqueia repetição sobre o alvo já
+existente para preservar evidências. Os bancos locais foram preservados; nenhum
+registro remoto foi limpo ou restaurado. Credencial temporária removida do plano
+de dump salvo. Para retomar o laboratório, usar o stack-id do handoff.
+
+### 12.20 Gate integrado local — R-200, data futura e estorno
+
+Atuação: Auditor; depois Coordenação na integração documental. Autorização atual:
+seguir pendências testáveis com segurança. Código `a1722c47c346a4a80c84ad6cd5efd0ee42afbf08`
+copiado por `git archive`, sem alteração de aplicação. Nenhum commit, push, deploy,
+serviço pago, escrita remota ou registro real nesta rodada.
+
+Ambiente: Next em `localhost:3140`, proxy de falha exclusivamente loopback em 3141,
+Auth/PostgREST nativos em 30983 e PG17 em 30807. Duas identidades Auth reais locais,
+clínicas distintas `QA LOCAL R200 A/B`, pacientes e valores fictícios. Serviços de
+email, Storage, Realtime e integrações externas fora do ensaio. Credenciais privadas
+ficam fora do Git em `~/.local/share/odontoia-qa/r200-browser-lab/`.
+
+Schema `public/private` restaurado do export real de §12.19. O bootstrap nativo
+acrescentou ACLs em 136 objetos; elas foram conciliadas **somente no laboratório**
+com o manifesto de origem. Comparação final: **2.271 entradas, zero diferenças**
+em definições, owner, ACL, RLS, constraints, triggers e índices da aplicação.
+As duas falhas financeiras e negativas autenticadas foram reexecutadas após essa
+conciliação. Não declarar Auth/extensões/runtime integralmente idênticos à produção.
+
+| Critério / recorte | Estado | Resultado observado |
+| --- | --- | --- |
+| Auth real e isolamento A/B | **PASSA local** | Login por senha no GoTrue, JWT próprio via PostgREST. Cada identidade leu seu único paciente e zero pacientes da outra clínica. RPC financeira cruzada: HTTP 400 `sem_permissao`, zero pagamento/log de B. |
+| R-200 geral, falha após commit | **PASSA local integrado** | Proxy viu RPC 200 e devolveu 503 somente na releitura seguinte de pagamentos. UI manteve valores anteriores, formulário e mensagem de resultado incerto. |
+| R-189 retry | **PASSA local integrado** | “Tentar novamente” reutilizou a mesma chave; um pagamento/log por intenção, resumo convergiu somente após resposta confirmada e permaneceu após reload. |
+| R-200 etapa, fechar/reabrir | **PASSA local integrado** | Recebimento persistiu uma vez; confirmação interrompida preservou resumo e desabilitou novo envio. Fechar/reabrir manteve bloqueio. Reload mostrou recebido/saldo reais e liberou botão. |
+| Data futura nativa | **PASSA local integrado** | Digitação por segmentos nativos escolheu 15/11/2026. Alterar parcelas 3→4→3 preservou a data. Criar cobrança gerou 3×R$ 200 em 15/11/2026, 15/12/2026 e 15/01/2027; UI/reload/Financeiro e banco concordaram. |
+| Estorno por etapa | **PASSA local integrado** | Estorno explícito de R$ 10 com motivo: recebido 60→50, saldo 390→400, três previsões recompostas totalizam 400; um log `pagamento.estornado`, recebimento anterior de R$ 50 preservado, UI imediata e reload coerentes. |
+
+Rastreabilidade financeira: primeira rodada, geral R$ 40 e etapa R$ 50. Rodada
+após conciliação das ACLs, duas novas intenções de R$ 10, uma em cada orçamento.
+Antes do estorno: quatro intenções deliberadas, quatro pagamentos e quatro logs;
+os dois retries gerais não acrescentaram pagamentos. Depois do estorno: geral
+R$ 50 recebido/saldo 250; etapa R$ 50 recebido/saldo 400. Cancelamentos de previsões
+anteriores permanecem na trilha, não representam novos recebimentos.
+
+Evidências: [manifesto e hashes](evidencias-2026-10-12-r200-local/sha256.json),
+[catálogo](evidencias-2026-10-12-r200-local/app-schema-comparison.json),
+[negativas Auth](evidencias-2026-10-12-r200-local/authenticated-negatives.json),
+[fault injection](evidencias-2026-10-12-r200-local/fault-events.jsonl),
+[banco antes do estorno](evidencias-2026-10-12-r200-local/final-database-evidence.json),
+[banco após estorno](evidencias-2026-10-12-r200-local/after-estorno.json).
+Capturas na mesma pasta mostram erro, retry, bloqueio reaberto, reload, futuro e estorno.
+
+**Conclusão:** os bloqueios técnicos de R-200, data futura e estorno por etapa
+estão demonstrados no recorte local integrado. Nenhum defeito novo confirmado.
+O controle `fill` de data não foi usado como evidência de estado React; o teste
+válido usou teclado nativo. Timeouts de compilação/memória do servidor dev e
+cliques durante transição de modal foram incidentes de ferramenta/laboratório,
+sem atribuição de falha ao produto. A origem R-200 permanece coberta por Preview
+normal e gate representativo publicado; não houve falha induzida remotamente.
+
+**Limites para fechar a R-182 ampla:** revisão/aceite manual do usuário;
+AC-06 de expiração/retomada de sessão; lote com Ficha assinada via Auth real;
+exceção de transporte do editor R-197. Esses cenários ainda não têm prova integrada
+nesta auditoria. Reabertura/negativa do encaminhamento têm evidência anterior em
+§9.2, mas o feedback imediato R-195 só foi retestado para conclusão (§12.13).
+O atalho legado R-194 não é alcançável pela rota atual redirecionada: não inventar
+uma segunda jornada nem ampliar produto para satisfazer um teste. Backup físico,
+Storage, gateway e indisponibilidade total da plataforma não foram testados;
+o AC-10 é o ensaio lógico representativo descrito em §12.19. Nenhum desses limites
+foi silenciosamente convertido em PASSA ou transferido ao backlog.
+
+### 12.21 Decisão de encerramento operacional — 12/10/2026
+
+O usuário decidiu encerrar agora a fase de estabilização e executar os testes
+remanescentes quando tiver mais tempo. Este é **aceite do encerramento operacional
+com ressalvas**, não evidência nova de que todos os ACs da R-182 passaram.
+Ficam anotados como 🧊 para retomada dirigida: sessão expirada/retomada (AC-06),
+lote com Ficha assinada sob Auth real, exceção de transporte do editor R-197,
+feedback imediato ao reabrir R-195 e revisão manual do usuário. Demais limites
+de §12.20 preservados. Nenhum teste foi repetido nem estado de produção alterado
+por esta decisão. Se a revisão manual revelar um defeito, reproduzir e abrir
+recorte próprio antes de corrigir; não reabrir toda a auditoria automaticamente.

@@ -1,12 +1,25 @@
 # R-182 — baseline verificável e encerramento da estabilização do core
 
-STATUS: ACTIVE
+STATUS: REFERENCE_ONLY — fase encerrada operacionalmente; verificações residuais 🧊 congeladas
 OWNER: Coordenação — integração; Auditor — evidências por marco após despacho
 LAST_REVIEWED: 2026-10-12
 REPLACES: recorte de planejamento do R-182 de 03/10/2026; evidências históricas preservadas no Git
-CANONICAL_FOR: contrato de M0 autorizado; proposta dos demais marcos e gates da estabilização
+CANONICAL_FOR: registro histórico da R-182 e contrato de referência dos testes adiados
 
 ## 1. Objetivo e autoridade
+
+**Decisão atual, 12/10:** o usuário encerrou a fase de estabilização agora e fará
+os testes restantes com mais tempo. O encerramento é operacional; os cenários
+listados na auditoria §12.20 continuam **NÃO TESTADOS** no recorte indicado.
+Não marcar esta spec como DONE nem usar o encerramento como prova de estabilidade
+integral. Retomar apenas o teste focal escolhido pelo usuário; defeito novo vira
+item próprio. A evidência desta spec fica preservada como referência.
+
+**Gate concluído, 12/10:** usuário autorizou seguir testes seguros. AC-10 lógico,
+resultado incerto R-200, data futura e estorno por etapa passaram no laboratório;
+ver [auditoria §§12.19–12.20](../auditorias/2026-10-12-R-182-estabilizacao-dirigida.md).
+Os despachos/resultados datados abaixo são históricos e não substituem a
+decisão atual de adiar verificações residuais.
 
 **Autorização de 11/10/2026:** usuário aprovou encaminhar somente M0 ao chat Auditor.
 M0 cobre conciliação em leitura; M1–M5 e correções continuam propostos, sem autorização
@@ -77,6 +90,11 @@ de rotas/papéis será inventariada em M0; ausência de teste não equivale a ap
 | AC-08 | Dependência indisponível ou salvamento interrompido em teste isolado; recuperar e repetir a ação. | Estado final consistente e orientação de retomada; sem confirmação falsa, operação duplicada ou perda clínica/financeira silenciosa. | Falhas simuladas, persistência e recarga; integrações sem envio externo ou uso pago nesta preparação. |
 | AC-09 | Falhas corrigidas e versão candidata identificada; repetir casos e regressões relacionadas. | Todas as obrigatórias passam; sem S0/S1 aberto nem achado confirmado de perda, exposição ou corrupção pendente. | Evidência por critério e consumidor; compilação/teste unitário sozinho não fecha o gate. |
 | AC-10 | Procedimento de recuperação e ambiente isolado disponíveis; exercitar restauração representativa e contenção. | Dados/fluxos recuperáveis demonstrados; proibir rollback que reintroduza vulnerabilidade ou restauração sobre produção. | Ensaio isolado, dados sintéticos e procedimento registrado; não declarar backup recuperável sem teste. |
+
+**AC-10 — resultado em 12/10/2026:** PASSA no ensaio representativo local de
+recuperação lógica, com schema exportado e dados sintéticos. Evidências e limites
+no [§12.19 da auditoria](../auditorias/2026-10-12-R-182-estabilizacao-dirigida.md).
+Não cobre backup físico real, arquivos Storage ou login/UI; não encerra a R-182.
 
 AC-04/08 cobrem também revisão e reexecução da IA quando aplicável. Se prompt clínico mudar,
 o contrato da correção exige eval antes/depois; não executar chamadas pagas por esta preparação.
@@ -233,6 +251,12 @@ A secretária também recebeu a linha operacional em `secretarias` com
 `must_change_password=false`, pois usa senha exclusiva de QA. As senhas das três
 contas foram giradas após um envio nativo do formulário no servidor local expor uma
 senha QA em log; o arquivo seguro foi substituído sem imprimir os novos valores.
+
+Em 12/10/2026, foi criado outro dentista exclusivo de QA para encaminhamento
+entre duas sessões sintéticas, sem usar contas da Clindent:
+`12cea711-42cf-4030-b0cd-d7cff4087cc6` na mesma clínica. Login por senha
+verificado; credenciais fora do repositório em arquivo `0600`:
+`/home/mtx/.local/share/odontoia-qa/2026-10-12-qa-b-dentista-a.json`.
 
 Fotografia anterior ao ensaio M3 na clínica QA B: vínculos/perfis `1 → 4`;
 pacientes `2 → 2`, fichas `5 → 5`, orçamentos `2 → 2`. Nesse momento, ainda não havia

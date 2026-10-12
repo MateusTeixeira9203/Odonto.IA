@@ -1,0 +1,18 @@
+[
+  {
+    "identity": "a",
+    "real_auth_login": true,
+    "own_rows": 1,
+    "cross_rows": 0
+  },
+  {
+    "identity": "b",
+    "real_auth_login": true,
+    "own_rows": 1,
+    "cross_rows": 0
+  },
+  {
+    "cross_rpc_status": 400,
+    "message": "sem_permissao"
+  }
+]

@@ -1,0 +1,130 @@
+{
+  "logs": [
+    {
+      "action": "cobranca.etapa_criada",
+      "metadata": {
+        "desconto": 0,
+        "item_ids": [
+          "7a07bccc-7309-4ffc-add5-26084e3b9016"
+        ],
+        "subtotal": 450.0,
+        "cobranca_id": "ce42e6f0-41ee-458b-b5b0-d6ffb8a473f7",
+        "valor_final": 450.0,
+        "entrada_valor": 0,
+        "parcelas_forma": "acordo",
+        "numero_parcelas": 3,
+        "entrada_registrada": false
+      }
+    },
+    {
+      "action": "pagamento.registrado",
+      "metadata": {
+        "forma": "pix",
+        "valor": 50,
+        "cobranca_id": "ce42e6f0-41ee-458b-b5b0-d6ffb8a473f7"
+      }
+    },
+    {
+      "action": "pagamento.registrado",
+      "metadata": {
+        "forma": "pix",
+        "valor": 10,
+        "cobranca_id": "ce42e6f0-41ee-458b-b5b0-d6ffb8a473f7"
+      }
+    },
+    {
+      "action": "pagamento.estornado",
+      "metadata": {
+        "valor": 10.0,
+        "motivo": "QA LOCAL \u2014 teste de estorno sint\u00e9tico",
+        "cobranca_id": "ce42e6f0-41ee-458b-b5b0-d6ffb8a473f7"
+      }
+    }
+  ],
+  "payments": [
+    {
+      "id": "05283c50-b66f-465b-8144-66f104218cee",
+      "valor": 133.34,
+      "status": "cancelado",
+      "data_vencimento": "2027-01-01"
+    },
+    {
+      "id": "106af607-f0ca-4e4b-aec2-2d62cf3d1b7a",
+      "valor": 133.33,
+      "status": "cancelado",
+      "data_vencimento": "2026-11-01"
+    },
+    {
+      "id": "21e06df1-b718-41b1-9800-82256f9fb9d2",
+      "valor": 150.0,
+      "status": "cancelado",
+      "data_vencimento": "2027-01-01"
+    },
+    {
+      "id": "26cee049-1e5c-4645-8de6-419d1d07c3b8",
+      "valor": 133.33,
+      "status": "cancelado",
+      "data_vencimento": "2026-12-01"
+    },
+    {
+      "id": "539a8aa4-f04e-4155-a08d-41fbc44b2ed3",
+      "valor": 50.0,
+      "status": "pago",
+      "data_vencimento": null
+    },
+    {
+      "id": "55418e57-88f5-47f5-b2e7-3cec6af901ae",
+      "valor": 133.34,
+      "status": "pendente",
+      "data_vencimento": "2027-01-01"
+    },
+    {
+      "id": "5dcf06ad-d95a-4769-8c9e-19c1dc2b73f9",
+      "valor": 10.0,
+      "status": "cancelado",
+      "data_vencimento": null
+    },
+    {
+      "id": "696e2927-c69c-4cea-95e2-b0bd0a892f8c",
+      "valor": 150.0,
+      "status": "cancelado",
+      "data_vencimento": "2026-12-01"
+    },
+    {
+      "id": "7f48e5cd-fa96-4076-a446-17dc75ba43b8",
+      "valor": 130.0,
+      "status": "cancelado",
+      "data_vencimento": "2026-11-01"
+    },
+    {
+      "id": "7f791544-016d-4b1a-b4ad-e9795004afa1",
+      "valor": 150.0,
+      "status": "cancelado",
+      "data_vencimento": "2026-11-01"
+    },
+    {
+      "id": "afa0a2f9-99de-46c9-9eb5-f1fe868e6529",
+      "valor": 133.33,
+      "status": "pendente",
+      "data_vencimento": "2026-11-01"
+    },
+    {
+      "id": "bdb2d299-aca9-44ef-b68d-2923939f690b",
+      "valor": 130.0,
+      "status": "cancelado",
+      "data_vencimento": "2027-01-01"
+    },
+    {
+      "id": "f24748dd-4dab-4e37-91f2-f8159dad7743",
+      "valor": 133.33,
+      "status": "pendente",
+      "data_vencimento": "2026-12-01"
+    },
+    {
+      "id": "f2f2287c-ec87-4c83-813e-ba1f2a6bab27",
+      "valor": 130.0,
+      "status": "cancelado",
+      "data_vencimento": "2026-12-01"
+    }
+  ]
+}

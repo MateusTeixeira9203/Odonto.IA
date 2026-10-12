@@ -1,6 +1,6 @@
 # R-200 — Resumo financeiro após recebimento confirmado
 
-STATUS: 🔵 ativo — fluxo representativo PASSA em produção; resultado incerto integrado pendente
+STATUS: REFERENCE_ONLY — recorte técnico concluído; encerramento operacional em 12/10
 OWNER: Coordenação — contrato/integração; Implementar — código; Auditor — gate
 LAST_REVIEWED: 2026-10-12
 CANONICAL_FOR: R182-EST-07 da auditoria dirigida
@@ -110,3 +110,35 @@ QA B.
 
 O fluxo representativo normal está publicado e verificado. O item continua ativo somente pelo caso
 específico de resultado incerto; o gate pós-publicação não amplia a conclusão para esse cenário.
+
+## Gate integrado isolado — 12/10/2026, após os gates publicados
+
+Este adendo substitui o **NÃO TESTADO em runtime** de resultado incerto acima.
+Contrato e código preservados em `a1722c47c346a4a80c84ad6cd5efd0ee42afbf08`;
+Next local + Auth/PostgREST reais + PG17, exclusivamente com fixtures sintéticas.
+Manifesto final: 2.271 entradas `public/private`, zero diferenças contra o schema
+exportado da produção, incluindo definição, owner, ACL e RLS. O runtime gerenciado
+Auth/extensões não foi declarado idêntico à plataforma hospedada.
+
+| Critério | Estado | Evidência |
+| --- | --- | --- |
+| RPC confirma e releitura falha | **PASSA integrado local** | Proxy somente loopback devolveu 503 ao GET de pagamentos após RPC 200; UI preservou resumo/formulário e orientou retomada. |
+| Retry geral | **PASSA integrado local** | Dois envios com a mesma `operacao_id` produziram um pagamento/log por intenção; resumo atualizado após confirmação, banco e reload coerentes. |
+| Bloqueio da etapa | **PASSA integrado local** | Botão desabilitado após resultado incerto e após fechar/reabrir; reload mostrou o pagamento persistido e liberou o fluxo. Nenhum segundo recebimento automático. |
+| Isolamento autenticado | **PASSA no recorte** | A/B fizeram login real em clínicas distintas; leitura cruzada vazia, RPC financeira de B sobre A retornou `sem_permissao`, sem pagamento/log de B. |
+
+Primeira rodada: geral R$ 40 e etapa R$ 50. Após conciliar ACLs extras do bootstrap
+nativo, ambos os cenários foram repetidos com novas intenções de R$ 10: geral
+R$ 50/saldo R$ 250, etapa R$ 60/saldo R$ 390. Quatro intenções deliberadas,
+quatro pagamentos e quatro logs; os dois retries gerais não criaram linhas.
+O estorno posterior do R$ 10 da etapa pertence ao gate AC-05, documentado separadamente.
+
+Evidências e limitações: [auditoria §12.20](../auditorias/2026-10-12-R-182-estabilizacao-dirigida.md#1220-gate-integrado-local--r-200-data-futura-e-estorno).
+Falha controlada não foi induzida no Preview/produção. O sucesso publicado anterior
+e este gate isolado são evidências complementares; revisão/aceite do usuário e
+fechamento amplo R-182 permanecem separados. Nenhum novo deploy é necessário
+para os testes desta rodada, pois não houve correção de código.
+
+**Decisão posterior em 12/10:** o usuário encerrou esta fase e fará os testes
+residuais da R-182 com mais tempo. O recorte técnico R-200 acima está concluído;
+isso não amplia a falha controlada local para um teste em produção.

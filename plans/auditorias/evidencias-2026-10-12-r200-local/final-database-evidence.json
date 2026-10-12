@@ -1,0 +1,214 @@
+{
+  "payments": [
+    {
+      "id": "9d31d216-919a-452c-a103-cfb366d7edb1",
+      "valor": 200.0,
+      "status": "pendente",
+      "cobranca_id": "b84b11fd-a151-418d-b95e-6d174c646949",
+      "operacao_id": null,
+      "orcamento_id": "1e136884-a0da-4344-9915-7dff3a0577d8",
+      "parcela_numero": 1,
+      "data_vencimento": "2026-11-15"
+    },
+    {
+      "id": "392c9771-f88b-4395-8efc-443904b899d4",
+      "valor": 200.0,
+      "status": "pendente",
+      "cobranca_id": "b84b11fd-a151-418d-b95e-6d174c646949",
+      "operacao_id": null,
+      "orcamento_id": "1e136884-a0da-4344-9915-7dff3a0577d8",
+      "parcela_numero": 2,
+      "data_vencimento": "2026-12-15"
+    },
+    {
+      "id": "f5998314-7a5f-4375-af18-e2b418971301",
+      "valor": 200.0,
+      "status": "pendente",
+      "cobranca_id": "b84b11fd-a151-418d-b95e-6d174c646949",
+      "operacao_id": null,
+      "orcamento_id": "1e136884-a0da-4344-9915-7dff3a0577d8",
+      "parcela_numero": 3,
+      "data_vencimento": "2027-01-15"
+    },
+    {
+      "id": "106af607-f0ca-4e4b-aec2-2d62cf3d1b7a",
+      "valor": 133.33,
+      "status": "cancelado",
+      "cobranca_id": "ce42e6f0-41ee-458b-b5b0-d6ffb8a473f7",
+      "operacao_id": null,
+      "orcamento_id": "8c39f000-aad4-4432-a0d9-587626e0f417",
+      "parcela_numero": 1,
+      "data_vencimento": "2026-11-01"
+    },
+    {
+      "id": "7f791544-016d-4b1a-b4ad-e9795004afa1",
+      "valor": 150.0,
+      "status": "cancelado",
+      "cobranca_id": "ce42e6f0-41ee-458b-b5b0-d6ffb8a473f7",
+      "operacao_id": null,
+      "orcamento_id": "8c39f000-aad4-4432-a0d9-587626e0f417",
+      "parcela_numero": 1,
+      "data_vencimento": "2026-11-01"
+    },
+    {
+      "id": "26cee049-1e5c-4645-8de6-419d1d07c3b8",
+      "valor": 133.33,
+      "status": "cancelado",
+      "cobranca_id": "ce42e6f0-41ee-458b-b5b0-d6ffb8a473f7",
+      "operacao_id": null,
+      "orcamento_id": "8c39f000-aad4-4432-a0d9-587626e0f417",
+      "parcela_numero": 2,
+      "data_vencimento": "2026-12-01"
+    },
+    {
+      "id": "696e2927-c69c-4cea-95e2-b0bd0a892f8c",
+      "valor": 150.0,
+      "status": "cancelado",
+      "cobranca_id": "ce42e6f0-41ee-458b-b5b0-d6ffb8a473f7",
+      "operacao_id": null,
+      "orcamento_id": "8c39f000-aad4-4432-a0d9-587626e0f417",
+      "parcela_numero": 2,
+      "data_vencimento": "2026-12-01"
+    },
+    {
+      "id": "05283c50-b66f-465b-8144-66f104218cee",
+      "valor": 133.34,
+      "status": "cancelado",
+      "cobranca_id": "ce42e6f0-41ee-458b-b5b0-d6ffb8a473f7",
+      "operacao_id": null,
+      "orcamento_id": "8c39f000-aad4-4432-a0d9-587626e0f417",
+      "parcela_numero": 3,
+      "data_vencimento": "2027-01-01"
+    },
+    {
+      "id": "21e06df1-b718-41b1-9800-82256f9fb9d2",
+      "valor": 150.0,
+      "status": "cancelado",
+      "cobranca_id": "ce42e6f0-41ee-458b-b5b0-d6ffb8a473f7",
+      "operacao_id": null,
+      "orcamento_id": "8c39f000-aad4-4432-a0d9-587626e0f417",
+      "parcela_numero": 3,
+      "data_vencimento": "2027-01-01"
+    },
+    {
+      "id": "539a8aa4-f04e-4155-a08d-41fbc44b2ed3",
+      "valor": 50.0,
+      "status": "pago",
+      "cobranca_id": "ce42e6f0-41ee-458b-b5b0-d6ffb8a473f7",
+      "operacao_id": null,
+      "orcamento_id": "8c39f000-aad4-4432-a0d9-587626e0f417",
+      "parcela_numero": null,
+      "data_vencimento": null
+    },
+    {
+      "id": "5dcf06ad-d95a-4769-8c9e-19c1dc2b73f9",
+      "valor": 10.0,
+      "status": "pago",
+      "cobranca_id": "ce42e6f0-41ee-458b-b5b0-d6ffb8a473f7",
+      "operacao_id": null,
+      "orcamento_id": "8c39f000-aad4-4432-a0d9-587626e0f417",
+      "parcela_numero": null,
+      "data_vencimento": null
+    },
+    {
+      "id": "7f48e5cd-fa96-4076-a446-17dc75ba43b8",
+      "valor": 130.0,
+      "status": "pendente",
+      "cobranca_id": "ce42e6f0-41ee-458b-b5b0-d6ffb8a473f7",
+      "operacao_id": null,
+      "orcamento_id": "8c39f000-aad4-4432-a0d9-587626e0f417",
+      "parcela_numero": 1,
+      "data_vencimento": "2026-11-01"
+    },
+    {
+      "id": "f2f2287c-ec87-4c83-813e-ba1f2a6bab27",
+      "valor": 130.0,
+      "status": "pendente",
+      "cobranca_id": "ce42e6f0-41ee-458b-b5b0-d6ffb8a473f7",
+      "operacao_id": null,
+      "orcamento_id": "8c39f000-aad4-4432-a0d9-587626e0f417",
+      "parcela_numero": 2,
+      "data_vencimento": "2026-12-01"
+    },
+    {
+      "id": "bdb2d299-aca9-44ef-b68d-2923939f690b",
+      "valor": 130.0,
+      "status": "pendente",
+      "cobranca_id": "ce42e6f0-41ee-458b-b5b0-d6ffb8a473f7",
+      "operacao_id": null,
+      "orcamento_id": "8c39f000-aad4-4432-a0d9-587626e0f417",
+      "parcela_numero": 3,
+      "data_vencimento": "2027-01-01"
+    },
+    {
+      "id": "62053054-1ba4-45ec-ba88-0f33fc3498d4",
+      "valor": 40.0,
+      "status": "pago",
+      "cobranca_id": null,
+      "operacao_id": "bf3f5f8f-7843-4a41-9df5-9f8d95693701",
+      "orcamento_id": "dbc7f30d-debb-4dcb-a0e8-cfa9a0a47750",
+      "parcela_numero": null,
+      "data_vencimento": null
+    },
+    {
+      "id": "6bef1b67-315e-4d5e-a324-531675d42299",
+      "valor": 10.0,
+      "status": "pago",
+      "cobranca_id": null,
+      "operacao_id": "75abb864-324d-44af-9f76-91203888d604",
+      "orcamento_id": "dbc7f30d-debb-4dcb-a0e8-cfa9a0a47750",
+      "parcela_numero": null,
+      "data_vencimento": null
+    }
+  ],
+  "receipt_logs": [
+    {
+      "id": "c0e87f7c-0aad-4b38-bbaf-824cf9c83de1",
+      "action": "pagamento.registrado",
+      "actor_id": "17998c43-cd4e-4c53-9209-b5cfb2cf6af4",
+      "metadata": {
+        "forma": "dinheiro",
+        "valor": 40,
+        "operacao_id": "bf3f5f8f-7843-4a41-9df5-9f8d95693701",
+        "orcamento_id": "dbc7f30d-debb-4dcb-a0e8-cfa9a0a47750"
+      },
+      "entity_id": "dbc7f30d-debb-4dcb-a0e8-cfa9a0a47750"
+    },
+    {
+      "id": "f2a6c4f1-6fbb-4743-8ee2-eeab751adb0c",
+      "action": "pagamento.registrado",
+      "actor_id": "17998c43-cd4e-4c53-9209-b5cfb2cf6af4",
+      "metadata": {
+        "forma": "pix",
+        "valor": 50,
+        "cobranca_id": "ce42e6f0-41ee-458b-b5b0-d6ffb8a473f7"
+      },
+      "entity_id": "8c39f000-aad4-4432-a0d9-587626e0f417"
+    },
+    {
+      "id": "81c31de0-f7cc-46fc-9f37-813d2c405bd1",
+      "action": "pagamento.registrado",
+      "actor_id": "17998c43-cd4e-4c53-9209-b5cfb2cf6af4",
+      "metadata": {
+        "forma": "dinheiro",
+        "valor": 10,
+        "operacao_id": "75abb864-324d-44af-9f76-91203888d604",
+        "orcamento_id": "dbc7f30d-debb-4dcb-a0e8-cfa9a0a47750"
+      },
+      "entity_id": "dbc7f30d-debb-4dcb-a0e8-cfa9a0a47750"
+    },
+    {
+      "id": "eda94f4a-75c5-4716-87de-2406510ff11d",
+      "action": "pagamento.registrado",
+      "actor_id": "17998c43-cd4e-4c53-9209-b5cfb2cf6af4",
+      "metadata": {
+        "forma": "pix",
+        "valor": 10,
+        "cobranca_id": "ce42e6f0-41ee-458b-b5b0-d6ffb8a473f7"
+      },
+      "entity_id": "8c39f000-aad4-4432-a0d9-587626e0f417"
+    }
+  ],
+  "clinic_b_payments": 0,
+  "clinic_b_receipt_logs": 0
+}
