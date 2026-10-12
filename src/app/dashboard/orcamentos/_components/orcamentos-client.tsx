@@ -56,6 +56,7 @@ import { Label } from '@/components/ui/label';
 import { createClient } from '@/lib/supabase/client';
 import { parseValorBR, formatValorBR } from '@/lib/valor-br';
 import { normalizarNome } from '@/lib/normalizar-nome';
+import { hojeBRT } from '@/lib/hora-brt';
 import type { OrcamentoRow, OrcamentoItemRow, PagamentoRow } from '../page';
 import { BotaoDownloadPDF } from '@/components/orcamentos/botao-download-pdf';
 import { BotaoEnviarWhatsApp } from '@/components/orcamentos/botao-enviar-whatsapp';
@@ -176,6 +177,8 @@ export function OrcamentosClient({
   });
   const [pagSaving, setPagSaving] = useState(false);
   const [pagError, setPagError] = useState<string | null>(null);
+  const [pagIntent, setPagIntent] = useState<Parameters<typeof registrarPagamento>[0] | null>(null);
+  const [pagResultadoDesconhecido, setPagResultadoDesconhecido] = useState(false);
   const [parcelasMode, setParcelasMode] = useState(false);
   // R-113 — id da parcela pendente sendo fechada; null = painel em modo "criar pagamento novo".
   // Mesmo discriminador que a ficha do paciente usa (paciente-detail-client.tsx).
@@ -207,6 +210,9 @@ export function OrcamentosClient({
   const [viewedIds, setViewedIds] = useState<Set<string>>(new Set());
   const [pixModalOrc, setPixModalOrc] = useState<OrcamentoRow | null>(null);
   const [pagRapidoSaving, setPagRapidoSaving] = useState(false);
+  const rapidoIntentRef = useRef<Parameters<typeof registrarPagamentoRapido>[0] | null>(null);
+  const rapidoInFlightRef = useRef(false);
+  const [rapidoResultadoDesconhecido, setRapidoResultadoDesconhecido] = useState(false);
 
   // Limpa debounce ao desmontar
   useEffect(() => () => {
@@ -461,32 +467,41 @@ export function OrcamentosClient({
   const handleRegistrarPagamento = async () => {
     if (!selected) return;
     const valor = parseValorBR(pagForm.valor);
-    if (!valor || valor <= 0) {
+    if (!pagIntent && (!valor || valor <= 0)) {
       setPagError('Informe um valor válido.');
       return;
     }
     setPagError(null);
     setPagSaving(true);
-
-    const result = await registrarPagamento({
+    const intent = pagIntent ?? {
+      operacaoId: crypto.randomUUID(),
       orcamentoId: selected.id,
       pacienteId: selected.paciente?.id ?? '',
       valor,
       formaPagamento: pagForm.formaPagamento,
       data: pagForm.data,
       dentistaId: selected.dentista?.id,
-    });
+    };
+    setPagIntent(intent);
+    try {
+      const result = await registrarPagamento(intent);
 
-    if (result.error) {
-      setPagError(result.error);
-    } else {
+      if (result.error) {
+        setPagError(result.error);
+        if (result.retryable) {
+          setPagResultadoDesconhecido(true);
+        } else {
+          setPagIntent(null);
+          setPagResultadoDesconhecido(false);
+        }
+      } else {
       const novoPag: PagamentoRow = {
         id: result.id ?? crypto.randomUUID(),
         orcamento_id: selected.id,
-        valor,
+        valor: intent.valor,
         status: 'pago',
-        forma_pagamento: pagForm.formaPagamento,
-        data_pagamento: pagForm.data,
+        forma_pagamento: intent.formaPagamento,
+        data_pagamento: intent.data,
         data_vencimento: null,
         parcela_numero: null,
         total_parcelas: null,
@@ -512,9 +527,16 @@ export function OrcamentosClient({
         data: new Date().toISOString().split('T')[0],
         dataVencimento: '',
       });
+      setPagIntent(null);
+      setPagResultadoDesconhecido(false);
       router.refresh();
+      }
+    } catch {
+      setPagResultadoDesconhecido(true);
+      setPagError('Não foi possível confirmar o resultado. Tentar novamente repetirá a mesma operação.');
+    } finally {
+      setPagSaving(false);
     }
-    setPagSaving(false);
   };
 
   // Cobrança futura é previsão substituível; recebimentos confirmados ficam intactos.
@@ -794,20 +816,44 @@ export function OrcamentosClient({
   };
 
   const handlePagamentoRapido = async (formaPagamento: FormaPagamento) => {
-    if (!selected) return;
-    setPagRapidoSaving(true);
-    // R-34 — agora pode fechar uma parcela existente (UPDATE) em vez de sempre inserir
-    // linha nova; o valor exato e se aprovou vêm do server. Sem estado otimista aqui —
-    // o router.refresh() logo abaixo já busca o estado real.
-    const result = await registrarPagamentoRapido({
+    if (!selected || rapidoInFlightRef.current) return;
+    const intent = rapidoIntentRef.current ?? {
+      operacaoId: crypto.randomUUID(),
       orcamentoId: selected.id,
       pacienteId: selected.paciente?.id ?? '',
       formaPagamento,
-    });
-    if (!result.error) {
+      data: hojeBRT(),
+    };
+    if (intent.orcamentoId !== selected.id) return;
+    rapidoIntentRef.current = intent;
+    rapidoInFlightRef.current = true;
+    setPagRapidoSaving(true);
+    try {
+      const result = await registrarPagamentoRapido(intent);
+      if (result.error) {
+        if (result.retryable) {
+          setRapidoResultadoDesconhecido(true);
+          setPixModalOrc(null);
+        } else {
+          rapidoIntentRef.current = null;
+          setRapidoResultadoDesconhecido(false);
+        }
+        toast.error(result.error);
+        return;
+      }
+      rapidoIntentRef.current = null;
+      setRapidoResultadoDesconhecido(false);
+      setPixModalOrc(null);
       router.refresh();
+      toast.success(result.repetida ? 'Recebimento confirmado anteriormente.' : 'Recebimento registrado.');
+    } catch {
+      setRapidoResultadoDesconhecido(true);
+      setPixModalOrc(null);
+      toast.error('Não foi possível confirmar o resultado. Tentar novamente repetirá a mesma operação.');
+    } finally {
+      rapidoInFlightRef.current = false;
+      setPagRapidoSaving(false);
     }
-    setPagRapidoSaving(false);
   };
 
   // Pagamento recebido não bloqueia mais a exclusão — só levanta o aviso no diálogo.
@@ -1119,7 +1165,7 @@ export function OrcamentosClient({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => { setSelected(null); setEditMode(false); setEditError(null); }}
+              onClick={() => { if (!rapidoResultadoDesconhecido && !pagRapidoSaving) { setSelected(null); setEditMode(false); setEditError(null); } }}
               className="fixed inset-0 bg-black/40 z-40"
             />
             <motion.aside
@@ -1183,13 +1229,35 @@ export function OrcamentosClient({
                         </button>
                       </>
                     )}
-                    <button onClick={() => { setSelected(null); setEditMode(false); setEditError(null); }}
+                    <button onClick={() => { if (!rapidoResultadoDesconhecido && !pagRapidoSaving) { setSelected(null); setEditMode(false); setEditError(null); } }}
+                      disabled={rapidoResultadoDesconhecido || pagRapidoSaving}
                       className="p-2 rounded-xl text-white/70 hover:text-white hover:bg-white/15 transition-colors">
                       <X className="w-5 h-5" />
                     </button>
                   </div>
                 </div>
               </div>
+
+              {(rapidoResultadoDesconhecido || pagRapidoSaving) && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-card/95 p-6">
+                  <div className="max-w-sm space-y-4 text-center" role="status" aria-live="polite">
+                    {pagRapidoSaving ? (
+                      <>
+                        <Loader2 className="mx-auto h-6 w-6 animate-spin text-foreground" />
+                        <p className="text-sm text-foreground">Confirmando recebimento…</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="font-semibold text-foreground">Resultado ainda não confirmado</p>
+                        <p className="text-sm text-muted-foreground">Tentar novamente consulta a mesma operação e não cria outro recebimento. Para iniciar um novo, recarregue o orçamento depois de confirmar o resultado.</p>
+                        <Button onClick={() => void handlePagamentoRapido(rapidoIntentRef.current?.formaPagamento ?? 'dinheiro')}>
+                          Tentar novamente
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="flex-1 overflow-y-auto p-6 space-y-6">
                 {/* Ações rápidas da secretária.
@@ -1616,7 +1684,9 @@ export function OrcamentosClient({
                         ? 'Confirmar previsão como recebida'
                         : parcelasMode
                           ? 'Organizar cobrança'
-                          : 'Registrar recebimento'}
+                            : pagResultadoDesconhecido
+                              ? 'Tentar novamente'
+                              : 'Registrar recebimento'}
                     </label>
                     {/* Atalhos de criação não fazem sentido enquanto se fecha uma parcela. */}
                     {!closingPagamentoId && (
@@ -1775,7 +1845,7 @@ export function OrcamentosClient({
       </AnimatePresence>
 
       {/* Dialog: QR Code PIX */}
-      <Dialog open={!!pixModalOrc} onOpenChange={(open) => { if (!open) setPixModalOrc(null); }}>
+      <Dialog open={!!pixModalOrc} onOpenChange={(open) => { if (!open && !pagRapidoSaving) setPixModalOrc(null); }}>
         <DialogContent className="max-w-sm rounded-2xl bg-surface border-border">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl text-text-primary">QR Code PIX</DialogTitle>
@@ -1799,7 +1869,7 @@ export function OrcamentosClient({
                 </p>
               </div>
               <Button
-                onClick={() => void handlePagamentoRapido('pix').then(() => setPixModalOrc(null))}
+                onClick={() => void handlePagamentoRapido('pix')}
                 disabled={pagRapidoSaving}
                 className="w-full bg-teal text-white hover:bg-teal-lt rounded-xl"
               >

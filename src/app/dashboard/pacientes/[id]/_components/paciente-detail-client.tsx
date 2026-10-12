@@ -277,6 +277,8 @@ export function PacienteDetailClient({
   const [parcelasError, setParcelasError] = useState<string | null>(null);
   const [pagSaving, setPagSaving] = useState(false);
   const [pagError, setPagError] = useState<string | null>(null);
+  const [pagIntent, setPagIntent] = useState<Parameters<typeof registrarPagamento>[0] | null>(null);
+  const [pagResultadoDesconhecido, setPagResultadoDesconhecido] = useState(false);
 
   // R-28 — fechar uma parcela pendente específica via a aba Registrar pagamento
   // (em vez de abrir um pagamento novo e duplicar o recebimento).
@@ -815,34 +817,50 @@ export function PacienteDetailClient({
   const handleRegistrarPagamento = async () => {
     if (!detalheOrcId || !detalheOrc) return;
     const valor = parseValorBR(pagForm.valor);
-    if (!valor || valor <= 0) {
+    if (!pagIntent && (!valor || valor <= 0)) {
       setPagError('Informe um valor válido.');
       return;
     }
     setPagError(null);
     setPagSaving(true);
-
-    const result = await registrarPagamento({
+    const intent = pagIntent ?? {
+      operacaoId: crypto.randomUUID(),
       orcamentoId: detalheOrcId,
       pacienteId: paciente.id,
       valor,
       formaPagamento: pagForm.formaPagamento,
       data: pagForm.data,
-      dentistaId: detalheOrc?.dentista_id ?? undefined,
-    });
+      dentistaId: detalheOrc.dentista_id ?? undefined,
+    };
+    setPagIntent(intent);
+    try {
+      const result = await registrarPagamento(intent);
 
-    if (result.error) {
-      setPagError(result.error);
-    } else {
+      if (result.error) {
+        setPagError(result.error);
+        if (result.retryable) {
+          setPagResultadoDesconhecido(true);
+        } else {
+          setPagIntent(null);
+          setPagResultadoDesconhecido(false);
+        }
+      } else {
       setPagForm({
         valor: '',
         formaPagamento: 'dinheiro',
         data: new Date().toISOString().split('T')[0],
         dataVencimento: '',
       });
+      setPagIntent(null);
+      setPagResultadoDesconhecido(false);
       router.refresh();
+      }
+    } catch {
+      setPagResultadoDesconhecido(true);
+      setPagError('Não foi possível confirmar o resultado. Tentar novamente repetirá a mesma operação.');
+    } finally {
+      setPagSaving(false);
     }
-    setPagSaving(false);
   };
 
   const handleIniciarFechamentoPagamento = (pg: Pagamento) => {
@@ -1993,6 +2011,7 @@ export function PacienteDetailClient({
         setPagForm={setPagForm}
         pagSaving={pagSaving}
         pagError={pagError}
+        pagResultadoDesconhecido={pagResultadoDesconhecido}
         parcelasMode={parcelasMode}
         setParcelasMode={setParcelasMode}
         parcelasForm={parcelasForm}

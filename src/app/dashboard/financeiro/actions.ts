@@ -725,13 +725,14 @@ export async function buscarOrcamentosPendentesPorPaciente(
 export type FormaRecebimento = 'pix' | 'dinheiro' | 'transferencia' | 'cartao_credito' | 'cartao_debito' | 'boleto' | 'outro';
 
 export async function registrarRecebimento(dados: {
+  operacaoId: string;
   pacienteId: string;
   orcamentoId: string;
   valor: number;
   formaPagamento: FormaRecebimento;
   data: string;
   dentistaId?: string;
-}): Promise<{ error?: string; autoAprovado?: boolean }> {
+}): Promise<{ error?: string; retryable?: boolean; autoAprovado?: boolean }> {
   // Transferência é uma forma apresentada só no Financeiro legado; `pagamentos` não possui
   // esse valor no CHECK, então preservamos a escrita como "outro" em vez de inseri-la sem
   // validação. Todas as demais regras (saldo, tenant e auditoria) são a mesma transação do
@@ -740,6 +741,7 @@ export async function registrarRecebimento(dados: {
     ? 'outro'
     : dados.formaPagamento;
   return registrarPagamento({
+    operacaoId: dados.operacaoId,
     orcamentoId: dados.orcamentoId,
     pacienteId: dados.pacienteId,
     valor: dados.valor,

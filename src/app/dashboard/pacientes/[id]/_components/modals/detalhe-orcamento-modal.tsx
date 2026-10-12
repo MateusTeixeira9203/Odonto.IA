@@ -84,6 +84,7 @@ interface Props {
   setPagForm: React.Dispatch<React.SetStateAction<PagForm>>;
   pagSaving: boolean;
   pagError: string | null;
+  pagResultadoDesconhecido: boolean;
   parcelasMode: boolean;
   setParcelasMode: (v: boolean) => void;
   parcelasForm: ParcelasForm;
@@ -683,7 +684,7 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
 export function DetalheOrcamentoModal({
   detalheOrc, detalheOrcId, onClose,
   pacienteTelefone, pacienteNome, pacienteId,
-  pagForm, setPagForm, pagSaving, pagError,
+  pagForm, setPagForm, pagSaving, pagError, pagResultadoDesconhecido,
   parcelasMode, setParcelasMode, parcelasForm, setParcelasForm, parcelasSaving, parcelasError, onGerarParcelas,
   orcEditMode, setOrcEditMode, orcEditItens, setOrcEditItens,
   orcEditValorAcordado, setOrcEditValorAcordado,
@@ -1681,7 +1682,9 @@ export function DetalheOrcamentoModal({
                           ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Salvando...</>
                           : closingPagamentoId
                             ? 'Marcar como Pago'
-                            : 'Registrar recebimento'
+                            : pagResultadoDesconhecido
+                              ? 'Tentar novamente'
+                              : 'Registrar recebimento'
                         }
                       </Button>
                     )}

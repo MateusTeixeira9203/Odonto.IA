@@ -157,6 +157,8 @@ export function FinanceiroClient({
   const [recLoading, setRecLoading]                   = useState(false);
   const [recBuscando, setRecBuscando]                 = useState(false);
   const [recError, setRecError]                       = useState<string | null>(null);
+  const [recIntent, setRecIntent]                     = useState<Parameters<typeof registrarRecebimento>[0] | null>(null);
+  const [recResultadoDesconhecido, setRecResultadoDesconhecido] = useState(false);
   const supabaseClient = useMemo(() => createClient(), []);
 
   const buscarPacientesRec = useCallback(async (nome: string) => {
@@ -189,30 +191,47 @@ export function FinanceiroClient({
   };
 
   const handleRegistrarRecebimento = async () => {
-    if (!recPacienteId) { setRecError('Selecione o paciente.'); return; }
-    if (!recOrcamentoId) { setRecError('Selecione o orçamento.'); return; }
+    if (!recIntent && !recPacienteId) { setRecError('Selecione o paciente.'); return; }
+    if (!recIntent && !recOrcamentoId) { setRecError('Selecione o orçamento.'); return; }
     const valorNum = parseValorBR(recValor);
-    if (!valorNum || valorNum <= 0) { setRecError('Informe um valor válido.'); return; }
+    if (!recIntent && (!valorNum || valorNum <= 0)) { setRecError('Informe um valor válido.'); return; }
     setRecError(null);
     setRecLoading(true);
-    const result = await registrarRecebimento({
-      pacienteId:     recPacienteId,
-      orcamentoId:    recOrcamentoId,
-      valor:          valorNum,
+    const intent = recIntent ?? {
+      operacaoId: crypto.randomUUID(),
+      pacienteId: recPacienteId,
+      orcamentoId: recOrcamentoId,
+      valor: valorNum,
       formaPagamento: recForma,
-      data:           recData,
-      dentistaId:     recDentistaId || undefined,
-    });
-    if (result.error) {
-      setRecError(result.error);
-    } else {
-      setIsRecebimentoOpen(false);
-      setRecPacienteSearch(''); setRecPacienteId(''); setRecPacienteNome('');
-      setRecOrcamentos([]); setRecOrcamentoId(''); setRecValor('');
-      router.refresh();
-      toast.success('Recebimento registrado!');
+      data: recData,
+      dentistaId: recDentistaId || undefined,
+    };
+    setRecIntent(intent);
+    try {
+      const result = await registrarRecebimento(intent);
+      if (result.error) {
+        setRecError(result.error);
+        if (result.retryable) {
+          setRecResultadoDesconhecido(true);
+        } else {
+          setRecIntent(null);
+          setRecResultadoDesconhecido(false);
+        }
+      } else {
+        setIsRecebimentoOpen(false);
+        setRecPacienteSearch(''); setRecPacienteId(''); setRecPacienteNome('');
+        setRecOrcamentos([]); setRecOrcamentoId(''); setRecValor('');
+        setRecIntent(null);
+        setRecResultadoDesconhecido(false);
+        router.refresh();
+        toast.success('Recebimento registrado!');
+      }
+    } catch {
+      setRecResultadoDesconhecido(true);
+      setRecError('Não foi possível confirmar o resultado. Tentar novamente repetirá a mesma operação.');
+    } finally {
+      setRecLoading(false);
     }
-    setRecLoading(false);
   };
 
   async function handleExportCsv() {
@@ -1138,7 +1157,7 @@ export function FinanceiroClient({
             >
               {recLoading
                 ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Registrando...</>
-                : 'Confirmar Recebimento'
+                : recResultadoDesconhecido ? 'Tentar novamente' : 'Confirmar Recebimento'
               }
             </Button>
             <button
