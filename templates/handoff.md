@@ -1,38 +1,11 @@
-# Handoff — YYYY-MM-DD HH:MM
+# Template de handoff substituído
 
-> **HANDOFF** · **R-NN** · sessão #N · modo {discussão|planejamento|execução|auditoria}
+STATUS: SUPERSEDED
+OWNER: Coordenação do Odonto.IA
+LAST_REVIEWED: 2026-10-11
+REPLACES: nenhum
+CANONICAL_FOR: nenhum
 
-<!-- Este arquivo é imutável: é o log do raciocínio da sessão.
-     A situação ATUAL (o que falta, o que trava) mora no plans/ESTADO.md, não aqui. -->
-
-## O que trabalhamos
-
-2–5 bullets, do mais importante ao menos.
-
-## O que concluímos
-
-O que está pronto e funcional, separado do que ficou pela metade.
-Marque 🟡 o que subiu sem verificação real — não vale ✅.
-
-## Decisões tomadas
-
-> Para não re-debater na próxima sessão.
-
-| Decisão | Alternativa descartada | Motivo |
-|---|---|---|
-
-## Erros e como pensei em resolver
-
-> A razão de o handoff existir. Registre a hipótese mesmo sem solução.
-
-| Erro | Causa (ou hipótese) | Como eu pensava em resolver | Resolvido? |
-|---|---|---|---|
-
-## O que eu estava cogitando
-
-Direções que ainda não viraram decisão. A próxima sessão começa daqui, não do zero.
-
-## Arquivos alterados
-
-| Arquivo | Mudança |
-|---|---|
+O formato vigente é [04_HANDOFF_TEMPLATE.md](../04_HANDOFF_TEMPLATE.md).
+Criar o registro em `plans/handoffs/`, seguindo o 04 e apontando para a spec do item;
+não manter dois checklists de execução. Este caminho permanece para referências antigas.
