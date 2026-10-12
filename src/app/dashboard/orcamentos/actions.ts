@@ -533,7 +533,7 @@ export async function gerarParcelas(dados: {
   entradaForma?: FormaPagamento;
   parcelasForma?: FormaPagamento;
 }): Promise<{ error?: string; parcelas?: ParcelaGerada[] }> {
-  const { supabase, user, clinicId } = await requireClinicContext();
+  const { supabase, user, clinicId, role } = await requireClinicContext();
 
   if (!Number.isInteger(dados.numeroParcelas) || dados.numeroParcelas < 2 || dados.numeroParcelas > 24) {
     return { error: "Número de parcelas deve ser entre 2 e 24." };
@@ -542,14 +542,22 @@ export async function gerarParcelas(dados: {
     return { error: "Informe a data do primeiro vencimento." };
   }
 
+  if (!['admin', 'dentista', 'secretaria'].includes(role)) {
+    return { error: "Você não tem permissão para gerar parcelas." };
+  }
+
   const { data: dentistaPerfil } = await supabase
     .from("dentistas")
-    .select("id, nome")
+    .select("id, nome, role")
     .eq("user_id", user.id)
     .eq("clinica_id", clinicId)
+    .eq("ativo", true)
+    .in("role", ["admin", "dentista", "secretaria"])
     .maybeSingle();
 
-  if (!dentistaPerfil) redirect("/onboarding");
+  if (!dentistaPerfil || dentistaPerfil.role !== role) {
+    return { error: "Você não tem permissão para gerar parcelas." };
+  }
 
   const { data: parcelas, error } = await supabase.rpc("gerar_parcelas_orcamento", {
     p_orcamento_id:        dados.orcamentoId,
@@ -563,6 +571,7 @@ export async function gerarParcelas(dados: {
 
   if (error) {
     if (error.message.includes("numero_parcelas_invalido")) return { error: "Número de parcelas deve ser entre 2 e 24." };
+    if (error.message.includes("orcamento_sem_aprovacao")) return { error: "Aprove ao menos um procedimento antes de organizar a cobrança." };
     if (error.message.includes("valor_invalido")) return { error: "Não há valor pendente para parcelar." };
     if (error.message.includes("vencimento_invalido")) return { error: "Informe a data do primeiro vencimento." };
     if (error.message.includes("plano_ja_definido")) return { error: "Este orçamento já tem forma de pagamento definida." };
