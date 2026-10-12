@@ -1,6 +1,6 @@
 # R-182 — auditoria dirigida de estabilização
 
-STATUS: R-197 PREVIEW PASSA; R-195 PREVIEW PASSA; R-196 PREVIEW PASSA; R-199 390×844 PREVIEW PASSA; R-200 PREVIEW PASSA / RESULTADO INCERTO NÃO TESTADO
+STATUS: R-197 PREVIEW PASSA; R-195 PREVIEW PASSA; R-196 PREVIEW PASSA; R-199 390×844 PREVIEW PASSA; R-200 PRODUÇÃO REPRESENTATIVO PASSA / RESULTADO INCERTO NÃO TESTADO
 OWNER: Auditor — evidência; Coordenação — integração; Executor — correção após despacho
 LAST_REVIEWED: 2026-10-12
 CANONICAL_FOR: evidência desta execução dirigida do R-182 no candidato `2c52879`
@@ -67,6 +67,16 @@ pertencem ao **preview candidato `2c52879` com o schema vivo do Supabase publica
 - **Classificação:** NEEDS_EVIDENCE.
 - **Evidência existente:** logs do preview registraram `ENOTFOUND` para o host do Upstash ao carregar alertas, seguido de fallback em memória.
 - **Por que não é achado confirmado deste marco:** não houve falha observável no fluxo auditado nem teste dirigido de rate limit; investigar agora ampliaria o escopo depois do gate S1.
+
+**Adendo de produção, 12/10:** no deployment `dpl_J2pcmJBWwf4f6eR5ZRBnGD6SfC7p`,
+os logs de runtime de `/api/dex/alerts` registraram três ocorrências entre
+16:25 e 16:27 UTC de `ENOTFOUND frank-sponge-87179.upstash.io`, com a mensagem
+`[rate-limit] Erro no Redis, usando fallback em memória`. A indisponibilidade
+de DNS do Upstash e o fallback estão **confirmados em produção**; o efeito
+sobre limites de requisições e as demais rotas está **NÃO TESTADO**. O fluxo
+financeiro QA pós-publicação passou sem erro no console. Investigar a URL e a
+saúde do serviço em item próprio, sem alterar credenciais ou política de
+rate limit durante este gate.
 
 ## 6. Falsos positivos e incidentes de QA
 
@@ -1072,3 +1082,36 @@ do pedido, não uma segunda mudança de estado já coberta no adendo 9.3.
 **Próxima ação:** nenhuma correção nova para o Executor em R-196. Coordenação pode integrar o item
 com as demais evidências da estabilização, mantendo integração, publicação e aceite como estados
 distintos.
+
+### 12.16 Gate pós-publicação representativo — R-200
+
+Baseline verificada antes do teste: a API da Vercel resolveu `odontoia.app` para o deployment
+`dpl_J2pcmJBWwf4f6eR5ZRBnGD6SfC7p`, `target=production`, estado `READY`, branch `main` e commit
+`d66a32614e8338c1a10f59e7e47c5756d88a58d5`; o domínio consta entre os aliases do próprio
+deployment. A execução usou uma identidade, um paciente, uma Ficha, um procedimento e um orçamento
+novos e sintéticos na clínica QA B, marcador `QA R200 PROD 113f3f4c`. Nenhuma conta ou registro da
+Clindent foi acessado.
+
+| Critério | Estado | Evidência e limite |
+| --- | --- | --- |
+| Estado inicial | **PASSA** | Orçamento de R$ 300,00, valor acordado R$ 300,00, zero pagamentos e zero logs; UI mostrava recebido R$ 0,00 e saldo R$ 300,00. |
+| Resposta única e resumo imediato | **PASSA** | Uma única submissão de R$ 40,00 em dinheiro mudou, antes de reload, cabeçalho, resumo e cartão para recebido R$ 40,00/saldo R$ 260,00. O histórico exibiu um recebimento de R$ 40,00. |
+| Banco e ausência de duplicação | **PASSA** | Exatamente um pagamento pago `b0f519ab-0a1d-4388-b659-8360dff7337c`, sem `cobranca_id`, e um log `pagamento.registrado` foram criados. Ambos carregam a mesma `operacao_id=3731a99e-1cec-4004-ae31-ad0dd4a9cd63`; não houve segunda linha ou segundo log. |
+| Recarga | **PASSA** | Reload completo voltou ao perfil; o cartão reapareceu com `falta R$ 260,00`, um pagamento em dinheiro de R$ 40,00 e, ao reabrir, cabeçalho/resumo/histórico mantiveram R$ 40,00 recebido e R$ 260,00 de saldo. Nova leitura do banco continuou com uma linha e um log. |
+| Estado clínico complementar | **PASSA como leitura, sem ampliar aceite R-195** | Na mesma fixture, a Ficha mostrou procedimento no dente 16 como `A fazer`, progresso `0% · 0 de 1`; banco mostrou `status=indicado`, `realizado_em=null`, `momento_planejado=sessao_atual`. Não houve encaminhamento nem mudança clínica, portanto isso é somente sanidade de leitura, não novo gate funcional de R-195. |
+| Console | **PASSA** | Zero warning/error durante login, leitura clínica, recebimento e reload. |
+| Limpeza | **PASSA** | Zero paciente, Ficha, evento, orçamento, pagamento, log, participação, perfil e usuário sintéticos remanescentes; identidade Auth removida. |
+
+**Resultado:** o fluxo representativo R-200/R-189 **PASSA em produção**, incluindo resposta única,
+resumo imediato, persistência, recarga e ausência de duplicação. Nenhum achado S0/S1 ou de outra
+severidade foi confirmado. O critério de resultado incerto permanece **NÃO TESTADO em runtime** e
+não foi inferido a partir deste sucesso normal.
+
+**Cobertura:** domínio/deployment/SHA, login sintético, estado antes/depois, uma submissão, três
+superfícies imediatas, banco, `operacao_id`, reload, efeito único, leitura clínica complementar,
+console e limpeza. **Fora:** cobrança por etapa em produção, retry após perda de resposta, erro
+definitivo e negativa de permissão; esses cenários permaneceram nas evidências de Preview/estática.
+
+**Próxima ação:** nenhuma correção nova para o Executor a partir deste gate. A Coordenação pode
+registrar o fluxo normal representativo como publicado e verificado, sem encerrar o risco específico
+de resultado incerto até existir fault injection segura.

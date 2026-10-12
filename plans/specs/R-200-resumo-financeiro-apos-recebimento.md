@@ -1,6 +1,6 @@
 # R-200 — Resumo financeiro após recebimento confirmado
 
-STATUS: 🔵 ativo — sucessos confirmados passam no Preview; resultado incerto integrado pendente
+STATUS: 🔵 ativo — fluxo representativo PASSA em produção; resultado incerto integrado pendente
 OWNER: Coordenação — contrato/integração; Implementar — código; Auditor — gate
 LAST_REVIEWED: 2026-10-12
 CANONICAL_FOR: R182-EST-07 da auditoria dirigida
@@ -92,3 +92,21 @@ Deployment `dpl_KKAAtPXXdEKjEsFhuHj1ANHsyjDh`, commit
 O fluxo normal de ambos os consumidores **PASSA no Preview**. O item permanece ativo somente pelo
 caso específico de resultado incerto: ele exige fault injection real antes de encerrar o risco S1
 em runtime.
+
+## Gate pós-publicação representativo — 2026-10-12
+
+Produção `https://odontoia.app`, resolvida pela Vercel para
+`dpl_J2pcmJBWwf4f6eR5ZRBnGD6SfC7p`, estado `READY`, target `production`, branch `main` e commit
+`d66a32614e8338c1a10f59e7e47c5756d88a58d5`. Dados e identidade descartáveis ficaram limitados à
+QA B.
+
+| Critério | Estado | Evidência e limite |
+| --- | --- | --- |
+| R-189: resposta e resumo imediato | **PASSA em produção** | Uma submissão de R$ 40,00 mudou modal e cartão de recebido R$ 0/saldo R$ 300 para R$ 40/R$ 260 antes de reload. |
+| Persistência e efeito único | **PASSA em produção** | Exatamente um pagamento, sem `cobranca_id`, e um log `pagamento.registrado`, com a mesma `operacao_id`; nenhuma duplicação. |
+| Recarga | **PASSA em produção** | Cartão, cabeçalho, resumo e histórico preservaram R$ 40,00 recebido/R$ 260,00 saldo; banco continuou com uma linha e um log. |
+| Console e limpeza | **PASSA** | Zero warning/error e zero resíduo sintético delimitado. |
+| Resultado incerto | **NÃO TESTADO em runtime** | O sucesso normal não substitui a fault injection que confirma a RPC e perde somente a resposta/releitura. |
+
+O fluxo representativo normal está publicado e verificado. O item continua ativo somente pelo caso
+específico de resultado incerto; o gate pós-publicação não amplia a conclusão para esse cenário.
