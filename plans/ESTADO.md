@@ -35,6 +35,11 @@ continuam **NÃO TESTADOS em runtime**. Montar o componente localmente exigiria
 adicionar infraestrutura de testes ausente; esse recorte não foi ampliado.
 As fixtures desta rodada foram removidas, com zero resíduo delimitado.
 
+No domínio publicado, um recebimento QA de R$ 40 passou com UI imediata,
+pagamento/log únicos, `operacao_id` preservada e recarga; a fixture foi
+removida. Logs de `/api/dex/alerts` confirmam `ENOTFOUND` do Upstash e
+fallback de rate limit em memória; impacto fora dessa rota **NÃO TESTADO**.
+
 [R-198](specs/R-198-ficha-colaborativa-por-profissional.md) está na fila
 **após** a estabilização, por decisão do usuário: B adicionará procedimentos
 próprios à Ficha de A após encaminhamento; a Ficha será agrupada e haverá
@@ -42,16 +47,17 @@ orçamento por dentista. Contrato pronto; implementação não iniciada.
 
 ## Próximos gates
 
-1. Integrar o candidato ao `main`, publicar após conferir o SHA e repetir
-   um fluxo sintético representativo no domínio de produção.
-2. Concluir o teste de resultado incerto do R-200 com componente montado,
+1. Concluir o teste de resultado incerto do R-200 com componente montado,
    sem induzir falha em dados reais.
+2. Diagnosticar o Upstash usado pelo rate limit, mantendo a configuração
+   atual até haver alternativa testada.
 3. Fechar os ACs restantes da R-182: data futura no controle nativo,
    restauração AC-10 e revisão manual do usuário.
 
-Produção `odontoia.app` ainda atende `main@ba5b531` no deployment
-`dpl_FBHKryftZvhHn7Nz7Sy22LdK7bos`, reconfirmado em 12/10. Preview, branch
-e produção são estados distintos.
+Produção `odontoia.app` atende `main@d66a326` no deployment
+`dpl_J2pcmJBWwf4f6eR5ZRBnGD6SfC7p`, READY e com alias confirmado em
+12/10. O teste de uso pós-publicação está em andamento; publicação e aceite
+da baseline permanecem estados distintos.
 
 ## Preservação
 
