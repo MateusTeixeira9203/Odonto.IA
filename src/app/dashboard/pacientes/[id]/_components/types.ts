@@ -49,6 +49,8 @@ export type CobrancaEtapa = {
 
 export type OrcamentoComItens = {
   id: string;
+  /** A edição de valores do R-197 só vale para o orçamento criado a partir da Ficha. */
+  ficha_id: string | null;
   /** Legado (R-65 e anteriores) — a tela antiga de `/dashboard/orcamentos` ainda declara
    *  status por aqui; esta tela (perfil do paciente) usa `estado`, derivado (R-114). Não
    *  remover: `atualizarStatusOrcamento` (usado pela ponte da tela antiga) ainda escreve nele,

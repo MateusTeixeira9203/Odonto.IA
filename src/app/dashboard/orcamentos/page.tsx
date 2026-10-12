@@ -26,7 +26,9 @@ export type PagamentoRow = {
 
 export type OrcamentoRow = {
   id: string;
+  ficha_id: string | null;
   created_at: string;
+  updated_at: string;
   status: 'rascunho' | 'enviado' | 'aprovado' | 'recusado';
   total: number | null;
   valor_acordado: number | null;

@@ -71,6 +71,7 @@ import {
   marcarPagamentoPago,
   criarOrcamento,
   editarOrcamento,
+  editarValoresOrcamentoVinculado,
   excluirOrcamento,
   criarProcedimentoRapido,
   reorganizarParcelas,
@@ -662,7 +663,9 @@ export function OrcamentosClient({
       // Atualização otimista — adiciona o novo orçamento ao topo da lista
       const novoOrc: OrcamentoRow = {
         id: result.id ?? crypto.randomUUID(),
+        ficha_id: null,
         created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
         status: 'rascunho',
         total: novoOrcTotal,
         valor_acordado: null,
@@ -727,6 +730,73 @@ export function OrcamentosClient({
       setEditError('Adicione ao menos um procedimento com descrição e valor.');
       return;
     }
+    if (selected.ficha_id !== null) {
+      const itensOriginais = new Map(selected.itens.map((item) => [item.id, item]));
+      const alterouListaOuDescricao = itensValidos.length !== selected.itens.length
+        || itensValidos.some((item) => {
+          const original = item.id ? itensOriginais.get(item.id) : undefined;
+          return !original || (original.descricao ?? '').trim() !== item.descricao.trim();
+        });
+      if (alterouListaOuDescricao) {
+        setEditError('Este orçamento veio da Ficha. Para adicionar, remover ou renomear procedimentos, use a alteração incremental na Ficha; aqui você pode ajustar apenas quantidade e preço.');
+        return;
+      }
+      if (!selected.updated_at) {
+        setEditError('Não foi possível confirmar a versão deste orçamento. Recarregue a página.');
+        return;
+      }
+
+      setEditSaving(true);
+      try {
+        const result = await editarValoresOrcamentoVinculado({
+          orcamentoId: selected.id,
+          versaoEsperada: selected.updated_at,
+          itens: itensValidos.map((item) => ({
+            id: item.id!,
+            quantidade: item.quantidade,
+            precoUnitario: parseValorBR(item.preco_unitario),
+          })),
+        });
+        const totalConfirmado = result.total;
+        const versaoConfirmada = result.updatedAt;
+        if (result.error || totalConfirmado === undefined || !versaoConfirmada) {
+          setEditError(result.error ?? 'Não foi possível atualizar o orçamento na tela. Recarregue antes de continuar.');
+        } else {
+          const valoresAtualizados = new Map(itensValidos.map((item) => [item.id!, {
+            quantidade: item.quantidade,
+            precoUnitario: parseValorBR(item.preco_unitario),
+          }]));
+          const aplicarRespostaConfirmada = (orcamento: OrcamentoRow): OrcamentoRow => ({
+            ...orcamento,
+            total: totalConfirmado,
+            updated_at: versaoConfirmada,
+            itens: orcamento.itens.map((item) => {
+              const valor = valoresAtualizados.get(item.id);
+              return valor ? {
+                ...item,
+                quantidade: valor.quantidade,
+                preco_unitario: valor.precoUnitario,
+                preco_total: valor.quantidade * valor.precoUnitario,
+              } : item;
+            }),
+          });
+          setOrcamentos((prev) => prev.map((orcamento) => (
+            orcamento.id === selected.id ? aplicarRespostaConfirmada(orcamento) : orcamento
+          )));
+          setSelected((prev) => (
+            prev?.id === selected.id ? aplicarRespostaConfirmada(prev) : prev
+          ));
+          setEditMode(false);
+          router.refresh();
+        }
+      } catch {
+        setEditError('Não foi possível salvar os valores. O rascunho foi preservado; tente novamente ou recarregue antes de continuar.');
+      } finally {
+        setEditSaving(false);
+      }
+      return;
+    }
+
     setEditSaving(true);
     const result = await editarOrcamento(selected.id, itensValidos.map(i => ({ ...i, preco_unitario: parseValorBR(i.preco_unitario) })), selected.desconto ?? 0);
     if (result.error) {

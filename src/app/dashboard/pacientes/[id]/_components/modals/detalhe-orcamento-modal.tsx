@@ -39,6 +39,7 @@ import {
 } from '@/app/dashboard/orcamentos/actions';
 import { deriveEstadoOrcamento, rotuloEstado, type EstadoOrcamento } from '@/lib/orcamentos/estado';
 import { deriveEstadoCobrancaEtapa } from '@/lib/orcamentos/cobranca-etapa';
+import { exigeRevisaoComercial } from '@/lib/orcamentos/exige-revisao-comercial';
 import { parseValorBR, formatValorBR } from '@/lib/valor-br';
 import { hojeBRT } from '@/lib/hora-brt';
 import { toast } from 'sonner';
@@ -788,7 +789,7 @@ export function DetalheOrcamentoModal({
   const temPlanoParcelado = detalheOrc?.plano_forma === 'parcelado'
     || detalheOrc?.pagamentos.some((pagamento) => pagamento.parcela_numero !== null) === true;
   const temItensAprovados = valorAprovado > 0;
-  const revisaoObrigatoria = temItensAprovados || totalPago > 0 || !!detalheOrc?.aceite;
+  const revisaoObrigatoria = detalheOrc !== null && exigeRevisaoComercial(detalheOrc);
   const totalItensEmEdicao = orcEditItens.reduce(
     (soma, item) => soma + item.quantidade * parseValorBR(item.preco_unitario),
     0,

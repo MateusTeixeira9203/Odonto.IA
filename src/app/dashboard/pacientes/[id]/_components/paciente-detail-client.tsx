@@ -71,6 +71,7 @@ import {
   excluirPagamento,
   estornarPagamento,
   editarOrcamento,
+  editarValoresOrcamentoVinculado,
   revisarOrcamento,
   excluirOrcamento,
   gerarParcelas,
@@ -82,6 +83,7 @@ import {
   type FormaPagamento,
 } from '@/app/dashboard/orcamentos/actions';
 import { deriveEstadoOrcamento, rotuloEstado } from '@/lib/orcamentos/estado';
+import { exigeRevisaoComercial } from '@/lib/orcamentos/exige-revisao-comercial';
 import type { Paciente } from '@/types/database';
 import type { TimelineEvent } from '@/server/patients/get-visible-timeline-events';
 import { addMonths, format, parseISO, differenceInCalendarDays } from 'date-fns';
@@ -1182,9 +1184,7 @@ export function PacienteDetailClient({
       setOrcEditError('Adicione ao menos um procedimento com descrição e valor.');
       return;
     }
-    const temHistoricoFinanceiro = detalheOrc.itens.some((item) => item.aprovado)
-      || detalheOrc.pagamentos.some((pagamento) => pagamento.status === 'pago')
-      || !!detalheOrc.aceite;
+    const temHistoricoFinanceiro = exigeRevisaoComercial(detalheOrc);
     const subtotalNovo = itensValidos.reduce((sum, item) => sum + item.quantidade * parseValorBR(item.preco_unitario), 0);
     const novoTotal = Math.max(0, subtotalNovo - (detalheOrc.desconto ?? 0));
 
@@ -1193,7 +1193,6 @@ export function PacienteDetailClient({
       return;
     }
 
-    setOrcEditSaving(true);
     if (temHistoricoFinanceiro) {
       const totalAnterior = detalheOrc.total ?? 0;
       const acordoAnterior = detalheOrc.valor_acordado ?? totalAnterior;
@@ -1207,9 +1206,9 @@ export function PacienteDetailClient({
       }
       if (!detalheOrc.updated_at) {
         setOrcEditError('Não foi possível confirmar a versão deste orçamento. Recarregue a página.');
-        setOrcEditSaving(false);
         return;
       }
+      setOrcEditSaving(true);
       const result = await revisarOrcamento({
         orcamentoId: detalheOrc.id,
         itens: itensValidos.map((item) => ({
@@ -1235,6 +1234,69 @@ export function PacienteDetailClient({
       return;
     }
 
+    if (detalheOrc.ficha_id !== null) {
+      const itensOriginais = new Map(detalheOrc.itens.map((item) => [item.id, item]));
+      const alterouListaOuDescricao = itensValidos.length !== detalheOrc.itens.length
+        || itensValidos.some((item) => {
+          const original = item.id ? itensOriginais.get(item.id) : undefined;
+          return !original || (original.descricao ?? '').trim() !== item.descricao.trim();
+        });
+      if (alterouListaOuDescricao) {
+        setOrcEditError('Este orçamento veio da Ficha. Para adicionar, remover ou renomear procedimentos, use a alteração incremental na Ficha; aqui você pode ajustar apenas quantidade e preço.');
+        return;
+      }
+      if (!detalheOrc.updated_at) {
+        setOrcEditError('Não foi possível confirmar a versão deste orçamento. Recarregue a página.');
+        return;
+      }
+
+      setOrcEditSaving(true);
+      try {
+        const result = await editarValoresOrcamentoVinculado({
+          orcamentoId: detalheOrc.id,
+          versaoEsperada: detalheOrc.updated_at,
+          itens: itensValidos.map((item) => ({
+            id: item.id!,
+            quantidade: item.quantidade,
+            precoUnitario: parseValorBR(item.preco_unitario),
+          })),
+        });
+        const totalConfirmado = result.total;
+        const versaoConfirmada = result.updatedAt;
+        if (result.error || totalConfirmado === undefined || !versaoConfirmada) {
+          setOrcEditError(result.error ?? 'Não foi possível atualizar o orçamento na tela. Recarregue antes de continuar.');
+        } else {
+          const valoresAtualizados = new Map(itensValidos.map((item) => [item.id!, {
+            quantidade: item.quantidade,
+            precoUnitario: parseValorBR(item.preco_unitario),
+          }]));
+          setOrcamentosState((prev) => prev.map((orcamento) => (
+            orcamento.id !== detalheOrc.id ? orcamento : {
+              ...orcamento,
+              total: totalConfirmado,
+              updated_at: versaoConfirmada,
+              itens: orcamento.itens.map((item) => {
+                const valor = valoresAtualizados.get(item.id);
+                return valor ? {
+                  ...item,
+                  quantidade: valor.quantidade,
+                  preco_total: valor.quantidade * valor.precoUnitario,
+                } : item;
+              }),
+            }
+          )));
+          setOrcEditMode(false);
+          router.refresh();
+        }
+      } catch {
+        setOrcEditError('Não foi possível salvar os valores. O rascunho foi preservado; tente novamente ou recarregue antes de continuar.');
+      } finally {
+        setOrcEditSaving(false);
+      }
+      return;
+    }
+
+    setOrcEditSaving(true);
     const result = await editarOrcamento(detalheOrc.id, itensValidos.map(i => ({ ...i, preco_unitario: parseValorBR(i.preco_unitario) })), detalheOrc.desconto ?? 0);
     if (result.error) {
       setOrcEditError(result.error);

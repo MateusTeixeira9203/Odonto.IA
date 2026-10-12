@@ -1290,6 +1290,81 @@ export async function editarOrcamento(
   return {};
 }
 
+const editarValoresOrcamentoVinculadoSchema = z.object({
+  orcamentoId: z.string().uuid(),
+  versaoEsperada: z.string().datetime({ offset: true }),
+  itens: z.array(z.object({
+    id: z.string().uuid(),
+    quantidade: z.number().int().min(1).max(99),
+    precoUnitario: z.number().finite().min(0).max(999999.99).multipleOf(0.01),
+  })).min(1).max(100).refine(
+    (itens) => new Set(itens.map((item) => item.id)).size === itens.length,
+    'Os procedimentos precisam ser únicos.',
+  ),
+});
+
+export type EditarValoresOrcamentoVinculadoInput = z.infer<typeof editarValoresOrcamentoVinculadoSchema>;
+
+function erroEdicaoValoresOrcamentoVinculado(message: string): string {
+  if (message.includes('sem_permissao')) return 'Somente o dentista responsável pode alterar os valores deste orçamento.';
+  if (message.includes('conflito')) return 'Este orçamento mudou em outra tela. Recarregue antes de salvar os valores.';
+  if (message.includes('orcamento_com_historico_comercial')) return 'Este orçamento já tem aceite, cobrança ou pagamento. Use a revisão comercial para preservar o histórico.';
+  if (message.includes('orcamento_nao_vinculado')) return 'Este orçamento não está vinculado à Ficha. Use a edição disponível para esse orçamento.';
+  if (message.includes('orcamento_itens_retirados') || message.includes('orcamento_itens_com_composicao')) return 'Este orçamento tem procedimentos retirados ou agrupados. Use a alteração incremental na Ficha para preservar o histórico.';
+  if (message.includes('itens_incompletos') || message.includes('item_')) return 'Os procedimentos do orçamento mudaram. Recarregue a página antes de editar os valores.';
+  if (message.includes('itens_invalidos')) return 'Informe quantidade e preço válidos para todos os procedimentos.';
+  return 'Não foi possível salvar os valores. O orçamento foi preservado.';
+}
+
+/**
+ * R-197 — edição restrita a quantidade e preço de itens já existentes em orçamento
+ * de Ficha sem histórico comercial. A RPC mantém IDs e vínculos clínicos intactos.
+ */
+export async function editarValoresOrcamentoVinculado(
+  entrada: EditarValoresOrcamentoVinculadoInput,
+): Promise<{ error?: string; total?: number; updatedAt?: string }> {
+  const parsed = editarValoresOrcamentoVinculadoSchema.safeParse(entrada);
+  if (!parsed.success) {
+    return { error: 'Revise a quantidade e o preço de todos os procedimentos antes de salvar.' };
+  }
+
+  const { supabase, clinicId } = await requireClinicContext();
+  const { data: orcamento } = await supabase
+    .from('orcamentos')
+    .select('paciente_id')
+    .eq('id', parsed.data.orcamentoId)
+    .eq('clinica_id', clinicId)
+    .maybeSingle();
+  if (!orcamento) return { error: 'Orçamento não encontrado.' };
+
+  const rpc = supabase.rpc.bind(supabase) as unknown as RpcCall;
+  const { data, error } = await rpc('editar_valores_orcamento_vinculado', {
+    p_orcamento_id: parsed.data.orcamentoId,
+    p_versao_esperada: parsed.data.versaoEsperada,
+    p_itens: parsed.data.itens.map((item) => ({
+      id: item.id,
+      quantidade: item.quantidade,
+      preco_unitario: item.precoUnitario,
+    })),
+  });
+  if (error) return { error: erroEdicaoValoresOrcamentoVinculado(error.message) };
+
+  const resposta = Array.isArray(data) ? data[0] : undefined;
+  const total = typeof resposta === 'object' && resposta !== null
+    ? Number((resposta as { total?: unknown }).total)
+    : Number.NaN;
+  const updatedAt = typeof resposta === 'object' && resposta !== null
+    ? (resposta as { updated_at?: unknown }).updated_at
+    : undefined;
+  if (!Number.isFinite(total) || typeof updatedAt !== 'string') {
+    return { error: 'Os valores foram salvos, mas não foi possível atualizar a tela. Recarregue o orçamento antes de continuar.' };
+  }
+
+  revalidatePath('/dashboard/orcamentos');
+  revalidatePath(`/dashboard/pacientes/${orcamento.paciente_id}`);
+  return { total, updatedAt };
+}
+
 const itemRevisaoOrcamentoSchema = z.object({
   id: z.string().uuid().optional(),
   descricao: z.string().trim().min(1).max(500),
