@@ -39,6 +39,7 @@ import {
 } from '@/app/dashboard/orcamentos/actions';
 import { deriveEstadoOrcamento, rotuloEstado, type EstadoOrcamento } from '@/lib/orcamentos/estado';
 import { deriveEstadoCobrancaEtapa } from '@/lib/orcamentos/cobranca-etapa';
+import { reconciliarPagamentosConfirmados } from '@/lib/orcamentos/reconciliar-pagamentos-confirmados';
 import { exigeRevisaoComercial } from '@/lib/orcamentos/exige-revisao-comercial';
 import { parseValorBR, formatValorBR } from '@/lib/valor-br';
 import { hojeBRT } from '@/lib/hora-brt';
@@ -146,15 +147,28 @@ interface Props {
   onAceiteRegistrado: () => void;
   /** R-38 — liga/desliga o valor por procedimento no PDF deste orçamento. */
   onToggleMostrarValorPorItem: (id: string, mostrar: boolean) => void;
+  cobrancasComResultadoIncerto: ReadonlySet<string>;
+  onCobrancaResultadoIncerto: (cobrancaId: string) => void;
+  onPagamentosOrcamentoConfirmados: (orcamentoId: string, pagamentos: Pagamento[]) => void;
   diferencasFicha: DiferencasFichaOrcamento | null;
   onRevisarAdicao: () => void;
   onRecarregarDiferencasFicha: () => Promise<void>;
 }
 
-function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
+function CobrancasPorEtapa({
+  orcamento,
+  pacienteId,
+  permitirNovaEtapa,
+  cobrancasComResultadoIncerto,
+  onCobrancaResultadoIncerto,
+  onPagamentosOrcamentoConfirmados,
+}: {
   orcamento: OrcamentoComItens;
   pacienteId: string;
   permitirNovaEtapa: boolean;
+  cobrancasComResultadoIncerto: ReadonlySet<string>;
+  onCobrancaResultadoIncerto: (cobrancaId: string) => void;
+  onPagamentosOrcamentoConfirmados: (orcamentoId: string, pagamentos: Pagamento[]) => void;
 }) {
   const router = useRouter();
   const hoje = hojeBRT();
@@ -184,12 +198,17 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
   const [cobrancaEditandoId, setCobrancaEditandoId] = useState<string | null>(null);
   const [itensEtapaEditados, setItensEtapaEditados] = useState<string[]>([]);
   const [valorFinalEtapaEditado, setValorFinalEtapaEditado] = useState('');
+  const [cobrancas, setCobrancas] = useState(orcamento.cobrancas);
+
+  useEffect(() => {
+    setCobrancas(orcamento.cobrancas);
+  }, [orcamento.cobrancas]);
 
   const idsCobrados = useMemo(() => new Set(
-    orcamento.cobrancas
+    cobrancas
       .filter((cobranca) => cobranca.situacao === 'aberta')
       .flatMap((cobranca) => cobranca.itens.map((item) => item.orcamento_item_id)),
-  ), [orcamento.cobrancas]);
+  ), [cobrancas]);
   const itensElegiveis = useMemo(() => orcamento.itens.filter(
     (item) => item.aprovado && !idsCobrados.has(item.id),
   ), [idsCobrados, orcamento.itens]);
@@ -325,15 +344,27 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
         data: recebimento.data,
       });
       if (result.error) {
+        if (result.outcomeUnknown) onCobrancaResultadoIncerto(cobrancaId);
         setErro(result.error);
         return;
       }
+      if (!result.pagamentos || !result.pagamentosOrcamento) {
+        onCobrancaResultadoIncerto(cobrancaId);
+        setErro('Não foi possível confirmar o resultado. Recarregue antes de tentar outra ação.');
+        return;
+      }
+      const pagamentosConfirmados = result.pagamentos;
+      setCobrancas((prev) => (
+        reconciliarPagamentosConfirmados(prev, cobrancaId, pagamentosConfirmados).registros
+      ));
+      onPagamentosOrcamentoConfirmados(orcamento.id, result.pagamentosOrcamento);
       setCobrancaRecebendoId(null);
       setRecebimento({ valor: '', forma: 'pix', data: hoje });
       toast.success('Recebimento registrado. O status da etapa foi atualizado.');
       router.refresh();
     } catch {
-      setErro("Não foi possível confirmar a operação. Confira o histórico antes de tentar novamente; seus campos foram preservados.");
+      onCobrancaResultadoIncerto(cobrancaId);
+      setErro('Não foi possível confirmar o resultado. Recarregue antes de tentar outra ação.');
     } finally {
       setSaving(false);
     }
@@ -457,7 +488,7 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
         <p className="mt-1 text-xs text-text-secondary">Cobrar só o que o paciente decidiu fazer agora. O restante continua como proposta.</p>
       </div>
 
-      {orcamento.cobrancas.map((cobranca) => {
+      {cobrancas.map((cobranca) => {
         const estado = deriveEstadoCobrancaEtapa({
           valorFinal: cobranca.valor_final,
           situacao: cobranca.situacao,
@@ -466,6 +497,7 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
         const podeCancelar = cobranca.situacao === 'aberta' && estado.valorPago === 0;
         const recebendo = cobrancaRecebendoId === cobranca.id;
         const recebimentosConfirmados = cobranca.pagamentos.filter((pagamento) => pagamento.status === 'pago');
+        const resultadoDesconhecido = cobrancasComResultadoIncerto.has(cobranca.id);
         const editandoEtapa = cobrancaEditandoId === cobranca.id;
         const idsDestaEtapa = new Set(cobranca.itens.map((item) => item.orcamento_item_id));
         const itensEditaveis = orcamento.itens.filter((item) => item.aprovado
@@ -587,17 +619,18 @@ function CobrancasPorEtapa({ orcamento, pacienteId, permitirNovaEtapa }: {
                   <Input type="date" value={recebimento.data} onChange={(event) => setRecebimento((current) => ({ ...current, data: event.target.value }))} className="h-9" />
                   <Select value={recebimento.forma} onValueChange={(value) => setRecebimento((current) => ({ ...current, forma: value as FormaPagamento }))}><SelectTrigger className="h-9"><SelectValue /></SelectTrigger><SelectContent>{Object.entries(FORMA_LABEL).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select>
                 </div>
-                <div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => setCobrancaRecebendoId(null)} disabled={saving} className="flex-1">Cancelar</Button><Button size="sm" onClick={() => void registrar(cobranca.id)} disabled={saving} className="flex-1 bg-teal text-white hover:bg-teal-lt">{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Registrar'}</Button></div>
+                <div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => setCobrancaRecebendoId(null)} disabled={saving} className="flex-1">Cancelar</Button><Button size="sm" onClick={() => void registrar(cobranca.id)} disabled={saving || resultadoDesconhecido} className="flex-1 bg-teal text-white hover:bg-teal-lt">{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : resultadoDesconhecido ? 'Recarregue para confirmar' : 'Registrar'}</Button></div>
               </div>
             ) : !editandoEtapa && cancelandoId === cobranca.id ? (
               <div className="space-y-2 border-t border-border pt-3"><Input value={motivoCancelamento} onChange={(event) => setMotivoCancelamento(event.target.value)} placeholder="Motivo do cancelamento" maxLength={500} className="h-9" /><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => setCancelandoId(null)} disabled={saving} className="flex-1">Voltar</Button><Button size="sm" onClick={() => void cancelar(cobranca.id)} disabled={saving} className="flex-1 bg-coral-pale text-coral-ink hover:bg-coral/20">Cancelar etapa</Button></div></div>
             ) : !editandoEtapa && cobranca.situacao === 'aberta' ? (
               <div className="flex gap-2 border-t border-border pt-3">
-                {estado.estado !== 'paga' && <Button size="sm" onClick={() => setCobrancaRecebendoId(cobranca.id)} className="flex-1 bg-teal text-white hover:bg-teal-lt">Registrar recebimento</Button>}
+                {estado.estado !== 'paga' && <Button size="sm" onClick={() => setCobrancaRecebendoId(cobranca.id)} disabled={resultadoDesconhecido} className="flex-1 bg-teal text-white hover:bg-teal-lt">{resultadoDesconhecido ? 'Recarregue para confirmar' : 'Registrar recebimento'}</Button>}
                 <Button size="sm" variant="outline" onClick={() => iniciarEdicaoEtapa(cobranca)} disabled={saving} className={estado.estado === 'paga' ? 'flex-1' : ''}><Edit2 className="mr-1 h-3.5 w-3.5" />Editar etapa</Button>
                 {podeCancelar && <Button size="sm" variant="outline" onClick={() => setCancelandoId(cobranca.id)} className="text-coral-ink">Cancelar</Button>}
               </div>
             ) : null}
+            {resultadoDesconhecido && !recebendo && <p role="alert" className="text-xs text-coral-ink">Não foi possível confirmar o resultado. Recarregue antes de tentar outro recebimento.</p>}
           </div>
         );
       })}
@@ -703,7 +736,7 @@ export function DetalheOrcamentoModal({
   valorAcordadoSaving, valorAcordadoError,
   onIniciarEdicaoValorAcordado, onCancelarEdicaoValorAcordado, onSalvarValorAcordado,
   onAceiteRegistrado,
-  onToggleMostrarValorPorItem,
+  onToggleMostrarValorPorItem, cobrancasComResultadoIncerto, onCobrancaResultadoIncerto, onPagamentosOrcamentoConfirmados,
   diferencasFicha,
   onRevisarAdicao,
   onRecarregarDiferencasFicha,
@@ -1149,7 +1182,7 @@ export function DetalheOrcamentoModal({
               >
                 <div className="flex-1 min-h-0 overflow-y-auto p-5">
                   {!orcEditMode && usarCobrancasPorEtapa ? (
-                    <CobrancasPorEtapa orcamento={detalheOrc} pacienteId={pacienteId} permitirNovaEtapa={!temAcordoGlobal} />
+                    <CobrancasPorEtapa orcamento={detalheOrc} pacienteId={pacienteId} permitirNovaEtapa={!temAcordoGlobal} cobrancasComResultadoIncerto={cobrancasComResultadoIncerto} onCobrancaResultadoIncerto={onCobrancaResultadoIncerto} onPagamentosOrcamentoConfirmados={onPagamentosOrcamentoConfirmados} />
                   ) : (
                     <>
                   {orcEditMode ? (

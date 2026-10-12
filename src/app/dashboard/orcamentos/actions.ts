@@ -91,6 +91,24 @@ const cancelarCobrancaSchema = z.object({
 type RpcResult = { data: unknown; error: { message: string; code?: string } | null };
 type RpcCall = (fn: string, args: Record<string, unknown>) => Promise<RpcResult>;
 
+type PagamentoConfirmado = {
+  id: string;
+  cobranca_id: string | null;
+  valor: number;
+  status: string;
+  forma_pagamento: string | null;
+  data_pagamento: string | null;
+  data_vencimento: string | null;
+  parcela_numero: number | null;
+  total_parcelas: number | null;
+  marcado_por: { nome: string } | null;
+};
+
+const SELECT_PAGAMENTOS_CONFIRMADOS =
+  'id, cobranca_id, valor, status, forma_pagamento, data_pagamento, data_vencimento, parcela_numero, total_parcelas, marcado_por:dentistas!pagamentos_marcado_por_id_fkey(nome)';
+const SELECT_PAGAMENTOS_CONFIRMADOS_COM_ORCAMENTO =
+  `orcamento_id, ${SELECT_PAGAMENTOS_CONFIRMADOS}`;
+
 function erroFinanceiro(message: string): string {
   if (message.includes('orcamento_acordo_global')) return 'Este orçamento tem desconto ou valor combinado geral. Use o recebimento do orçamento.';
   if (message.includes('orcamento_sem_aprovacao')) return ERRO_ORCAMENTO_SEM_APROVACAO;
@@ -790,7 +808,7 @@ export async function registrarPagamento(dados: {
   data: string;
   dataVencimento?: string;
   dentistaId?: string;
-}): Promise<{ error?: string; retryable?: boolean; id?: string; repetida?: boolean; autoAprovado?: boolean }> {
+}): Promise<{ error?: string; retryable?: boolean; id?: string; repetida?: boolean; autoAprovado?: boolean; pagamentos?: PagamentoConfirmado[] }> {
   if (dados.dataVencimento) {
     return { error: 'Para prever cobrança futura, use Organizar cobrança. Registrar recebimento é apenas dinheiro já recebido.' };
   }
@@ -840,10 +858,28 @@ export async function registrarPagamento(dados: {
       href: `/dashboard/pacientes/${parsed.data.pacienteId}`,
     });
   }
+
+  const { data: pagamentos, error: pagamentosError } = await supabase
+    .from('pagamentos')
+    .select(SELECT_PAGAMENTOS_CONFIRMADOS)
+    .eq('orcamento_id', parsed.data.orcamentoId)
+    .eq('clinica_id', clinicId);
+  if (pagamentosError || !pagamentos) {
+    return { error: 'Não foi possível confirmar o resultado. Tentar novamente repetirá a mesma operação.', retryable: true };
+  }
+  const pagamentosConfirmados = pagamentos.map((pagamento) => ({
+    ...pagamento,
+    marcado_por: pagamento.marcado_por?.[0] ?? null,
+  })) satisfies PagamentoConfirmado[];
+
   revalidatePath(`/dashboard/pacientes/${parsed.data.pacienteId}`);
   revalidatePath('/dashboard/orcamentos');
   revalidatePath('/dashboard/financeiro');
-  return { id: pagamento.pagamento_id, repetida: pagamento.repetida };
+  return {
+    id: pagamento.pagamento_id,
+    repetida: pagamento.repetida,
+    pagamentos: pagamentosConfirmados,
+  };
 }
 
 /**
@@ -921,11 +957,11 @@ export async function registrarRecebimentoCobranca(dados: {
   valor: number;
   formaPagamento: FormaPagamento;
   data: string;
-}): Promise<{ error?: string; id?: string }> {
+}): Promise<{ error?: string; id?: string; pagamentos?: PagamentoConfirmado[]; pagamentosOrcamento?: PagamentoConfirmado[]; outcomeUnknown?: boolean }> {
   const parsed = recebimentoCobrancaSchema.safeParse(dados);
   if (!parsed.success) return { error: 'Revise valor, data e forma de pagamento.' };
 
-  const { supabase } = await requireClinicContext();
+  const { supabase, clinicId } = await requireClinicContext();
   const rpc = supabase.rpc.bind(supabase) as unknown as RpcCall;
   const { data, error } = await rpc('registrar_recebimento_cobranca', {
     p_cobranca_id: parsed.data.cobrancaId,
@@ -936,10 +972,51 @@ export async function registrarRecebimentoCobranca(dados: {
   if (error) return { error: erroFinanceiro(error.message) };
 
   const pagamento = data as { id?: string } | null;
+  const { data: pagamentos, error: pagamentosError } = await supabase
+    .from('pagamentos')
+    .select(SELECT_PAGAMENTOS_CONFIRMADOS_COM_ORCAMENTO)
+    .eq('cobranca_id', parsed.data.cobrancaId)
+    .eq('clinica_id', clinicId);
+  if (pagamentosError || !pagamentos) {
+    return {
+      error: 'Não foi possível confirmar o resultado. Recarregue antes de tentar outra ação.',
+      outcomeUnknown: true,
+    };
+  }
+  const pagamentosConfirmados = pagamentos.map((pagamentoConfirmado) => ({
+    ...pagamentoConfirmado,
+    marcado_por: pagamentoConfirmado.marcado_por?.[0] ?? null,
+  })) satisfies PagamentoConfirmado[];
+  const pagamentoConfirmado = pagamentos.find((item) => item.id === pagamento?.id);
+  if (!pagamento?.id || !pagamentoConfirmado?.orcamento_id || !pagamentosConfirmados.some((item) => item.id === pagamento.id)) {
+    return {
+      error: 'Não foi possível confirmar o resultado. Recarregue antes de tentar outra ação.',
+      outcomeUnknown: true,
+    };
+  }
+  const { data: pagamentosOrcamento, error: pagamentosOrcamentoError } = await supabase
+    .from('pagamentos')
+    .select(SELECT_PAGAMENTOS_CONFIRMADOS)
+    .eq('orcamento_id', pagamentoConfirmado.orcamento_id)
+    .eq('clinica_id', clinicId);
+  if (pagamentosOrcamentoError || !pagamentosOrcamento) {
+    return {
+      error: 'Não foi possível confirmar o resultado. Recarregue antes de tentar outra ação.',
+      outcomeUnknown: true,
+    };
+  }
+  const pagamentosDoOrcamentoConfirmados = pagamentosOrcamento.map((item) => ({
+    ...item,
+    marcado_por: item.marcado_por?.[0] ?? null,
+  })) satisfies PagamentoConfirmado[];
   revalidatePath(`/dashboard/pacientes/${parsed.data.pacienteId}`);
   revalidatePath('/dashboard/orcamentos');
   revalidatePath('/dashboard/financeiro');
-  return { id: pagamento?.id };
+  return {
+    id: pagamento.id,
+    pagamentos: pagamentosConfirmados,
+    pagamentosOrcamento: pagamentosDoOrcamentoConfirmados,
+  };
 }
 
 /** Cancela apenas uma etapa sem dinheiro recebido e libera seus itens para nova negociação. */

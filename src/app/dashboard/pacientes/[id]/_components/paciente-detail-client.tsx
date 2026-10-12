@@ -83,6 +83,10 @@ import {
   type FormaPagamento,
 } from '@/app/dashboard/orcamentos/actions';
 import { deriveEstadoOrcamento, rotuloEstado } from '@/lib/orcamentos/estado';
+import { reconciliarPagamentosConfirmados } from '@/lib/orcamentos/reconciliar-pagamentos-confirmados';
+import {
+  bloquearCobrancaComResultadoIncerto,
+} from '@/lib/orcamentos/bloqueio-resultado-incerto-cobranca';
 import { exigeRevisaoComercial } from '@/lib/orcamentos/exige-revisao-comercial';
 import type { Paciente } from '@/types/database';
 import type { TimelineEvent } from '@/server/patients/get-visible-timeline-events';
@@ -247,6 +251,7 @@ export function PacienteDetailClient({
 
   // Orçamentos — cópia local para atualizações otimistas
   const [orcamentosState, setOrcamentosState] = useState<OrcamentoComItens[]>(orcamentos);
+  const [cobrancasComResultadoIncerto, setCobrancasComResultadoIncerto] = useState<ReadonlySet<string>>(() => new Set());
   useEffect(() => { setOrcamentosState(orcamentos); }, [orcamentos]);
 
   // Persiste paciente como recente para a Command Palette
@@ -846,16 +851,23 @@ export function PacienteDetailClient({
           setPagIntent(null);
           setPagResultadoDesconhecido(false);
         }
+      } else if (!result.pagamentos) {
+        setPagResultadoDesconhecido(true);
+        setPagError('Não foi possível confirmar o resultado. Tentar novamente repetirá a mesma operação.');
       } else {
-      setPagForm({
-        valor: '',
-        formaPagamento: 'dinheiro',
-        data: new Date().toISOString().split('T')[0],
-        dataVencimento: '',
-      });
-      setPagIntent(null);
-      setPagResultadoDesconhecido(false);
-      router.refresh();
+        const pagamentosConfirmados = result.pagamentos;
+        setOrcamentosState((prev) => (
+          reconciliarPagamentosConfirmados(prev, intent.orcamentoId, pagamentosConfirmados).registros
+        ));
+        setPagForm({
+          valor: '',
+          formaPagamento: 'dinheiro',
+          data: new Date().toISOString().split('T')[0],
+          dataVencimento: '',
+        });
+        setPagIntent(null);
+        setPagResultadoDesconhecido(false);
+        router.refresh();
       }
     } catch {
       setPagResultadoDesconhecido(true);
@@ -2138,6 +2150,17 @@ export function PacienteDetailClient({
         onIniciarEdicaoValorAcordado={handleIniciarEdicaoValorAcordado}
         onCancelarEdicaoValorAcordado={handleCancelarEdicaoValorAcordado}
         onSalvarValorAcordado={handleSalvarValorAcordado}
+        cobrancasComResultadoIncerto={cobrancasComResultadoIncerto}
+        onCobrancaResultadoIncerto={(cobrancaId) => {
+          setCobrancasComResultadoIncerto((atual) => (
+            bloquearCobrancaComResultadoIncerto(atual, cobrancaId)
+          ));
+        }}
+        onPagamentosOrcamentoConfirmados={(orcamentoId, pagamentos) => {
+          setOrcamentosState((prev) => (
+            reconciliarPagamentosConfirmados(prev, orcamentoId, pagamentos).registros
+          ));
+        }}
         onAceiteRegistrado={() => {
           // R-03c-1: o snapshot real (cro_no_ato, termos exatos) é montado no servidor —
           // busca de novo em vez de aproximar no client, mesma disciplina do handleStatusChange.
