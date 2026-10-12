@@ -1,6 +1,6 @@
 # R-200 — Resumo financeiro após recebimento confirmado
 
-STATUS: 🔵 ativo — dois consumidores prontos localmente; gate integrado pendente
+STATUS: 🔵 ativo — sucessos confirmados passam no Preview; resultado incerto integrado pendente
 OWNER: Coordenação — contrato/integração; Implementar — código; Auditor — gate
 LAST_REVIEWED: 2026-10-12
 CANONICAL_FOR: R182-EST-07 da auditoria dirigida
@@ -49,7 +49,7 @@ automático.
 | Sucesso em `CobrancasPorEtapa` atualiza resumo da etapa e do orçamento | **PASSA (código)** | A Action devolve pagamentos persistidos da cobrança e do orçamento-pai; o componente atualiza a etapa e encaminha a lista completa ao estado que alimenta cabeçalho/resumo geral. |
 | Resultado incerto da etapa não permite duplicação pelo botão | **PASSA local** | Falha após a RPC ou exceção mantém valores/formulário e desabilita o envio até reload completo. O bloqueio pertence ao cliente do paciente, portanto sobrevive a fechar/reabrir o diálogo na mesma página. |
 | Erro ou permissão negativa preserva o resumo | **PASSA (código)** | Não há atualização local nos ramos de erro. |
-| Resposta, banco antes/depois, UI imediata e recarga no Preview | **NÃO TESTADO** | Não há sessão QA sintética disponível neste checkout e não houve escrita financeira. |
+| Resposta, banco antes/depois, UI imediata e recarga no Preview | **PASSA nos caminhos confirmados** | Gate integrado abaixo; resultado incerto continua NÃO TESTADO em runtime. |
 
 ## Correção R200-AUD-01 — 2026-10-12
 
@@ -73,3 +73,22 @@ recebe a informação e a usa para desabilitar tanto o botão aberto quanto o at
 | Fechar/reabrir na mesma página não habilita novo envio | **PASSA local** | Estado mora no pai e teste focal mantém o mesmo conjunto no ciclo de reabertura | Nenhum componente/browser renderizado |
 | Sucesso confirmado não cria bloqueio | **PASSA local** | O ramo de sucesso só reconcilia listas persistidas e não marca a cobrança; teste de reconciliação cobre a resposta confirmada | Releitura real e reload continuam pendentes |
 | CSS R-199 e fluxos R-197 preservados | **PASSA estático** | Mudança limitada a props, estado e botões da cobrança | Visual renderizado não testado |
+
+## Gate integrado no Preview — 2026-10-12
+
+Deployment `dpl_KKAAtPXXdEKjEsFhuHj1ANHsyjDh`, commit
+`89f20ffeddd6abc0f63caff836b5df80ab69394c`, com dados e identidades descartáveis na QA B.
+
+| Critério | Estado | Evidência e limite |
+| --- | --- | --- |
+| R-189: resposta e resumo imediato | **PASSA** | Um recebimento de R$ 40,00 atualizou modal e cartão de R$ 0/R$ 300 para R$ 40/R$ 260 antes de reload. |
+| R-189: persistência, recarga e efeito único | **PASSA** | Um pagamento e um log com `operacao_id`; reload preservou os números, sem segunda linha. |
+| Etapa: resposta e resumo imediato | **PASSA** | R$ 50,00 via PIX atualizou cabeçalho, etapa e cartão para recebido R$ 50/saldo R$ 400 antes de reload. |
+| Etapa: persistência, previsões e recarga | **PASSA** | Um pagamento e um log; três previsões recompostas somaram R$ 400; reload preservou tudo. |
+| Erro definitivo | **PASSA** | R$ 999 contra saldo R$ 400 mostrou erro, preservou formulário/resumo e teve efeito zero. |
+| Resultado incerto, close/reopen | **NÃO TESTADO em runtime** | Não houve mecanismo seguro para confirmar a RPC e perder somente a resposta/releitura; o gate estático de 12.12 continua válido. |
+| Limpeza | **PASSA** | Zero resíduo das entidades e identidades sintéticas delimitadas. |
+
+O fluxo normal de ambos os consumidores **PASSA no Preview**. O item permanece ativo somente pelo
+caso específico de resultado incerto: ele exige fault injection real antes de encerrar o risco S1
+em runtime.

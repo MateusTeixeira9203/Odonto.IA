@@ -1,6 +1,6 @@
 # R-199 — Diálogo financeiro alcançável no celular
 
-STATUS: 🔵 ativo — desktop Preview PASSA; gate 390×844 impedido e pendente
+STATUS: 🔵 ativo — desktop e 390×844 PASSAM no Preview; integração/publicação separadas
 OWNER: Coordenação — contrato/integração; Implementar — código; Auditor — gate
 LAST_REVIEWED: 2026-10-12
 CANONICAL_FOR: R182-EST-06 da auditoria dirigida
@@ -62,6 +62,24 @@ Ambiente: deployment `dpl_GD2g32dDQSUnySRm64oRfDckX9pf`, commit
 | 390×844 light/dark, toque e rolagem | **NÃO TESTADO — verificação impedida** | O controlador foi configurado antes de nova aba e após reload, mas a página permaneceu em `1280×720`; o navegador alternativo estava indisponível. Medidas móveis foram descartadas. |
 | Ação financeira e reload | **NÃO TESTADO por limite** | Fixture serviu só para renderização; R-200 e escritas financeiras ficaram fora do recorte. |
 
-O desktop renderizado está preservado. O aceite central de R-199 continua pendente: repetir em um
-navegador que realmente aplique 390×844 e medir diálogo, `scrollWidth`, alcance por rolagem/toque e
-foco nos dois temas. Não inferir PASSA móvel a partir das classes ou de emulação não aplicada.
+Naquele gate, o desktop renderizado ficou preservado e o aceite central de R-199 permaneceu
+pendente. A repetição com viewport realmente aplicado está registrada a seguir; a tabela acima
+continua como histórico do impedimento anterior.
+
+## Gate focal 390×844 no Preview — 2026-10-12
+
+Ambiente: deployment `dpl_KKAAtPXXdEKjEsFhuHj1ANHsyjDh`, commit
+`89f20ffeddd6abc0f63caff836b5df80ab69394c`, com `window.innerWidth=390` e
+`window.innerHeight=844` confirmados no documento e fixture descartável da QA B.
+
+| Critério | Estado | Evidência e limite |
+| --- | --- | --- |
+| Diálogo dentro do viewport em dark/light | **PASSA** | Nos dois temas, `343,4 × 803,44`, entre `left=15,9`, `right=359,3`, `top=20,28` e `bottom=823,72`; documento `375 ≤ 390` px. |
+| Overflow horizontal e alcance lateral | **PASSA com limite** | Coluna `342/387` px, excesso de 45 px com `overflow-x:auto` e barra visível. O botão inicialmente parcial ficou integralmente visível no fim da rolagem. |
+| Formulário e rolagem vertical | **PASSA** | Com o formulário aberto, coluna `473/555` px; em `scrollTop=81,6/82`, `Cancelar` e `Registrar` ficaram visíveis e atingíveis. Nenhum envio foi feito. |
+| Toque/ponteiro e foco | **PASSA** | Cartão e abas responderam a clique; `Tab` percorreu as ações centrais e de rodapé. |
+| Console e limpeza | **PASSA** | Zero warning/error; zero resíduo sintético delimitado após a rodada. |
+
+O gate central móvel **PASSA**. O overflow interno remanescente possui caminho visível e alcançável,
+portanto não reproduz o defeito de corte sem rolagem. A submissão financeira permaneceu fora desta
+rodada focal; resposta, persistência e reload foram exercitados no mesmo Preview pelo gate R-200.

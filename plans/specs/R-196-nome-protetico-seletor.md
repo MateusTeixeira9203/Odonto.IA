@@ -1,6 +1,6 @@
 # R-196 — mostrar nome do protético antes de enviar pedido
 
-STATUS: ACTIVE
+STATUS: ACTIVE — gate Preview PASSA; integração/publicação separadas
 OWNER: Implementar — código e teste; Coordenação — integração; Auditor — gate
 LAST_REVIEWED: 2026-10-12
 CANONICAL_FOR: correção do achado R182-EST-03
@@ -25,3 +25,21 @@ Não alterar modelo de dados, Action nem outras telas.
 
 Entregar diff pequeno e gate de UI + persistência. Não fazer commit, push ou
 deploy no despacho de implementação.
+
+## Gate no Preview — 2026-10-12
+
+Deployment `dpl_KKAAtPXXdEKjEsFhuHj1ANHsyjDh`, commit
+`89f20ffeddd6abc0f63caff836b5df80ab69394c`, com secretária, dentista, dois protéticos, paciente e
+agendamento descartáveis na QA B.
+
+| Critério | Estado | Evidência e limite |
+| --- | --- | --- |
+| Nome de Alfa e Beta no Select fechado | **PASSA** | Alfa apareceu após seleção por ponteiro; Beta após `ArrowDown` + `Enter`. Reabrir e fechar preservou o nome escolhido, sem UUID visível. |
+| ID escolhido | **PASSA** | Beta visível correspondeu ao valor interno `5b3f9096-5bdd-46c8-8e08-3b8f0802280b`; o único pedido persistido usou exatamente esse `protetico_id`. |
+| Destinatário e reload | **PASSA** | Beta viu o pedido completo na própria agenda e o reload preservou paciente, dentista, observação, hora e status. |
+| Isolamento negativo | **PASSA** | Sessão autenticada de Alfa recebeu zero linhas para o pedido; Beta recebeu uma. |
+| Console e limpeza | **PASSA** | Zero warning/error e zero resíduo sintético delimitado. |
+
+O gate focal **PASSA no Preview**. R182-EST-03 fica preservado como falha histórica, com a correção
+confirmada no candidato atual. Marcar o pedido como entregue permaneceu fora desta rodada porque não
+é necessário para verificar o rótulo, o ID enviado e a persistência do destinatário.

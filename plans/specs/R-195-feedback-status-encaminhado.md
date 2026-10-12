@@ -1,6 +1,6 @@
 # R-195 — refletir status encaminhado após salvar
 
-STATUS: ACTIVE
+STATUS: ACTIVE — direção A fazer → Realizado PASSA no Preview; inversa e negativa não testadas
 OWNER: Implementar — código e teste; Coordenação — integração; Auditor — gate
 LAST_REVIEWED: 2026-10-12
 CANONICAL_FOR: correção do achado R182-EST-02
@@ -27,3 +27,21 @@ Não redesenhar o Prontuário nem alterar schema ou outros fluxos.
 
 Entregar diff pequeno, testes focais, PASSA/NÃO PASSA/NÃO TESTADO e risco de
 regressão. Não fazer commit, push ou deploy no despacho de implementação.
+
+## Gate no Preview — 2026-10-12
+
+No deployment `dpl_KKAAtPXXdEKjEsFhuHj1ANHsyjDh` (`89f20ffeddd6abc0f63caff836b5df80ab69394c`),
+um procedimento novo e sintético encaminhado ao dentista autenticado passou de `A fazer` para
+`Realizado`. Antes de reload, cartão, odontograma e progresso mudaram para `Realizado`, “feito aqui”
+e `33% · 1 de 3`. O banco confirmou `realizado_em=2026-10-12`,
+`momento_planejado=sessao_atual`, autoria/destino preservados e um log do destinatário. A recarga
+manteve o mesmo estado.
+
+| Critério | Estado |
+| --- | --- |
+| `A fazer → Realizado`, resposta, UI imediata e banco | **PASSA** |
+| Persistência após recarga | **PASSA** |
+| `Realizado → A fazer` | **NÃO TESTADO nesta rodada** |
+| Falha/sem permissão com efeito zero | **NÃO TESTADO nesta rodada** |
+
+A fixture e as duas identidades QA foram removidas; zero resíduo delimitado permaneceu.

@@ -1,6 +1,6 @@
 # R-182 — auditoria dirigida de estabilização
 
-STATUS: R-197 PREVIEW PASSA; R-199 DESKTOP PASSA / 390×844 NÃO TESTADO; R-200 CORRIGIDO LOCAL / RUNTIME NÃO TESTADO
+STATUS: R-197 PREVIEW PASSA; R-195 PREVIEW PASSA; R-196 PREVIEW PASSA; R-199 390×844 PREVIEW PASSA; R-200 PREVIEW PASSA / RESULTADO INCERTO NÃO TESTADO
 OWNER: Auditor — evidência; Coordenação — integração; Executor — correção após despacho
 LAST_REVIEWED: 2026-10-12
 CANONICAL_FOR: evidência desta execução dirigida do R-182 no candidato `2c52879`
@@ -943,3 +943,132 @@ encerrado em runtime, adicionar ou executar teste de componente que monte o pai,
 `outcomeUnknown`, feche/reabra e faça `router.refresh`, verificando que nenhuma segunda Action fica
 habilitada; depois, se autorizado, repetir com RPC e dados sintéticos sob perda controlada de
 resposta.
+
+### 12.13 Gate dirigido no Preview — R-200 e R-195
+
+Ambiente: deployment Vercel `dpl_KKAAtPXXdEKjEsFhuHj1ANHsyjDh`, estado `READY`, commit
+`89f20ffeddd6abc0f63caff836b5df80ab69394c`. Foram usados somente duas identidades, um paciente,
+uma Ficha, três eventos e dois orçamentos novos e sintéticos na clínica QA B, marcador
+`QA R200 PREVIEW 97a8650b`. Nenhuma conta ou registro da Clindent foi acessado.
+
+#### R-200 — recebimento R-189
+
+| Critério | Estado | Evidência e limite |
+| --- | --- | --- |
+| Resposta confirmada e resumo imediato | **PASSA** | Orçamento global de R$ 300,00 recebeu R$ 40,00 em dinheiro. Antes de reload, cabeçalho, resumo e cartão passaram de recebido R$ 0,00/saldo R$ 300,00 para recebido R$ 40,00/saldo R$ 260,00. |
+| Persistência e efeito único | **PASSA** | Banco confirmou exatamente um pagamento pago de R$ 40,00, sem `cobranca_id`, e um log `pagamento.registrado` com uma `operacao_id`; não houve segunda linha ou segundo log. |
+| Recarga | **PASSA** | Reload completo manteve cabeçalho, resumo, histórico e cartão em R$ 40,00 recebido/R$ 260,00 saldo. |
+| Retry da mesma intenção após resposta perdida | **NÃO TESTADO** | A ferramenta não permitiu perder somente a resposta da Server Action preservando a sessão e a mesma `operacaoId`; não foi simulada uma nova intenção como substituto. |
+
+#### R-200 — cobrança por etapa
+
+| Critério | Estado | Evidência e limite |
+| --- | --- | --- |
+| Resposta confirmada e três superfícies imediatas | **PASSA** | Etapa final R$ 450,00 recebeu R$ 50,00 via PIX. Antes de reload, cabeçalho, resumo da etapa e cartão passaram para recebido R$ 50,00/saldo R$ 400,00; toast confirmou a operação. |
+| Banco, recomposição e ausência de duplicação | **PASSA** | Exatamente um pagamento pago de R$ 50,00 e um log foram criados. As três previsões antigas de R$ 150,00 ficaram canceladas e três novas previsões de R$ 133,33/R$ 133,33/R$ 133,34 somaram o saldo R$ 400,00. |
+| Recarga | **PASSA** | Reload manteve etapa `Parcial`, recebido R$ 50,00, saldo R$ 400,00 e o único recebimento PIX. |
+| Erro definitivo | **PASSA** | Tentativa de R$ 999,00 com saldo R$ 400,00 mostrou “O recebimento não pode ultrapassar o saldo do orçamento”, preservou o campo e todos os resumos. Banco permaneceu com um pagamento e um log. Fechar/reabrir manteve o botão habilitado, coerente com falha definitiva e segura para correção. |
+| Resultado incerto e bloqueio close/reopen | **NÃO TESTADO em runtime** | Não havia fault injection segura para fazer a RPC confirmar e perder somente a releitura/resposta. O bloqueio permaneceu PASSA estático em 12.12; o erro definitivo não foi apresentado como prova dessa condição. |
+| Console | **PASSA** | Zero warning/error na sessão após os dois sucessos, reloads e erro definitivo. |
+
+**Resultado R-200:** **PASSA no Preview para os dois caminhos de sucesso confirmado**, incluindo
+resposta, estado imediato, banco, ausência de duplicação observada e recarga. O critério específico
+de resultado incerto permanece **NÃO TESTADO**, portanto R200-AUD-01 está corrigido localmente e tem
+o caminho normal integrado aprovado, mas ainda não possui fault injection end-to-end.
+
+#### R-195 — feedback do procedimento encaminhado
+
+| Critério | Estado | Evidência e limite |
+| --- | --- | --- |
+| Destinatário marca realizado e UI muda sem reload | **PASSA** | Procedimento sintético encaminhado no dente 14 mudou imediatamente de `A fazer` para `Realizado`; odontograma mudou para “feito aqui” e progresso da Ficha para `33% · 1 de 3 procedimentos`. |
+| Banco, autoria/destino e log | **PASSA** | Evento ficou `status=realizado`, `realizado_em=2026-10-12`, `momento_planejado=sessao_atual`; `dentista_id` do autor e `encaminhado_para` do destinatário foram preservados. Um log `odontograma_evento.marcado_realizado` registrou o destinatário. |
+| Recarga | **PASSA** | Após reload, cartão permaneceu `Realizado`, última alteração correta e progresso `33% · 1 de 3`. |
+| Reabertura `Realizado → A fazer` e negativa | **NÃO TESTADO** | O gate adicional foi limitado ao defeito focal de atualização imediata após sucesso. |
+
+**Resultado R-195:** **PASSA no Preview no sentido focal `A fazer → Realizado`**, com resposta,
+estado imediato, persistência e reload. O sentido inverso e a negativa não foram repetidos.
+
+#### R-196, cobertura e limpeza
+
+- **R-196 — NÃO TESTADO nesta rodada:** não foi inferido a partir do helper; o gate próprio posterior
+  está registrado em 12.15.
+- **R-199 móvel — não repetido nesta rodada:** o gate próprio posterior está registrado em 12.14.
+- **Achados confirmados:** nenhum novo.
+- **Falsos positivos evitados:** erro definitivo da etapa não foi confundido com resultado incerto;
+  uma única submissão bem-sucedida não foi apresentada como retry idempotente após perda de resposta.
+- **Limpeza:** **PASSA**. A proteção viva do encaminhamento impediu a exclusão ordinária do evento
+  sintético; a remoção foi concluída por ID explícito em transação delimitada, seguida da rotina
+  normal. Contagens finais: zero paciente, orçamento, pagamento, cobrança, participação, perfil e
+  usuário sintéticos remanescentes; as identidades Auth também foram removidas.
+
+**Próxima ação daquele gate:** para encerrar R200-AUD-01 em runtime, executar fault injection
+controlada que deixe a RPC confirmar e faça apenas a releitura/resposta falhar; então fechar/reabrir
+sem reload e provar que nenhum segundo recebimento fica habilitado. A ação então pendente de R-196
+foi cumprida no gate 12.15.
+
+### 12.14 Gate focal R-199 em 390×844 no Preview
+
+Ambiente: deployment Vercel `dpl_KKAAtPXXdEKjEsFhuHj1ANHsyjDh`, commit
+`89f20ffeddd6abc0f63caff836b5df80ab69394c`, navegador IAB com override real confirmado por
+`window.innerWidth=390` e `window.innerHeight=844`. Foi usada uma identidade, um paciente e uma
+cobrança novos e sintéticos na clínica QA B, marcador `QA BROWSER R197 R199 1894e0fe`. Nenhuma ação
+financeira foi submetida e nenhum dado da Clindent foi acessado.
+
+| Critério | Estado | Evidência e limite |
+| --- | --- | --- |
+| Diálogo dentro do viewport — dark | **PASSA** | Retângulo `343,4 × 803,44`, entre `left=15,9`, `right=359,3`, `top=20,28` e `bottom=823,72`; documento `scrollWidth=375 ≤ 390`. Fundo/texto `rgba(17,17,18,0.9)` / `rgb(250,250,250)`. |
+| Diálogo dentro do viewport — light | **PASSA** | Mesma geometria e largura do documento; fundo/texto `rgba(255,255,255,0.92)` / `rgb(9,9,11)`. |
+| Overflow horizontal interno | **PASSA com limite explícito** | A coluna financeira mediu `clientWidth=342` e `scrollWidth=387`, excesso de 45 px com `overflow-x:auto` e barra visível. `Cancelar` começou parcialmente fora da área (`right=403,3`), mas em `scrollLeft=44,8/45` ficou totalmente visível (`left=285,08`, `right=358,5`). Portanto existe caminho alcançável; não reapareceu o corte sem rolagem de R182-EST-06. |
+| Formulário, rolagem vertical e controles finais | **PASSA** | Abrir `Registrar recebimento` sem enviar ampliou a coluna para `scrollHeight=555` / `clientHeight=473`. Em `scrollTop=81,6/82`, `Cancelar` e `Registrar` ficaram totalmente visíveis, com centro atingindo o próprio botão. O formulário foi cancelado sem escrita. |
+| Toque/ponteiro | **PASSA no recorte** | O cartão abriu o diálogo; `Atividade` e `Procedimentos` alternaram por clique e os dois painéis ficaram visíveis. Nenhuma ação destrutiva ou financeira foi acionada. |
+| Teclado e foco | **PASSA com limite explícito** | `Tab` percorreu abas, item aprovado, Registrar recebimento, Editar etapa, Cancelar, Excluir, Revisar orçamento, PDF e Fechar. O foco chegou ao `Cancelar` ainda parcialmente recortado, mas a rolagem horizontal comprovada o torna integralmente alcançável. |
+| Console | **PASSA** | Zero warning/error após abertura, troca de tema, rolagens, foco e abertura/cancelamento do formulário. |
+| Limpeza | **PASSA** | Zero paciente, orçamento, pagamento, cobrança, participação, perfil e usuário sintéticos remanescentes; identidade Auth removida. |
+
+**Resultado R-199:** **PASSA no Preview em 390×844 nos temas dark e light**. O diálogo e seu
+formulário permanecem dentro do viewport, as duas áreas roláveis dão acesso aos controles e o fluxo
+por ponteiro e teclado permaneceu utilizável. Existe overflow horizontal interno de 45 px; ele é
+visível e alcançável e, por isso, não reproduz o defeito confirmado de conteúdo cortado sem caminho
+de rolagem. Nenhum novo achado foi confirmado.
+
+**Cobertura:** geometria, largura do documento, cores light/dark, overflow horizontal, rolagem
+vertical do formulário, toque/ponteiro, foco e console. **Fora:** submissão financeira nesta rodada;
+resposta, persistência e reload continuam cobertos separadamente pelo gate R-200 da seção 12.13.
+
+**Próxima ação:** nenhuma correção nova para o Executor em R-199. Integração e publicação continuam
+estados separados; o excesso horizontal de 45 px só vira novo item se o produto exigir eliminação
+da rolagem, porque o contrato atual proíbe corte sem caminho e esse efeito não ocorreu.
+
+### 12.15 Gate dirigido R-196 no Preview
+
+Ambiente: deployment Vercel `dpl_KKAAtPXXdEKjEsFhuHj1ANHsyjDh`, commit
+`89f20ffeddd6abc0f63caff836b5df80ab69394c`. A execução criou uma secretária, um dentista, dois
+protéticos, um paciente e um agendamento novos e sintéticos na clínica QA B, marcador
+`QA R196 PREVIEW 6c898c21`. A lista continha também um protético QA preexistente; nenhuma conta ou
+registro da Clindent foi acessado.
+
+| Critério | Estado | Evidência e limite |
+| --- | --- | --- |
+| Opções Alfa e Beta legíveis | **PASSA** | O Select aberto mostrou `QA R196 PREVIEW 6c898c21 PROTETICO ALFA` e `... PROTETICO BETA`. Selecionar Alfa por ponteiro fechou o controle com o nome de Alfa; reabrir mostrou Alfa selecionado. Nenhum UUID apareceu no rótulo visível. |
+| Seleção por teclado e fechamento/reabertura | **PASSA** | Com Alfa ativo, `ArrowDown` moveu o foco para Beta e `Enter` selecionou. O controle fechado exibiu o nome de Beta; reabrir e fechar com `Escape` preservou o mesmo nome. O valor interno permaneceu `5b3f9096-5bdd-46c8-8e08-3b8f0802280b`, ID de Beta. |
+| Envio e efeito único | **PASSA** | Antes do envio havia zero pedidos para a fixture. A UI confirmou `Enviado pro protético!`; o banco passou a conter exatamente um pedido `f9bd3d94-1bfd-4f90-b123-79cde8cf27d2`, destinado ao ID de Beta, com paciente, dentista e agendamento sintéticos corretos, observação marcada, entrega `2026-12-10`, `status=pendente` e `entregue_em=null`. |
+| Destinatário e recarga | **PASSA** | Em sessão própria, Beta viu em 10/12 o pedido, paciente, dentista, observação, horário `14:00` e estado `Pendente`. Após reload completo e nova seleção do dia, os mesmos dados reapareceram. |
+| Negativa do não destinatário | **PASSA** | Cliente autenticado de Alfa consultou o ID do pedido e recebeu zero linhas; cliente autenticado de Beta recebeu exatamente a linha destinada a ele. Nenhuma alteração foi feita nessa negativa. |
+| Validação sem efeito | **PASSA com limite** | A primeira entrada automatizada de data não permaneceu no `input`; a UI mostrou `Escolha a data de entrega do protético` e o banco continuou com zero pedidos. A entrada posterior por teclado produziu uma data futura válida. Isso não foi classificado como defeito do R-196. |
+| Console | **PASSA** | Zero warning/error durante seleção, envio, troca de identidade e reload. |
+| Limpeza | **PASSA** | Zero paciente, agendamento, pedido, participação, perfil e usuário sintéticos remanescentes; as quatro identidades Auth foram removidas. |
+
+**Resultado R-196:** **PASSA no Preview**. O nome mostrado acompanhou Alfa e Beta em seleção por
+ponteiro e teclado, enquanto o ID persistido continuou sendo o destino real. O destinatário viu o
+pedido após recarga e o outro protético não conseguiu lê-lo. R182-EST-03 permanece no histórico como
+defeito confirmado, agora corrigido no Preview candidato. Nenhum novo achado S0/S1 ou de outra
+severidade foi confirmado.
+
+**Cobertura:** rótulo fechado, lista aberta, seleção por ponteiro, foco/teclado, close/reopen,
+resposta, efeito único, banco, destinatário, recarga, negativa autenticada, console e limpeza.
+**Fora:** produção; marcação como `Entregue`, porque o contrato focal exige recebimento e persistência
+do pedido, não uma segunda mudança de estado já coberta no adendo 9.3.
+
+**Próxima ação:** nenhuma correção nova para o Executor em R-196. Coordenação pode integrar o item
+com as demais evidências da estabilização, mantendo integração, publicação e aceite como estados
+distintos.
