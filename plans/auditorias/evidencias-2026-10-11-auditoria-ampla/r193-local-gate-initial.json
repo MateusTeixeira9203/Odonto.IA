@@ -1,0 +1,56 @@
+[
+  {
+    "viewport": 1280,
+    "flow": "patient",
+    "patientCount": 1,
+    "tabReached": true,
+    "enterOpened": true
+  },
+  {
+    "viewport": 1280,
+    "flow": "appointment",
+    "appointmentCount": 1,
+    "tabReached": true,
+    "enterOpenedDialog": true,
+    "spaceOpenedDialog": true
+  },
+  {
+    "viewport": 1280,
+    "flow": "budget",
+    "budgetCount": 0,
+    "tabReached": false,
+    "enterOpenedDialog": false,
+    "spaceOpenedDialog": false,
+    "mouseOpenedDialog": false,
+    "hydrationErrors": 0,
+    "otherConsoleErrors": 0,
+    "overflow": false
+  },
+  {
+    "viewport": 390,
+    "flow": "patient",
+    "patientCount": 1,
+    "tabReached": true,
+    "enterOpened": true
+  },
+  {
+    "viewport": 390,
+    "flow": "appointment",
+    "appointmentCount": 1,
+    "tabReached": true,
+    "enterOpenedDialog": true,
+    "spaceOpenedDialog": true
+  },
+  {
+    "viewport": 390,
+    "flow": "budget",
+    "budgetCount": 0,
+    "tabReached": false,
+    "enterOpenedDialog": false,
+    "spaceOpenedDialog": false,
+    "mouseOpenedDialog": false,
+    "hydrationErrors": 0,
+    "otherConsoleErrors": 0,
+    "overflow": false
+  }
+]

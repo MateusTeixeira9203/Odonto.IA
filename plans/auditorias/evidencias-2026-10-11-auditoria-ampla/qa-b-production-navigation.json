@@ -1,0 +1,334 @@
+[
+  {
+    "mode": "desktop_light",
+    "requested": "/dashboard",
+    "httpStatus": 200,
+    "actual": "/dashboard",
+    "statusText": "Odonto.IA | Inteligência Odontológica",
+    "width": 1280,
+    "scrollWidth": 1280,
+    "theme": "light",
+    "h1Count": 1,
+    "alertCount": 0,
+    "pageErrors": 0
+  },
+  {
+    "mode": "desktop_light",
+    "requested": "/dashboard/meu-dia",
+    "httpStatus": 200,
+    "actual": "/dashboard/meu-dia",
+    "statusText": "Odonto.IA | Inteligência Odontológica",
+    "width": 1280,
+    "scrollWidth": 1280,
+    "theme": "light",
+    "h1Count": 1,
+    "alertCount": 0,
+    "pageErrors": 0
+  },
+  {
+    "mode": "desktop_light",
+    "requested": "/dashboard/agendamentos",
+    "httpStatus": 200,
+    "actual": "/dashboard/agendamentos",
+    "statusText": "Odonto.IA | Inteligência Odontológica",
+    "width": 1280,
+    "scrollWidth": 1280,
+    "theme": "light",
+    "h1Count": 1,
+    "alertCount": 0,
+    "pageErrors": 1
+  },
+  {
+    "mode": "desktop_light",
+    "requested": "/dashboard/pacientes",
+    "httpStatus": 200,
+    "actual": "/dashboard/pacientes",
+    "statusText": "Odonto.IA | Inteligência Odontológica",
+    "width": 1280,
+    "scrollWidth": 1280,
+    "theme": "light",
+    "h1Count": 1,
+    "alertCount": 0,
+    "pageErrors": 1
+  },
+  {
+    "mode": "desktop_light",
+    "requested": "/dashboard/pacientes/novo",
+    "httpStatus": 200,
+    "actual": "/dashboard/pacientes/novo",
+    "statusText": "Odonto.IA | Inteligência Odontológica",
+    "width": 1280,
+    "scrollWidth": 1280,
+    "theme": "light",
+    "h1Count": 1,
+    "alertCount": 0,
+    "pageErrors": 0
+  },
+  {
+    "mode": "desktop_light",
+    "requested": "/dashboard/pacientes/2150ce91-e0ad-4972-84d3-8f605c59f3ce",
+    "httpStatus": 200,
+    "actual": "/dashboard/pacientes/2150ce91-e0ad-4972-84d3-8f605c59f3ce",
+    "statusText": "Odonto.IA | Inteligência Odontológica",
+    "width": 1280,
+    "scrollWidth": 1280,
+    "theme": "light",
+    "h1Count": 1,
+    "alertCount": 0,
+    "pageErrors": 0
+  },
+  {
+    "mode": "desktop_light",
+    "requested": "/dashboard/financeiro",
+    "httpStatus": 200,
+    "actual": "/dashboard/financeiro",
+    "statusText": "Odonto.IA | Inteligência Odontológica",
+    "width": 1280,
+    "scrollWidth": 1280,
+    "theme": "light",
+    "h1Count": 1,
+    "alertCount": 0,
+    "pageErrors": 0
+  },
+  {
+    "mode": "desktop_light",
+    "requested": "/dashboard/arquivo-clinico",
+    "httpStatus": 200,
+    "actual": "/dashboard/arquivo-clinico",
+    "statusText": "Odonto.IA | Inteligência Odontológica",
+    "width": 1280,
+    "scrollWidth": 1280,
+    "theme": "light",
+    "h1Count": 1,
+    "alertCount": 0,
+    "pageErrors": 0
+  },
+  {
+    "mode": "desktop_light",
+    "requested": "/dashboard/perfil",
+    "httpStatus": 200,
+    "actual": "/dashboard/perfil",
+    "statusText": "Odonto.IA | Inteligência Odontológica",
+    "width": 1280,
+    "scrollWidth": 1280,
+    "theme": "light",
+    "h1Count": 1,
+    "alertCount": 0,
+    "pageErrors": 0
+  },
+  {
+    "mode": "desktop_light",
+    "requested": "/dashboard/configuracoes",
+    "httpStatus": 200,
+    "actual": "/dashboard/configuracoes",
+    "statusText": "Odonto.IA | Inteligência Odontológica",
+    "width": 1280,
+    "scrollWidth": 1280,
+    "theme": "light",
+    "h1Count": 1,
+    "alertCount": 0,
+    "pageErrors": 0
+  },
+  {
+    "mode": "desktop_light",
+    "requested": "/dashboard/configuracoes/usuarios",
+    "error": "Error: page.evaluate: Execution context was destroyed, most likely because of a navigation",
+    "actual": "/dashboard/configuracoes/usuarios"
+  },
+  {
+    "mode": "desktop_light",
+    "requested": "/dashboard/configuracoes/whatsapp",
+    "error": "Error: page.goto: Navigation to \"https://odontoia.app/dashboard/configuracoes/whatsapp\" is interrupted by another navigation to \"https://odo",
+    "actual": "/dashboard/configuracoes"
+  },
+  {
+    "mode": "desktop_light",
+    "requested": "/dashboard/whatsapp",
+    "error": "Error: page.goto: Navigation to \"https://odontoia.app/dashboard/whatsapp\" is interrupted by another navigation to \"https://odontoia.app/dash",
+    "actual": "/dashboard/configuracoes/whatsapp"
+  },
+  {
+    "mode": "desktop_light",
+    "requested": "/dashboard/bot",
+    "error": "Error: page.goto: Navigation to \"https://odontoia.app/dashboard/bot\" is interrupted by another navigation to \"https://odontoia.app/dashboard",
+    "actual": "/dashboard/whatsapp"
+  },
+  {
+    "mode": "desktop_light",
+    "requested": "/dashboard/protetico",
+    "error": "Error: page.goto: Navigation to \"https://odontoia.app/dashboard/protetico\" is interrupted by another navigation to \"https://odontoia.app/das",
+    "actual": "/dashboard/bot"
+  },
+  {
+    "mode": "desktop_light",
+    "requested": "/dashboard/orcamentos",
+    "error": "Error: page.goto: Navigation to \"https://odontoia.app/dashboard/orcamentos\" is interrupted by another navigation to \"https://odontoia.app/da",
+    "actual": "/dashboard/protetico"
+  },
+  {
+    "mode": "mobile_dark",
+    "requested": "/dashboard",
+    "httpStatus": 200,
+    "actual": "/dashboard",
+    "statusText": "Odonto.IA | Inteligência Odontológica",
+    "width": 390,
+    "scrollWidth": 390,
+    "theme": "dark",
+    "h1Count": 1,
+    "alertCount": 0,
+    "pageErrors": 0
+  },
+  {
+    "mode": "mobile_dark",
+    "requested": "/dashboard/meu-dia",
+    "httpStatus": 200,
+    "actual": "/dashboard/meu-dia",
+    "statusText": "Odonto.IA | Inteligência Odontológica",
+    "width": 390,
+    "scrollWidth": 390,
+    "theme": "dark",
+    "h1Count": 1,
+    "alertCount": 0,
+    "pageErrors": 0
+  },
+  {
+    "mode": "mobile_dark",
+    "requested": "/dashboard/agendamentos",
+    "httpStatus": 200,
+    "actual": "/dashboard/agendamentos",
+    "statusText": "Odonto.IA | Inteligência Odontológica",
+    "width": 390,
+    "scrollWidth": 390,
+    "theme": "dark",
+    "h1Count": 1,
+    "alertCount": 0,
+    "pageErrors": 1
+  },
+  {
+    "mode": "mobile_dark",
+    "requested": "/dashboard/pacientes",
+    "httpStatus": 200,
+    "actual": "/dashboard/pacientes",
+    "statusText": "Odonto.IA | Inteligência Odontológica",
+    "width": 390,
+    "scrollWidth": 390,
+    "theme": "dark",
+    "h1Count": 1,
+    "alertCount": 0,
+    "pageErrors": 1
+  },
+  {
+    "mode": "mobile_dark",
+    "requested": "/dashboard/pacientes/novo",
+    "httpStatus": 200,
+    "actual": "/dashboard/pacientes/novo",
+    "statusText": "Odonto.IA | Inteligência Odontológica",
+    "width": 390,
+    "scrollWidth": 390,
+    "theme": "dark",
+    "h1Count": 1,
+    "alertCount": 0,
+    "pageErrors": 0
+  },
+  {
+    "mode": "mobile_dark",
+    "requested": "/dashboard/pacientes/2150ce91-e0ad-4972-84d3-8f605c59f3ce",
+    "httpStatus": 200,
+    "actual": "/dashboard/pacientes/2150ce91-e0ad-4972-84d3-8f605c59f3ce",
+    "statusText": "Odonto.IA | Inteligência Odontológica",
+    "width": 390,
+    "scrollWidth": 390,
+    "theme": "dark",
+    "h1Count": 1,
+    "alertCount": 0,
+    "pageErrors": 0
+  },
+  {
+    "mode": "mobile_dark",
+    "requested": "/dashboard/financeiro",
+    "httpStatus": 200,
+    "actual": "/dashboard/financeiro",
+    "statusText": "Odonto.IA | Inteligência Odontológica",
+    "width": 390,
+    "scrollWidth": 390,
+    "theme": "dark",
+    "h1Count": 1,
+    "alertCount": 0,
+    "pageErrors": 0
+  },
+  {
+    "mode": "mobile_dark",
+    "requested": "/dashboard/arquivo-clinico",
+    "httpStatus": 200,
+    "actual": "/dashboard/arquivo-clinico",
+    "statusText": "Odonto.IA | Inteligência Odontológica",
+    "width": 390,
+    "scrollWidth": 390,
+    "theme": "dark",
+    "h1Count": 1,
+    "alertCount": 0,
+    "pageErrors": 0
+  },
+  {
+    "mode": "mobile_dark",
+    "requested": "/dashboard/perfil",
+    "httpStatus": 200,
+    "actual": "/dashboard/perfil",
+    "statusText": "Odonto.IA | Inteligência Odontológica",
+    "width": 390,
+    "scrollWidth": 390,
+    "theme": "dark",
+    "h1Count": 1,
+    "alertCount": 0,
+    "pageErrors": 0
+  },
+  {
+    "mode": "mobile_dark",
+    "requested": "/dashboard/configuracoes",
+    "httpStatus": 200,
+    "actual": "/dashboard/configuracoes",
+    "statusText": "Odonto.IA | Inteligência Odontológica",
+    "width": 390,
+    "scrollWidth": 390,
+    "theme": "dark",
+    "h1Count": 1,
+    "alertCount": 0,
+    "pageErrors": 0
+  },
+  {
+    "mode": "mobile_dark",
+    "requested": "/dashboard/configuracoes/usuarios",
+    "error": "Error: page.evaluate: Execution context was destroyed, most likely because of a navigation",
+    "actual": "/dashboard/configuracoes/usuarios"
+  },
+  {
+    "mode": "mobile_dark",
+    "requested": "/dashboard/configuracoes/whatsapp",
+    "error": "Error: page.goto: Navigation to \"https://odontoia.app/dashboard/configuracoes/whatsapp\" is interrupted by another navigation to \"https://odo",
+    "actual": "/dashboard/configuracoes"
+  },
+  {
+    "mode": "mobile_dark",
+    "requested": "/dashboard/whatsapp",
+    "error": "Error: page.goto: Navigation to \"https://odontoia.app/dashboard/whatsapp\" is interrupted by another navigation to \"https://odontoia.app/dash",
+    "actual": "/dashboard/configuracoes/whatsapp"
+  },
+  {
+    "mode": "mobile_dark",
+    "requested": "/dashboard/bot",
+    "error": "Error: page.goto: Navigation to \"https://odontoia.app/dashboard/bot\" is interrupted by another navigation to \"https://odontoia.app/dashboard",
+    "actual": "/dashboard/whatsapp"
+  },
+  {
+    "mode": "mobile_dark",
+    "requested": "/dashboard/protetico",
+    "error": "Error: page.goto: Navigation to \"https://odontoia.app/dashboard/protetico\" is interrupted by another navigation to \"https://odontoia.app/das",
+    "actual": "/dashboard/bot"
+  },
+  {
+    "mode": "mobile_dark",
+    "requested": "/dashboard/orcamentos",
+    "error": "Error: page.goto: Navigation to \"https://odontoia.app/dashboard/orcamentos\" is interrupted by another navigation to \"https://odontoia.app/da",
+    "actual": "/dashboard/protetico"
+  }
+]

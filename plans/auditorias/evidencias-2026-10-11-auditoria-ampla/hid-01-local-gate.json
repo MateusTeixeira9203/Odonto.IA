@@ -1,0 +1,48 @@
+{
+  "date": "2026-10-11",
+  "environment": "localhost:3107, Next dev, server TZ=UTC, QA B, billing disabled only in local process",
+  "base_sha": "ba5b531164c2983b991de27a96f94668fbb7ebda",
+  "published": false,
+  "cases": [
+  {
+    "timezoneId": "UTC",
+    "route": "/dashboard/pacientes",
+    "status": 200,
+    "finalPath": "/dashboard/pacientes",
+    "hasQaPatientDate": true,
+    "hasQaAppointmentTime": false,
+    "hydrationErrors": 0,
+    "otherConsoleErrors": 0
+  },
+  {
+    "timezoneId": "UTC",
+    "route": "/dashboard/agendamentos",
+    "status": 200,
+    "finalPath": "/dashboard/agendamentos",
+    "hasQaPatientDate": false,
+    "hasQaAppointmentTime": true,
+    "hydrationErrors": 0,
+    "otherConsoleErrors": 0
+  },
+  {
+    "timezoneId": "America/Sao_Paulo",
+    "route": "/dashboard/pacientes",
+    "status": 200,
+    "finalPath": "/dashboard/pacientes",
+    "hasQaPatientDate": true,
+    "hasQaAppointmentTime": false,
+    "hydrationErrors": 0,
+    "otherConsoleErrors": 0
+  },
+  {
+    "timezoneId": "America/Sao_Paulo",
+    "route": "/dashboard/agendamentos",
+    "status": 200,
+    "finalPath": "/dashboard/agendamentos",
+    "hasQaPatientDate": false,
+    "hasQaAppointmentTime": true,
+    "hydrationErrors": 0,
+    "otherConsoleErrors": 0
+  }
+  ]
+}

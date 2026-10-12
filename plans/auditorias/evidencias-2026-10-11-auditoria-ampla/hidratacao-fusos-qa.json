@@ -1,0 +1,24 @@
+{
+  "date": "2026-10-11",
+  "identity": "QA B only",
+  "production": {
+    "UTC": { "patients_react_418": false, "agenda_react_418": false },
+    "America/Sao_Paulo": { "patients_react_418": true, "agenda_react_418": true }
+  },
+  "development_reproduction": {
+    "server_timezone": "UTC",
+    "browser_timezone": "America/Sao_Paulo",
+    "patients": {
+      "component": "PacientesTable",
+      "client_text": "03/10/2026",
+      "server_text": "04/10/2026"
+    },
+    "agenda": {
+      "component": "WeekView",
+      "client_text": "12:30",
+      "server_text": "15:30"
+    }
+  },
+  "classification": "CONFIRMED S2 - hydration text mismatch; user flow impact beyond tree regeneration not measured",
+  "existing_item": "R-129a"
+}

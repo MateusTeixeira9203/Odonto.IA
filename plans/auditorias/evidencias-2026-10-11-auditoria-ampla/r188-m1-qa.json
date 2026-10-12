@@ -1,0 +1,41 @@
+{
+  "date": "2026-10-11",
+  "environment": "Supabase production database and public API, QA clinics only",
+  "budget_id": "72a8172b-b605-437d-82dc-6ecb331f52aa",
+  "clinic_id": "c959f510-c490-410d-9eb6-8c1dfa5b4080",
+  "initial": {
+    "budget_total_brl": 80,
+    "synthetic_items": 1,
+    "payment_plan": null,
+    "payments": 0
+  },
+  "other_active_dentist_b": {
+    "authenticated_as_own_qa_user": true,
+    "same_clinic_temporarily": true,
+    "normal_budget_read_rows": 0,
+    "rpc_error": "P0001/sem_permissao",
+    "rpc_returned_rows": 0,
+    "five_surface_hashes_unchanged": true
+  },
+  "owner_a": {
+    "authenticated_as_own_qa_user": true,
+    "rpc_returned_rows": 2,
+    "persisted_pending_installments_brl": [40, 40],
+    "plan": "parcelado",
+    "agreed_amount_brl": 80,
+    "reloaded_in_new_authenticated_session": true
+  },
+  "final": {
+    "b_original_qa_clinic_restored": true,
+    "b_temporary_membership": "removido",
+    "b_temporary_profile_active": false,
+    "b_post_restore_normal_read_rows": 0,
+    "b_post_restore_rpc_error": "sem_permissao",
+    "b_post_restore_payments_unchanged": true,
+    "paid_rows": 0,
+    "stage_charges": 0,
+    "external_messages_or_gateway_calls": 0,
+    "synthetic_budget_and_installments_retained_as_evidence": true
+  },
+  "not_tested": ["published UI action", "QA secretary", "revoked session", "other roles"]
+}
