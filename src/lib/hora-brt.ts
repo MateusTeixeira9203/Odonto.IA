@@ -16,6 +16,60 @@
 
 const TZ = 'America/Sao_Paulo';
 
+const FORMATADOR_PARTES_BRT = new Intl.DateTimeFormat('en-GB', {
+  timeZone: TZ,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
+export type PartesDataHoraBRT = {
+  data: string;
+  hora: string;
+  minutoDoDia: number;
+};
+
+/**
+ * Extrai data e hora clínicas de um instante sem depender do fuso do processo.
+ * Use para textos, agrupamentos e geometria de agenda; não para persistir nem comparar instantes.
+ */
+export function partesDataHoraBRT(valor: string | Date): PartesDataHoraBRT {
+  const instante = typeof valor === 'string' ? new Date(valor) : valor;
+  const partes = FORMATADOR_PARTES_BRT.formatToParts(instante);
+  const parte = (tipo: Intl.DateTimeFormatPartTypes): string => {
+    const encontrada = partes.find((item) => item.type === tipo);
+    if (!encontrada) throw new Error(`Parte de data ausente: ${tipo}`);
+    return encontrada.value;
+  };
+
+  const ano = parte('year');
+  const mes = parte('month');
+  const dia = parte('day');
+  const hora = parte('hour');
+  const minuto = parte('minute');
+
+  return {
+    data: `${ano}-${mes}-${dia}`,
+    hora: `${hora}:${minuto}`,
+    minutoDoDia: Number(hora) * 60 + Number(minuto),
+  };
+}
+
+/** Data de um instante em formato exibível da clínica, sempre DD/MM/AAAA. */
+export function formatarDataBRT(valor: string | Date): string {
+  const { data } = partesDataHoraBRT(valor);
+  const [ano, mes, dia] = data.split('-');
+  return `${dia}/${mes}/${ano}`;
+}
+
+/** Hora de um instante em formato exibível da clínica, sempre HH:mm. */
+export function formatarHoraBRT(valor: string | Date): string {
+  return partesDataHoraBRT(valor).hora;
+}
+
 /** Hora do dia (0–23) no fuso da clínica. */
 export function horaBRT(d: Date = new Date()): number {
   // hourCycle 'h23' evita o "24" que alguns locales devolvem à meia-noite.

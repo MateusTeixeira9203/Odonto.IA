@@ -14,9 +14,9 @@ import {
   X,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { format, parseISO } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { formatarDataBRT } from '@/lib/hora-brt';
 
 type PacienteRow = {
   id: string;
@@ -302,11 +302,7 @@ export function PacientesTable({
                     .slice(0, 2)
                     .toUpperCase();
                   const cor = AVATAR_COLORS[i % AVATAR_COLORS.length];
-                  const dataCadastro = format(
-                    parseISO(paciente.created_at),
-                    'dd/MM/yyyy',
-                    { locale: ptBR },
-                  );
+                  const dataCadastro = formatarDataBRT(paciente.created_at);
 
                   return (
                     <motion.tr
@@ -330,9 +326,13 @@ export function PacientesTable({
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="font-semibold text-sm text-text-primary group-hover:text-teal transition-colors capitalize">
+                              <Link
+                                href={`/dashboard/pacientes/${paciente.id}`}
+                                onClick={(event) => event.stopPropagation()}
+                                className="font-semibold text-sm text-text-primary group-hover:text-teal transition-colors capitalize focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal focus-visible:ring-offset-2"
+                              >
                                 {paciente.nome}
-                              </span>
+                              </Link>
                               {paciente.followup_pendente && (
                                 <span className="inline-flex items-center text-[10px] font-bold uppercase tracking-wider bg-teal/10 text-teal px-1.5 py-0.5 rounded-full leading-none">
                                   follow-up
@@ -435,26 +435,28 @@ export function PacientesTable({
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.02 }}
-                  onClick={() =>
-                    router.push(`/dashboard/pacientes/${paciente.id}`)
-                  }
-                  className="flex items-center gap-3 p-4 hover:bg-surface-alt/60 transition-colors cursor-pointer group"
+                  className="group"
                 >
-                  <div
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center
-                               text-white font-bold text-xs shrink-0 ${cor}`}
+                  <Link
+                    href={`/dashboard/pacientes/${paciente.id}`}
+                    className="flex items-center gap-3 p-4 hover:bg-surface-alt/60 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal"
                   >
-                    {iniciais}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm text-text-primary group-hover:text-teal transition-colors truncate">
-                      {paciente.nome}
-                    </p>
-                    <p className="text-xs text-text-secondary truncate mt-0.5">
-                      {paciente.telefone ?? paciente.email ?? 'Sem contato'}
-                    </p>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-border group-hover:text-teal transition-colors shrink-0" />
+                    <div
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center
+                                 text-white font-bold text-xs shrink-0 ${cor}`}
+                    >
+                      {iniciais}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm text-text-primary group-hover:text-teal transition-colors truncate">
+                        {paciente.nome}
+                      </p>
+                      <p className="text-xs text-text-secondary truncate mt-0.5">
+                        {paciente.telefone ?? paciente.email ?? 'Sem contato'}
+                      </p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-border group-hover:text-teal transition-colors shrink-0" />
+                  </Link>
                 </motion.div>
               );
             })}

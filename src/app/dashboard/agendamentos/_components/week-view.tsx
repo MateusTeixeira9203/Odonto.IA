@@ -10,7 +10,6 @@ import {
   subWeeks,
   isToday as isDateToday,
   isSameDay,
-  parseISO,
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Lock } from 'lucide-react';
@@ -19,6 +18,7 @@ import { calcularFaixas } from './layout-sobreposicao';
 import { corDoDentista, type DentistaAgenda } from './cor-dentista';
 import type { AgendamentoRow, BloqueioRow } from '../page';
 import type { AgendamentoStatus } from '@/types/database';
+import { formatarHoraBRT, partesDataHoraBRT } from '@/lib/hora-brt';
 
 const HOUR_START  = 7;
 const HOUR_END    = 20;
@@ -86,27 +86,28 @@ export function WeekView({
   onSlotVazioClick,
   onCargaClick,
 }: WeekViewProps) {
-  const { weekStart, weekEnd, weekEndExclusive, days } = useMemo(() => {
+  const { weekStart, weekEnd, days } = useMemo(() => {
     const inicio = startOfWeek(selectedWeek, { weekStartsOn: 1 });
     const fim = addDays(inicio, 5);
     return {
       weekStart: inicio,
       weekEnd: fim,
-      weekEndExclusive: addDays(fim, 1),
       days: eachDayOfInterval({ start: inicio, end: fim }),
     };
   }, [selectedWeek]);
+
+  const chavesDaSemana = useMemo(
+    () => new Set(days.map((day) => format(day, 'yyyy-MM-dd'))),
+    [days],
+  );
 
   // "Todos" só vira mapa de carga quando há de fato mais de um dentista pra comparar —
   // com 0 ou 1, a indireção não ajuda ninguém, mostra a grade direto (mesma regra do Dia).
   const mostraCarga = isSecretaria && filtroDentistaId === 'todos' && dentistas.length > 1;
 
   const weekApts = useMemo(() => {
-    return agendamentos.filter(apt => {
-      const d = parseISO(apt.data_hora);
-      return d >= weekStart && d < weekEndExclusive;
-    });
-  }, [agendamentos, weekStart, weekEndExclusive]);
+    return agendamentos.filter((apt) => chavesDaSemana.has(partesDataHoraBRT(apt.data_hora).data));
+  }, [agendamentos, chavesDaSemana]);
 
   // O que a GRADE (cabeçalho de dia + grade cheia) mostra: tudo, ou só o dentista filtrado.
   const aptsEfetivos = useMemo(() => {
@@ -118,18 +119,15 @@ export function WeekView({
     const map: Record<string, AgendamentoRow[]> = {};
     for (const day of days) {
       const key = format(day, 'yyyy-MM-dd');
-      map[key]  = aptsEfetivos.filter(a => isSameDay(parseISO(a.data_hora), day));
+      map[key]  = aptsEfetivos.filter((apt) => partesDataHoraBRT(apt.data_hora).data === key);
     }
     return map;
   }, [aptsEfetivos, days]);
 
   // R-102 — mesmo recorte de semana + filtro de dentista que `aptsEfetivos`/`aptsByDay`.
   const weekBloqueios = useMemo(() => {
-    return bloqueios.filter(bl => {
-      const d = parseISO(bl.data_hora);
-      return d >= weekStart && d < weekEndExclusive;
-    });
-  }, [bloqueios, weekStart, weekEndExclusive]);
+    return bloqueios.filter((bloqueio) => chavesDaSemana.has(partesDataHoraBRT(bloqueio.data_hora).data));
+  }, [bloqueios, chavesDaSemana]);
 
   const bloqueiosEfetivos = useMemo(() => {
     if (!isSecretaria || filtroDentistaId === 'todos') return weekBloqueios;
@@ -140,7 +138,7 @@ export function WeekView({
     const map: Record<string, BloqueioRow[]> = {};
     for (const day of days) {
       const key = format(day, 'yyyy-MM-dd');
-      map[key]  = bloqueiosEfetivos.filter(b => isSameDay(parseISO(b.data_hora), day));
+      map[key]  = bloqueiosEfetivos.filter((bloqueio) => partesDataHoraBRT(bloqueio.data_hora).data === key);
     }
     return map;
   }, [bloqueiosEfetivos, days]);
@@ -149,8 +147,7 @@ export function WeekView({
   const totalHeight = (HOUR_END - HOUR_START) * SLOT_HEIGHT;
 
   function getAptStyle(apt: AgendamentoRow) {
-    const d           = parseISO(apt.data_hora);
-    const hourDecimal = d.getHours() + d.getMinutes() / 60;
+    const hourDecimal = partesDataHoraBRT(apt.data_hora).minutoDoDia / 60;
     const top         = (hourDecimal - HOUR_START) * SLOT_HEIGHT;
     const height      = Math.max((apt.duracao_minutos / 60) * SLOT_HEIGHT - 4, 22);
     const { bg, border, text } = (STATUS_CONFIG[apt.status as AgendamentoStatus] ?? STATUS_CONFIG.scheduled).timeline;
@@ -158,8 +155,7 @@ export function WeekView({
   }
 
   function getBloqueioStyle(bl: BloqueioRow) {
-    const d           = parseISO(bl.data_hora);
-    const hourDecimal = d.getHours() + d.getMinutes() / 60;
+    const hourDecimal = partesDataHoraBRT(bl.data_hora).minutoDoDia / 60;
     const top         = (hourDecimal - HOUR_START) * SLOT_HEIGHT;
     const height      = Math.max((bl.duracao_minutos / 60) * SLOT_HEIGHT - 4, 22);
     return { top, height };
@@ -212,7 +208,7 @@ export function WeekView({
     const porDentista = new Map<string, number[]>();
     for (const d of dentistasOrdenados) {
       porDentista.set(d.id, days.map(day =>
-        weekApts.filter(a => a.dentista_id === d.id && isSameDay(parseISO(a.data_hora), day)).length,
+        weekApts.filter((apt) => apt.dentista_id === d.id && partesDataHoraBRT(apt.data_hora).data === format(day, 'yyyy-MM-dd')).length,
       ));
     }
     return porDentista;
@@ -279,7 +275,7 @@ export function WeekView({
                       className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left active:bg-surface-alt"
                     >
                       <span className="w-11 shrink-0 font-mono text-xs font-bold" style={{ color: config.timeline.text }}>
-                        {format(parseISO(apt.data_hora), 'HH:mm')}
+                        {formatarHoraBRT(apt.data_hora)}
                       </span>
                       <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text-primary">{apt.paciente?.nome ?? '—'}</span>
                       <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${config.bg} ${config.text}`}>{config.label}</span>
@@ -295,7 +291,7 @@ export function WeekView({
                   >
                     <Lock className="h-3.5 w-3.5 shrink-0 text-text-secondary" />
                     <span className="min-w-0 flex-1 truncate text-xs font-semibold text-text-secondary">{bloqueio.titulo || 'Compromisso pessoal'}</span>
-                    <span className="font-mono text-xs text-text-secondary">{format(parseISO(bloqueio.data_hora), 'HH:mm')}</span>
+                    <span className="font-mono text-xs text-text-secondary">{formatarHoraBRT(bloqueio.data_hora)}</span>
                   </button>
                 ))}
                 {consultas.length === 0 && bloqueiosDoDia.length === 0 && (
@@ -509,7 +505,7 @@ export function WeekView({
                           key={item.id}
                           type="button"
                           onClick={(e) => { e.stopPropagation(); onBloqueioClick(bl); }}
-                          title={`${format(parseISO(bl.data_hora), 'HH:mm')} — ${bl.titulo || 'Compromisso pessoal'}`}
+                          title={`${formatarHoraBRT(bl.data_hora)} — ${bl.titulo || 'Compromisso pessoal'}`}
                           className="absolute rounded-md px-1.5 py-1 text-left cursor-pointer hover:brightness-95 active:brightness-90 transition-all overflow-hidden select-none border border-border bg-surface-alt"
                           style={{
                             top: `${top}px`,
@@ -521,7 +517,7 @@ export function WeekView({
                         >
                           <p className="text-[10px] font-semibold leading-tight truncate flex items-center gap-1 text-text-secondary">
                             <Lock className="w-2.5 h-2.5 shrink-0" />
-                            {format(parseISO(bl.data_hora), 'HH:mm')} · {bl.titulo || 'Compromisso'}
+                            {formatarHoraBRT(bl.data_hora)} · {bl.titulo || 'Compromisso'}
                           </p>
                         </button>
                       );
@@ -531,11 +527,13 @@ export function WeekView({
                     const { top, height, bg, border, text } = getAptStyle(apt);
                     const corSlot = slotPorDentista[apt.dentista_id];
                     return (
-                      <div
+                      <button
                         key={apt.id}
+                        type="button"
                         onClick={() => onAppointmentClick(apt)}
-                        title={`${format(parseISO(apt.data_hora), 'HH:mm')} — ${apt.paciente?.nome ?? '—'}`}
-                        className="absolute rounded-md px-1.5 py-1 cursor-pointer hover:brightness-95 active:brightness-90 transition-all overflow-hidden select-none"
+                        title={`${formatarHoraBRT(apt.data_hora)} — ${apt.paciente?.nome ?? '—'}`}
+                        aria-label={`Abrir consulta de ${apt.paciente?.nome ?? 'paciente'} às ${formatarHoraBRT(apt.data_hora)}`}
+                        className="absolute rounded-md px-1.5 py-1 text-left cursor-pointer hover:brightness-95 active:brightness-90 transition-all overflow-hidden select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal focus-visible:ring-offset-1"
                         style={{
                           top: `${top}px`,
                           height: `${height}px`,
@@ -552,15 +550,15 @@ export function WeekView({
                             : {}),
                         }}
                       >
-                        <p className="text-[10px] font-semibold leading-tight truncate" style={{ color: text }}>
-                          {format(parseISO(apt.data_hora), 'HH:mm')} · {apt.paciente?.nome?.split(' ')[0] ?? '—'}
-                        </p>
+                        <span className="block text-[10px] font-semibold leading-tight truncate" style={{ color: text }}>
+                          {formatarHoraBRT(apt.data_hora)} · {apt.paciente?.nome?.split(' ')[0] ?? '—'}
+                        </span>
                         {height > 32 && apt.observacoes && (
-                          <p className="text-[10px] truncate mt-0.5 opacity-70" style={{ color: text }}>
+                          <span className="block text-[10px] truncate mt-0.5 opacity-70" style={{ color: text }}>
                             {apt.observacoes}
-                          </p>
+                          </span>
                         )}
-                      </div>
+                      </button>
                     );
                   })}
                 </div>

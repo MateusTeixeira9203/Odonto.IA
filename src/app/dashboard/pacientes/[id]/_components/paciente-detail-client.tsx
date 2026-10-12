@@ -1711,7 +1711,16 @@ export function PacienteDetailClient({
                         <div
                           key={orc.id}
                           onClick={() => setDetalheOrcId(orc.id)}
-                          className={`rounded-2xl border shadow-sm p-6 cursor-pointer transition-colors ${
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              setDetalheOrcId(orc.id);
+                            }
+                          }}
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`Abrir orçamento de ${format(parseISO(orc.created_at), 'dd/MM/yyyy', { locale: ptBR })}`}
+                          className={`rounded-2xl border shadow-sm p-6 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal ${
                             derivado.estado === 'proposto'
                               ? 'bg-amber-500/[0.03] border-amber-500/40 hover:border-amber-500/60'
                               : 'bg-surface border-border/60 hover:border-teal/30'
