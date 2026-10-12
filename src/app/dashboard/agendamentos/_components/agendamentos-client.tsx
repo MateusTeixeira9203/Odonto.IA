@@ -82,6 +82,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ToggleSwitch } from '@/components/ui/toggle-switch';
+import { nomeProteticoSelecionado, type ProteticoSelecionavel } from './nome-protetico-selecionado';
 import type { AgendamentoRow, BloqueioRow, ForaDaJanela } from '../page';
 import {
   atualizarStatusAgendamento,
@@ -164,7 +165,7 @@ interface Props {
   /** Agendamentos ativos além do mês exibido — null quando não há nenhum. */
   foraDaJanela: ForaDaJanela | null;
   /** Protéticos ativos da clínica — vazio esconde o bloco "Enviar pro protético" (R-94). */
-  proteticos: { id: string; nome: string }[];
+  proteticos: ProteticoSelecionavel[];
 }
 
 export function AgendamentosClient({
@@ -288,6 +289,9 @@ export function AgendamentosClient({
   useEffect(() => {
     setBloqueios(bloqueiosIniciais);
   }, [bloqueiosIniciais]);
+  useEffect(() => {
+    setProteticosAtivos(proteticos);
+  }, [proteticos]);
 
   useEffect(() => {
     let cancelado = false;
@@ -2417,7 +2421,9 @@ export function AgendamentosClient({
                         onValueChange={(proteticoId) => proteticoId && setPedidoProteticoForm((form) => ({ ...form, proteticoId }))}
                       >
                         <SelectTrigger id="pedido-protetico" className="rounded-xl border-border bg-surface-alt text-text-primary">
-                          <SelectValue placeholder="Selecione o protético" />
+                          <SelectValue>
+                            {(value: string | null) => nomeProteticoSelecionado(proteticosAtivos, value)}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent className="border-border bg-surface">
                           {proteticosAtivos.map((protetico) => (
