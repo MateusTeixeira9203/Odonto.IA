@@ -2,7 +2,7 @@
 
 STATUS: ACTIVE
 OWNER: Coordenação — integração; Auditor — evidências por marco após despacho
-LAST_REVIEWED: 2026-10-11
+LAST_REVIEWED: 2026-10-12
 REPLACES: recorte de planejamento do R-182 de 03/10/2026; evidências históricas preservadas no Git
 CANONICAL_FOR: contrato de M0 autorizado; proposta dos demais marcos e gates da estabilização
 
@@ -271,3 +271,23 @@ falha na versão publicada por R-193 e HID-01. R-184/R-189/R-194 não foram
 aplicadas nem passaram em banco isolado. A cadeia local de migrations não
 reproduz o schema publicado. Não promover a versão em uso a estável ou o item
 a ✅ até cumprir os critérios da seção 5.
+
+## 13. R182-EST-01 — contenção da conclusão de encaminhamento
+
+**Despacho de 12/10/2026:** corrigir somente a RPC
+`public.concluir_evento_encaminhado` para que, ao marcar como `realizado` um evento
+encaminhado em `proxima_sessao`, ela grave `momento_planejado = 'sessao_atual'` na
+mesma atualização. A restrição real `odontograma_eventos_momento_coerente` exige essa
+combinação. Ao reabrir, preservar `sessao_atual`, conforme o fluxo comum existente.
+
+Preservar autorização de destinatário, ficha não assinada, clínica, autoria
+(`dentista_id`), destino (`encaminhado_para`), paciente, data e `activity_logs`; manter
+grants da RPC. Fora: UI, outras RPCs, regra clínica nova, dados reais, aplicação de
+migration, commit, push e deploy. Consumidores diretos: `atualizarStatusEncaminhado`,
+`FichasTab` e `ProntuarioTab`.
+
+Aceite dirigido: o destinatário conclui e recarrega com status/data/momento corretos e
+campos preservados; reabre com data nula e sem voltar a `proxima_sessao`; outro dentista
+e outra clínica recebem `sem_permissao` sem alteração; lote com ficha assinada não altera
+nenhum evento. Evidência local isolada: `scripts/test-r182-est-01-encaminhamento.mjs`,
+que cria o `CHECK` real e executa a migration contra identidades e dados sintéticos.
