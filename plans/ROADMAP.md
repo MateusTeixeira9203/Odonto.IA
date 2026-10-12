@@ -1,3 +1,12 @@
+STATUS: REFERENCE_ONLY
+OWNER: Coordenação do Odonto.IA
+LAST_REVIEWED: 2026-10-11
+CANONICAL_FOR: nenhum até reconciliação da fila
+
+> Snapshot histórico da baseline Git. Os estados e decisões abaixo não foram reconfirmados
+> neste ciclo e não autorizam execução. O foco vigente está em [ESTADO.md](ESTADO.md).
+> A incorporação da governança V2 não reabre itens nem redefine produto.
+
 # Roadmap — Odonto.IA
 
 > **ROADMAP** · atualizado em **03/09/2026** · mapa do produto atual.
