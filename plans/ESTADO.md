@@ -75,7 +75,13 @@ da baseline permanecem estados distintos.
 
 ## Preservação
 
-Worktree anterior `codex/preservacao-pre-baseline-v2@41d0a83` em
-`/home/mtx/.codex/worktrees/odonto-preservacao-v2/Odonto.IA`: reconciliar por
-item, sem reaplicar o lote. A coordenação integra os chats Implementar e Auditor;
-nenhum deles edita este panorama.
+O trabalho pré-baseline foi preservado **apenas localmente** em
+`codex/preservacao-pre-baseline-v2@55d740d` (evidências QA, rascunhos V2 e
+specs em commits separados). As 116 exclusões de specs sem classificação foram
+revertidas a partir do próprio Git; a alteração temporária da versão da CLI também.
+Esse ramo é histórico, não fonte de requisitos nem candidato a merge integral.
+O worktree de preservação agora está limpo em
+`codex/nova-fase-gestao-2026-10-13`, criado de `e44aa3c` (mesmo código da
+baseline publicada, acrescido apenas dos registros de fechamento). Ver
+[handoff da transição](_arquivo/handoffs/2026-10-12-preparacao-nova-fase.md).
+A coordenação integra os chats Implementar e Auditor; nenhum deles edita este panorama.
