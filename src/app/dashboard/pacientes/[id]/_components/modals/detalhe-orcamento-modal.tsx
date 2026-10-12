@@ -836,8 +836,7 @@ export function DetalheOrcamentoModal({
   return (
     <Dialog open={!!detalheOrcId} onOpenChange={open => { if (!open) onClose(); }}>
       <DialogContent
-        className="flex flex-col rounded-3xl bg-surface border-border p-0 overflow-hidden gap-0 w-[94vw] sm:w-[82vw]"
-        style={{ maxWidth: '1280px', maxHeight: '90vh', left: '50%' }}
+        className="flex flex-col rounded-3xl bg-surface border-border p-0 overflow-hidden gap-0 w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] sm:w-[82vw] sm:max-w-[1280px] sm:max-h-[90vh]"
         showCloseButton={false}
       >
         {detalheOrc && (
@@ -899,7 +898,7 @@ export function DetalheOrcamentoModal({
             {/* ── Corpo: procedimentos à esquerda, dinheiro à direita (R-39a) ──────
                 Empilha com o dinheiro ACIMA no celular (flex-col-reverse): é a
                 pergunta que se responde primeiro num gesto de balcão. */}
-            <div className="flex-1 min-h-0 flex flex-col-reverse sm:flex-row">
+            <div className="flex-1 min-w-0 min-h-0 flex flex-col-reverse sm:flex-row">
 
               {/* ── Coluna clínica ─────────────────────────────────────── */}
               <div className="min-w-0 flex flex-col min-h-0 sm:basis-[36%] sm:flex-none">
@@ -1146,7 +1145,7 @@ export function DetalheOrcamentoModal({
                   é gesto de balcão, não cabe atrás de um segundo clique. */}
               <div
                 id="ajustes-financeiros-orcamento"
-                className="w-full border-t border-border sm:basis-[64%] sm:border-l sm:border-t-0 sm:flex-none flex flex-col min-h-0 bg-teal/[0.04]"
+                className="w-full min-w-0 border-t border-border sm:basis-[64%] sm:border-l sm:border-t-0 sm:flex-none flex flex-col min-h-0 bg-teal/[0.04]"
               >
                 <div className="flex-1 min-h-0 overflow-y-auto p-5">
                   {!orcEditMode && usarCobrancasPorEtapa ? (
