@@ -54,10 +54,11 @@ orçamento por dentista. Contrato pronto; implementação não iniciada.
 3. Fechar os ACs restantes da R-182: data futura no controle nativo,
    restauração AC-10 e revisão manual do usuário.
 
-Produção `odontoia.app` atende `main@d66a326` no deployment
-`dpl_J2pcmJBWwf4f6eR5ZRBnGD6SfC7p`, READY e com alias confirmado em
-12/10. O teste de uso pós-publicação está em andamento; publicação e aceite
-da baseline permanecem estados distintos.
+O gate pós-publicação passou em `odontoia.app` no deployment
+`dpl_J2pcmJBWwf4f6eR5ZRBnGD6SfC7p`, `main@d66a326`, READY e com alias
+confirmado em 12/10. Commits posteriores alteraram somente documentação;
+verificar o alias atual antes de nova ação. Publicação e aceite da baseline
+permanecem estados distintos.
 
 ## Preservação
 
