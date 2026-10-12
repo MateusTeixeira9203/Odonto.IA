@@ -1,5 +1,15 @@
 # Estratégia de Produto — Odonto.IA
 
+STATUS: SUPERSEDED
+OWNER: Produto
+LAST_REVIEWED: 2026-10-11
+REPLACES: nenhum
+CANONICAL_FOR: nenhum; histórico de estratégia de 13/06/2026
+
+Substituído pela [visão vigente](PRODUTO.md). O conteúdo abaixo foi preservado como histórico;
+não define público, onboarding, ativação, métricas ou requisitos do novo ciclo. Afirmações
+sobre recursos implantados e resultados não foram revalidadas nesta conciliação.
+
 > **Bússola de decisões.** Antes de aprovar qualquer feature de onboarding, ativação ou retenção, pergunte: *isso serve ao momento de valor e fecha o loop do Hook?* Se não, reavalie.
 
 Última revisão: 2026-06-13
