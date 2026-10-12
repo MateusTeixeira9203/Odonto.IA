@@ -55,7 +55,8 @@ manter a chave global em `true` e usar **Create New** para a chave QA separada.
 
 1. Revisar o [patch isolado](2026-10-11-qa-billing-isencao.patch), que contém
    somente `src/lib/billing/exemptions.ts` e `.env.example`. Ele é aplicável à
-   baseline `ba5b531` e passou em `git apply --check --reverse` no checkout editado.
+   baseline `ba5b531` e passou em `git apply --unidiff-zero --check --reverse`
+   no checkout editado.
 2. Publicar **somente esses dois arquivos** a partir da baseline de produção, em
    commit isolado. Não incluir o restante do checkout nem migrations financeiras.
 3. Na Vercel do projeto `odonto.ia`, confirmar que a nova variável server-side de

@@ -2,31 +2,19 @@ diff --git a/.env.example b/.env.example
 index 0fb19d0..83c1db3 100644
 --- a/.env.example
 +++ b/.env.example
-@@ -22,8 +22,10 @@ STRIPE_PRICE_PUBLICO_CONSULTORIO_ANUAL=
- STRIPE_PRICE_PUBLICO_CLINICA_MENSAL=
- STRIPE_PRICE_PUBLICO_CLINICA_ANUAL=
- STRIPE_BILLING_ENABLED=false
+@@ -25 +25 @@ STRIPE_BILLING_ENABLED=false
 -# IDs UUID separados por vírgula. Em produção: somente ClinDent e VIP.
 +# Lista permanente de UUIDs (ClinDent e VIP); a clínica QA usa a variável abaixo.
- STRIPE_BILLING_EXEMPT_CLINIC_IDS=
+@@ -26,0 +27,2 @@ STRIPE_BILLING_EXEMPT_CLINIC_IDS=
 +# Clínica sintética de QA, separada da lista de isenções existentes.
 +STRIPE_BILLING_QA_EXEMPT_CLINIC_ID=
- # Exige o domínio odontoia.app verificado no Resend.
- EMAIL_FROM=Odonto.IA <equipe@odontoia.app>
- LANDING_LEADS_TO=equipe@odontoia.app
 diff --git a/src/lib/billing/exemptions.ts b/src/lib/billing/exemptions.ts
 index aab7346..bb9a336 100644
 --- a/src/lib/billing/exemptions.ts
 +++ b/src/lib/billing/exemptions.ts
-@@ -1,6 +1,11 @@
- import 'server-only';
- 
- export function clinicaIsentaDeCobranca(clinicId: string): boolean {
+@@ -3,0 +4,5 @@ export function clinicaIsentaDeCobranca(clinicId: string): boolean {
 +  const qaClinicId = process.env.STRIPE_BILLING_QA_EXEMPT_CLINIC_ID?.trim();
 +  if (qaClinicId && clinicId === qaClinicId) {
 +    return true;
 +  }
 +
-   const ids = (process.env.STRIPE_BILLING_EXEMPT_CLINIC_IDS ?? '')
-     .split(',')
-     .map((id) => id.trim())
