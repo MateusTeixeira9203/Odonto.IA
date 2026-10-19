@@ -62,9 +62,10 @@ export default async function DashboardLayout({
         || acessoFormacao.liberado;
 
       if (!assinaturaLiberada) {
-        const aguardandoCheckout = statusIndividual
-          && ['aguardando_formacao', 'checkout_pendente', 'cartao_pronto'].includes(statusIndividual);
-        redirect(aguardandoCheckout ? '/bem-vindo-agregado' : '/planos?billing=required');
+        // requireClinicContext já confirmou vínculo ativo. A página de agregado
+        // atende vínculos pendentes/suspensos e, sem eles, volta ao dashboard.
+        // Enviar um vínculo ativo para lá causava um ciclo de redirecionamento.
+        redirect('/planos?billing=required');
       }
     }
 

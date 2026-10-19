@@ -2,8 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
 const PUBLIC_ROUTES = ["/", "/planos"];
-const AUTH_ROUTES = ["/login", "/cadastro", "/esqueci-senha"];
-const ALWAYS_ALLOWED_AUTH_ROUTES = ["/redefinir-senha"];
+const AUTH_ROUTES = ["/cadastro", "/esqueci-senha"];
+// Uma sessão existente não pode impedir abrir o formulário para trocar de conta.
+const ALWAYS_ALLOWED_AUTH_ROUTES = ["/login", "/redefinir-senha"];
 const CANONICAL_ORIGIN = 'https://odontoia.app';
 const LEGACY_HOSTS = new Set(['dentia.app.br']);
 
