@@ -316,9 +316,10 @@ export function MonthView({
                                     onValueChange={(val) => { if (val) onStatusChange(apt.id, val); }}
                                   >
                                     <SelectTrigger
+                                      aria-label="Status do agendamento"
                                       className={`h-7 px-2.5 text-[10px] font-bold uppercase tracking-wider border-none shadow-none ${statusCfg.bg} ${statusCfg.text}`}
                                     >
-                                      <SelectValue />
+                                      <SelectValue>{statusCfg.label}</SelectValue>
                                     </SelectTrigger>
                                     <SelectContent className="bg-surface border-border">
                                       <SelectItem value="scheduled">Agendado</SelectItem>

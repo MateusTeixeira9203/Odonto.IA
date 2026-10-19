@@ -63,7 +63,7 @@ export function PassoFicha() {
             </div>
             <span className="pill pill-warn">
               <span className="dot" />
-              Próxima seção
+              Próxima sessão
             </span>
             <span className="pill pill-coral">
               <span className="dot" />

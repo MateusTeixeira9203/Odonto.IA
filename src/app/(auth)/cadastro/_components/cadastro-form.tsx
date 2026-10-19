@@ -181,6 +181,8 @@ export function CadastroForm() {
                 />
                 <button
                   type="button"
+                  disabled={isLoading}
+                  aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute inset-y-0 right-0 pr-4 flex items-center text-text-secondary hover:text-text-primary transition-colors"
                 >
@@ -206,6 +208,8 @@ export function CadastroForm() {
                 />
                 <button
                   type="button"
+                  disabled={isLoading}
+                  aria-label={showConfirmPassword ? 'Ocultar confirmação de senha' : 'Mostrar confirmação de senha'}
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   className="absolute inset-y-0 right-0 pr-4 flex items-center text-text-secondary hover:text-text-primary transition-colors"
                 >

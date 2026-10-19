@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion } from "motion/react";
-import { ArrowRight, AlertCircle } from "lucide-react";
+import { ArrowRight, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getDentistaLoginInfo } from "@/lib/auth";
 import { toast } from "sonner";
@@ -42,6 +42,7 @@ function LoginFormContent(): React.JSX.Element {
   const requestedNext = searchParams.get("next") ?? searchParams.get("redirectTo");
   const redirectTo = safeReturnPath(requestedNext);
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [emailNaoConfirmado, setEmailNaoConfirmado] = useState(false);
 
@@ -127,11 +128,13 @@ function LoginFormContent(): React.JSX.Element {
           <div className="bg-surface/90 rounded-2xl border border-border shadow-sm p-6 sm:p-8 w-full max-w-md backdrop-blur-sm">
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
               <div>
-                <label className="block font-mono text-xs text-text-secondary uppercase tracking-widest mb-1.5">
+                <label htmlFor="login-email" className="block font-mono text-xs text-text-secondary uppercase tracking-widest mb-1.5">
                   E-mail
                 </label>
                 <input
+                  id="login-email"
                   type="email"
+                  autoComplete="username"
                   disabled={isLoading}
                   placeholder="seu@email.com"
                   className="bg-surface-alt border border-border rounded-xl px-4 py-3 text-sm text-text-primary w-full focus:ring-2 focus:ring-teal/20 outline-none transition-all placeholder:text-text-secondary"
@@ -144,7 +147,7 @@ function LoginFormContent(): React.JSX.Element {
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block font-mono text-xs text-text-secondary uppercase tracking-widest">
+                  <label htmlFor="login-password" className="block font-mono text-xs text-text-secondary uppercase tracking-widest">
                     Senha
                   </label>
                   <Link
@@ -154,13 +157,27 @@ function LoginFormContent(): React.JSX.Element {
                     Esqueceu a senha?
                   </Link>
                 </div>
-                <input
-                  type="password"
-                  disabled={isLoading}
-                  placeholder="••••••••"
-                  className="bg-surface-alt border border-border rounded-xl px-4 py-3 text-sm text-text-primary w-full focus:ring-2 focus:ring-teal/20 outline-none transition-all"
-                  {...register("password")}
-                />
+                <div className="relative">
+                  <input
+                    id="login-password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    disabled={isLoading}
+                    placeholder="••••••••"
+                    className="bg-surface-alt border border-border rounded-xl pl-4 pr-12 py-3 text-sm text-text-primary w-full focus:ring-2 focus:ring-teal/20 outline-none transition-all"
+                    {...register("password")}
+                  />
+                  <button
+                    type="button"
+                    disabled={isLoading}
+                    aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                    aria-controls="login-password"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 w-11 flex items-center justify-center rounded-r-xl text-text-secondary hover:text-text-primary focus-visible:outline-2 focus-visible:outline-teal"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
                 {errors.password && (
                   <p className="mt-1 text-xs text-red-500">{errors.password.message}</p>
                 )}
