@@ -1,0 +1,21 @@
+Browser tab: 2115955912, Title: "Odonto.IA | Inteligência Odontológica", URL: "https://odontoia.app/dashboard/configuracoes".
+1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/dashboard/configuracoes
+	2 container
+		50 container Notifications alt+T
+		51 container Adicionar membro
+			52 heading Adicionar membro, Value: 2, ID: base-ui-_r_j_
+				53 text Adicionar membro
+			54 container base-ui-_r_k_
+				55 text Escolha o tipo de acesso para o novo membro  do consultório .
+			56 button Dentista
+			57 button Secretária
+			58 button Protético
+			59 container
+				60 text O dentista recebe um  link por email  (que você também pode copiar e enviar) e cria a própria conta. O convite expira em 7 dias.
+			61 text EMAIL DO DENTISTA
+			62 text field (settable)
+			63 button Cancelar
+			64 button Enviar convite
+			65 button Close
+
+The focused UI element is 62 text field (settable)

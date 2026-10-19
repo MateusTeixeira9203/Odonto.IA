@@ -1,0 +1,32 @@
+{
+  "method": "Actual action source transpiled in isolated VM with synthetic in-memory query adapter. No network or production writes.",
+  "code_sha": "a1722c47c346a4a80c84ad6cd5efd0ee42afbf08",
+  "fixed_date": "2026-10-18",
+  "input": {
+    "pagamento": 100,
+    "receita_manual": 50,
+    "despesa": 20
+  },
+  "saldo": {
+    "receita": 150,
+    "despesas": 20,
+    "saldo": 130
+  },
+  "serie_outubro": {
+    "mes": "Out",
+    "mesISO": "2026-10",
+    "receita": 100,
+    "despesas": 20
+  },
+  "query_tables": [
+    "despesas",
+    "pagamentos",
+    "receitas_manuais",
+    "pagamentos",
+    "despesas"
+  ],
+  "assertions": {
+    "saldo_includes_manual": true,
+    "chart_omits_manual": true
+  }
+}

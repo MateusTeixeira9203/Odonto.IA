@@ -1,0 +1,30 @@
+{
+  "ambiente": "produção",
+  "sha": "a1722c47c346a4a80c84ad6cd5efd0ee42afbf08",
+  "clinica_id": "eddc5fc6-62b0-4d01-8e6e-3f84f61e64e7",
+  "paciente_id": "290b050a-877c-40b7-8cf4-38e3488ce636",
+  "dados_sinteticos": true,
+  "resultado": [
+    {
+      "id": "738b69e9-f50e-424c-a3c0-55fe5452e8cb",
+      "ficha_id": "51047d58-ef96-4b54-b6db-95e0e96b81c3",
+      "tipo": "endodontia",
+      "status": "indicado",
+      "dente": 32,
+      "observacao": "QA fictício — teste de persistência, sem indicação clínica real.",
+      "detalhe": {
+        "canais": [
+          {
+            "nome": "Único",
+            "limaFinal": "30",
+            "referencia": "QA referência",
+            "limaInicial": "15",
+            "comprimentoRaiz": 20
+          }
+        ],
+        "cimento": null,
+        "obturacao": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+Browser tab: 2115955912, Title: "Odonto.IA | Inteligência Odontológica", URL: "https://odontoia.app/dashboard/pacientes/290b050a-877c-40b7-8cf4-38e3488ce636".
+1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/dashboard/pacientes/290b050a-877c-40b7-8cf4-38e3488ce636
+	2 container
+		3 container Notifications alt+T
+		4 container Aceite do orçamento
+			5 heading Aceite do orçamento, Value: 2, ID: base-ui-_r_2g_
+				6 text Aceite do orçamento
+			7 text O paciente confirma que aceita pagar nestes termos.
+			8 button Fechar
+			9 text Total
+			10 text R$ 
+			11 text 0,00
+			12 text NOME DE QUEM ASSINA
+			13 text field (settable) NOME DE QUEM ASSINA, ID: aceite-assinado-por
+			16 button Limpar
+			14 button Cancelar
+			15 button Confirmar aceite
+
+The focused UI element is 8 button Fechar

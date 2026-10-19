@@ -1,0 +1,51 @@
+{
+  "data": "2026-10-18",
+  "metodo": "Advisors renovados e SELECT de pg_stat_user_tables limitado a seis tabelas centrais; sem conteúdo de registros",
+  "advisors": {
+    "fk_sem_indice": 83,
+    "rls_initplan": 6,
+    "indice_sem_uso_observado": 38,
+    "policies_permissivas_sobrepostas": 75,
+    "conexoes_auth": 1
+  },
+  "estatisticas": [
+    {
+      "tabela": "pacientes",
+      "seq_scan": 1417,
+      "seq_tup_read": 1058807,
+      "idx_scan": 161214
+    },
+    {
+      "tabela": "odontograma_eventos",
+      "seq_scan": 219,
+      "seq_tup_read": 566939,
+      "idx_scan": 9626
+    },
+    {
+      "tabela": "fichas",
+      "seq_scan": 152,
+      "seq_tup_read": 86855,
+      "idx_scan": 41935
+    },
+    {
+      "tabela": "agendamentos",
+      "seq_scan": 25,
+      "seq_tup_read": 45406,
+      "idx_scan": 23173
+    },
+    {
+      "tabela": "orcamentos",
+      "seq_scan": 74,
+      "seq_tup_read": 24879,
+      "idx_scan": 75433
+    },
+    {
+      "tabela": "pagamentos",
+      "seq_scan": 34,
+      "seq_tup_read": 20500,
+      "idx_scan": 24755
+    }
+  ],
+  "conclusao": "Contadores acumulados não provam latência nem necessidade de índice; falta janela e medição de consulta. Nenhuma otimização aplicada.",
+  "observacao": "Índices sem uso observado passaram de 44 para 38 entre coletas, reforçando a dependência da janela de estatísticas."
+}

@@ -1,0 +1,342 @@
+diff --git a/src/app/(auth)/cadastro/_components/cadastro-form.tsx b/src/app/(auth)/cadastro/_components/cadastro-form.tsx
+index b85a489..a9106e3 100644
+--- a/src/app/(auth)/cadastro/_components/cadastro-form.tsx
++++ b/src/app/(auth)/cadastro/_components/cadastro-form.tsx
+@@ -181,6 +181,8 @@ export function CadastroForm() {
+                 />
+                 <button
+                   type="button"
++                  disabled={isLoading}
++                  aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                   onClick={() => setShowPassword(!showPassword)}
+                   className="absolute inset-y-0 right-0 pr-4 flex items-center text-text-secondary hover:text-text-primary transition-colors"
+                 >
+@@ -206,6 +208,8 @@ export function CadastroForm() {
+                 />
+                 <button
+                   type="button"
++                  disabled={isLoading}
++                  aria-label={showConfirmPassword ? 'Ocultar confirmação de senha' : 'Mostrar confirmação de senha'}
+                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                   className="absolute inset-y-0 right-0 pr-4 flex items-center text-text-secondary hover:text-text-primary transition-colors"
+                 >
+diff --git a/src/app/(auth)/login/page.tsx b/src/app/(auth)/login/page.tsx
+index 91fc013..19f290a 100644
+--- a/src/app/(auth)/login/page.tsx
++++ b/src/app/(auth)/login/page.tsx
+@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
+ import { zodResolver } from "@hookform/resolvers/zod";
+ import { z } from "zod";
+ import { motion } from "motion/react";
+-import { ArrowRight, AlertCircle } from "lucide-react";
++import { ArrowRight, AlertCircle, Eye, EyeOff } from "lucide-react";
+ import { createClient } from "@/lib/supabase/client";
+ import { getDentistaLoginInfo } from "@/lib/auth";
+ import { toast } from "sonner";
+@@ -42,6 +42,7 @@ function LoginFormContent(): React.JSX.Element {
+   const requestedNext = searchParams.get("next") ?? searchParams.get("redirectTo");
+   const redirectTo = safeReturnPath(requestedNext);
+   const [isLoading, setIsLoading] = useState(false);
++  const [showPassword, setShowPassword] = useState(false);
+   const [authError, setAuthError] = useState<string | null>(null);
+   const [emailNaoConfirmado, setEmailNaoConfirmado] = useState(false);
+ 
+@@ -127,11 +128,13 @@ function LoginFormContent(): React.JSX.Element {
+           <div className="bg-surface/90 rounded-2xl border border-border shadow-sm p-6 sm:p-8 w-full max-w-md backdrop-blur-sm">
+             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+               <div>
+-                <label className="block font-mono text-xs text-text-secondary uppercase tracking-widest mb-1.5">
++                <label htmlFor="login-email" className="block font-mono text-xs text-text-secondary uppercase tracking-widest mb-1.5">
+                   E-mail
+                 </label>
+                 <input
++                  id="login-email"
+                   type="email"
++                  autoComplete="username"
+                   disabled={isLoading}
+                   placeholder="seu@email.com"
+                   className="bg-surface-alt border border-border rounded-xl px-4 py-3 text-sm text-text-primary w-full focus:ring-2 focus:ring-teal/20 outline-none transition-all placeholder:text-text-secondary"
+@@ -144,7 +147,7 @@ function LoginFormContent(): React.JSX.Element {
+ 
+               <div>
+                 <div className="flex items-center justify-between mb-1.5">
+-                  <label className="block font-mono text-xs text-text-secondary uppercase tracking-widest">
++                  <label htmlFor="login-password" className="block font-mono text-xs text-text-secondary uppercase tracking-widest">
+                     Senha
+                   </label>
+                   <Link
+@@ -154,13 +157,27 @@ function LoginFormContent(): React.JSX.Element {
+                     Esqueceu a senha?
+                   </Link>
+                 </div>
+-                <input
+-                  type="password"
+-                  disabled={isLoading}
+-                  placeholder="••••••••"
+-                  className="bg-surface-alt border border-border rounded-xl px-4 py-3 text-sm text-text-primary w-full focus:ring-2 focus:ring-teal/20 outline-none transition-all"
+-                  {...register("password")}
+-                />
++                <div className="relative">
++                  <input
++                    id="login-password"
++                    type={showPassword ? "text" : "password"}
++                    autoComplete="current-password"
++                    disabled={isLoading}
++                    placeholder="••••••••"
++                    className="bg-surface-alt border border-border rounded-xl pl-4 pr-12 py-3 text-sm text-text-primary w-full focus:ring-2 focus:ring-teal/20 outline-none transition-all"
++                    {...register("password")}
++                  />
++                  <button
++                    type="button"
++                    disabled={isLoading}
++                    aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
++                    aria-controls="login-password"
++                    onClick={() => setShowPassword(!showPassword)}
++                    className="absolute inset-y-0 right-0 w-11 flex items-center justify-center rounded-r-xl text-text-secondary hover:text-text-primary focus-visible:outline-2 focus-visible:outline-teal"
++                  >
++                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
++                  </button>
++                </div>
+                 {errors.password && (
+                   <p className="mt-1 text-xs text-red-500">{errors.password.message}</p>
+                 )}
+diff --git a/src/app/dashboard/agendamentos/_components/month-view.tsx b/src/app/dashboard/agendamentos/_components/month-view.tsx
+index 00b866a..b82cdd1 100644
+--- a/src/app/dashboard/agendamentos/_components/month-view.tsx
++++ b/src/app/dashboard/agendamentos/_components/month-view.tsx
+@@ -316,9 +316,10 @@ export function MonthView({
+                                     onValueChange={(val) => { if (val) onStatusChange(apt.id, val); }}
+                                   >
+                                     <SelectTrigger
++                                      aria-label="Status do agendamento"
+                                       className={`h-7 px-2.5 text-[10px] font-bold uppercase tracking-wider border-none shadow-none ${statusCfg.bg} ${statusCfg.text}`}
+                                     >
+-                                      <SelectValue />
++                                      <SelectValue>{statusCfg.label}</SelectValue>
+                                     </SelectTrigger>
+                                     <SelectContent className="bg-surface border-border">
+                                       <SelectItem value="scheduled">Agendado</SelectItem>
+diff --git a/src/app/dashboard/layout.tsx b/src/app/dashboard/layout.tsx
+index fcaab58..fa18a40 100644
+--- a/src/app/dashboard/layout.tsx
++++ b/src/app/dashboard/layout.tsx
+@@ -62,9 +62,10 @@ export default async function DashboardLayout({
+         || acessoFormacao.liberado;
+ 
+       if (!assinaturaLiberada) {
+-        const aguardandoCheckout = statusIndividual
+-          && ['aguardando_formacao', 'checkout_pendente', 'cartao_pronto'].includes(statusIndividual);
+-        redirect(aguardandoCheckout ? '/bem-vindo-agregado' : '/planos?billing=required');
++        // requireClinicContext já confirmou vínculo ativo. A página de agregado
++        // atende vínculos pendentes/suspensos e, sem eles, volta ao dashboard.
++        // Enviar um vínculo ativo para lá causava um ciclo de redirecionamento.
++        redirect('/planos?billing=required');
+       }
+     }
+ 
+diff --git a/src/components/landing/passo-ficha.tsx b/src/components/landing/passo-ficha.tsx
+index 97f0156..9a6585e 100644
+--- a/src/components/landing/passo-ficha.tsx
++++ b/src/components/landing/passo-ficha.tsx
+@@ -63,7 +63,7 @@ export function PassoFicha() {
+             </div>
+             <span className="pill pill-warn">
+               <span className="dot" />
+-              Próxima seção
++              Próxima sessão
+             </span>
+             <span className="pill pill-coral">
+               <span className="dot" />
+diff --git a/src/proxy.ts b/src/proxy.ts
+index c220c03..b0be13b 100644
+--- a/src/proxy.ts
++++ b/src/proxy.ts
+@@ -2,8 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
+ import { updateSession } from "@/lib/supabase/middleware";
+ 
+ const PUBLIC_ROUTES = ["/", "/planos"];
+-const AUTH_ROUTES = ["/login", "/cadastro", "/esqueci-senha"];
+-const ALWAYS_ALLOWED_AUTH_ROUTES = ["/redefinir-senha"];
++const AUTH_ROUTES = ["/cadastro", "/esqueci-senha"];
++// Uma sessão existente não pode impedir abrir o formulário para trocar de conta.
++const ALWAYS_ALLOWED_AUTH_ROUTES = ["/login", "/redefinir-senha"];
+ const CANONICAL_ORIGIN = 'https://odontoia.app';
+ const LEGACY_HOSTS = new Set(['dentia.app.br']);
+ 
+diff --git a/src/access-navigation.test.ts b/src/access-navigation.test.ts
+new file mode 100644
+index 0000000..37b6204
+--- /dev/null
++++ b/src/access-navigation.test.ts
+@@ -0,0 +1,171 @@
++import assert from 'node:assert/strict';
++import { readFileSync } from 'node:fs';
++import { fileURLToPath } from 'node:url';
++import { runInNewContext } from 'node:vm';
++import test from 'node:test';
++import ts from 'typescript';
++import { NextRequest, NextResponse } from 'next/server';
++import { resolverEstadoComercial } from './lib/billing/estado-comercial';
++
++// Execute the actual entry points with isolated dependencies: no Auth, DB or Stripe calls.
++function loadEntry(file: string, dependencies: Record<string, unknown>): Record<string, unknown> {
++  const path = fileURLToPath(new URL(file, import.meta.url));
++  const compiled = ts.transpileModule(readFileSync(path, 'utf8'), {
++    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
++  });
++  const entryExports: Record<string, unknown> = {};
++  runInNewContext(compiled.outputText, {
++    exports: entryExports,
++    URL,
++    process: { env: { STRIPE_BILLING_ENABLED: 'true' } },
++    require: (name: string): unknown => {
++      if (!(name in dependencies)) throw new Error(`Unexpected dependency: ${name}`);
++      return dependencies[name];
++    },
++  }, { filename: path });
++  return entryExports;
++}
++
++async function runProxy(path: string, authenticated: boolean): Promise<NextResponse> {
++  const refreshed = NextResponse.next();
++  refreshed.cookies.set('audit-session', 'synthetic-refreshed', { httpOnly: true });
++  const entry = loadEntry('./proxy.ts', {
++    'next/server': { NextResponse },
++    '@/lib/supabase/middleware': {
++      updateSession: async () => ({
++        response: refreshed,
++        session: authenticated ? { id: 'synthetic-user' } : null,
++      }),
++    },
++  });
++  const proxy = entry.proxy as (request: NextRequest) => Promise<NextResponse>;
++  return proxy(new NextRequest(`https://odontoia.app${path}`));
++}
++
++test('login permanece acessível com sessão existente e preserva o cookie renovado', async () => {
++  const response = await runProxy('/login', true);
++  assert.equal(response.status, 200);
++  assert.equal(response.headers.get('location'), null);
++  assert.equal(response.cookies.get('audit-session')?.value, 'synthetic-refreshed');
++});
++
++test('dashboard sem sessão continua protegido e conserva o destino de retorno', async () => {
++  const response = await runProxy('/dashboard', false);
++  assert.equal(response.status, 307);
++  assert.equal(response.headers.get('location'), 'https://odontoia.app/login?redirectTo=%2Fdashboard');
++  assert.equal(response.cookies.get('audit-session')?.value, 'synthetic-refreshed');
++});
++
++test('login anônimo, redefinição de senha e dashboard autenticado continuam acessíveis', async () => {
++  for (const [path, authenticated] of [['/login', false], ['/redefinir-senha', true], ['/dashboard', true]] as const) {
++    assert.equal((await runProxy(path, authenticated)).status, 200);
++  }
++});
++
++class RouteRedirect extends Error {
++  constructor(readonly destination: string) { super(destination); }
++}
++
++interface AccessFixture {
++  subscription: string | null;
++  exempt?: boolean;
++  formationAllowed?: boolean;
++  role?: 'admin' | 'dentista' | 'secretaria';
++  clinicStatus?: string;
++}
++
++async function dashboardDestination(fixture: AccessFixture): Promise<string> {
++  const service = {
++    from(table: string) {
++      assert.ok(['clinicas', 'assinaturas_dentista'].includes(table));
++      const query = {
++        select: () => query,
++        eq: () => query,
++        maybeSingle: async () => ({ data: table === 'clinicas'
++          ? { status_elegibilidade: fixture.clinicStatus ?? 'elegivel' }
++          : fixture.subscription ? { status: fixture.subscription } : null }),
++      };
++      return query;
++    },
++  };
++  const entry = loadEntry('./app/dashboard/layout.tsx', {
++    'react/jsx-runtime': { jsx: (type: unknown, props: unknown) => ({ type, props }), jsxs: (type: unknown, props: unknown) => ({ type, props }) },
++    'next/navigation': { redirect: (destination: string): never => { throw new RouteRedirect(destination); } },
++    'next/headers': { headers: async () => new Headers({ 'x-pathname': '/dashboard' }) },
++    '@/server/auth/clinic': { requireClinicContext: async () => ({ clinicId: 'synthetic-clinic', user: { id: 'synthetic-user' }, supabase: service }) },
++    '@/lib/get-dentista': { getDentistaCached: async () => ({ id: 'synthetic-dentist', role: fixture.role ?? 'dentista' }) },
++    '@/components/layout/dashboard-shell': { DashboardShell: 'test-shell' },
++    './_components/welcome-modal': { WelcomeModal: 'test-welcome' },
++    '@/lib/supabase/service': { createServiceClient: () => service },
++    '@/lib/billing/exemptions': { clinicaIsentaDeCobranca: () => fixture.exempt ?? false },
++    '@/lib/billing/estado-comercial': { resolverEstadoComercial },
++    '@/server/services/formacao-clinica': { obterAcessoFormacaoClinica: async () => ({ liberado: fixture.formationAllowed ?? false }) },
++  });
++  const layout = entry.default as (props: { children: null }) => Promise<unknown>;
++  try {
++    await layout({ children: null });
++    return '/dashboard';
++  } catch (error) {
++    if (error instanceof RouteRedirect) return error.destination;
++    throw error;
++  }
++}
++
++for (const subscription of ['aguardando_formacao', 'checkout_pendente', 'cartao_pronto']) {
++  test(`vínculo já ativo com ${subscription} termina em planos, sem voltar à página de vínculo pendente`, async () => {
++    assert.equal(await dashboardDestination({ subscription }), '/planos?billing=required');
++  });
++}
++
++test('assinatura válida, isenção e formação autorizada preservam acesso', async () => {
++  for (const subscription of ['active', 'trialing', 'past_due']) {
++    assert.equal(await dashboardDestination({ subscription }), '/dashboard');
++  }
++  assert.equal(await dashboardDestination({ subscription: 'checkout_pendente', exempt: true }), '/dashboard');
++  assert.equal(await dashboardDestination({ subscription: 'cartao_pronto', formationAllowed: true }), '/dashboard');
++});
++
++test('assinatura ausente/inadimplente não recebe acesso por causa da correção', async () => {
++  for (const subscription of [null, 'unpaid', 'suspended', 'canceled']) {
++    assert.equal(await dashboardDestination({ subscription }), '/planos?billing=required');
++  }
++});
++
++test('bloqueio da clínica continua prevalecendo sobre assinatura válida', async () => {
++  assert.equal(await dashboardDestination({ subscription: 'active', clinicStatus: 'bloqueada' }), '/dashboard/configuracoes?aba=clinica');
++});
++
++test('destino planos encerra o fluxo dos três estados que causavam o ciclo', async () => {
++  for (const status of ['aguardando_formacao', 'checkout_pendente', 'cartao_pronto']) {
++    assert.equal(await dashboardDestination({ subscription: status }), '/planos?billing=required');
++    const service = {
++      from(table: string) {
++        const records: Record<string, unknown> = {
++          users: { active_clinica_id: 'synthetic-clinic' },
++          clinicas: { status_assinatura: 'trial', trial_ends_at: null },
++          assinaturas_dentista: { status },
++          politicas_trial_assinatura: { dias_trial: 7 },
++        };
++        assert.ok(table in records);
++        const query = {
++          select: () => query,
++          eq: () => query,
++          maybeSingle: async () => ({ data: records[table] }),
++        };
++        return query;
++      },
++    };
++    const entry = loadEntry('./app/planos/page.tsx', {
++      'react/jsx-runtime': { jsx: (type: unknown, props: unknown) => ({ type, props }) },
++      'next/navigation': { redirect: (destination: string): never => { throw new RouteRedirect(destination); } },
++      '@/lib/supabase/server': { createClient: async () => ({ auth: { getUser: async () => ({ data: { user: { id: 'synthetic-user' } } }) } }) },
++      '@/lib/supabase/service': { createServiceClient: () => service },
++      '@/lib/billing/exemptions': { clinicaIsentaDeCobranca: () => false },
++      '@/lib/billing/estado-comercial': { resolverEstadoComercial },
++      './_components/planos-client': { PlanosClient: 'test-plans' },
++    });
++    const page = entry.default as (props: { searchParams: Promise<Record<string, string>> }) => Promise<{ type: string }>;
++    const rendered = await page({ searchParams: Promise.resolve({}) });
++    assert.equal(rendered.type, 'test-plans');
++  }
++});

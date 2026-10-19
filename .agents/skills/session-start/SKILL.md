@@ -1,59 +1,18 @@
 ---
 name: session-start
-description: >
-  Abre uma nova sessão de trabalho retomando de onde paramos. Lê plans/ESTADO.md (o item
-  ativo, o que falta, o que trava, o que espera decisão) e o último handoff se precisar do
-  raciocínio, e faz um recap acionável antes de começar. Use quando o usuário cumprimentar
-  pra começar o dia: "bom dia", "boa tarde", "boa noite", "tudo bem Codex", "oi Codex",
-  "começar sessão", "nova sessão", "vamos continuar", "onde paramos".
+description: Retoma uma sessão lendo o Estado e resumindo o foco atual, sem percorrer histórico ou iniciar implementação por uma saudação.
 ---
 
 # Abertura de sessão
 
-O usuário cumprimentou pra começar. Não comece do zero — **retome de onde paramos.**
+Siga `AGENTS.md` e leia `plans/ESTADO.md`. Resuma o foco, a pendência relevante e
+o próximo passo em poucas linhas, distinguindo o feito do não verificado.
 
-## 1. Ler o estado (uma fonte, não três)
+Consulte `docs/PRODUTO.md` para contexto funcional e `plans/ROADMAP.md` quando a
+pergunta envolver a situação geral. Não procurar specs, handoffs, arquivo histórico
+ou memória externa para reconstruir uma fase encerrada.
 
-```bash
-cat plans/ESTADO.md
-```
-
-É o arquivo do **agora**: item ativo, o que já foi feito e o que falta nele, o que está
-travado, o que espera decisão do usuário. Se ele existe, é daqui que sai o recap.
-
-**Só leia mais se precisar:**
-- `plans/ROADMAP.md` — se o usuário perguntar do projeto como um todo, ou se o ESTADO não tem item ativo
-- último handoff em `plans/handoffs/` — se o ESTADO cita erro/travamento e você precisa do **raciocínio** de como se pensou em resolver
-- `plans/ESTADO.md` ausente → é a primeira sessão: cumprimente, diga que não há estado anterior, pergunte no que vamos trabalhar
-
-Se o usuário mencionou um projeto por nome e existe vault Obsidian, cheque
-`Projetos/{NomeProjeto}.md` antes — traz visão e decisões.
-
-## 2. Recap acionável (não despeje o arquivo)
-
-Cumprimente de volta em uma linha e entregue:
-
-- **Item ativo:** qual é, e o que falta nele (do `## Agora`)
-- **Travado:** o que impede avanço, e a hipótese registrada (do `## Travado`)
-- **Esperando você:** decisões pendentes que só o usuário toma (do `## Esperando você`)
-- **Divergência:** se o hook avisou que ESTADO e ROADMAP não batem, **traga isso primeiro** —
-  o estado do projeto está mentindo e precisa ser consertado antes de trabalhar
-
-Feche perguntando: **"Continuamos por aqui ou mudou alguma coisa?"** — não saia
-implementando antes de confirmar (regra 2: discutir antes de codar).
-
-## 3. Modo
-
-Não adivinhe o modo pela saudação nem pelo handoff. O usuário ativa quando quiser
-(`/discutir`, `/planejar`, `/executar`, `/auditar`). Se ele já disser o que quer fazer,
-sugira o comando correspondente.
-
-## 4. Desambiguação
-
-"Boa noite" pode ser chegada **ou** despedida. Se o usuário disser "boa noite, vou dormir"
-ou estiver claramente encerrando, **não** abra sessão — acione a skill `handoff`.
-
-## Regra
-
-Esta skill só lê e resume. Não altera código nem o `plans/`. O objetivo é a próxima sessão
-começar com contexto, não da estaca zero.
+Uma saudação não autoriza implementação. Se o usuário já definiu o trabalho,
+prossiga no escopo pedido sem exigir um comando especial ou confirmação repetida.
+Esta abertura é de leitura; não cria novos documentos. Se o Estado estiver ausente,
+informe isso e use o pedido atual como ponto de partida, sem inventar continuidade.

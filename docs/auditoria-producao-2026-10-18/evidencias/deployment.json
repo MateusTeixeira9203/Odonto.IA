@@ -1,0 +1,45 @@
+{
+  "result": {
+    "deployment": {
+      "id": "dpl_3LzHS31AvnGY6hertJtgChPJfyCb",
+      "name": "odonto.ia",
+      "url": "odonto-o0hgehlke-mateusteixeira9203s-projects.vercel.app",
+      "type": "LAMBDAS",
+      "state": "READY",
+      "createdAt": 1791838199929,
+      "creator": {
+        "uid": "hAWLxgG8tMq9voeq9M1lLeKe",
+        "username": "mateusteixeira9203"
+      },
+      "project": {
+        "id": "prj_1H66beuUgFwprxtJ1mTw73qdqGF4",
+        "name": "odonto.ia",
+        "framework": "nextjs"
+      },
+      "meta": {
+        "githubCommitRef": "main",
+        "githubCommitSha": "a1722c47c346a4a80c84ad6cd5efd0ee42afbf08",
+        "githubCommitMessage": "docs(state): keep production gate as historical evidence",
+        "githubRepo": "Odonto.IA",
+        "githubOrg": "MateusTeixeira9203"
+      },
+      "alias": [
+        "odontoia.app",
+        "dentia.app.br",
+        "www.odontoia.app",
+        "odonto-ia-gamma.vercel.app",
+        "odontoia-mateusteixeira9203s-projects.vercel.app",
+        "odontoia-git-main-mateusteixeira9203s-projects.vercel.app"
+      ],
+      "target": "production",
+      "regions": [
+        "iad1"
+      ],
+      "buildingAt": 1791838202582,
+      "ready": 1791838300984,
+      "readyState": "READY",
+      "source": "redeploy",
+      "aliasError": null
+    }
+  }
+}

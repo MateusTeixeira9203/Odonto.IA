@@ -1,0 +1,57 @@
+Browser tab: 2115955912, Title: "Odonto.IA | Inteligência Odontológica", URL: "https://odontoia.app/dashboard/perfil".
+1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/dashboard/perfil
+	2 container
+		95 container
+			159 heading Meu Perfil, Value: 1
+				160 text Meu Perfil
+			161 text Gerencie suas informações pessoais e foto de perfil. DT
+			162 button Trocar foto
+			163 text Dentista teste 1 Dentista
+			164 button Adicionar foto
+			165 text JPG, PNG ou WebP · máx. 5 MB
+			166 heading CONTA, Value: 2
+				167 text CONTA
+			168 text EMAIL mateusteixeira9203@gmail.com FUNÇÃO Dentista CLÍNICA
+			169 image
+			170 text Clinica teste
+			171 heading DADOS PESSOAIS, Value: 2
+				172 text DADOS PESSOAIS
+			173 container
+				174 text NOME COMPLETO  *
+			175 text field (settable) Dentista teste 1
+			176 text TELEFONE
+			177 text field (settable)
+			178 text DADOS PROFISSIONAIS
+			179 text CRO
+			180 text field (settable) 123456
+			181 text CPF
+			182 text field (settable)
+			183 text ESPECIALIDADES
+			184 checkbox Clínico Geral, Value: 1
+			185 checkbox Ortodontia, Value: 0
+			186 checkbox Endodontia, Value: 0
+			187 checkbox Implantodontia, Value: 0
+			188 checkbox Periodontia, Value: 0
+			189 checkbox Odontopediatria, Value: 0
+			190 checkbox Cirurgia, Value: 0
+			191 checkbox Outro, Value: 0
+			192 text PAGAMENTOS
+			193 text CHAVE PIX
+			194 text field (settable)
+			195 text Sua chave PIX pessoal para receber pagamentos via bot e orçamentos.
+			196 button Salvar perfil
+		147 container
+			148 image
+			149 text Odonto .IA
+			150 link Description: INÍCIO, Value: odontoia.app/dashboard
+			151 link Description: MEU DIA, Value: odontoia.app/dashboard/meu-dia
+			152 link Description: PACIENTES, Value: odontoia.app/dashboard/pacientes
+			153 link Description: AGENDA, Value: odontoia.app/dashboard/agendamentos
+			154 link Description: FINANCEIRO, Value: odontoia.app/dashboard/financeiro
+			155 link Description: CONFIG, Value: odontoia.app/dashboard/configuracoes
+			156 button Abrir DEX
+			157 button Modo Escuro
+			158 pop up button (collapsed) DT, Help: Dentista teste 1, ID: radix-_r_0_, Secondary Actions: Expand
+		67 container Notifications alt+T
+
+The focused UI element is 158 pop up button (collapsed) DT, Help: Dentista teste 1, ID: radix-_r_0_, Secondary Actions: Expand

@@ -1,0 +1,21 @@
+{
+  "deployment": "dpl_HiZZiUFuWTtCVa5hawEfdrjp7WrN",
+  "domain": "https://odontoia.app",
+  "state": "READY",
+  "source": "CLI baseline + patch, sem nova SHA",
+  "date_local": "2026-10-18",
+  "tested": [
+    "login com sessao e recarga",
+    "dashboard QA e recarga",
+    "anonimo redirecionado",
+    "mostrar ocultar senha",
+    "cadastro botoes acessiveis",
+    "agenda AGENDADO",
+    "landing texto"
+  ],
+  "not_tested": [
+    "nova autenticacao por senha",
+    "estados comerciais reais"
+  ],
+  "database_changes": false
+}

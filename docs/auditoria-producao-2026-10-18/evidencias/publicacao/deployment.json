@@ -1,0 +1,10 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\n  \"result\": {\n    \"deployment\": {\n      \"id\": \"dpl_HiZZiUFuWTtCVa5hawEfdrjp7WrN\",\n      \"name\": \"odonto.ia\",\n      \"url\": \"odonto-huue58xxw-mateusteixeira9203s-projects.vercel.app\",\n      \"type\": \"LAMBDAS\",\n      \"state\": \"READY\",\n      \"createdAt\": 1792369484481,\n      \"creator\": {\n        \"uid\": \"hAWLxgG8tMq9voeq9M1lLeKe\",\n        \"username\": \"mateusteixeira9203\"\n      },\n      \"project\": {\n        \"id\": \"prj_1H66beuUgFwprxtJ1mTw73qdqGF4\",\n        \"name\": \"odonto.ia\",\n        \"framework\": \"nextjs\"\n      },\n      \"meta\": {},\n      \"alias\": [\n        \"odontoia-mateusteixeira9203s-projects.vercel.app\"\n      ],\n      \"target\": \"production\",\n      \"regions\": [\n        \"iad1\"\n      ],\n      \"buildingAt\": 1792369485424,\n      \"ready\": 1792369579350,\n      \"readyState\": \"READY\",\n      \"source\": \"cli\",\n      \"aliasError\": null\n    }\n  }\n}"
+    }
+  ],
+  "structuredContent": null,
+  "isError": false
+}

@@ -1,0 +1,6 @@
+{
+  "status": "PASSA",
+  "exit_code": 0,
+  "command": "node --max-old-space-size=6144 node_modules/typescript/bin/tsc --noEmit --incremental false",
+  "scope": "Projeto completo conforme tsconfig; execução local; não é build nem publicação"
+}

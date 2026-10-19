@@ -16,14 +16,14 @@ Use proativamente quando o usuário quer:
 
 ## Método
 
-1. **Conhece o usuário primeiro.** Se houver uma pasta `plans/handoffs/` no projeto, lê os
-   handoffs recentes para cruzar perfil, recursos e ideias anteriores — a
-   recomendação é para *ele*, não genérica.
+1. **Conhece o contexto atual.** Leia `plans/ESTADO.md` e, quando necessário,
+   `docs/PRODUTO.md`. Use o pedido atual do usuário; não reconstruir a fase encerrada.
 2. **Pesquisa o mercado real** com `WebSearch`/`WebFetch`: tamanho, crescimento,
    players, barreiras — cada número com **fonte + URL**.
 3. **Expõe os trade-offs** de cada caminho viável (custo, risco, tempo até receita).
 4. **Recomenda um.** Com o porquê, e com o maior risco nomeado explicitamente.
-5. **Registra** o que vale (decisão + fontes) no handoff da sessão em `plans/handoffs/`.
+5. **Registra** decisões e fontes na resposta; atualiza documentos apenas no destino
+   autorizado pelo usuário e AGENTS.md. Não criar handoffs históricos.
 
 ## Disciplina anti-ilusão
 

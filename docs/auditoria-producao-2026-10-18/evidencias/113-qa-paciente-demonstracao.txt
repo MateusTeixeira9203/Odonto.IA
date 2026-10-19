@@ -1,0 +1,49 @@
+Browser tab: 2115955912, Title: "Odonto.IA | Inteligência Odontológica", URL: "https://odontoia.app/dashboard/pacientes/demo".
+1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/dashboard/pacientes/demo
+	2 container
+		3 container
+			4 button Pacientes
+			5 button Editar paciente
+			6 button Exportar prontuário
+			7 button Excluir paciente
+			8 button Gerar TCLE do paciente
+			9 button Emitir documento (receita, atestado, pedido de exame)
+			10 button Apresentar
+			11 button Marcar retorno
+			12 text JS
+			13 heading João Silva (Demonstração), Value: 1
+				14 text João Silva (Demonstração)
+			15 text 42  anos ·  12/03/1984 · Paciente desde  out de 2026 (11) 99999-9999 joao@exemplo.com Rua das Flores, 123 — São Paulo, SP
+			16 tab group
+				17 tab (selected, settable, boolean) Prontuário, Value: 1, ID: tab-fichas
+				18 tab (selectable, settable, boolean) Orçamentos, Value: 0, ID: tab-orcamento
+				19 tab (selectable, settable, boolean) Arquivos, Value: 0, ID: tab-documentos
+				20 tab (selectable, settable, boolean) Agenda, Value: 0, ID: base-ui-_r_7_
+			21 container Description: Prontuário, ID: base-ui-_r_9_
+				35 container Prontuário do paciente
+					36 text Prontuário
+					37 text Consultas e histórico clínico do paciente.
+					38 button Importar histórico
+					39 button Novo atendimento
+					40 button (collapsed) 0 atendimentos, Secondary Actions: Expand
+					41 button (collapsed) 0 pendências, Secondary Actions: Expand
+					42 button Tudo
+					43 button Indicados
+					44 button Realizados
+					45 text Nenhum atendimento registrado ainda.
+					46 text O primeiro atendimento pode ser feito aqui, manualmente ou com o Dex.
+		22 container
+			23 image
+			24 text Odonto .IA
+			25 link Description: INÍCIO, Value: odontoia.app/dashboard
+			26 link Description: MEU DIA, Value: odontoia.app/dashboard/meu-dia
+			27 link Description: PACIENTES, Value: odontoia.app/dashboard/pacientes
+			28 link Description: AGENDA, Value: odontoia.app/dashboard/agendamentos
+			29 link Description: FINANCEIRO, Value: odontoia.app/dashboard/financeiro
+			30 link Description: CONFIG, Value: odontoia.app/dashboard/configuracoes
+			31 button Abrir DEX
+			32 button Modo Escuro
+			33 pop up button (collapsed) DT, Help: Dentista teste 1, ID: radix-_r_0_, Secondary Actions: Expand
+		34 container Notifications alt+T
+
+The focused UI element is 1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/dashboard/pacientes/demo

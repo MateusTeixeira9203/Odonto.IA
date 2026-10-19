@@ -1,0 +1,12 @@
+{
+  "alterados_desde_inicio_auditoria": [
+    "src/access-navigation.test.ts",
+    "src/app/(auth)/cadastro/_components/cadastro-form.tsx",
+    "src/app/(auth)/login/page.tsx",
+    "src/app/dashboard/agendamentos/_components/month-view.tsx",
+    "src/components/landing/passo-ficha.tsx"
+  ],
+  "adicionados": [],
+  "removidos": [],
+  "observacao": "Proxy/layout já continham correção autorizada de login antes do snapshot. Nenhuma migration ou fonte financeira/clínica alterada nesta rodada."
+}

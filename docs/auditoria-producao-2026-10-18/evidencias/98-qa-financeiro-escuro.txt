@@ -1,0 +1,53 @@
+Browser tab: 2115955912, Title: "Odonto.IA | Inteligência Odontológica", URL: "https://odontoia.app/dashboard/financeiro".
+1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/dashboard/financeiro
+	2 container
+		3 container
+			4 heading Financeiro, Value: 1
+				5 text Financeiro
+			6 text Fluxo de caixa e desempenho operacional
+			7 button Ocultar valores
+			8 button
+			9 text OUT 2026
+			10 text Tendência receita — vs Set Tendência despesas — vs Set Margem operacional 100.0% receita líquida / bruta
+			11 text CUSTO POR HORA CLÍNICA
+			12 text —
+			13 container
+				14 text Configure seus horários em
+				15 link Description: Configurações, Value: odontoia.app/dashboard/configuracoes
+				16 text para calcular o custo/hora.
+			17 text Receita
+			18 container
+				19 text R$ 50,00
+			20 text Despesas
+			21 container
+				22 text R$ 0,00
+			23 text Lucro
+			24 container
+				25 text R$ 50,00
+			26 heading Fluxo de Caixa, Value: 2
+				27 text Fluxo de Caixa
+			28 text Entradas × Saídas — últimos 6 meses Receita Despesas Sem dados financeiros ainda para exibir o gráfico.
+			29 heading Extrato do Mês, Value: 2
+				30 text Extrato do Mês
+			31 text 1 lançamento
+			32 button CSV, Help: Exportar extrato como CSV
+			33 button Saída
+			34 button Entrada
+			35 text PIX QA AUDITORIA — lançamento fictício, sem dinheiro real 18/10 +R$ 50,00
+			36 button
+			37 text SALDO DO MÊS +R$ 50,00
+		38 container
+			39 image
+			40 text Odonto .IA
+			41 link Description: INÍCIO, Value: odontoia.app/dashboard
+			42 link Description: MEU DIA, Value: odontoia.app/dashboard/meu-dia
+			43 link Description: PACIENTES, Value: odontoia.app/dashboard/pacientes
+			44 link Description: AGENDA, Value: odontoia.app/dashboard/agendamentos
+			45 link Description: FINANCEIRO, Value: odontoia.app/dashboard/financeiro
+			46 link Description: CONFIG, Value: odontoia.app/dashboard/configuracoes
+			47 button Abrir DEX
+			48 button Modo Claro
+			49 pop up button (collapsed) DT, Help: Dentista teste 1, ID: radix-_r_0_, Secondary Actions: Expand
+		50 container Notifications alt+T
+
+The focused UI element is 1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/dashboard/financeiro

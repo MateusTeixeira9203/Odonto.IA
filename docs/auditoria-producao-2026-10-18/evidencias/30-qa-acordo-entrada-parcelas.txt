@@ -1,0 +1,3 @@
+Browser tab: 2115955912, Title: "Odonto.IA | Inteligência Odontológica", URL: "https://odontoia.app/dashboard/pacientes/290b050a-877c-40b7-8cf4-38e3488ce636".
+There has been no change in the accessibility tree.
+The focused UI element is 79 button Entrada + parcelas

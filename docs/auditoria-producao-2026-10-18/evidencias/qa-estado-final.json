@@ -1,0 +1,49 @@
+{
+  "clinic_id": "eddc5fc6-62b0-4d01-8e6e-3f84f61e64e7",
+  "scope": "Consulta somente leitura, restrita à clínica QA. Não prova isolamento entre clínicas.",
+  "result": [
+    {
+      "consultado_em": "2026-10-18 22:47:33.078959+00",
+      "pacientes": [
+        {
+          "id": "290b050a-877c-40b7-8cf4-38e3488ce636",
+          "nome": "QA Auditoria 18-10-2026"
+        }
+      ],
+      "fichas": [
+        {
+          "id": "51047d58-ef96-4b54-b6db-95e0e96b81c3",
+          "nome": null,
+          "assinado_em": null
+        }
+      ],
+      "orcamentos": [
+        {
+          "id": "99909ee0-2e7c-4750-8b12-25890de3e8fb",
+          "total": 100,
+          "status": "rascunho",
+          "aprovado_em": null
+        }
+      ],
+      "agendamentos": [
+        {
+          "id": "64e04349-a394-47c1-b048-3f1b80fc7ccf",
+          "status": "scheduled",
+          "data_hora": "2026-10-18T22:30:00+00:00",
+          "observacoes": "[Walk-in — Atender agora]",
+          "google_event_id": null,
+          "whatsapp_reminder_sent": false
+        }
+      ],
+      "receitas_manuais": [
+        {
+          "id": "040da89c-a835-4978-bb03-7d36942482ba",
+          "forma": "pix",
+          "valor": 50,
+          "descricao": "QA AUDITORIA — lançamento fictício, sem dinheiro real"
+        }
+      ],
+      "pagamentos": 0
+    }
+  ]
+}

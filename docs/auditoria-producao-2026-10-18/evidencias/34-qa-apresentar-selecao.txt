@@ -1,0 +1,15 @@
+Browser tab: 2115955912, Title: "Odonto.IA | Inteligência Odontológica", URL: "https://odontoia.app/dashboard/pacientes/290b050a-877c-40b7-8cf4-38e3488ce636".
+1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/dashboard/pacientes/290b050a-877c-40b7-8cf4-38e3488ce636
+	2 container
+		3 container Notifications alt+T
+		4 container Apresentar ficha
+			5 container
+				6 heading Apresentar ficha, Value: 2, ID: base-ui-_r_2u_
+					7 text Apresentar ficha
+				8 text Escolha qual registro clínico apresentar ao paciente.
+			9 button Evolução clínica 18/10/2026 às 19:26 Dentista teste 1
+				10 text Evolução clínica
+				11 text 18/10/2026 às 19:26
+				12 text Dentista teste 1
+
+The focused UI element is 9 button Evolução clínica 18/10/2026 às 19:26 Dentista teste 1

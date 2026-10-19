@@ -1,0 +1,7 @@
+
+/home/mtx/Documentos/Odonto.IA/src/app/dashboard/financeiro/actions.ts
+  139:11  warning  'inicio' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  139:19  warning  'fim' is assigned a value but never used     @typescript-eslint/no-unused-vars
+
+✖ 2 problems (0 errors, 2 warnings)
+

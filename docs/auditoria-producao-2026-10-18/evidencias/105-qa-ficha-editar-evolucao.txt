@@ -1,0 +1,205 @@
+Browser tab: 2115955912, Title: "Odonto.IA | Inteligência Odontológica", URL: "https://odontoia.app/dashboard/pacientes/290b050a-877c-40b7-8cf4-38e3488ce636".
+1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/dashboard/pacientes/290b050a-877c-40b7-8cf4-38e3488ce636
+	2 container
+		3 container
+			4 button Pacientes
+			5 button Editar paciente
+			6 button Exportar prontuário
+			7 button Excluir paciente
+			8 button Gerar TCLE do paciente
+			9 button Emitir documento (receita, atestado, pedido de exame)
+			10 button Apresentar
+			11 button Marcar retorno
+			12 text QA
+			13 heading QA Auditoria 18-10-2026, Value: 1
+				14 text QA Auditoria 18-10-2026
+			15 text · Paciente desde  out de 2026 OBSERVAÇÕES PACIENTE FICTÍCIO — auditoria autorizada de produção. Nenhum dado de pessoa real.
+			16 tab group
+				17 tab (selected, settable, boolean) Prontuário, Value: 1, ID: tab-fichas
+				18 tab (selectable, settable, boolean) Orçamentos, Value: 0, ID: tab-orcamento
+				19 tab (selectable, settable, boolean) Arquivos, Value: 0, ID: tab-documentos
+				20 tab (selectable, settable, boolean) Agenda, Value: 0, ID: base-ui-_r_7_
+			21 container Description: Prontuário, ID: base-ui-_r_9_
+				22 container Ficha aberta no prontuário
+					58 container
+						59 button Voltar ao prontuário
+						60 text Canal · 32 Responsável: Dentista teste 1 Consulta de  18 de outubro de 2026 EM CURSO
+						61 progress indicator Description: Progresso da Ficha, Value: 0
+						62 text 0 % ·  0  de  1  procedimentos
+						63 button Novo atendimento
+						64 button Baixar PDF da Ficha
+						65 pop up button (collapsed) Description: Mais ações da Ficha, ID: radix-_r_19_, Secondary Actions: Expand
+					66 container
+						67 text EVOLUÇÃO CLÍNICA Registro da consulta em exibição.
+						222 text Evolução clínica
+						223 text entry area (settable) Evolução clínica
+						224 button Cancelar
+						225 button Salvar evolução
+						226 text Dentista teste 1
+					70 container
+						71 text ODONTOGRAMA DA FICHA Clique em um dente para ir ao procedimento desta ficha. Dentes sem procedimento não abrem formulário.
+						72 button Ver odontograma completo
+						73 button Permanentes 1
+							74 text Permanentes
+							75 text 1
+						76 button Decíduos
+						77 button (collapsed) Description: Legenda do odontograma, Secondary Actions: Expand
+						78 text SUP. DIREITO SUP. ESQUERDO
+						79 button Dente 18 — Siso
+							80 text 18
+							81 image
+						82 button Dente 17 — 2º Molar
+							83 text 17
+							84 image
+						85 button Dente 16 — 1º Molar
+							86 text 16
+							87 image
+						88 button Dente 15 — 2º Pré-molar
+							89 text 15
+							90 image
+						91 button Dente 14 — 1º Pré-molar
+							92 text 14
+							93 image
+						94 button Dente 13 — Canino
+							95 text 13
+							96 image
+						97 button Dente 12 — Incisivo Lateral
+							98 text 12
+							99 image
+						100 button Dente 11 — Incisivo Central
+							101 text 11
+							102 image
+						103 button Dente 21 — Incisivo Central
+							104 text 21
+							105 image
+						106 button Dente 22 — Incisivo Lateral
+							107 text 22
+							108 image
+						109 button Dente 23 — Canino
+							110 text 23
+							111 image
+						112 button Dente 24 — 1º Pré-molar
+							113 text 24
+							114 image
+						115 button Dente 25 — 2º Pré-molar
+							116 text 25
+							117 image
+						118 button Dente 26 — 1º Molar
+							119 text 26
+							120 image
+						121 button Dente 27 — 2º Molar
+							122 text 27
+							123 image
+						124 button Dente 28 — Siso
+							125 text 28
+							126 image
+						127 button Dente 48 — Siso
+							128 image
+							129 text 48
+						130 button Dente 47 — 2º Molar
+							131 image
+							132 text 47
+						133 button Dente 46 — 1º Molar
+							134 image
+							135 text 46
+						136 button Dente 45 — 2º Pré-molar
+							137 image
+							138 text 45
+						139 button Dente 44 — 1º Pré-molar
+							140 image
+							141 text 44
+						142 button Dente 43 — Canino
+							143 image
+							144 text 43
+						145 button Dente 42 — Incisivo Lateral
+							146 image
+							147 text 42
+						148 button Dente 41 — Incisivo Central
+							149 image
+							150 text 41
+						151 button Dente 31 — Incisivo Central
+							152 image
+							153 text 31
+						154 button Dente 32 — Incisivo Lateral, a fazer, alterado nesta consulta
+							155 image
+							156 text 32
+						157 button Dente 33 — Canino
+							158 image
+							159 text 33
+						160 button Dente 34 — 1º Pré-molar
+							161 image
+							162 text 34
+						163 button Dente 35 — 2º Pré-molar
+							164 image
+							165 text 35
+						166 button Dente 36 — 1º Molar
+							167 image
+							168 text 36
+						169 button Dente 37 — 2º Molar
+							170 image
+							171 text 37
+						172 button Dente 38 — Siso
+							173 image
+							174 text 38
+						175 text INF. DIREITO INF. ESQUERDO Toque um dente para ver e editar o detalhe
+						176 button Maxila
+						177 button Mandíbula
+						178 button Face
+						179 button Arcada superior
+						180 button Arcada inferior
+						181 button Arcadas
+					182 container
+						183 text PROCEDIMENTOS Status clínico e organização da próxima sessão são controles separados.
+						184 button (collapsed) Adicionar procedimentos, Secondary Actions: Expand
+						185 button (disabled) Coletar assinatura
+						186 content list
+							187 container procedimento-738b69e9-f50e-424c-a3c0-55fe5452e8cb
+								188 container
+									189 text Canal  · dente 32
+								190 text QA fictício — teste de persistência, sem indicação clínica real.
+								191 container
+									192 text Registrado por  Dentista teste 1  · CRO 123456
+								193 text A fazer
+								194 container Status clínico
+									195 checkbox A fazer, Value: 1
+									196 checkbox Realizado, Value: 0
+								197 button Levar para próxima sessão
+								198 button Encaminhar
+								199 button Editar procedimento
+					200 container
+						201 text RETORNO
+						202 text Nenhum retorno vinculado a esta visita.
+						203 button Marcar retorno
+						204 text RASTREABILIDADE
+						205 text Materiais não informados
+						206 text A leitura de etiquetas será registrada nesta consulta quando o módulo de materiais estiver disponível.
+						207 text MATERIAIS E DOCUMENTOS
+						208 text Nenhum documento vinculado a esta consulta.
+						209 button Abrir materiais e documentos
+						210 text ORÇAMENTO DA FICHA
+						227 button Ver orçamento
+						212 text HISTÓRICO DA FICHA
+						213 text 1  visita
+						214 button 18 de outubro de 2026 Em exibição Dentista teste 1 · 1 procedimento Canal · dente 32
+							215 text 18 de outubro de 2026
+							216 text Em exibição
+							217 text Dentista teste 1
+							218 text  · 
+							219 text 1
+							220 text  procedimento
+							221 text Canal · dente 32
+		45 container
+			46 image
+			47 text Odonto .IA
+			48 link Description: INÍCIO, Value: odontoia.app/dashboard
+			49 link Description: MEU DIA, Value: odontoia.app/dashboard/meu-dia
+			50 link Description: PACIENTES, Value: odontoia.app/dashboard/pacientes
+			51 link Description: AGENDA, Value: odontoia.app/dashboard/agendamentos
+			52 link Description: FINANCEIRO, Value: odontoia.app/dashboard/financeiro
+			53 link Description: CONFIG, Value: odontoia.app/dashboard/configuracoes
+			54 button Abrir DEX
+			55 button Modo Escuro
+			56 pop up button (collapsed) DT, Help: Dentista teste 1, ID: radix-_r_0_, Secondary Actions: Expand
+		57 container Notifications alt+T
+
+The focused UI element is 223 text entry area (settable) Evolução clínica

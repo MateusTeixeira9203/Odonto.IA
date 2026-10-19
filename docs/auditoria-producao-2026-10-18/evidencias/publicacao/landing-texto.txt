@@ -1,0 +1,3 @@
+Browser tab: 5, Title: "Odonto.IA — Você atende. A IA documenta.", URL: "https://odontoia.app/".
+There has been no change in the accessibility tree.
+The focused UI element is 1 AXWebArea Odonto.IA — Você atende. A IA documenta., URL: odontoia.app/

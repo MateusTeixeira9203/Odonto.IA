@@ -1,0 +1,81 @@
+Browser tab: 2115955912, Title: "Odonto.IA | Inteligência Odontológica", URL: "https://odontoia.app/dashboard/pacientes/290b050a-877c-40b7-8cf4-38e3488ce636".
+1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/dashboard/pacientes/290b050a-877c-40b7-8cf4-38e3488ce636
+	2 container
+		58 container
+			59 button Pacientes
+			60 button Editar paciente
+			61 button Exportar prontuário
+			62 button Excluir paciente
+			63 button Gerar TCLE do paciente
+			64 button Emitir documento (receita, atestado, pedido de exame)
+			65 button Apresentar
+			66 button Marcar retorno
+			67 text QA
+			68 heading QA Auditoria 18-10-2026, Value: 1
+				69 text QA Auditoria 18-10-2026
+			70 text · Paciente desde  out de 2026
+			71 text OBSERVAÇÕES
+			72 text PACIENTE FICTÍCIO — auditoria autorizada de produção. Nenhum dado de pessoa real.
+			73 tab group
+				74 tab (selected, settable, boolean) Prontuário, Value: 1, ID: tab-fichas
+				75 tab (selectable, settable, boolean) Orçamentos, Value: 0, ID: tab-orcamento
+				76 tab (selectable, settable, boolean) Arquivos, Value: 0, ID: tab-documentos
+				77 tab (selectable, settable, boolean) Agenda, Value: 0, ID: base-ui-_R_132av5ubqsnljb_
+			78 container Description: Prontuário, ID: base-ui-_R_l2av5ubqsnljb_
+				79 container Prontuário do paciente
+					80 text Prontuário
+					81 text Consultas e histórico clínico do paciente.
+					82 button Importar histórico
+					83 button Novo atendimento
+					84 button (collapsed) 1 atendimento, Secondary Actions: Expand
+					85 button (collapsed) 1 pendência, Secondary Actions: Expand
+					86 button Tudo
+					87 button Indicados
+					88 button Realizados
+					89 content list
+						90 container
+							91 text 18 de outubro de 2026 Atendimento pelo prontuário  ·  Dentista teste 1 1  procedimento Sem evolução textual registrada. Canal  · 32
+							92 button Abrir ficha · Canal · 32 0% · 0/1
+								93 text Abrir ficha · 
+								94 text Canal · 32
+								95 text 0
+								96 text % · 
+								97 text 0
+								98 text /
+								99 text 1
+							100 button Gerar orçamento
+							101 button Marcar retorno
+			102 image
+			103 text Odonto .IA
+			104 link Description: INÍCIO, Value: odontoia.app/dashboard
+			105 link Description: MEU DIA, Value: odontoia.app/dashboard/meu-dia
+			106 link Description: PACIENTES, Value: odontoia.app/dashboard/pacientes
+			107 link Description: AGENDA, Value: odontoia.app/dashboard/agendamentos
+			108 link Description: FINANCEIRO, Value: odontoia.app/dashboard/financeiro
+			109 link Description: CONFIG, Value: odontoia.app/dashboard/configuracoes
+			110 button Abrir DEX
+			111 button Modo Escuro
+			112 pop up button (collapsed) DT, Help: Dentista teste 1, ID: radix-_r_0_, Secondary Actions: Expand
+		57 container Notifications alt+T
+		113 container Colar histórico do Word
+			114 heading Colar histórico do Word, Value: 2, ID: base-ui-_r_21_
+				115 text Colar histórico do Word
+			116 container base-ui-_r_22_
+				117 text QA Auditoria 18-10-2026  — cole o texto ou suba o arquivo (.pdf, .docx, .doc, .txt). Entra tal qual, sem estruturar em registros — é histórico transcrito, não um atendimento.
+			118 text DATA DO HISTÓRICO
+			119 date field (settable) 2026-10-18
+				120 container
+					121 stepper
+					122 stepper
+					123 stepper
+				124 pop up button Mostrar seletor de datas
+			125 text entry area (settable)
+			126 button Subir arquivo
+			127 text 0
+			128 text /
+			129 text 5000
+			130 button Cancelar
+			131 button (disabled) Importar
+			132 button Close
+
+The focused UI element is 121 stepper

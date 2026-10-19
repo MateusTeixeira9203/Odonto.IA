@@ -1,0 +1,64 @@
+Browser tab: 2115955912, Title: "Odonto.IA | Inteligência Odontológica", URL: "https://odontoia.app/dashboard".
+1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/dashboard
+	2 container
+		3 container
+			4 text DOMINGO, 18 DE OUTUBRO
+			5 heading Boa noite, Dr. Dentista., Value: 1
+				6 text Boa noite , Dr.  Dentista .
+			7 button ◆ Ver procedimentos do dia
+				8 text ◆
+				9 text Ver procedimentos do dia
+			10 container dex-tour-metrics
+				11 container
+					12 text 01 Consultas hoje Agendadas para hoje
+				13 container
+					14 text 01 Agenda da semana Próximos 7 dias
+				15 container
+					16 text 00 Concluídos hoje Nenhum ainda
+			17 text INICIAR AGORA
+			18 heading Qa Auditoria 18-10-2026, Value: 2
+				19 text Qa Auditoria 18-10-2026
+			20 text 19:30 [Walk-in — Atender agora] INICIAR AGORA — AGORA PACIENTE FICTÍCIO — auditoria autorizada de produção. Nenhum dado de pessoa real. 1  orçamento  em aberto
+			21 image
+			22 container
+				23 text 0 min
+			24 text RESTANTES
+			25 button Abrir meu dia → Qa Auditoria 18-10-2026, 19:30
+				26 text Abrir meu dia → 
+				27 text Qa Auditoria 18-10-2026
+				28 text , 
+				29 text 19:30
+			30 button Já foi atendido
+			31 link Description: Ver perfil do paciente →, Value: odontoia.app/dashboard/pacientes/290b050a-877c-40b7-8cf4-38e3488ce636
+			32 heading Atenção hoje, Value: 2
+				33 text Atenção hoje
+			34 text 2
+			35 link Description: 1 sem confirmação Aguardando resposta do paciente 1, Value: odontoia.app/dashboard/agendamentos
+			36 link Description: 1 orçamento aguardando QA Auditoria 18-10-2026 · Pendente de aprovação 1, Value: odontoia.app/dashboard/pacientes/290b050a-877c-40b7-8cf4-38e3488ce636?tab=orcamentos
+		37 container
+			38 image
+			39 text Odonto .IA
+			40 link Description: INÍCIO, Value: odontoia.app/dashboard
+			41 link Description: MEU DIA, Value: odontoia.app/dashboard/meu-dia
+			42 link Description: PACIENTES, Value: odontoia.app/dashboard/pacientes
+			43 link Description: AGENDA, Value: odontoia.app/dashboard/agendamentos
+			44 link Description: FINANCEIRO, Value: odontoia.app/dashboard/financeiro
+			45 link Description: CONFIG, Value: odontoia.app/dashboard/configuracoes
+			46 button Abrir DEX
+			47 button Modo Escuro
+			48 pop up button (collapsed) DT, Help: Dentista teste 1, ID: radix-_r_0_, Secondary Actions: Expand
+		49 container Notifications alt+T
+		50 text ◆ DEX
+		51 heading Procedimentos de hoje, Value: 2
+			52 text Procedimentos de hoje
+		53 container
+			54 text Domingo, 18 De Outubro  ·  1  Atendimento
+		55 button
+		56 text 19:30
+		57 text QA Auditoria 18-10-2026
+		58 text PACIENTE FICTÍCIO — auditoria autorizada de produção. Nenhum dado de pessoa real.
+		59 text [Walk-in — Atender agora]
+		60 text AGENDADO
+		61 text Procedimentos baseados nas observações de cada agendamento
+
+The focused UI element is 7 button ◆ Ver procedimentos do dia

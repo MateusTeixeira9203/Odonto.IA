@@ -171,4 +171,4 @@ artefato usa 16px" —, nunca como "está diferente".
   ```html
   <!-- ARTEFATO · R-NN · rota: /… · componente: src/… · 2026-07-21 · status: aprovado -->
   ```
-- Artefato de item fechado vai pro `plans/_arquivo/artefatos/` junto com a spec.
+- Destino e retenção do artefato seguem AGENTS.md e a decisão atual do usuário. Não criar acervo histórico automaticamente.

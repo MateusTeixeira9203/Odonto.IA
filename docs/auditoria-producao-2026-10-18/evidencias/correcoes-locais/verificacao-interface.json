@@ -1,0 +1,32 @@
+{
+  "data": "2026-10-18",
+  "ambiente": "Local; aplicação em 127.0.0.1:3100 e componente isolado em 3101; sem autenticação ou escrita remota",
+  "login": {
+    "formulario": "PASSA: abre localmente",
+    "anonimo": "PASSA: dashboard leva a login?redirectTo=%2Fdashboard",
+    "olhinho": "PASSA: mouse mostra, Space oculta, nova exibição preserva visualmente o texto fictício",
+    "sem_submit": "PASSA: permaneceu no formulário; nenhuma autenticação enviada",
+    "mobile": "PASSA no recorte: 390x844, scrollWidth 390, botão visível; não é auditoria mobile completa"
+  },
+  "cadastro": {
+    "nomes_acessiveis": "PASSA: Mostrar/Ocultar senha e Mostrar/Ocultar confirmação de senha",
+    "tipo_campo": "PASSA: os dois alternam para text; sem cadastro enviado"
+  },
+  "agenda": {
+    "origem": "MonthView real importado, fixture sintética local, sem banco",
+    "inicial": "PASSA: Agendado visível com popup fechado",
+    "alteracao": "PASSA: Confirmado visível; callback qa-appointment:confirmed",
+    "limite": "Não testa persistência de agendamento; handler remoto não foi alterado"
+  },
+  "landing": {
+    "texto_corrigido": 2,
+    "texto_antigo": 0,
+    "resultado": "PASSA: contagem no DOM local"
+  },
+  "producao": "NÃO TESTADO após correção: não houve deploy",
+  "supabase": {
+    "senhas_vazadas": "Desligada, configuração disponível em organização PRO; apenas avaliada conforme confirmação do usuário",
+    "configuracao_alterada": false,
+    "migrations_aplicadas": false
+  }
+}

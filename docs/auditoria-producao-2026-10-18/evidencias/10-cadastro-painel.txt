@@ -1,0 +1,37 @@
+Browser tab: 2, Title: "Odonto.IA | Inteligência Odontológica", URL: "https://odontoia.app/cadastro".
+1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/cadastro
+	2 container
+		3 container
+			4 image
+			5 text Odonto .IA MENOS PAPELADA. MAIS CLÍNICA.
+			6 heading Você atende. A IA documenta., Value: 2
+				7 text Você atende.
+				8 text A IA documenta.
+			9 text Do atendimento ao prontuário estruturado, sem tirar o foco do paciente. ODONTO.IA
+		10 text PRIMEIRO ACESSO
+		11 heading Crie sua conta., Value: 1
+			12 text Crie sua conta.
+		13 text Organize o atendimento sem perder tempo com papelada.
+		14 container
+			15 text Nome
+			16 text field (settable)
+			17 text E-mail
+			18 text field (settable)
+			19 text Senha
+			20 text field (settable)
+			21 button
+			22 text Confirmar Senha
+			23 text field (settable)
+			24 button
+			25 button Cadastrar
+		26 container
+			27 text ou
+		28 button Cadastrar com Google
+			29 image
+			30 text Cadastrar com Google
+		31 container
+			32 text Já tem uma conta?
+			33 link Description: Fazer login, Value: odontoia.app/login?next=%2Fonboarding
+	34 container Notifications alt+T
+
+The focused UI element is 1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/cadastro

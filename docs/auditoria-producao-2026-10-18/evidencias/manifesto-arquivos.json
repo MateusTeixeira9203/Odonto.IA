@@ -1,0 +1,1380 @@
+{
+  "date": "2026-10-18",
+  "deployment_auditado": "dpl_HxR3nH6QiVZaZUpSuPBBe3Mhdyfa",
+  "sha_producao": "a1722c47c346a4a80c84ad6cd5efd0ee42afbf08",
+  "png_producao": 113,
+  "ajustes_locais": "Publicados; consultar PENDENCIAS.md",
+  "files": [
+    {
+      "path": ".gitignore",
+      "bytes": 77,
+      "sha256": "5145d488597c658eda6d41b2b8c11011ef000a7ac3fc61b516345550a3e5c445"
+    },
+    {
+      "path": "BANCO.md",
+      "bytes": 9719,
+      "sha256": "8df88afd43e5a29362d932f9635d2ba442b577b1014d3cc281df232852001e5a"
+    },
+    {
+      "path": "CODIGO.md",
+      "bytes": 17348,
+      "sha256": "9c19d9843e6becabe6564d1983aa1087ad7d9c3b906d336cf509228057df60db"
+    },
+    {
+      "path": "GALERIA.html",
+      "bytes": 36209,
+      "sha256": "da4e6438d5b2458af2d6e949bd3504682f147fbc40948a3a10d0f8addf201530"
+    },
+    {
+      "path": "INTERFACE.md",
+      "bytes": 12002,
+      "sha256": "ae5111958aca71e008f6d8f03191d152d0d82cb4455e0f52a524cddac7e13dee"
+    },
+    {
+      "path": "PENDENCIAS.md",
+      "bytes": 4932,
+      "sha256": "5db0eabd1468f477a84fd14edfeda2eec6a6550c0c6eac021aac5bfad4a2b59f"
+    },
+    {
+      "path": "PRINTS.md",
+      "bytes": 20122,
+      "sha256": "3b1a2eb8e6943011ac1e95327e0e81cc12b9d9eb7e6ab10827cce3100c10a94d"
+    },
+    {
+      "path": "README.md",
+      "bytes": 7777,
+      "sha256": "0ca99c10e72d070818a7233218eacd430550d1a93ddcf805e4c4f5c3f33d267f"
+    },
+    {
+      "path": "evidencias/07-recuperacao-senha-painel.txt",
+      "bytes": 689,
+      "sha256": "cd3173a939b97fb4a8e9ca1453566319d2accb7b3548a96b2a01c55508835105"
+    },
+    {
+      "path": "evidencias/10-cadastro-painel.txt",
+      "bytes": 1255,
+      "sha256": "16edad69a425e6784586f76302184040a5bbc44cf4fc122ffb9bf0e8efce514a"
+    },
+    {
+      "path": "evidencias/100-qa-prontuario-escuro.txt",
+      "bytes": 2803,
+      "sha256": "8bbca8f329f71791991acaf52b8a85096cffc5cc16435b668791abe43fe26bc8"
+    },
+    {
+      "path": "evidencias/101-qa-ficha-escuro.txt",
+      "bytes": 366,
+      "sha256": "4a8905d3680efdb7808e2dd0a505d65f2fff15640911faf2ca20a4ecbe22e4dd"
+    },
+    {
+      "path": "evidencias/102-qa-ficha-mais-acoes.txt",
+      "bytes": 480,
+      "sha256": "ac707352ce7a1bf97009b4c3f9b4d7acdb08284bbe4e3bfa92334526e336abdb"
+    },
+    {
+      "path": "evidencias/103-qa-ficha-encaminhar.txt",
+      "bytes": 8296,
+      "sha256": "cbe5e1fa1729741d936f050ad11705ff99284ca828406f88d6bec959f7b320bb"
+    },
+    {
+      "path": "evidencias/104-qa-marcar-retorno.txt",
+      "bytes": 1847,
+      "sha256": "8c321b22c7d2ddbdbae722b66821d71d0dbb92af483fd4a2ac120756762bedf2"
+    },
+    {
+      "path": "evidencias/105-qa-ficha-editar-evolucao.txt",
+      "bytes": 7681,
+      "sha256": "93d7f04401a0658a88b8ced6d92daee2f5516588dd36c54d3fb131808cea1a64"
+    },
+    {
+      "path": "evidencias/106-qa-odontograma-completo.txt",
+      "bytes": 10397,
+      "sha256": "a8faaa0507011fb798049faa3655b14cb62ec4025710dd16f23821f336a3cfc1"
+    },
+    {
+      "path": "evidencias/107-qa-importar-historico.txt",
+      "bytes": 3594,
+      "sha256": "87a70c581e489c0d94dbdce8b6075804dace60f4fd294500d5d1fd539fadee62"
+    },
+    {
+      "path": "evidencias/108-qa-editar-paciente.txt",
+      "bytes": 3825,
+      "sha256": "6f04955f323fa0e22f3bdc60ac21853d9c9ee576bfbf08d5816dc33b8b6ac68e"
+    },
+    {
+      "path": "evidencias/109-convite-expirado.txt",
+      "bytes": 627,
+      "sha256": "a3a551c45227b45994f0755331c494b6fc5eea02eb078fba63a05dfe4e815a65"
+    },
+    {
+      "path": "evidencias/110-verifique-email.txt",
+      "bytes": 1336,
+      "sha256": "d8cbf5e9155f04c0e15a3659f9bb7734bbd9140943a0ad8bcfdbed532d8b6d48"
+    },
+    {
+      "path": "evidencias/111-redefinir-senha-sem-token.txt",
+      "bytes": 775,
+      "sha256": "ddbec2a85c07d74bd271863e8a0205f79a8e199464b061ea71c744d03d0ac102"
+    },
+    {
+      "path": "evidencias/112-qa-cadastro-paciente-topo.txt",
+      "bytes": 2473,
+      "sha256": "fa5ad02f3390dd21281baa7d135791b9a9b96187740da56fc0971ac0146328ed"
+    },
+    {
+      "path": "evidencias/113-qa-paciente-demonstracao.txt",
+      "bytes": 2489,
+      "sha256": "c0b50deb3c1f0daf7c7cd63523f0d9de1cca84099de5a6035280d83c609704cc"
+    },
+    {
+      "path": "evidencias/20-qa-atendimento-apos-recarga.txt",
+      "bytes": 366,
+      "sha256": "4a8905d3680efdb7808e2dd0a505d65f2fff15640911faf2ca20a4ecbe22e4dd"
+    },
+    {
+      "path": "evidencias/21-qa-ficha-aberta.txt",
+      "bytes": 548,
+      "sha256": "8680e430edd32d3482aeaec2b653c7f5cc77b84deaec9d4016a1bad9e5126a8d"
+    },
+    {
+      "path": "evidencias/22-qa-endodontia-persistida.txt",
+      "bytes": 265,
+      "sha256": "faf65a5e5922973d02e71bedd744e84b3d9f867871fb14a22064d7a01bf07721"
+    },
+    {
+      "path": "evidencias/23-qa-orcamentos-vazio.txt",
+      "bytes": 316,
+      "sha256": "ea5d27c71b38299884fc38f28512aa12f1021e2a2d5ec62310753a1e041c2181"
+    },
+    {
+      "path": "evidencias/24-qa-montar-orcamento.txt",
+      "bytes": 254,
+      "sha256": "3de5c72e396ebff001381a059e8a68aea2da4b3d167c556dbed0e32864584fc1"
+    },
+    {
+      "path": "evidencias/25-qa-orcamento-agrupar.txt",
+      "bytes": 329,
+      "sha256": "f74f6cdf3cfedd9624ed77db18740d1f0699332aafc3c22bdaf1acc974557c2d"
+    },
+    {
+      "path": "evidencias/26-qa-orcamento-proposto.txt",
+      "bytes": 254,
+      "sha256": "82a40af07bbc8d856bcc05f36ab9a54548853c1db61d82f1d2eb66d162da2805"
+    },
+    {
+      "path": "evidencias/27-qa-orcamento-atividade.txt",
+      "bytes": 315,
+      "sha256": "67f6d989f076bb68f64b7c09714ee378aa7db0b3cff4853df70ac38151b03b04"
+    },
+    {
+      "path": "evidencias/28-qa-aceite-formulario.txt",
+      "bytes": 813,
+      "sha256": "f79632f42de74bb17959fbfbbc014d77add67f62dc30870991130b0c33e94bca"
+    },
+    {
+      "path": "evidencias/29-qa-orcamento-aprovado.txt",
+      "bytes": 262,
+      "sha256": "84be4126dd037a4bc3bc27019aa7ce8bf1e9220d5d96ae89dfab68841c680d96"
+    },
+    {
+      "path": "evidencias/30-qa-acordo-entrada-parcelas.txt",
+      "bytes": 267,
+      "sha256": "b18e3c50212c2ba051c4b022d23cc79a8ad27aad7a72ff63c1a4134d99979250"
+    },
+    {
+      "path": "evidencias/31-qa-acordo-parcelado.txt",
+      "bytes": 258,
+      "sha256": "0bcbf25eb40ea1cc06e175fee9fd4cc6015959a579899ac33a946313873c4eed"
+    },
+    {
+      "path": "evidencias/32-qa-paciente-arquivos.txt",
+      "bytes": 659,
+      "sha256": "23e16d4c4923a3573bf9d77001d7164158defc5ded03598f2fb7b925cbf01fcd"
+    },
+    {
+      "path": "evidencias/33-qa-paciente-agenda.txt",
+      "bytes": 311,
+      "sha256": "d925207dca5d924efd3016ecb6655887b0a83d8728191359de424ba36e75d9ed"
+    },
+    {
+      "path": "evidencias/34-qa-apresentar-selecao.txt",
+      "bytes": 795,
+      "sha256": "ce3b28883598328db21e5e3b7fde5774e478c52e19d144f2e6cd0dcacb72eeef"
+    },
+    {
+      "path": "evidencias/35-qa-apresentacao-editor.txt",
+      "bytes": 259,
+      "sha256": "e7a6497be68970b2a2b15d614e1b54fa3bacd397aa5c7a51f4c98883bb479809"
+    },
+    {
+      "path": "evidencias/36-qa-apresentacao-blocos.txt",
+      "bytes": 366,
+      "sha256": "4a8905d3680efdb7808e2dd0a505d65f2fff15640911faf2ca20a4ecbe22e4dd"
+    },
+    {
+      "path": "evidencias/37-qa-apresentacao-odontograma.txt",
+      "bytes": 366,
+      "sha256": "4a8905d3680efdb7808e2dd0a505d65f2fff15640911faf2ca20a4ecbe22e4dd"
+    },
+    {
+      "path": "evidencias/38-qa-apresentacao-paciente.txt",
+      "bytes": 516,
+      "sha256": "709ea997796b8067db4317cc8e94eb5f97ae7ac65bcf2fd99e961ba95187ee48"
+    },
+    {
+      "path": "evidencias/39-qa-apresentacao-odontograma-slide.txt",
+      "bytes": 366,
+      "sha256": "4a8905d3680efdb7808e2dd0a505d65f2fff15640911faf2ca20a4ecbe22e4dd"
+    },
+    {
+      "path": "evidencias/40-qa-apresentacao-visao-geral.txt",
+      "bytes": 266,
+      "sha256": "22c8b011d4ba803b9ad8168703a150d274bb9e81f232ebc9d190af19d3f97e85"
+    },
+    {
+      "path": "evidencias/41-qa-apresentacao-investimento.txt",
+      "bytes": 366,
+      "sha256": "4a8905d3680efdb7808e2dd0a505d65f2fff15640911faf2ca20a4ecbe22e4dd"
+    },
+    {
+      "path": "evidencias/42-qa-documentos-emitidos.txt",
+      "bytes": 257,
+      "sha256": "306c97535246ea88317e82d60993e75a3f5b66a35360d85ed3276b99f55f03f2"
+    },
+    {
+      "path": "evidencias/43-qa-emissao-receita.txt",
+      "bytes": 302,
+      "sha256": "649b15d170ce825d2913ed1f1dc8b5cbb3386dbad86c6908bc9aed8bb130abc1"
+    },
+    {
+      "path": "evidencias/44-qa-emissao-atestado.txt",
+      "bytes": 257,
+      "sha256": "6970e9f8a119af492ebc6a11e2f21a1a87ff117f49c6199ebd292e1661f6a71f"
+    },
+    {
+      "path": "evidencias/45-qa-emissao-exame.txt",
+      "bytes": 264,
+      "sha256": "056a0d391298fcdaed27edd0097c00b6ab8643483289989f9d15bad9ca4af93a"
+    },
+    {
+      "path": "evidencias/46-qa-exame-panoramica-formulario.txt",
+      "bytes": 260,
+      "sha256": "7790dbaeebc7e7c14457719236947b472f58ad961f842a91868e55ccadf8dbac"
+    },
+    {
+      "path": "evidencias/47-qa-atestado-comparecimento-formulario.txt",
+      "bytes": 635,
+      "sha256": "033d7e856e2648ad8654cb8b0761afcde6f650cfe9a020ac47bc7fe22099b0e9"
+    },
+    {
+      "path": "evidencias/48-qa-atestado-afastamento-formulario.txt",
+      "bytes": 260,
+      "sha256": "2abea1e9acbc74b7124ff62356be823a7188c55fae4c07e2ac4e85ec5539ec4c"
+    },
+    {
+      "path": "evidencias/49-qa-receita-formulario.txt",
+      "bytes": 264,
+      "sha256": "cb9b30ed8e93c3fd17fa2633d87a2d732f304c6a18ba07ef4e35b1987b161ea5"
+    },
+    {
+      "path": "evidencias/50-qa-tcle-formulario.txt",
+      "bytes": 270,
+      "sha256": "e63e947b84c0ed04087f3b7f44e0c9755df6ee07d56ce4cc52e7d2d4ae723b34"
+    },
+    {
+      "path": "evidencias/51-qa-meu-dia-sem-agenda.txt",
+      "bytes": 1160,
+      "sha256": "948863797d3d14f0d05e63226334831e12620d9359d6f0b821d705eada39dbba"
+    },
+    {
+      "path": "evidencias/52-qa-encaixe-selecao.txt",
+      "bytes": 580,
+      "sha256": "6559bd7c2d4521e4f860918c9cdf86b514d0c12b8dd680a22143e82ddd7f3c75"
+    },
+    {
+      "path": "evidencias/53-qa-encaixe-busca.txt",
+      "bytes": 885,
+      "sha256": "3f8fc139b0a09a99bb26695ccaf73760d2b014f2a572b32f3f71ef3aa6418bb4"
+    },
+    {
+      "path": "evidencias/54-qa-meu-dia-atendimento.txt",
+      "bytes": 259,
+      "sha256": "d22fa5e32f71cb9c0074befaf91dee6521d30bf6b95cf623a5f8825f0b5bfa6c"
+    },
+    {
+      "path": "evidencias/55-qa-meu-dia-plano-historico.txt",
+      "bytes": 4097,
+      "sha256": "bd69da7e66d87dce44c024f51ab27bf0d990002df205123f7e33ac29f55f2a7d"
+    },
+    {
+      "path": "evidencias/56-qa-meu-dia-anexos.txt",
+      "bytes": 274,
+      "sha256": "f292b8ec250430ce3612887f3fc8122600f4709a6d2cf9fffa9d3239632c71f7"
+    },
+    {
+      "path": "evidencias/57-qa-meu-dia-materiais.txt",
+      "bytes": 274,
+      "sha256": "f292b8ec250430ce3612887f3fc8122600f4709a6d2cf9fffa9d3239632c71f7"
+    },
+    {
+      "path": "evidencias/58-qa-meu-dia-regioes.txt",
+      "bytes": 231,
+      "sha256": "dc0c66d687fc1570e57df5c2ba035dca3d1f382350bfe08d6de1bcf24444c08f"
+    },
+    {
+      "path": "evidencias/59-qa-meu-dia-ortodontia.txt",
+      "bytes": 248,
+      "sha256": "3cd9bb89bf41bd15046ef0d94cbc21e98a1231da46affa176c48543be2c28e7b"
+    },
+    {
+      "path": "evidencias/60-qa-agenda-semana.txt",
+      "bytes": 275,
+      "sha256": "a9bc1313e529500cb9934abd61888ef0d833e6f8ab1b110f7e297e80f66fd12e"
+    },
+    {
+      "path": "evidencias/61-qa-agenda-dia.txt",
+      "bytes": 336,
+      "sha256": "b8d81bb74f1b9f6886a98911ae8431025466aec9695aa6fde52ae1409ca0ee4a"
+    },
+    {
+      "path": "evidencias/62-qa-agenda-mes.txt",
+      "bytes": 239,
+      "sha256": "3bf931d31a4ea470d036194697cdaf95c22514fb119ea860d30f5b5a00b783d4"
+    },
+    {
+      "path": "evidencias/63-qa-novo-agendamento-formulario.txt",
+      "bytes": 239,
+      "sha256": "5316a31f020a7467678709512a08fdc3d93f2d9bed540c480cb6b25e6ffea14e"
+    },
+    {
+      "path": "evidencias/64-qa-compromisso-pessoal.txt",
+      "bytes": 240,
+      "sha256": "89aaae6f941fbb396f93d6e95036219def2a4e0ae8081d84ca8abd18899b2547"
+    },
+    {
+      "path": "evidencias/65-qa-financeiro-resumo-vazio.txt",
+      "bytes": 274,
+      "sha256": "cf57c70d4c44586173f0c7d0f77995626349bd679c1a3db7ac89bdf81912a885"
+    },
+    {
+      "path": "evidencias/66-qa-financeiro-extrato-vazio.txt",
+      "bytes": 274,
+      "sha256": "cf57c70d4c44586173f0c7d0f77995626349bd679c1a3db7ac89bdf81912a885"
+    },
+    {
+      "path": "evidencias/67-qa-financeiro-saida.txt",
+      "bytes": 242,
+      "sha256": "a9201501593bde2f0762daee2967f2cfe6517b509193f1a1caa23ee730f15bb2"
+    },
+    {
+      "path": "evidencias/68-qa-financeiro-categorias.txt",
+      "bytes": 222,
+      "sha256": "7663d6ff6301f9ca6ae7bebcf5e7564182f87f5e732bb731159a2f17e5ea2e50"
+    },
+    {
+      "path": "evidencias/69-qa-financeiro-entrada.txt",
+      "bytes": 242,
+      "sha256": "206f84f633ac6fefde3bb5eca88aac72926b11e08b0240117eb908d0db741157"
+    },
+    {
+      "path": "evidencias/70-qa-financeiro-receita-sem-grafico.txt",
+      "bytes": 294,
+      "sha256": "c2f1f5418bcafd8ad73515304c358f1b80fa882ba24df0c32623bfb68858709c"
+    },
+    {
+      "path": "evidencias/71-qa-financeiro-extrato-persistido.txt",
+      "bytes": 294,
+      "sha256": "c2f1f5418bcafd8ad73515304c358f1b80fa882ba24df0c32623bfb68858709c"
+    },
+    {
+      "path": "evidencias/72-qa-config-consultorio-equipe.txt",
+      "bytes": 276,
+      "sha256": "2b7d3ec47a9d747378f48008978ef08081663ca725ba6e5f0a286faa6b29c099"
+    },
+    {
+      "path": "evidencias/73-qa-config-consultorio-dados.txt",
+      "bytes": 276,
+      "sha256": "2b7d3ec47a9d747378f48008978ef08081663ca725ba6e5f0a286faa6b29c099"
+    },
+    {
+      "path": "evidencias/74-qa-config-consultorio-final.txt",
+      "bytes": 276,
+      "sha256": "2b7d3ec47a9d747378f48008978ef08081663ca725ba6e5f0a286faa6b29c099"
+    },
+    {
+      "path": "evidencias/75-qa-convite-dentista.txt",
+      "bytes": 905,
+      "sha256": "5cd8bd2539f178527f72dbfb0aeae924ca36cb5a31eeeaccd033ccaf29f6a273"
+    },
+    {
+      "path": "evidencias/76-qa-convite-secretaria.txt",
+      "bytes": 1034,
+      "sha256": "352cf3a5c82648abdb687fca5a2f8445184f18775ed52d443ae25f71704bbe12"
+    },
+    {
+      "path": "evidencias/77-qa-convite-protetico.txt",
+      "bytes": 1039,
+      "sha256": "29484ec440fe4e2310cdc2d6371a4c1bbc4725c3195a26f5128a7ea4d7860484"
+    },
+    {
+      "path": "evidencias/78-qa-config-meu-perfil.txt",
+      "bytes": 226,
+      "sha256": "811c199f8cf3c2ce78172d9f520faca0680a214ec03c88d321651715c5a4deed"
+    },
+    {
+      "path": "evidencias/79-qa-config-horarios.txt",
+      "bytes": 225,
+      "sha256": "89a402c12369b49f9e088a7996e149c33d2d66c3020771ee7f242c44a1685fa1"
+    },
+    {
+      "path": "evidencias/80-qa-config-horario-expandido.txt",
+      "bytes": 275,
+      "sha256": "f552a22ec196f9f59c9cce89d7b61f2e1cbdf8190b28071182ebf1fc4b78c379"
+    },
+    {
+      "path": "evidencias/81-qa-catalogo-topo.txt",
+      "bytes": 229,
+      "sha256": "6fbffda5323033395def5478c9924b2501657070eea23772dbc45170d0cea882"
+    },
+    {
+      "path": "evidencias/82-qa-catalogo-meio.txt",
+      "bytes": 229,
+      "sha256": "6fbffda5323033395def5478c9924b2501657070eea23772dbc45170d0cea882"
+    },
+    {
+      "path": "evidencias/83-qa-catalogo-final.txt",
+      "bytes": 229,
+      "sha256": "6fbffda5323033395def5478c9924b2501657070eea23772dbc45170d0cea882"
+    },
+    {
+      "path": "evidencias/84-qa-catalogo-novo-procedimento.txt",
+      "bytes": 221,
+      "sha256": "afecadc8831ce261072dc4e94a5628e0bfb984c20369254029d62063e296f10d"
+    },
+    {
+      "path": "evidencias/85-qa-catalogo-importacao.txt",
+      "bytes": 225,
+      "sha256": "c050a6056689c207586f71c35d7af5e4df8ff5f1d19ddd3e36b9de54acb0d7f7"
+    },
+    {
+      "path": "evidencias/86-qa-config-plano.txt",
+      "bytes": 222,
+      "sha256": "ca150870013421567f35d49c9f7e4645a3089c90de7050bb984ffaedb9148b1d"
+    },
+    {
+      "path": "evidencias/87-qa-menu-conta.txt",
+      "bytes": 3166,
+      "sha256": "8fa0ba83d57eb20f7a6e9c2589bfc3c3cd90a61c464d52eb479103c0917ca1b1"
+    },
+    {
+      "path": "evidencias/88-qa-perfil-pessoal.txt",
+      "bytes": 299,
+      "sha256": "c255db4bec704ec7f0539d6712eb0da2c6345a0ecb9bef97c2dfe30907963aa4"
+    },
+    {
+      "path": "evidencias/89-qa-perfil-pessoal-completo.txt",
+      "bytes": 2330,
+      "sha256": "3eb42796d65ef7d96a36313e44a33c626102ef65044cef1f5075abf5adafdbdb"
+    },
+    {
+      "path": "evidencias/90-qa-dex-painel.txt",
+      "bytes": 219,
+      "sha256": "ffc4c5537461cb7f54145aa9a5227e01b21fcd301097e49f5de95a217183d717"
+    },
+    {
+      "path": "evidencias/91-qa-arquivo-clinico.txt",
+      "bytes": 304,
+      "sha256": "4b61f4925640653d21741438bcd93f83f00bfb828ad79129cd209e8a5adcdc41"
+    },
+    {
+      "path": "evidencias/92-qa-whatsapp-redirecionado-plano.txt",
+      "bytes": 320,
+      "sha256": "6764fba78397027b9feac69258aaaafaba585011ea4f08f3fb9ba8220706de1f"
+    },
+    {
+      "path": "evidencias/93-qa-dashboard-com-dados.txt",
+      "bytes": 272,
+      "sha256": "dba2e2f3da04bc7ba09ddf598c732aacb4be27969304cf910004a3742723afb2"
+    },
+    {
+      "path": "evidencias/94-qa-dashboard-procedimentos-dia.txt",
+      "bytes": 2926,
+      "sha256": "ae2f174f176345c3edf7060eff2d1e0b437580e7750ec9ef77061e10e97b8d88"
+    },
+    {
+      "path": "evidencias/95-qa-dashboard-escuro.txt",
+      "bytes": 2456,
+      "sha256": "e4e283ceb7f87b7181c9b6d026077d7e82e4d6bc5aaf913de68daf096439e1fc"
+    },
+    {
+      "path": "evidencias/96-qa-meu-dia-escuro.txt",
+      "bytes": 5453,
+      "sha256": "34185cb36e58ae1c0f5dfe087f26c78a955863ab7a4308baaf4f0bf784f4bcff"
+    },
+    {
+      "path": "evidencias/97-qa-pacientes-escuro.txt",
+      "bytes": 1687,
+      "sha256": "0ed047ee100f9ecaad8e829f23c4250f2b396034778cba5c8108285b169ab184"
+    },
+    {
+      "path": "evidencias/98-qa-financeiro-escuro.txt",
+      "bytes": 2227,
+      "sha256": "958d3180e3e56ffea8def6dfdb54ed3c7a5cc0f4426eeb3a1fba2bd3f76f7b97"
+    },
+    {
+      "path": "evidencias/99-qa-configuracoes-escuro.txt",
+      "bytes": 2959,
+      "sha256": "a4bbf47236e2822ad0830ebb289281ee5c0207531821c4ecae83fef17df8da28"
+    },
+    {
+      "path": "evidencias/acesso-antes.txt",
+      "bytes": 3949,
+      "sha256": "fac0eaef74356ebf272de553643aa6b26cdaf98b284492f72077a6c3b26db94f"
+    },
+    {
+      "path": "evidencias/acesso-depois.txt",
+      "bytes": 1543,
+      "sha256": "7d6e162c4bbd4d05826eed67e68b5d0351e91f5a72fd154e6875caf48978bde0"
+    },
+    {
+      "path": "evidencias/acesso-lint.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidencias/cadastro-botoes.json",
+      "bytes": 3385,
+      "sha256": "106b8fcc544f6b1864d8d5ddc1f13e315ed6d99f2a9471fbcfa5a02114411f9d"
+    },
+    {
+      "path": "evidencias/catalogo-banco.json",
+      "bytes": 299982,
+      "sha256": "4629a985abe42099654b8d7967efdc2a820304a3a1b94fe5f66e81f4e8f45a35"
+    },
+    {
+      "path": "evidencias/comparacao-migration-ledger.json",
+      "bytes": 23537,
+      "sha256": "6cf21aede9363910cbf546e57bb33c919c4dcd89ddd601166c452ef96f3d0d59"
+    },
+    {
+      "path": "evidencias/consulta-catalogo.sql",
+      "bytes": 1747,
+      "sha256": "9029ce1214bea33076a948ea8da87d518c1d5185526c336b06244f6ea62068ee"
+    },
+    {
+      "path": "evidencias/consulta-estrutura.sql",
+      "bytes": 1238,
+      "sha256": "b6451cd629338d85d7114e8f6f561dfcbe82ceb7308101851d4029d6fc52e98d"
+    },
+    {
+      "path": "evidencias/correcoes-locais/agenda-callback.txt",
+      "bytes": 1200,
+      "sha256": "fa862c629dd1d657c444249278ed57e4618b606426385d9c4f20459c5999cade"
+    },
+    {
+      "path": "evidencias/correcoes-locais/agenda-status-inicial.png",
+      "bytes": 34977,
+      "sha256": "059f8c08617efdcdfcba8723db6be69118e312d2a0b0091673eccb6b417ca7cc"
+    },
+    {
+      "path": "evidencias/correcoes-locais/cadastro-acessibilidade.txt",
+      "bytes": 1385,
+      "sha256": "e2e3329104bc1d5982ac78330717f5efd4fad3350bcd38939e10c6e272235f86"
+    },
+    {
+      "path": "evidencias/correcoes-locais/desempenho-leitura.json",
+      "bytes": 1369,
+      "sha256": "8dc7440872d2a98461602cd7319aa143f10e6a8bb15e042fcc9556d1d9028c21"
+    },
+    {
+      "path": "evidencias/correcoes-locais/escopo-fontes.json",
+      "bytes": 499,
+      "sha256": "0b39f6dbba53a4438a189fc7dd900e3f9ae8cb826b9a9ed0cb79ee59e5b9b058"
+    },
+    {
+      "path": "evidencias/correcoes-locais/lint.txt",
+      "bytes": 453,
+      "sha256": "73b1f9487dd5eff7e324a0f408e94d6c3dfd84af86328c300761f2007ee709db"
+    },
+    {
+      "path": "evidencias/correcoes-locais/login-anonimo-redirecionamento.txt",
+      "bytes": 1431,
+      "sha256": "ef59d43c04157f8b0c893ced628fa71bd160c76eb4329a0553fd0e06061b5144"
+    },
+    {
+      "path": "evidencias/correcoes-locais/login-mobile-local.png",
+      "bytes": 24303,
+      "sha256": "d9e224ec8c0e3cea3688b46dc9268b10acb44cc4bc464c4fc7eb8d94e38fd252"
+    },
+    {
+      "path": "evidencias/correcoes-locais/login-senha-visivel.png",
+      "bytes": 51656,
+      "sha256": "15d3959f5be2fc8afc5c6053807900f9ce1daf0b7bfdebe26e223ccb576d6abd"
+    },
+    {
+      "path": "evidencias/correcoes-locais/login-testes.txt",
+      "bytes": 1323,
+      "sha256": "0ac88a6c1e77480f16094ae38c303b9a41596ddc95213d9f7d5cb12262da5bff"
+    },
+    {
+      "path": "evidencias/correcoes-locais/performance-reavaliado.json",
+      "bytes": 96041,
+      "sha256": "2512b7e544818e4893094f0b9bea8e39a5a6cb3951c265f2666488d6470f1a07"
+    },
+    {
+      "path": "evidencias/correcoes-locais/security-reavaliado.json",
+      "bytes": 66299,
+      "sha256": "d69d5076fd50ba637862186d53a1c4abb219e57b185678015f083003f3f97eb6"
+    },
+    {
+      "path": "evidencias/correcoes-locais/typecheck-resultado.json",
+      "bytes": 249,
+      "sha256": "b57f88c70f0cd0ad1b6b6739df0fdd26a710841e879b614f274d753298300505"
+    },
+    {
+      "path": "evidencias/correcoes-locais/typecheck.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidencias/correcoes-locais/verificacao-interface.json",
+      "bytes": 1522,
+      "sha256": "400a751aaa6361ff3b8e2f45676563ea4bbfffa26512c78b368cfc78e30206f8"
+    },
+    {
+      "path": "evidencias/deployment.json",
+      "bytes": 1316,
+      "sha256": "bb8d0fb262f2c81ae062a60f3f8f7866158be01aac0ab95b4980d3b7b839e3c3"
+    },
+    {
+      "path": "evidencias/eslint-dirigido.txt",
+      "bytes": 308,
+      "sha256": "c21f18fc8f8d206dc78b26036ae3a92d8fdb11ac325f6306e924ff212b3f4319"
+    },
+    {
+      "path": "evidencias/estrutura-banco.json",
+      "bytes": 352181,
+      "sha256": "aec3cc47e3c435f8ada2c45a0ed310a6cbe27bc984ca572be89d299bc518e333"
+    },
+    {
+      "path": "evidencias/funcoes-dirigidas.sql",
+      "bytes": 25350,
+      "sha256": "7c946d848dad75ba1ade59bf91b37aea5c05b202447a220529f062d5f16369d2"
+    },
+    {
+      "path": "evidencias/hashes-aplicacao.json",
+      "bytes": 99148,
+      "sha256": "21864e646820d0dd28347fac4e6656e59ef030e04384c88c8c1131bcc15dceab"
+    },
+    {
+      "path": "evidencias/helpers-e-triggers.sql",
+      "bytes": 2554,
+      "sha256": "c8d5fda63e491ce5c3a6adf7e29332b8ba55730a70c5e807aa592413b5b44efb"
+    },
+    {
+      "path": "evidencias/mobile-viewport.json",
+      "bytes": 147,
+      "sha256": "c0e3c91e7d9de1327ce1828a1a2915673ac2a65a1d608cad54f50eaa4693f519"
+    },
+    {
+      "path": "evidencias/performance.json",
+      "bytes": 102704,
+      "sha256": "9ecf9d4a113761dcd2fd74924e2ee739ab4c5e93f9722f8a14b3fa2468dcbb0a"
+    },
+    {
+      "path": "evidencias/preservacao-fontes.json",
+      "bytes": 216,
+      "sha256": "adc77ca505a0787975b591c113e996b61566d23a875210a4772e11da54114de4"
+    },
+    {
+      "path": "evidencias/publicacao/agenda-status.png",
+      "bytes": 57125,
+      "sha256": "52f2da89433ca3807a874fb64328c7d6596f99dc17c4cc0ba44c77a9b45c3c64"
+    },
+    {
+      "path": "evidencias/publicacao/agenda-status.txt",
+      "bytes": 336,
+      "sha256": "fc44c642c8c3ae6287292635a1036589df1212bacc0949f09b3df1af22c681b5"
+    },
+    {
+      "path": "evidencias/publicacao/ajustes-publicados.patch",
+      "bytes": 17820,
+      "sha256": "79e5647822dc09a0be4c7dae4cdba2383aed469aa13c3f72d5ef8d9781cf7d75"
+    },
+    {
+      "path": "evidencias/publicacao/cadastro-acessibilidade.txt",
+      "bytes": 222,
+      "sha256": "2c6210c6a553b56deec8649162f2091d5ff6968922b2b5ece6585d7e2bbc597c"
+    },
+    {
+      "path": "evidencias/publicacao/dashboard-qa.png",
+      "bytes": 53236,
+      "sha256": "7714bf948e7023406623cf2cab142985bf2b65f38289429088a8c1fedaf3f071"
+    },
+    {
+      "path": "evidencias/publicacao/dashboard-qa.txt",
+      "bytes": 272,
+      "sha256": "dba2e2f3da04bc7ba09ddf598c732aacb4be27969304cf910004a3742723afb2"
+    },
+    {
+      "path": "evidencias/publicacao/deployment.json",
+      "bytes": 1078,
+      "sha256": "981ac69ba63200a29f832ab7e9c73b305f5b433417ae45c9ed1182e620908f58"
+    },
+    {
+      "path": "evidencias/publicacao/fontes.json",
+      "bytes": 1259,
+      "sha256": "59dd1b7ccbbfa9f16feffad34a4424685f6850fda8797f15e94dce9886e2cf7f"
+    },
+    {
+      "path": "evidencias/publicacao/http-anonimo.txt",
+      "bytes": 285,
+      "sha256": "8b37bd8faf5d88420b7a4109b63d6ca810db6d5656b602a6ee4fe84dd19ac87c"
+    },
+    {
+      "path": "evidencias/publicacao/landing-texto.txt",
+      "bytes": 253,
+      "sha256": "09a7559c39b89fd48fcbc379143abd0a33597b9d3772f3bc480a60d0986d6161"
+    },
+    {
+      "path": "evidencias/publicacao/login-anonimo.txt",
+      "bytes": 1302,
+      "sha256": "d4b25602832f64cc8a2d85257afddd47d670aa51cae4ace204926de1d3d91977"
+    },
+    {
+      "path": "evidencias/publicacao/login-com-sessao.txt",
+      "bytes": 1240,
+      "sha256": "3b022791d5569711e1580c8e4be622d24a7c41e3f9f75f3802f3dc267d739989"
+    },
+    {
+      "path": "evidencias/publicacao/login-publicado.png",
+      "bytes": 52319,
+      "sha256": "d1c6db415265d66bc47d75beeb0181f14e349ce646d4f2831a2405cdcdd7d25d"
+    },
+    {
+      "path": "evidencias/publicacao/login-senha-visivel.png",
+      "bytes": 53127,
+      "sha256": "ed8681a03df7f5f4eeb0b4e1c476ac22ac5c4fb8c3c8e31461bb0e2dc58ba4e3"
+    },
+    {
+      "path": "evidencias/publicacao/resultado.json",
+      "bytes": 526,
+      "sha256": "c7894cffb39bb0a374b8c1d77e5782d1c56fd77f9b14f40c499a9fed51f616fb"
+    },
+    {
+      "path": "evidencias/qa-apresentacao-persistida.json",
+      "bytes": 219,
+      "sha256": "44e53681ba17c903e305b56773849f2c7bb1188bbf001ac08d7bd3babf2d1c2a"
+    },
+    {
+      "path": "evidencias/qa-estado-final.json",
+      "bytes": 1343,
+      "sha256": "6b25f01fb3ea5395ce7dd2bf395e1c6d67dfe4bc75b68a7f23078036be12cf93"
+    },
+    {
+      "path": "evidencias/qa-evento-persistido.json",
+      "bytes": 844,
+      "sha256": "93259dbaf8539a7e75b3545a918d8876cc4ac0de4a64c8c1723cd47b38dcc294"
+    },
+    {
+      "path": "evidencias/repro-financeiro-harness.txt",
+      "bytes": 2496,
+      "sha256": "a605533e94b86e657523fc3fb27c40819fe719f780f6512a7041a85e07d747ae"
+    },
+    {
+      "path": "evidencias/repro-financeiro.json",
+      "bytes": 698,
+      "sha256": "b7916a0ed8a56053ac8823a5ac297cfb281d2d97fa5ffcf4ff0295d865a33b87"
+    },
+    {
+      "path": "evidencias/rotas.json",
+      "bytes": 18183,
+      "sha256": "0936afbe9d4aad5c399c91a9771d673bd7a55de2e86f2d6210ea5c115cc0e366"
+    },
+    {
+      "path": "evidencias/security.json",
+      "bytes": 68727,
+      "sha256": "5b65a1e818f7c814543749d9e61b61712ed29af6aba7875ccdacc0aee80cdeb8"
+    },
+    {
+      "path": "evidencias/testes-dirigidos-tsx.txt",
+      "bytes": 3793,
+      "sha256": "fe2fdc73b3aba24bff03d3180fb4208ac413b4754570f8b2da042b6dc6db1eeb"
+    },
+    {
+      "path": "evidencias/testes-dirigidos.txt",
+      "bytes": 8893,
+      "sha256": "397edacf4d1e7bcf640b06d9a57be41f95505b4efdaad5428055c38938736e9e"
+    },
+    {
+      "path": "evidencias/typecheck.txt",
+      "bytes": 1521,
+      "sha256": "f4b3153b99ed40bc4c9d6d0b7e3494c665e689ccd36395ee01324165dc260ba6"
+    },
+    {
+      "path": "prints/01-landing-desktop.png",
+      "bytes": 71750,
+      "sha256": "3204ccd2409c7d6f91686a6e50b27345bb58a1ead99f1b7c0281043da6e8f643"
+    },
+    {
+      "path": "prints/02-dashboard-carregamento-vazio.png",
+      "bytes": 6621,
+      "sha256": "7be8c15da32c792de359dbaeafec7abf461ce45066bca1d11d0230903fe5b6f8"
+    },
+    {
+      "path": "prints/03-landing-como-funciona.png",
+      "bytes": 58661,
+      "sha256": "d8029a2744eccc14f2a0de52c7d811e6a5ea49baa6f5ec602314f75cb0567fa0"
+    },
+    {
+      "path": "prints/04-landing-campo-magico.png",
+      "bytes": 44556,
+      "sha256": "418ce223c3a2406c8002129b223d8bc11b531b1ec707065dba45fdaaaeff5d8f"
+    },
+    {
+      "path": "prints/05-landing-planos.png",
+      "bytes": 62360,
+      "sha256": "9f75f58973055b60e1bd88104e6ddf3374ca544f11db7733584f2f09f6ce0527"
+    },
+    {
+      "path": "prints/06-login-painel.png",
+      "bytes": 25684,
+      "sha256": "150b2397d7733ebab77ce5e3a996be184b6971a8e05f8decc3f0872bffc3e95e"
+    },
+    {
+      "path": "prints/07-recuperacao-senha-painel.png",
+      "bytes": 28952,
+      "sha256": "4b6cd4a0486772de508ae84e23c5f2a86600dbeb61e30925b428f8bc2548c8a0"
+    },
+    {
+      "path": "prints/08-landing-faq.png",
+      "bytes": 42932,
+      "sha256": "c7dacde83837dc2da4412ae1e7d5e08022f0d7d1e2a16c0a0fc88b87cea74709"
+    },
+    {
+      "path": "prints/09-landing-completa.png",
+      "bytes": 719624,
+      "sha256": "9b837bc3c9c9f9bc1b3fb87099771d72d6cd24b59444592220e8e09bc96f7719"
+    },
+    {
+      "path": "prints/10-cadastro-painel.png",
+      "bytes": 53615,
+      "sha256": "3b34d9eb8759b7f8783b32911755b87741d074b667287eb44ac49dc860d5985f"
+    },
+    {
+      "path": "prints/100-qa-prontuario-escuro.png",
+      "bytes": 60976,
+      "sha256": "f0f1b0f0e1686d0fb930522da623962fd7aecb672809d4b4e5ca3eac38afc183"
+    },
+    {
+      "path": "prints/101-qa-ficha-escuro.png",
+      "bytes": 70835,
+      "sha256": "ce036ed18244fc50040518ad286564a5cfca681febdf1ac9e6c4c0b28cf4c73a"
+    },
+    {
+      "path": "prints/102-qa-ficha-mais-acoes.png",
+      "bytes": 71769,
+      "sha256": "6fb905ad2d16c3f4801273c979dbfe48ff6806b1d8c2fbcc829b774d712d49e4"
+    },
+    {
+      "path": "prints/103-qa-ficha-encaminhar.png",
+      "bytes": 45515,
+      "sha256": "063ef2a77b6c71dac0509dd35766638be07ce50622d7a12ae26bfdcdb066f8d3"
+    },
+    {
+      "path": "prints/104-qa-marcar-retorno.png",
+      "bytes": 57262,
+      "sha256": "2e4e088e56302312b48a3ce7107373b46cd551e2b24d983b24f33ed16e9b504f"
+    },
+    {
+      "path": "prints/105-qa-ficha-editar-evolucao.png",
+      "bytes": 74649,
+      "sha256": "49e5dccf97842359fc42ffdbc5823c10a7e0b20591494d98b45e7e40b53d8c98"
+    },
+    {
+      "path": "prints/106-qa-odontograma-completo.png",
+      "bytes": 50511,
+      "sha256": "95960350a75f5f815c206b0a50e686c51866d67c398e96caa5fdb1a79aa78a7e"
+    },
+    {
+      "path": "prints/107-qa-importar-historico.png",
+      "bytes": 49649,
+      "sha256": "e70cd5b212e1b9826574aeb45fddaaa00b3e380618f8a92c036756176149feb5"
+    },
+    {
+      "path": "prints/108-qa-editar-paciente.png",
+      "bytes": 51574,
+      "sha256": "cd9e3e0a4d3dc77689e44a0c5c070c590e7a92582f4596a5fedc1fd9dab91e7c"
+    },
+    {
+      "path": "prints/109-convite-expirado.png",
+      "bytes": 24172,
+      "sha256": "6ed29c3c55fd20e8697132fc4becd07abd413fcc851b169b4e3e40d305287bbd"
+    },
+    {
+      "path": "prints/11-qa-isencao-cobranca.png",
+      "bytes": 59775,
+      "sha256": "0754b2c8cc93d4a390d29dd2a9cf1b805a98ab6a08d6e1be4726c763a6054389"
+    },
+    {
+      "path": "prints/110-verifique-email.png",
+      "bytes": 61692,
+      "sha256": "16fbed26f7465e1548f43c9f06942c8e29e15d1ee9bb45b4378a77f0765baa09"
+    },
+    {
+      "path": "prints/111-redefinir-senha-sem-token.png",
+      "bytes": 29670,
+      "sha256": "1ed7f3e303943579d4967a64ff28ee84ca2a7ee864b62b725311e1e3b26f5704"
+    },
+    {
+      "path": "prints/112-qa-cadastro-paciente-topo.png",
+      "bytes": 43064,
+      "sha256": "a2bf7c65e35ca742bc66608ed1ef0405891296199070f8351cd01b586968bc61"
+    },
+    {
+      "path": "prints/113-qa-paciente-demonstracao.png",
+      "bytes": 63109,
+      "sha256": "4d46a3f041fef06673a84f84cad8d2fe8c062dc41a3d084358fea530b058273d"
+    },
+    {
+      "path": "prints/12-qa-dashboard-vazio.png",
+      "bytes": 62231,
+      "sha256": "ff71cb394b331b58f36d5af075af0583186e6b60be25051e1fec1b8389edfa98"
+    },
+    {
+      "path": "prints/13-qa-meu-dia-inicial.png",
+      "bytes": 63916,
+      "sha256": "bfeb2a29ce24c59ec402c132806e73d3915aec5b6697c2496932d26a788e745b"
+    },
+    {
+      "path": "prints/14-qa-pacientes-vazio.png",
+      "bytes": 42405,
+      "sha256": "804f10dbf53111d140b516f7357b60050f3ebd34ff51f05af554d447e8b80dc3"
+    },
+    {
+      "path": "prints/15-qa-cadastro-paciente.png",
+      "bytes": 53685,
+      "sha256": "b3199ddbc8059984e78432bcb66d8e3db80d206e4a6b18da20980560bdbe582d"
+    },
+    {
+      "path": "prints/16-qa-perfil-prontuario.png",
+      "bytes": 69951,
+      "sha256": "a6ff29914b51fc5c9010e423287da6a3b9e0f4724347c8aef319e690fb8d19ba"
+    },
+    {
+      "path": "prints/17-qa-novo-atendimento.png",
+      "bytes": 87735,
+      "sha256": "81c263bbd6ddcc4c5c97dbf5f23532e87d1138e0ff22f77c99221ab7a6a5903a"
+    },
+    {
+      "path": "prints/18-qa-odontograma-procedimento.png",
+      "bytes": 79346,
+      "sha256": "676c94c14ee3b1198d68a1b0d8bac06d6d852677fc34e50812ce3f9a21b0f4ae"
+    },
+    {
+      "path": "prints/19-qa-endodontia-detalhes.png",
+      "bytes": 73835,
+      "sha256": "6cf582f9c64d269eb98e210ee15c52a0651167eb1de0561b58f0801a37b9cff6"
+    },
+    {
+      "path": "prints/20-qa-atendimento-apos-recarga.png",
+      "bytes": 73688,
+      "sha256": "de1c4330a5178e2f2782bdb3d0a719e015f6a71e89b121b30fecfb4e3837d245"
+    },
+    {
+      "path": "prints/21-qa-ficha-aberta.png",
+      "bytes": 69561,
+      "sha256": "0616ba65bcf707b510dcbc1270124ddf8b4ceffe67e844fbb73ac590ed47b661"
+    },
+    {
+      "path": "prints/22-qa-endodontia-persistida.png",
+      "bytes": 74641,
+      "sha256": "b34c9a3211b23bac13ac1a0260cf8faafb725097a867e8c53e6eab37110e3db2"
+    },
+    {
+      "path": "prints/23-qa-orcamentos-vazio.png",
+      "bytes": 55918,
+      "sha256": "7d02952989f4be247dc6098c7940d6c62497ff982966e1104abfff4b7b733d72"
+    },
+    {
+      "path": "prints/24-qa-montar-orcamento.png",
+      "bytes": 66046,
+      "sha256": "ef2f9c2183e06bb10d836229b9bd46cd8564e0aa8d1245330505f421bf735f58"
+    },
+    {
+      "path": "prints/25-qa-orcamento-agrupar.png",
+      "bytes": 77402,
+      "sha256": "79cb88bc79876ca0cf54b60fc3458240fdd2a3ddefc03496d73d9c6e440d5607"
+    },
+    {
+      "path": "prints/26-qa-orcamento-proposto.png",
+      "bytes": 64849,
+      "sha256": "d35b855f013896300c11bd75e0c9822d0d791c5c917d12240b311e2a97dabe87"
+    },
+    {
+      "path": "prints/27-qa-orcamento-atividade.png",
+      "bytes": 62394,
+      "sha256": "be11c070f57cf654cced7b531d7578a2de45899ccf4a9a73b80f12bab2c9126d"
+    },
+    {
+      "path": "prints/28-qa-aceite-formulario.png",
+      "bytes": 61597,
+      "sha256": "a995738486cad5c38334b5df53ab77f388c88327f055b12fbb6465295def5f43"
+    },
+    {
+      "path": "prints/29-qa-orcamento-aprovado.png",
+      "bytes": 72766,
+      "sha256": "0fd328792d4a4eb9dddd2506016f034e167c9f258ad3f2c201009ecfa74d73c0"
+    },
+    {
+      "path": "prints/30-qa-acordo-entrada-parcelas.png",
+      "bytes": 76567,
+      "sha256": "5f9fb22f489d21863ad06a9274d28075178e212c5f2ccf20b1975cdb5654d68f"
+    },
+    {
+      "path": "prints/31-qa-acordo-parcelado.png",
+      "bytes": 77124,
+      "sha256": "32181d7070bf31d2da189c6490dbf5ea27239b53a18e5409ecaa9956687a13e0"
+    },
+    {
+      "path": "prints/32-qa-paciente-arquivos.png",
+      "bytes": 61145,
+      "sha256": "7cd2d3f5003a4e21a38d836e672aaafa8c4c8c377bfa7651f57d7027052cf6ab"
+    },
+    {
+      "path": "prints/33-qa-paciente-agenda.png",
+      "bytes": 57950,
+      "sha256": "cd76a4635f036d4f4be99841c5e4c7125422fbda3bfa02856d766d92daa3b163"
+    },
+    {
+      "path": "prints/34-qa-apresentar-selecao.png",
+      "bytes": 38019,
+      "sha256": "ee999e6f0ad127bce7fe08676434b6b3a8926737a1187ebaa10ce26dcf55aefe"
+    },
+    {
+      "path": "prints/35-qa-apresentacao-editor.png",
+      "bytes": 36812,
+      "sha256": "3172e39090eafc3ab9bc0f9c92b22a1774ddaace1a60993e19e6567a193d6c51"
+    },
+    {
+      "path": "prints/36-qa-apresentacao-blocos.png",
+      "bytes": 42703,
+      "sha256": "e4fcaff7467b86e7fb8e793fc8b69589371bb8725a9fbd6247a99964e0784547"
+    },
+    {
+      "path": "prints/37-qa-apresentacao-odontograma.png",
+      "bytes": 67322,
+      "sha256": "51f18e7935de278d2f8a94a62118873925aab86fb463b23c9fb6bc01ef3ad688"
+    },
+    {
+      "path": "prints/38-qa-apresentacao-paciente.png",
+      "bytes": 31083,
+      "sha256": "06075a463e1f0f112f6c2ff43bee2860edf829ad2d3835710a21701b2a404f05"
+    },
+    {
+      "path": "prints/39-qa-apresentacao-odontograma-slide.png",
+      "bytes": 51031,
+      "sha256": "982f5bb28e62af24b71500f0e952b01946d3a1f64989f9dcd42058fb4636f754"
+    },
+    {
+      "path": "prints/40-qa-apresentacao-visao-geral.png",
+      "bytes": 17217,
+      "sha256": "9a2bf0f47f1cce60968058b7cc97dfdcf13726741e4e96368db34f2644dc3c06"
+    },
+    {
+      "path": "prints/41-qa-apresentacao-investimento.png",
+      "bytes": 24787,
+      "sha256": "db4dd45f32a658a55e4188b80c0b816729bb1cc901646b661c08817d1b87d520"
+    },
+    {
+      "path": "prints/42-qa-documentos-emitidos.png",
+      "bytes": 61361,
+      "sha256": "7f88c3fe1d080210c3312fe2657e4535369d500e7fa5d9c1ca04a54712e32fdd"
+    },
+    {
+      "path": "prints/43-qa-emissao-receita.png",
+      "bytes": 37192,
+      "sha256": "3bf46dc04a51f26b74a46922e2933a43269705505d30080981fd77a4febaeb41"
+    },
+    {
+      "path": "prints/44-qa-emissao-atestado.png",
+      "bytes": 38015,
+      "sha256": "508e2ce62eb1977feebeb16ffbb185f561d6e447c1492aab00ad9a91a071b77a"
+    },
+    {
+      "path": "prints/45-qa-emissao-exame.png",
+      "bytes": 39569,
+      "sha256": "6c4e6779085bd255559f91e3054d2109b9a4d59fd72e77fe96786210ed0b531d"
+    },
+    {
+      "path": "prints/46-qa-exame-panoramica-formulario.png",
+      "bytes": 43760,
+      "sha256": "2f154b4ad8c19df570c61a48a38e956dd5667ebb15ef9f5293e470aceea54bf0"
+    },
+    {
+      "path": "prints/47-qa-atestado-comparecimento-formulario.png",
+      "bytes": 44895,
+      "sha256": "f2d5147b28a2100b84a4ce6c1b570d143f9767ae6872ec4937fa6cd0d25a2b38"
+    },
+    {
+      "path": "prints/48-qa-atestado-afastamento-formulario.png",
+      "bytes": 42323,
+      "sha256": "88679e7e1de28824a0f31501030f09933747c83aeceb30bb6311b77c7a656dd8"
+    },
+    {
+      "path": "prints/49-qa-receita-formulario.png",
+      "bytes": 44189,
+      "sha256": "17535b77f40962445ba43a9a622b382206b2f83d388bf74039b9b4cc1fc42871"
+    },
+    {
+      "path": "prints/50-qa-tcle-formulario.png",
+      "bytes": 48482,
+      "sha256": "7e6641bde2b176d410141afdc3f872d14b1303fa7e73e0da3de390cbd4176824"
+    },
+    {
+      "path": "prints/51-qa-meu-dia-sem-agenda.png",
+      "bytes": 30184,
+      "sha256": "4714e8552f1acd20d3568836cafc68b0ddeec1abfd8835de45f8241e350a6210"
+    },
+    {
+      "path": "prints/52-qa-encaixe-selecao.png",
+      "bytes": 26330,
+      "sha256": "d19bed0bf8df608c4882dd93a154112458b3ad2e73b1779c8c4ad248cfaed7db"
+    },
+    {
+      "path": "prints/53-qa-encaixe-busca.png",
+      "bytes": 37721,
+      "sha256": "e53525a2ad25c05bb19c41e7c0b2c2d6dca4efecf70d4f782b3af27a4a938066"
+    },
+    {
+      "path": "prints/54-qa-meu-dia-atendimento.png",
+      "bytes": 67344,
+      "sha256": "4723f582a679146972246638f28dbcef7f271d44ae34302b05549b8dac3c55a4"
+    },
+    {
+      "path": "prints/55-qa-meu-dia-plano-historico.png",
+      "bytes": 43984,
+      "sha256": "2babebf9edc775b4e0a9a1d5b2159a4ea75058cd7400ae1f5c7fb60f5bf22f98"
+    },
+    {
+      "path": "prints/56-qa-meu-dia-anexos.png",
+      "bytes": 32827,
+      "sha256": "b486d8716c0396291faa8ebfe1022540ca31d7e603fedb7a869014f57f9a9b21"
+    },
+    {
+      "path": "prints/57-qa-meu-dia-materiais.png",
+      "bytes": 32832,
+      "sha256": "15d6e45084f9a42f358655e73b50fd9ea5fd8c56f27a3855d68081dae16b5d0f"
+    },
+    {
+      "path": "prints/58-qa-meu-dia-regioes.png",
+      "bytes": 71813,
+      "sha256": "612cf5b6319a67772f0f3acc027fe00d8e9c067e11329301010151033bc18f3d"
+    },
+    {
+      "path": "prints/59-qa-meu-dia-ortodontia.png",
+      "bytes": 44367,
+      "sha256": "240c663f932129e1d7e0e5ba64f854def24038f5b6ea5c5e58332d44dc503711"
+    },
+    {
+      "path": "prints/60-qa-agenda-semana.png",
+      "bytes": 46051,
+      "sha256": "c96cfb7c076db7d29a140fb1780bd9cca55fa452c403a7422e63e01dd035a457"
+    },
+    {
+      "path": "prints/61-qa-agenda-dia.png",
+      "bytes": 42510,
+      "sha256": "41f1b1c51a7905b66504b6a925cae66f56f51b963badc3adc4a3ba49160c94cb"
+    },
+    {
+      "path": "prints/62-qa-agenda-mes.png",
+      "bytes": 58448,
+      "sha256": "6cbdcd758b8aaf4c9291f17d32dc3692d67829200c1c8ff0440a8976f182c009"
+    },
+    {
+      "path": "prints/63-qa-novo-agendamento-formulario.png",
+      "bytes": 43225,
+      "sha256": "b45b5fa62150ba9564e908596e7c49394519408cdef85b84c9d5532a81849cec"
+    },
+    {
+      "path": "prints/64-qa-compromisso-pessoal.png",
+      "bytes": 44639,
+      "sha256": "9778c3cbc9ca6da2ba7f7d66a808c54fff8ab479a1d4a9a61012832a535b3250"
+    },
+    {
+      "path": "prints/65-qa-financeiro-resumo-vazio.png",
+      "bytes": 48392,
+      "sha256": "e1f10ec8b5845e0e539cc1e342d773c2cd1fef5c433f4ded0ef90c34ee1cdf04"
+    },
+    {
+      "path": "prints/66-qa-financeiro-extrato-vazio.png",
+      "bytes": 48390,
+      "sha256": "21e293f9bb9edd9516c16fd312d972f9b84031f40c177feeb7899913c4b4c9d3"
+    },
+    {
+      "path": "prints/67-qa-financeiro-saida.png",
+      "bytes": 33114,
+      "sha256": "23583530baa8fd8ded5c32855a6a31a3628ad3847f0eff1908f3f26629a50114"
+    },
+    {
+      "path": "prints/68-qa-financeiro-categorias.png",
+      "bytes": 34629,
+      "sha256": "19c288a600c6a02e2de0a7b3231f9a9e4bc810a03c1b28cccd9832c89460bfc0"
+    },
+    {
+      "path": "prints/69-qa-financeiro-entrada.png",
+      "bytes": 32579,
+      "sha256": "8da0bcc3db16ca2ee95aa3f305f927a993b13e3fe758a30873e4a157376a7dda"
+    },
+    {
+      "path": "prints/70-qa-financeiro-receita-sem-grafico.png",
+      "bytes": 42737,
+      "sha256": "026db7f1ae09fc8dd4ff66337d9e9423dd83c1232696d5a51a6f7d3099024f69"
+    },
+    {
+      "path": "prints/71-qa-financeiro-extrato-persistido.png",
+      "bytes": 42237,
+      "sha256": "b3c33616d730aa3f527e199d512ada239b6fd3ae4f88ad74235921fc50dc7c44"
+    },
+    {
+      "path": "prints/72-qa-config-consultorio-equipe.png",
+      "bytes": 57919,
+      "sha256": "28eeb48efa0231722365c35dc4f465aaa8a46ac01f0c482761c843ea5e53d90c"
+    },
+    {
+      "path": "prints/73-qa-config-consultorio-dados.png",
+      "bytes": 52013,
+      "sha256": "0cf9e065c1f2b0c0df2b73f91867d1b5666ab62827e7e6a40ce475fe1a0ca7e6"
+    },
+    {
+      "path": "prints/74-qa-config-consultorio-final.png",
+      "bytes": 52694,
+      "sha256": "b22fb672f78579c90c68073d41d6d5f574620491b8bfa7114af3135f29e496e7"
+    },
+    {
+      "path": "prints/75-qa-convite-dentista.png",
+      "bytes": 44622,
+      "sha256": "012d2c09072ba02e678a94b87e479cc9487fe2c283b9cbd80f050a142f0e3232"
+    },
+    {
+      "path": "prints/76-qa-convite-secretaria.png",
+      "bytes": 47631,
+      "sha256": "84cbec68cbe87591567b4d507c7824beb689a22e063531bffee23ca2b5de2286"
+    },
+    {
+      "path": "prints/77-qa-convite-protetico.png",
+      "bytes": 49186,
+      "sha256": "62fd784c2451d6e10300cd05c3ab4bb04a1895a69971a821639bc0eb47e40c73"
+    },
+    {
+      "path": "prints/78-qa-config-meu-perfil.png",
+      "bytes": 46609,
+      "sha256": "3bcc0041948534097f247c4ffb2eb09aaf1c1fc749341709f992766a37ed271c"
+    },
+    {
+      "path": "prints/79-qa-config-horarios.png",
+      "bytes": 51988,
+      "sha256": "6df8ca601ab88996bc261c9d999186972d250c7666243f18b929a6f8d1659427"
+    },
+    {
+      "path": "prints/80-qa-config-horario-expandido.png",
+      "bytes": 55525,
+      "sha256": "4f4ec742c29b79d5ee95f8bbaad6db2e9766851259dae33e950925e3a1d55674"
+    },
+    {
+      "path": "prints/81-qa-catalogo-topo.png",
+      "bytes": 60091,
+      "sha256": "a2973cb622d55605a974afcac4d886a39823761372a49c7206a73bc194a89b03"
+    },
+    {
+      "path": "prints/82-qa-catalogo-meio.png",
+      "bytes": 60095,
+      "sha256": "fff6fe6b14e25251a45a4e4e67bb0bda1a4d496c5a356c921f32692da1b22a71"
+    },
+    {
+      "path": "prints/83-qa-catalogo-final.png",
+      "bytes": 53725,
+      "sha256": "33b41f16e85ba4dd14f81f27e1f6e152ca80d2f9b290d31e2133e5f2b7292173"
+    },
+    {
+      "path": "prints/84-qa-catalogo-novo-procedimento.png",
+      "bytes": 57274,
+      "sha256": "57546a7fc34e65bc4a1a8c2ea002a30044bb49921dbd6fc4e9c337f220a0c21d"
+    },
+    {
+      "path": "prints/85-qa-catalogo-importacao.png",
+      "bytes": 39405,
+      "sha256": "8e0beecd63b4d8848694d1ad5312aea2480e907aedd992ec57f4445f8d4972f3"
+    },
+    {
+      "path": "prints/86-qa-config-plano.png",
+      "bytes": 60701,
+      "sha256": "73147fca59df7cde20a7e8fd4d96a578eb7fe7718f7d785cbf7894df94cf79f7"
+    },
+    {
+      "path": "prints/87-qa-menu-conta.png",
+      "bytes": 60088,
+      "sha256": "03d2a64cbf807a812f7647b8fa06d36344ec409ae854b7b19e15d399552e577a"
+    },
+    {
+      "path": "prints/88-qa-perfil-pessoal.png",
+      "bytes": 59857,
+      "sha256": "201782f9a252e264dc82a8667f5f76be66113751f21c387f685d7fcf26088206"
+    },
+    {
+      "path": "prints/89-qa-perfil-pessoal-completo.png",
+      "bytes": 57710,
+      "sha256": "007b5258876ecfc99e5dc3226fbaca8e9edabe62ad72fc22d314c12431f0020b"
+    },
+    {
+      "path": "prints/90-qa-dex-painel.png",
+      "bytes": 59183,
+      "sha256": "290c3019b3740019ebeea279eafb471b2d34907fbf9590aa0bdb5a04294f2779"
+    },
+    {
+      "path": "prints/91-qa-arquivo-clinico.png",
+      "bytes": 40026,
+      "sha256": "08093ad5e5b1676236ca89ca35a2fbf6085282ad8316b6c23cad440eada22fe0"
+    },
+    {
+      "path": "prints/92-qa-whatsapp-redirecionado-plano.png",
+      "bytes": 59787,
+      "sha256": "8f8694e1e50b0cd483e6863cbf65db1cc4f9ff55f887b73e5f18f565e4b8c6a8"
+    },
+    {
+      "path": "prints/93-qa-dashboard-com-dados.png",
+      "bytes": 71203,
+      "sha256": "c4f57a526f3a630263e13db77e56ca1660b9974e25e983c7ba1c1f8ac2f6f680"
+    },
+    {
+      "path": "prints/94-qa-dashboard-procedimentos-dia.png",
+      "bytes": 40012,
+      "sha256": "9f5703cafd7adc242fe328a90d187193ab6da9e21e952f040514d53ca7945bdd"
+    },
+    {
+      "path": "prints/95-qa-dashboard-escuro.png",
+      "bytes": 65731,
+      "sha256": "79afdc9c54b8d072aa48a77c0201e45435cb5a29260b97153be2844d12b1f653"
+    },
+    {
+      "path": "prints/96-qa-meu-dia-escuro.png",
+      "bytes": 61803,
+      "sha256": "1f357283eb1789fcb9ed657cf53d5995c05b47fbb72c240e55647f7c3e7038ed"
+    },
+    {
+      "path": "prints/97-qa-pacientes-escuro.png",
+      "bytes": 38899,
+      "sha256": "45b380afbf3bd1db33a743989fabfd3f1e01b49b51d1f5455c41527f0462f88b"
+    },
+    {
+      "path": "prints/98-qa-financeiro-escuro.png",
+      "bytes": 69778,
+      "sha256": "79dd05fc390e47887a1b9966153b1203090c64b33cf0ace5271ba585284780a0"
+    },
+    {
+      "path": "prints/99-qa-configuracoes-escuro.png",
+      "bytes": 51526,
+      "sha256": "26ac365cda6260127b4163bcdf551e36070d1e561374c89300d95fec0ce74682"
+    }
+  ],
+  "deployment_ajustes": "dpl_HiZZiUFuWTtCVa5hawEfdrjp7WrN"
+}

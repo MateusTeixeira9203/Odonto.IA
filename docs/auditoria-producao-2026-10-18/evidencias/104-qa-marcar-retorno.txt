@@ -1,0 +1,44 @@
+Browser tab: 2115955912, Title: "Odonto.IA | Inteligência Odontológica", URL: "https://odontoia.app/dashboard/pacientes/290b050a-877c-40b7-8cf4-38e3488ce636".
+The following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 267-286
++			304 container
++				305 button 7 dias
++				306 button 15 dias
++				307 button 30 dias
++				308 button 60 dias
++				309 button 90 dias
++				310 button 180 dias
++				311 button 6 meses
++				312 button 1 ano
++				313 button Semana anterior
++				314 text 19 de out  –  24 de out 2026
++				315 button Próxima semana
++				316 button Hoje
++				317 text SEGUNDA TERÇA QUARTA QUINTA SEXTA SÁBADO
++				318 container
++					319 text 08 h
++				320 container
++					321 text 09 h
++				322 container
++					323 text 10 h
++				324 container
++					325 text 11 h
++				326 container
++					327 text 12 h
++				328 container
++					329 text 13 h
++				330 container
++					331 text 14 h
++				332 container
++					333 text 15 h
++				334 container
++					335 text 16 h
++				336 container
++					337 text 17 h
++				338 button Description: Marcar retorno em segunda-feira, 19 de outubro, Help: Clique pra marcar o retorno
++				339 button Description: Marcar retorno em terça-feira, 20 de outubro, Help: Clique pra marcar o retorno
++				340 button Description: Marcar retorno em quarta-feira, 21 de outubro, Help: Clique pra marcar o retorno
++				341 button Description: Marcar retorno em quinta-feira, 22 de outubro, Help: Clique pra marcar o retorno
++				342 button Description: Marcar retorno em sexta-feira, 23 de outubro, Help: Clique pra marcar o retorno
++				343 button Description: Marcar retorno em sábado, 24 de outubro, Help: Clique pra marcar o retorno
+The focused UI element is 260 button Fechar

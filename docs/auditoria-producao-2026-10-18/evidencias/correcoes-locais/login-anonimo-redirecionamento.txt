@@ -1,0 +1,35 @@
+Browser tab: 4, Title: "Odonto.IA | Inteligência Odontológica", URL: "http://127.0.0.1:3100/login?redirectTo=%2Fdashboard".
+1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: 127.0.0.1:3100/login?redirectTo=%2Fdashboard
+	2 container
+		3 container
+			4 image
+			5 text Odonto .IA MENOS PAPELADA. MAIS CLÍNICA.
+			6 heading Você atende. A IA documenta., Value: 2
+				7 text Você atende.
+				8 text A IA documenta.
+			9 text Do atendimento ao prontuário estruturado, sem tirar o foco do paciente. ODONTO.IA
+		10 text ÁREA DO DENTISTA
+		11 heading Bem-vindo de volta., Value: 1
+			12 text Bem-vindo de volta.
+		13 text Acesse sua conta e continue de onde parou.
+		14 container
+			15 text E-MAIL
+			16 text field (settable) E-MAIL
+			17 text SENHA
+			18 link Description: Esqueceu a senha?, Value: 127.0.0.1:3100/esqueci-senha
+			19 text field (settable) SENHA
+			20 button Mostrar senha
+			21 button Entrar
+		22 container
+			23 text ou
+		24 button Entrar com Google
+			25 image
+			26 text Entrar com Google
+		27 container
+			28 text Não tem uma conta?
+			29 link Description: Cadastre-se, Value: 127.0.0.1:3100/cadastro?next=%2Fdashboard
+	30 container Notifications alt+T
+	31 pop up button (collapsed) Description: Open Next.js Dev Tools, ID: next-logo, Secondary Actions: Expand
+		32 image
+
+The focused UI element is 1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: 127.0.0.1:3100/login?redirectTo=%2Fdashboard

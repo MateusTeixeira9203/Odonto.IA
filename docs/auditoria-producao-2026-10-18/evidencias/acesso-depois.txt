@@ -1,0 +1,24 @@
+✔ login permanece acessível com sessão existente e preserva o cookie renovado (87.338581ms)
+✔ dashboard sem sessão continua protegido e conserva o destino de retorno (17.072079ms)
+✔ login anônimo, redefinição de senha e dashboard autenticado continuam acessíveis (33.087599ms)
+✔ vínculo já ativo com aguardando_formacao termina em planos, sem voltar à página de vínculo pendente (21.56937ms)
+✔ vínculo já ativo com checkout_pendente termina em planos, sem voltar à página de vínculo pendente (14.349944ms)
+✔ vínculo já ativo com cartao_pronto termina em planos, sem voltar à página de vínculo pendente (10.890983ms)
+✔ assinatura válida, isenção e formação autorizada preservam acesso (59.359384ms)
+✔ assinatura ausente/inadimplente não recebe acesso por causa da correção (48.068349ms)
+✔ bloqueio da clínica continua prevalecendo sobre assinatura válida (10.595834ms)
+✔ isenção vence qualquer estado histórico de assinatura (1.18374ms)
+✔ formação não vira assinatura ativa nem inativa (0.199397ms)
+✔ status Stripe vira estado comercial estável (0.215041ms)
+✔ mapeia os estados Stripe sem liberar assinaturas incompletas (1.194985ms)
+✔ somente trialing e active contam para o mínimo da clínica (0.289772ms)
+✔ mantém sete dias para quem não possui exceção (2.100966ms)
+✔ cobrança imediata omite trial_period_days da requisição Stripe (0.239905ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1001.504652

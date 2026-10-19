@@ -1,0 +1,39 @@
+Browser tab: 4, Title: "Odonto.IA | Inteligência Odontológica", URL: "http://127.0.0.1:3100/cadastro".
+1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: 127.0.0.1:3100/cadastro
+	2 container
+		3 container
+			4 image
+			5 text Odonto .IA MENOS PAPELADA. MAIS CLÍNICA.
+			6 heading Você atende. A IA documenta., Value: 2
+				7 text Você atende.
+				8 text A IA documenta.
+			9 text Do atendimento ao prontuário estruturado, sem tirar o foco do paciente. ODONTO.IA
+		10 text PRIMEIRO ACESSO
+		11 heading Crie sua conta., Value: 1
+			12 text Crie sua conta.
+		13 text Organize o atendimento sem perder tempo com papelada.
+		14 container
+			15 text Nome
+			16 text field (settable)
+			17 text E-mail
+			18 text field (settable)
+			19 text Senha
+			20 text field (settable)
+			21 button Ocultar senha
+			22 text Confirmar Senha
+			23 text field (settable)
+			24 button Ocultar confirmação de senha
+			25 button Cadastrar
+		26 container
+			27 text ou
+		28 button Cadastrar com Google
+			29 image
+			30 text Cadastrar com Google
+		31 container
+			32 text Já tem uma conta?
+			33 link Description: Fazer login, Value: 127.0.0.1:3100/login?next=%2Fonboarding
+	34 container Notifications alt+T
+	35 pop up button (collapsed) Description: Open Next.js Dev Tools, ID: next-logo, Secondary Actions: Expand
+		36 image
+
+The focused UI element is 24 button Ocultar confirmação de senha

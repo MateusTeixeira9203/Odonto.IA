@@ -1,0 +1,24 @@
+Browser tab: 2115955912, Title: "Odonto.IA | Inteligência Odontológica", URL: "https://odontoia.app/dashboard/meu-dia".
+1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/dashboard/meu-dia
+	2 container
+		40 container
+			41 text MEU DIA
+			42 heading Domingo, 18 De Outubro, Value: 1
+				43 text Domingo, 18 De Outubro
+			44 text Nenhum atendimento hoje.
+			45 button Encaixe
+		28 container
+			29 image
+			30 text Odonto .IA
+			31 link Description: INÍCIO, Value: odontoia.app/dashboard
+			32 link Description: MEU DIA, Value: odontoia.app/dashboard/meu-dia
+			33 link Description: PACIENTES, Value: odontoia.app/dashboard/pacientes
+			34 link Description: AGENDA, Value: odontoia.app/dashboard/agendamentos
+			35 link Description: FINANCEIRO, Value: odontoia.app/dashboard/financeiro
+			36 link Description: CONFIG, Value: odontoia.app/dashboard/configuracoes
+			37 button Abrir DEX
+			38 button Modo Escuro
+			39 pop up button (collapsed) DT, Help: Dentista teste 1, ID: radix-_r_0_, Secondary Actions: Expand
+		3 container Notifications alt+T
+
+The focused UI element is 32 link Description: MEU DIA, URL: odontoia.app/dashboard/meu-dia

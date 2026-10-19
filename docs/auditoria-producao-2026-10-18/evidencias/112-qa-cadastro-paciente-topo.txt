@@ -1,0 +1,63 @@
+Browser tab: 2115955912, Title: "Odonto.IA | Inteligência Odontológica", URL: "https://odontoia.app/dashboard/pacientes/novo".
+1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/dashboard/pacientes/novo
+	2 container
+		3 container
+			4 button
+			5 heading Novo Paciente, Value: 1
+				6 text Novo Paciente
+			7 text Preencha os dados cadastrais do paciente.
+			8 heading Dados Pessoais, Value: 2
+				9 text Dados Pessoais
+			10 container
+				11 text Nome Completo *
+			12 text field (settable) Nome Completo*, ID: nome
+			13 container
+				14 text CPF (opcional)
+			15 text field (settable) CPF(opcional), ID: cpf
+			16 container
+				17 text Data de Nascimento (opcional)
+			18 text field (settable) Data de Nascimento(opcional), ID: data_nascimento
+			19 text /
+			20 text field (settable)
+			21 text /
+			22 text field (settable)
+			23 heading Contato, Value: 2
+				24 text Contato
+			25 container
+				26 text Telefone / WhatsApp (opcional)
+			27 text field (settable) Telefone / WhatsApp(opcional), ID: telefone
+			28 container
+				29 text Email (opcional)
+			30 text field (settable) Email(opcional)
+			31 heading Endereço, Value: 2
+				32 text Endereço
+			33 container
+				34 text Logradouro (opcional)
+			35 text field (settable) Logradouro(opcional), ID: endereco
+			36 container
+				37 text Cidade (opcional)
+			38 text field (settable) Cidade(opcional), ID: cidade
+			39 container
+				40 text Estado (opcional)
+			41 text field (settable) Estado(opcional), ID: estado
+			42 heading Observações, Value: 2
+				43 text Observações
+			44 text entry area (settable) observacoes
+			45 container
+				46 button Cancelar
+				47 button Cadastrar Paciente
+		48 container
+			49 image
+			50 text Odonto .IA
+			51 link Description: INÍCIO, Value: odontoia.app/dashboard
+			52 link Description: MEU DIA, Value: odontoia.app/dashboard/meu-dia
+			53 link Description: PACIENTES, Value: odontoia.app/dashboard/pacientes
+			54 link Description: AGENDA, Value: odontoia.app/dashboard/agendamentos
+			55 link Description: FINANCEIRO, Value: odontoia.app/dashboard/financeiro
+			56 link Description: CONFIG, Value: odontoia.app/dashboard/configuracoes
+			57 button Abrir DEX
+			58 button Modo Escuro
+			59 pop up button (collapsed) DT, Help: Dentista teste 1, ID: radix-_r_0_, Secondary Actions: Expand
+		60 container Notifications alt+T
+
+The focused UI element is 1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/dashboard/pacientes/novo

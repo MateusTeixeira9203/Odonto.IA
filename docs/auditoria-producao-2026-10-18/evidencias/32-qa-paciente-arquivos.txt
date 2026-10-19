@@ -1,0 +1,7 @@
+Browser tab: 2115955912, Title: "Odonto.IA | Inteligência Odontológica", URL: "https://odontoia.app/dashboard/pacientes/290b050a-877c-40b7-8cf4-38e3488ce636".
+The following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
++				66 heading Nenhum documento encontrado, Value: 3
++					67 text Nenhum documento encontrado
++				68 text Não existem arquivos nesta categoria ou para o período selecionado.
++				69 button Adicionar Primeiro Documento
+The focused UI element is 20 tab (selected, settable, boolean) Arquivos, Value: 1, ID: tab-documentos

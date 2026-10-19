@@ -1,0 +1,12 @@
+Browser tab: 2, Title: "Odonto.IA | Inteligência Odontológica", URL: "https://odontoia.app/convite-expirado".
+1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/convite-expirado
+	2 container
+		3 image
+		4 heading Convite expirado, Value: 1
+			5 text Convite expirado
+		6 text Este convite expirou e não pode mais ser utilizado.
+		7 text Solicite um novo convite ao administrador da clínica.
+		8 link Description: Voltar ao login, Value: odontoia.app/login
+	9 container Notifications alt+T
+
+The focused UI element is 1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/convite-expirado

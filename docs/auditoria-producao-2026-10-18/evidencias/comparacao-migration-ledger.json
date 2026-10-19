@@ -1,0 +1,793 @@
+{
+  "warning": "Ledger nao prova instalacao; nomes/versoes diferentes nao autorizam aplicar migrations. Catalogo vivo e autoridade.",
+  "local_count": 186,
+  "remote_count": 177,
+  "only_local": [
+    "20260319000001_010_sprint3_fixes.sql",
+    "20260319000002_011_procedimentos_categoria.sql",
+    "20260319000003_012_clinicas_contato.sql",
+    "20260321000001_013_planejamento_secoes.sql",
+    "20260321000002_014_orcamentos_ficha_id_nullable.sql",
+    "20260321000003_015_add_dentes_ficha.sql",
+    "20260321000004_016_paciente_documentos.sql",
+    "20260328000001_017_fichas_bucket_public.sql",
+    "20260328000003_018_dentistas_role_rls.sql",
+    "20260328000004_019_convites.sql",
+    "20260328000005_020_security_rls_fixes.sql",
+    "20260328000006_021_google_calendar.sql",
+    "20260328000007_022_agendamentos_extras.sql",
+    "20260328000008_023_bot_tables.sql",
+    "20260329000000_add_dentista_id_pacientes.sql",
+    "20260329000001_024_fix_bot_rls_policies.sql",
+    "20260329000002_025_instancias_whatsapp_bot_config.sql",
+    "20260331000001_026_fix_planejamentos_dentista_fk.sql",
+    "20260401000001_027_dentista_fk_set_null.sql",
+    "20260401000002_028_dentistas_avatar_url.sql",
+    "20260406000001_029_dentistas_cpf.sql",
+    "20260410000001_030_bot_list_flow.sql",
+    "20260410000002_031_bot_mensagens.sql",
+    "20260410000003_032_despesas.sql",
+    "20260411000001_033_plan_infrastructure.sql",
+    "20260412000001_034_trial_ends_at.sql",
+    "20260413000001_035_agendamentos_status_recepcao.sql",
+    "20260413000002_036_pacientes_dentista_id.sql",
+    "20260415000001_037_pacientes_avatar_url.sql",
+    "20260417000001_038_orcamentos_desconto.sql",
+    "20260418000001_040_notificacoes.sql",
+    "20260419000001_041_receitas_manuais.sql",
+    "20260420000001_042_dentistas_chave_pix.sql",
+    "20260421000001_043_bot_config_dex_fields.sql",
+    "20260421000002_044_fichas_procedimentos_concluidos.sql",
+    "20260429000001_045_fichas_assinatura.sql",
+    "20260430000001_046_pagamentos_marcado_por.sql",
+    "20260430000002_047_notificacoes_para_dentista.sql",
+    "20260503000001_048_planejamento_procedimentos.sql",
+    "20260503000002_049_planejamento_secoes_status.sql",
+    "20260504000001_050_convites_campos.sql",
+    "20260504000002_051_security_fixes.sql",
+    "20260520000001_052_users_table.sql",
+    "20260520000002_053_clinicas_status.sql",
+    "20260520000003_054_clinica_usuarios.sql",
+    "20260520000004_055_secretarias.sql",
+    "20260520000005_056_convites_expand.sql",
+    "20260520000006_057_rls_overhaul.sql",
+    "20260521000001_058_fichas_bucket_private.sql",
+    "20260521000002_059_agendamentos_status_english.sql",
+    "20260524000001_061_billing_idempotency.sql",
+    "20260524000002_062_complete_onboarding_rpc.sql",
+    "20260524000003_063_provision_secretaria_rpc.sql",
+    "20260528000001_064_pagamentos_financeiro_idx.sql",
+    "20260528000003_065_pacientes_followup.sql",
+    "20260528000004_066_pacientes_followup_snooze.sql",
+    "20260528000005_067_orcamentos_aprovado_por.sql",
+    "20260528000006_068_activity_logs.sql",
+    "20260603000001_069_whatsapp_official_api.sql",
+    "20260609000001_070_tratamentos_rls.sql",
+    "20260610000001_071_clinica_logo.sql",
+    "20260610000002_072_horarios_almoco.sql",
+    "20260610000003_073_orcamentos_status_pago.sql",
+    "20260613000001_074_fichas_origem.sql",
+    "20260614000001_075_procedimentos_pendente.sql",
+    "20260619000001_076_clinicas_whatsapp_meta.sql",
+    "20260619000002_077_fichas_procedimentos_status.sql",
+    "20260622000001_078_paciente_documentos_tipo.sql",
+    "20260703000001_082_fichas_procedimentos_status_v2.sql",
+    "20260703000002_083_procedimentos_insert_dentistas.sql",
+    "20260703000003_084_procedimentos_por_dentista.sql",
+    "20260704000001_085_dentistas_especialidade_array.sql",
+    "20260704000002_086_complete_onboarding_especialidade_array.sql",
+    "20260704000003_087_complete_onboarding_procedimentos_dono.sql",
+    "20260705000000_089_hierarquia_silo_rls.sql",
+    "20260705000001_090_storage_drop_legacy_broad_policies.sql",
+    "20260705000002_091_revoke_helper_rpc_from_anon.sql",
+    "20260705000003_092_fix_search_path_fn_clean_procs.sql",
+    "20260705000004_093_revoke_helper_rpc_from_public.sql",
+    "20260710000000_096_close_provision_secretaria_authenticated_and_avatars_listing.sql",
+    "20260714000000_097_pagamentos_parcelas.sql",
+    "20260715000000_098_orcamentos_secretaria_insert.sql",
+    "20260716000000_099_hierarquia_nucleo_clinico_compartilhado.sql",
+    "20260718000000_100_ficha_data_atendimento.sql",
+    "20260718000001_103_notificacoes_destinatario_pessoa.sql",
+    "20260718000002_101_odontograma_eventos.sql",
+    "20260719000000_104_odontograma_eventos_retry_atomico.sql",
+    "20260720000000_105_orto_manutencao_ficha.sql",
+    "20260721000000_106_detalhe_especialidade.sql",
+    "20260723000000_107_salvar_eventos_upsert.sql",
+    "20260723000001_108_odontograma_eventos_cascade_ficha.sql",
+    "20260723000002_109_encaminhamento_procedimento.sql",
+    "20260726000000_110_detalhe_encaminhado.sql",
+    "20260728000000_111_assinatura_por_registro.sql",
+    "20260728000001_112_fix_search_path_trigger_imutavel.sql",
+    "20260728120000_112_fichas_delete_admin.sql",
+    "20260729000000_113_aceite_orcamento.sql",
+    "20260729233500_117_avatars_bucket_private.sql",
+    "20260729234500_118_has_active_membership_escopa_clinica.sql",
+    "20260730000000_119_google_tokens_clinica_id.sql",
+    "20260730010000_120_get_my_dentista_id_por_clinica_ativa.sql",
+    "20260730020000_121_can_see_orcamento.sql",
+    "20260730140000_116_orcamento_plano_pagamento.sql",
+    "20260730160000_122_orcamento_plano_pagamento_rpcs.sql",
+    "20260730161500_123_gerar_parcelas_considera_ja_pago.sql",
+    "20260730223000_124_orcamento_mostrar_valor_por_item.sql",
+    "20260731010000_125_pacientes_nome_busca.sql",
+    "20260731020000_126_pacientes_cpf_unico.sql",
+    "20260803190000_127_fichas_origem_importado.sql",
+    "20260809180000_128_pedidos_protetico.sql",
+    "20260809180100_129_pedidos_protetico_ajuste_rls_indices.sql",
+    "20260809180200_130_provision_secretaria_aceita_role.sql",
+    "20260809180300_131_provision_secretaria_remove_overload_antiga.sql",
+    "20260809180400_132_provision_secretaria_revoke_anon.sql",
+    "20260809180500_133_provision_secretaria_revoke_authenticated.sql",
+    "20260810120000_134_planejamento_secoes_tipo_bloco.sql",
+    "20260810150000_135_planejamento_secoes_anotacoes.sql",
+    "20260811003000_137_odontograma_momento_planejado.sql",
+    "20260811120000_138_agenda_bloqueios.sql",
+    "20260813000000_139_odontograma_tipo_outro.sql",
+    "20260813120000_140_drop_apresentacao_modelos.sql",
+    "20260813140000_141_ficha_evolucoes.sql",
+    "20260813160000_142_salvar_eventos_sincronizar.sql",
+    "20260814120000_143_aceite_orcamento_cascade.sql",
+    "20260816120000_144_orcamento_itens_delete_secretaria.sql",
+    "20260816140000_145_orcamento_aprovacao_por_item.sql",
+    "20260816150000_146_aceitar_orcamento_le_estado.sql",
+    "20260819014358_r97_gestao_colaborativa.sql",
+    "20260819020033_r92_assinatura_individual_stripe.sql",
+    "20260819150000_147_documentos_aceite.sql",
+    "20260821090000_148_onboarding_primeiro_valor.sql",
+    "20260821091000_149_onboarding_comunicacoes.sql",
+    "20260822090000_150_salvar_eventos_encaminhamento.sql",
+    "20260822091000_151_orcamento_eventos_atomico.sql",
+    "20260825090000_152_orcamento_eventos_ficha_completa.sql",
+    "20260826103000_153_adicionar_itens_orcamento_com_eventos.sql",
+    "20260830041444_atendimento_clinico_fundacao.sql",
+    "20260830192437_r140a_backfill_evolucoes_legado.sql",
+    "20260831010101_r140b_procedimento_flexivel.sql",
+    "20260831093000_r142_ai_usage_aggregates.sql",
+    "20260831110000_r140c_retorno_atendimento.sql",
+    "20260831111000_r140c_auditoria_encaminhamento.sql",
+    "20260902040711_r145_orcamento_flexivel.sql",
+    "20260902050000_r145_avista_cobranca_pendente.sql",
+    "20260902100000_r140c_editar_detalhes_no_prontuario.sql",
+    "20260902113000_r145_cobrancas_por_etapa.sql",
+    "20260903070000_r92_politica_trial_assinatura.sql",
+    "20260903110000_r153_orcamento_ficha_catalogo_guardas.sql",
+    "20260903120000_r152_excluir_procedimento.sql",
+    "20260909030656_r157_grupos_acordo_cobranca.sql",
+    "20260911180146_r166_desconto_saldo_orcamento.sql",
+    "20260912020819_r167_editar_cobranca_etapa.sql",
+    "20260914204853_r169_editar_nome_procedimento.sql",
+    "20260914210000_r169_adicionar_procedimentos_ficha.sql",
+    "20260914210240_r169b_ficha_orcamento_incremental.sql",
+    "20260914210511_r169_preservar_retirados_fluxos_clinicos.sql",
+    "20260914213000_r169_vinculos_criacao_orcamento.sql",
+    "20260914214000_r169_restringir_trigger_interno.sql",
+    "20260915001500_r169c_editar_evolucao_clinica.sql",
+    "20260916093000_r157b_etapas_flexiveis.sql",
+    "20260923150000_r172_revisao_orcamento_aceito.sql",
+    "20260923160000_r172_normalizar_plano_legado_revisao.sql",
+    "20260924110000_r173_responsavel_evento_orcamento.sql",
+    "20260924153000_r173_corrigir_trigger_titular_financeiro.sql"
+  ],
+  "only_remote": [
+    {
+      "version": "20260320021008",
+      "name": "010_sprint3_fixes"
+    },
+    {
+      "version": "20260320021207",
+      "name": "011_procedimentos_categoria"
+    },
+    {
+      "version": "20260320025429",
+      "name": "012_clinicas_contato"
+    },
+    {
+      "version": "20260321160234",
+      "name": "013_planejamento_secoes"
+    },
+    {
+      "version": "20260321160451",
+      "name": "014_orcamentos_ficha_id_nullable"
+    },
+    {
+      "version": "20260321162125",
+      "name": "015_add_dentes_ficha"
+    },
+    {
+      "version": "20260321164553",
+      "name": "016_paciente_documentos"
+    },
+    {
+      "version": "20260328042549",
+      "name": "018_dentistas_role_rls"
+    },
+    {
+      "version": "20260328044135",
+      "name": "019_convites"
+    },
+    {
+      "version": "20260328213025",
+      "name": "020_security_rls_fixes"
+    },
+    {
+      "version": "20260328214324",
+      "name": "021_google_calendar"
+    },
+    {
+      "version": "20260328221024",
+      "name": "022_agendamentos_extras"
+    },
+    {
+      "version": "20260329023922",
+      "name": "023_bot_tables"
+    },
+    {
+      "version": "20260329031027",
+      "name": "024_fix_bot_rls_policies"
+    },
+    {
+      "version": "20260329033855",
+      "name": "025_instancias_whatsapp_bot_config"
+    },
+    {
+      "version": "20260402043044",
+      "name": "028_dentistas_avatar_url"
+    },
+    {
+      "version": "20260407185920",
+      "name": "030_convites_allow_secretaria"
+    },
+    {
+      "version": "20260407233823",
+      "name": "031_dentistas_status_convite"
+    },
+    {
+      "version": "20260407234114",
+      "name": "032_clinicas_plano"
+    },
+    {
+      "version": "20260411180325",
+      "name": "033_despesas"
+    },
+    {
+      "version": "20260411182938",
+      "name": "034_agendamentos_ical_uid"
+    },
+    {
+      "version": "20260412022907",
+      "name": "033_plan_infrastructure"
+    },
+    {
+      "version": "20260412200434",
+      "name": "034_trial_ends_at"
+    },
+    {
+      "version": "20260413030500",
+      "name": "035_agendamentos_status_recepcao"
+    },
+    {
+      "version": "20260415174557",
+      "name": "037_pacientes_avatar_url"
+    },
+    {
+      "version": "20260415174959",
+      "name": "036_pacientes_dentista_id"
+    },
+    {
+      "version": "20260417225125",
+      "name": "038_orcamentos_desconto"
+    },
+    {
+      "version": "20260418234708",
+      "name": "040_notificacoes"
+    },
+    {
+      "version": "20260419172434",
+      "name": "041_receitas_manuais"
+    },
+    {
+      "version": "20260421015445",
+      "name": "042_dentistas_chave_pix"
+    },
+    {
+      "version": "20260421211515",
+      "name": "043_bot_config_dex_fields"
+    },
+    {
+      "version": "20260422184152",
+      "name": "044_fichas_procedimentos_concluidos"
+    },
+    {
+      "version": "20260428035938",
+      "name": "045_notificacoes_para_dentista"
+    },
+    {
+      "version": "20260429042917",
+      "name": "045_fichas_assinatura"
+    },
+    {
+      "version": "20260429044551",
+      "name": "046_rls_performance_fix"
+    },
+    {
+      "version": "20260430184424",
+      "name": "046_pagamentos_marcado_por"
+    },
+    {
+      "version": "20260430184542",
+      "name": "047_notificacoes_para_dentista"
+    },
+    {
+      "version": "20260504023420",
+      "name": "048_planejamento_procedimentos"
+    },
+    {
+      "version": "20260504023436",
+      "name": "049_planejamento_secoes_status"
+    },
+    {
+      "version": "20260521104106",
+      "name": "058_fichas_bucket_private"
+    },
+    {
+      "version": "20260521110911",
+      "name": "059_agendamentos_status_english"
+    },
+    {
+      "version": "20260524230650",
+      "name": "061_billing_idempotency"
+    },
+    {
+      "version": "20260524231220",
+      "name": "062_complete_onboarding_rpc"
+    },
+    {
+      "version": "20260525003813",
+      "name": "063_provision_secretaria_rpc"
+    },
+    {
+      "version": "20260526125307",
+      "name": "050_convites_campos"
+    },
+    {
+      "version": "20260526125318",
+      "name": "051_security_fixes"
+    },
+    {
+      "version": "20260526125335",
+      "name": "052_users_table"
+    },
+    {
+      "version": "20260526125346",
+      "name": "053_clinicas_status"
+    },
+    {
+      "version": "20260526125403",
+      "name": "054_clinica_usuarios"
+    },
+    {
+      "version": "20260526125416",
+      "name": "055_secretarias"
+    },
+    {
+      "version": "20260526125427",
+      "name": "056_convites_expand"
+    },
+    {
+      "version": "20260526125526",
+      "name": "057_rls_overhaul"
+    },
+    {
+      "version": "20260528152156",
+      "name": "064_pagamentos_financeiro_idx"
+    },
+    {
+      "version": "20260528171323",
+      "name": "065_pacientes_followup"
+    },
+    {
+      "version": "20260528172344",
+      "name": "066_pacientes_followup_snooze"
+    },
+    {
+      "version": "20260528173445",
+      "name": "067_orcamentos_aprovado_por"
+    },
+    {
+      "version": "20260528174305",
+      "name": "068_activity_logs"
+    },
+    {
+      "version": "20260602040810",
+      "name": "add_responsavel_to_pacientes"
+    },
+    {
+      "version": "20260607041000",
+      "name": "add_fichas_evolucao_columns"
+    },
+    {
+      "version": "20260608160519",
+      "name": "patient_dentist_ownership_rls"
+    },
+    {
+      "version": "20260608184501",
+      "name": "create_tratamentos_and_fichas_tratamento_id"
+    },
+    {
+      "version": "20260609233754",
+      "name": "070_tratamentos_rls"
+    },
+    {
+      "version": "20260611034028",
+      "name": "cascade_delete_planejamento_procedimentos_on_ficha_delete"
+    },
+    {
+      "version": "20260611034629",
+      "name": "tratamentos_multi_status_v2"
+    },
+    {
+      "version": "20260614012357",
+      "name": "074_fichas_origem"
+    },
+    {
+      "version": "20260614072009",
+      "name": "075_procedimentos_pendente"
+    },
+    {
+      "version": "20260619073546",
+      "name": "077_fichas_procedimentos_status"
+    },
+    {
+      "version": "20260622055701",
+      "name": "078_paciente_documentos_tipo"
+    },
+    {
+      "version": "20260704030232",
+      "name": "083_procedimentos_insert_dentistas"
+    },
+    {
+      "version": "20260704132101",
+      "name": "084_procedimentos_por_dentista"
+    },
+    {
+      "version": "20260704132125",
+      "name": "085_dentistas_especialidade_array"
+    },
+    {
+      "version": "20260704132207",
+      "name": "086_complete_onboarding_especialidade_array"
+    },
+    {
+      "version": "20260704135513",
+      "name": "087_complete_onboarding_procedimentos_dono"
+    },
+    {
+      "version": "20260705191924",
+      "name": "089_hierarquia_silo_rls"
+    },
+    {
+      "version": "20260706010220",
+      "name": "090_storage_drop_legacy_broad_policies"
+    },
+    {
+      "version": "20260706012649",
+      "name": "091_revoke_helper_rpc_from_anon"
+    },
+    {
+      "version": "20260706012659",
+      "name": "092_fix_search_path_fn_clean_procs"
+    },
+    {
+      "version": "20260706012849",
+      "name": "093_revoke_helper_rpc_from_public"
+    },
+    {
+      "version": "20260710121638",
+      "name": "096_close_provision_secretaria_authenticated_and_avatars_listing"
+    },
+    {
+      "version": "20260720033326",
+      "name": "104_odontograma_eventos_retry_atomico"
+    },
+    {
+      "version": "20260721020026",
+      "name": "105_orto_manutencao_ficha"
+    },
+    {
+      "version": "20260721082154",
+      "name": "106_detalhe_especialidade"
+    },
+    {
+      "version": "20260727023701",
+      "name": "110_detalhe_encaminhado"
+    },
+    {
+      "version": "20260728030925",
+      "name": "111_assinatura_por_registro"
+    },
+    {
+      "version": "20260728031153",
+      "name": "112_fix_search_path_trigger_imutavel"
+    },
+    {
+      "version": "20260728161326",
+      "name": "fichas_delete_admin"
+    },
+    {
+      "version": "20260729042246",
+      "name": "113_aceite_orcamento"
+    },
+    {
+      "version": "20260730023652",
+      "name": "117_avatars_bucket_private"
+    },
+    {
+      "version": "20260730033702",
+      "name": "121_can_see_orcamento"
+    },
+    {
+      "version": "20260730055532",
+      "name": "071_clinica_logo"
+    },
+    {
+      "version": "20260730143004",
+      "name": "116_orcamento_plano_pagamento"
+    },
+    {
+      "version": "20260730144052",
+      "name": "122_orcamento_plano_pagamento_rpcs"
+    },
+    {
+      "version": "20260730144737",
+      "name": "123_gerar_parcelas_considera_ja_pago"
+    },
+    {
+      "version": "20260731030349",
+      "name": "124_orcamento_mostrar_valor_por_item"
+    },
+    {
+      "version": "20260731042905",
+      "name": "125_pacientes_nome_busca"
+    },
+    {
+      "version": "20260731042940",
+      "name": "126_pacientes_cpf_unico"
+    },
+    {
+      "version": "20260803183509",
+      "name": "127_fichas_origem_importado"
+    },
+    {
+      "version": "20260806052241",
+      "name": "072_horarios_almoco"
+    },
+    {
+      "version": "20260810005534",
+      "name": "pedidos_protetico"
+    },
+    {
+      "version": "20260810010256",
+      "name": "pedidos_protetico_ajuste_rls_indices"
+    },
+    {
+      "version": "20260810011432",
+      "name": "provision_secretaria_aceita_role"
+    },
+    {
+      "version": "20260810011504",
+      "name": "provision_secretaria_remove_overload_antiga"
+    },
+    {
+      "version": "20260810011824",
+      "name": "provision_secretaria_revoke_anon"
+    },
+    {
+      "version": "20260810011852",
+      "name": "provision_secretaria_revoke_authenticated"
+    },
+    {
+      "version": "20260810143703",
+      "name": "134_planejamento_secoes_tipo_bloco"
+    },
+    {
+      "version": "20260810175801",
+      "name": "135_planejamento_secoes_anotacoes"
+    },
+    {
+      "version": "20260811130040",
+      "name": "137_odontograma_momento_planejado"
+    },
+    {
+      "version": "20260811130146",
+      "name": "136_apresentacao_modelos"
+    },
+    {
+      "version": "20260813043536",
+      "name": "139_odontograma_tipo_outro"
+    },
+    {
+      "version": "20260813134544",
+      "name": "140_drop_apresentacao_modelos"
+    },
+    {
+      "version": "20260813154844",
+      "name": "141_ficha_evolucoes"
+    },
+    {
+      "version": "20260813171455",
+      "name": "142_salvar_eventos_sincronizar"
+    },
+    {
+      "version": "20260814182935",
+      "name": "143_aceite_orcamento_cascade"
+    },
+    {
+      "version": "20260816045558",
+      "name": "145_orcamento_aprovacao_por_item"
+    },
+    {
+      "version": "20260816051336",
+      "name": "146_aceitar_orcamento_le_estado"
+    },
+    {
+      "version": "20260819171509",
+      "name": "r120_documentos_aceite"
+    },
+    {
+      "version": "20260821052119",
+      "name": "148_onboarding_primeiro_valor"
+    },
+    {
+      "version": "20260821052143",
+      "name": "149_onboarding_comunicacoes"
+    },
+    {
+      "version": "20260821171426",
+      "name": "r92_assinatura_individual_stripe"
+    },
+    {
+      "version": "20260824020507",
+      "name": "orcamento_eventos_atomico"
+    },
+    {
+      "version": "20260825190310",
+      "name": "r130_orcamento_eventos_ficha_completa"
+    },
+    {
+      "version": "20260827025317",
+      "name": "153_adicionar_itens_orcamento_com_eventos"
+    },
+    {
+      "version": "20260903100333",
+      "name": "r92_politica_trial_assinatura"
+    },
+    {
+      "version": "20260905174147",
+      "name": "r157_operational_access_foundation"
+    },
+    {
+      "version": "20260905174311",
+      "name": "r157_commercial_write_guard_foundation"
+    },
+    {
+      "version": "20260905181130",
+      "name": "r157_commercial_write_policies"
+    },
+    {
+      "version": "20260909034638",
+      "name": "r157_grupos_acordo_cobranca"
+    },
+    {
+      "version": "20260912022345",
+      "name": "r167_editar_cobranca_etapa"
+    },
+    {
+      "version": "20260912022930",
+      "name": "r166_desconto_saldo_orcamento"
+    },
+    {
+      "version": "20260914213401",
+      "name": "r169_editar_nome_procedimento"
+    },
+    {
+      "version": "20260914213409",
+      "name": "r169_adicionar_procedimentos_ficha"
+    },
+    {
+      "version": "20260914213416",
+      "name": "r169b_ficha_orcamento_incremental"
+    },
+    {
+      "version": "20260914213423",
+      "name": "r169_preservar_retirados_fluxos_clinicos"
+    },
+    {
+      "version": "20260914213431",
+      "name": "r169_vinculos_criacao_orcamento"
+    },
+    {
+      "version": "20260914213523",
+      "name": "r169_restringir_trigger_interno"
+    },
+    {
+      "version": "20260915002354",
+      "name": "r169c_editar_evolucao_clinica"
+    },
+    {
+      "version": "20260915203650",
+      "name": "r169d_excluir_ficha_preservando_financeiro"
+    },
+    {
+      "version": "20260922013045",
+      "name": "r159b_persistencia_acessos"
+    },
+    {
+      "version": "20260923041054",
+      "name": "r172_estoque_estrutura"
+    },
+    {
+      "version": "20260923041103",
+      "name": "r172_estoque_autorizacao"
+    },
+    {
+      "version": "20260923041112",
+      "name": "r172_estoque_operacoes"
+    },
+    {
+      "version": "20260923041118",
+      "name": "r172_estoque_trigger_saldo"
+    },
+    {
+      "version": "20260923041126",
+      "name": "r172_estoque_tipo_consumo"
+    },
+    {
+      "version": "20260923041134",
+      "name": "r172_estoque_kits_usos"
+    },
+    {
+      "version": "20260923041148",
+      "name": "r172_estoque_correcao_uso"
+    },
+    {
+      "version": "20260923041155",
+      "name": "r172_estoque_leituras"
+    },
+    {
+      "version": "20260923041203",
+      "name": "r172_estoque_lotes_vencidos"
+    },
+    {
+      "version": "20260923201452",
+      "name": "r163_titularidade_financeira_clinica"
+    },
+    {
+      "version": "20260925120000",
+      "name": "r181_modelo_tratamento_whatsapp"
+    },
+    {
+      "version": "20260925121000",
+      "name": "r181_integrar_estoque_gestao"
+    },
+    {
+      "version": "20260925122000",
+      "name": "r181_provisionar_acessos_membros"
+    },
+    {
+      "version": "20260925123000",
+      "name": "r181_capability_mensagens"
+    },
+    {
+      "version": "20260925124000",
+      "name": "r181_restringir_financeiro_por_capability"
+    },
+    {
+      "version": "20260925125000",
+      "name": "r181_delegar_gestao_equipe"
+    },
+    {
+      "version": "20261016001802",
+      "name": "r202_otimizar_guard_eventos_odontograma"
+    }
+  ]
+}

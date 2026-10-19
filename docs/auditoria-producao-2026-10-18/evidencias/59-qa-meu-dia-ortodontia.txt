@@ -1,0 +1,3 @@
+Browser tab: 2115955912, Title: "Odonto.IA | Inteligência Odontológica", URL: "https://odontoia.app/dashboard/meu-dia".
+There has been no change in the accessibility tree.
+The focused UI element is 283 checkbox Manutenção ortodôntica, Value: 1

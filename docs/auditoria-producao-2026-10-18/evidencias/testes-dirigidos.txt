@@ -1,0 +1,120 @@
+(node:44947) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/mtx/Documentos/Odonto.IA/src/lib/especialidades/extrair-endo-deterministico.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /home/mtx/Documentos/Odonto.IA/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ extrai canais ancorados no dente e preserva origem (3.274858ms)
+✔ recusa número fora da faixa e resolução inválida (3.931297ms)
+✔ número solto vira dúvida, sem associação por palpite (0.438045ms)
+(node:44948) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/mtx/Documentos/Odonto.IA/src/lib/especialidades/mesclar-endo-extracao.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /home/mtx/Documentos/Odonto.IA/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ valor já presente vence sugestão diferente e gera dúvida de conflito (2.347925ms)
+✔ campo vazio recebe complemento com origem (0.545042ms)
+(node:44954) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/mtx/Documentos/Odonto.IA/src/lib/odontograma/agrupar-por-dente.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /home/mtx/Documentos/Odonto.IA/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ dente único vira uma seção "dente" com o número certo (4.213526ms)
+✔ vários cards do MESMO dente caem na mesma seção "dente" (0.467378ms)
+✔ card com 2+ dentes distintos (mesmo grupo_id, ex. exodontia 31·41·42) vira "multi" (0.412413ms)
+✔ âncora sem dente (arcada/quadrante) vira "geral" (0.308768ms)
+✔ GATE: seções "dente" ordenadas 11→48 (FDI crescente), independentemente da ordem de entrada (0.816864ms)
+✔ GATE: "multi" vem depois dos dentes e "geral" por último (0.549302ms)
+✔ GATE: ordem interna de cada seção preserva a ENTRADA — não reordena por status (0.533727ms)
+✔ todas as três seções juntas, na ordem certa (0.515149ms)
+✔ multi/geral só existem quando há cards pra eles (0.748349ms)
+✔ lista vazia devolve lista vazia (0.619282ms)
+(node:44960) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/mtx/Documentos/Odonto.IA/src/lib/odontograma/dedup-eventos-draft.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /home/mtx/Documentos/Odonto.IA/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ dedupEventosDraft: mesma chave, sem assinatura — mantém o de MENOR id (3.012046ms)
+✔ dedupEventosDraft: evento com assinaturaId NUNCA sai, mesmo com chave repetida (0.764134ms)
+✔ dedupEventosDraft: âncoras diferentes (dente diferente) nunca colidem (2.423912ms)
+✔ mesclarEventosSemPerda: reextração idêntica é no-op — não duplica nem substitui (6.262949ms)
+✔ mesclarEventosSemPerda: evento novo com âncora distinta entra (0.672711ms)
+✔ mesclarEventosSemPerda: dois eventos NOVOS com a mesma chave entre si dedup antes de entrar (0.399003ms)
+✔ mesclarEventosSemPerda: realizado_em só entra pra realizado+clinica (§1.10, invariante #13) (0.707772ms)
+✔ mesclarEventosSemPerda: contexto da captura não sobrescreve status heterogêneo do Dex (0.80094ms)
+✔ chaveDedupEvento: faces em ordem diferente geram a MESMA chave (sort interno) (0.527581ms)
+✔ Dex conserva protocolos provisório e definitivo na mesma arcada e não perde lote anterior (2.791208ms)
+✔ legado outro usa nome na observação para não fundir intervenções diferentes (0.566622ms)
+✔ mesma captura conserva a chave clínica e reaplicação mantém IDs já materializados (0.423657ms)
+(node:44966) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/mtx/Documentos/Odonto.IA/src/lib/orcamentos/estado.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /home/mtx/Documentos/Odonto.IA/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+node:internal/modules/esm/resolve:271
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/home/mtx/Documentos/Odonto.IA/src/lib/orcamentos/estado' imported from /home/mtx/Documentos/Odonto.IA/src/lib/orcamentos/estado.test.ts
+    at finalizeResolution (node:internal/modules/esm/resolve:271:11)
+    at moduleResolve (node:internal/modules/esm/resolve:865:10)
+    at defaultResolve (node:internal/modules/esm/resolve:992:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:701:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:721:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:759:56)
+    at #resolve (node:internal/modules/esm/loader:683:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:603:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:163:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:253:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///home/mtx/Documentos/Odonto.IA/src/lib/orcamentos/estado'
+}
+
+Node.js v24.19.0
+✖ src/lib/orcamentos/estado.test.ts (201.158667ms)
+(node:44972) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/mtx/Documentos/Odonto.IA/src/lib/orcamentos/r194-pagamento-rapido-contract.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /home/mtx/Documentos/Odonto.IA/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ R-194 mantém uma única chamada transacional no pagamento rápido (3.714789ms)
+✔ R-194 autoriza e reconcilia sob o lock antes de escolher previsão ou saldo (1.46995ms)
+✔ R-194 depende da chave única da R-189, sem recriar o índice (0.3696ms)
+✔ R-194 notifica somente o primeiro efeito de saldo aplicável (0.560756ms)
+✔ R-194 mantém um log novo e grants restritos (0.826642ms)
+(node:44974) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/mtx/Documentos/Odonto.IA/src/lib/orcamentos/reconciliar-pagamentos-confirmados.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /home/mtx/Documentos/Odonto.IA/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+node:internal/modules/esm/resolve:271
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/home/mtx/Documentos/Odonto.IA/src/lib/orcamentos/reconciliar-pagamentos-confirmados' imported from /home/mtx/Documentos/Odonto.IA/src/lib/orcamentos/reconciliar-pagamentos-confirmados.test.ts
+    at finalizeResolution (node:internal/modules/esm/resolve:271:11)
+    at moduleResolve (node:internal/modules/esm/resolve:865:10)
+    at defaultResolve (node:internal/modules/esm/resolve:992:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:701:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:721:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:759:56)
+    at #resolve (node:internal/modules/esm/loader:683:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:603:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:163:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:253:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///home/mtx/Documentos/Odonto.IA/src/lib/orcamentos/reconciliar-pagamentos-confirmados'
+}
+
+Node.js v24.19.0
+✖ src/lib/orcamentos/reconciliar-pagamentos-confirmados.test.ts (196.513383ms)
+ℹ tests 34
+ℹ suites 0
+ℹ pass 32
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 271.180162
+
+✖ failing tests:
+
+test at src/lib/orcamentos/estado.test.ts:1:1
+✖ src/lib/orcamentos/estado.test.ts (201.158667ms)
+  'test failed'
+
+test at src/lib/orcamentos/reconciliar-pagamentos-confirmados.test.ts:1:1
+✖ src/lib/orcamentos/reconciliar-pagamentos-confirmados.test.ts (196.513383ms)
+  'test failed'

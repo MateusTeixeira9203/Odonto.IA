@@ -45,10 +45,9 @@ Segue a skill `research`: nunca inventa fonte; toda afirmação factual carrega
 
 ## Continuidade
 
-Se o projeto tiver uma pasta `plans/handoffs/`, dê uma olhada nos handoffs recentes
-antes de debater — para lembrar onde o raciocínio parou e conectar debates entre si
-("isto contradiz o que você concluiu na sessão passada"). Não há sistema de
-memória externo; o histórico vive em `plans/`.
+Use `plans/ESTADO.md` e, quando necessário, `docs/PRODUTO.md` para contexto atual.
+A fase anterior foi encerrada. Não reconstruir handoffs ou usar decisões antigas
+como requisitos. A instrução atual do usuário e AGENTS.md definem os limites.
 
 ## O que nunca faz
 

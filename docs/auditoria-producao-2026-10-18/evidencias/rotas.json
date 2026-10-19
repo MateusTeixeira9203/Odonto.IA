@@ -1,0 +1,513 @@
+[
+  {
+    "route": "/cadastro",
+    "kind": "page",
+    "source": "src/app/(auth)/cadastro/page.tsx",
+    "ui_status": "OBSERVADO: formulário sem submissão",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/esqueci-senha",
+    "kind": "page",
+    "source": "src/app/(auth)/esqueci-senha/page.tsx",
+    "ui_status": "OBSERVADO: formulário sem envio",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/login",
+    "kind": "page",
+    "source": "src/app/(auth)/login/page.tsx",
+    "ui_status": "OBSERVADO: sem sessão; ciclo com sessão registrado antes",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/redefinir-senha",
+    "kind": "page",
+    "source": "src/app/(auth)/redefinir-senha/page.tsx",
+    "ui_status": "OBSERVADO: link expirado/sem token; troca válida NÃO TESTADA",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/verifique-email",
+    "kind": "page",
+    "source": "src/app/(auth)/verifique-email/page.tsx",
+    "ui_status": "OBSERVADO: aviso genérico, sem reenviar",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/calendar/auth/callback",
+    "kind": "endpoint",
+    "source": "src/app/api/calendar/auth/callback/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/calendar/auth",
+    "kind": "endpoint",
+    "source": "src/app/api/calendar/auth/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/calendar/disconnect",
+    "kind": "endpoint",
+    "source": "src/app/api/calendar/disconnect/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/convite/[id]",
+    "kind": "endpoint",
+    "source": "src/app/api/convite/[id]/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/convite",
+    "kind": "endpoint",
+    "source": "src/app/api/convite/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/cron/onboarding-emails",
+    "kind": "endpoint",
+    "source": "src/app/api/cron/onboarding-emails/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/cron/suspender-assinaturas-stripe",
+    "kind": "endpoint",
+    "source": "src/app/api/cron/suspender-assinaturas-stripe/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/dex/alerts",
+    "kind": "endpoint",
+    "source": "src/app/api/dex/alerts/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/dex/briefing",
+    "kind": "endpoint",
+    "source": "src/app/api/dex/briefing/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/dex/comunicacao",
+    "kind": "endpoint",
+    "source": "src/app/api/dex/comunicacao/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/dex/consultation-context",
+    "kind": "endpoint",
+    "source": "src/app/api/dex/consultation-context/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/dex/context",
+    "kind": "endpoint",
+    "source": "src/app/api/dex/context/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/dex/detectar-consulta",
+    "kind": "endpoint",
+    "source": "src/app/api/dex/detectar-consulta/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/dex/explicar",
+    "kind": "endpoint",
+    "source": "src/app/api/dex/explicar/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/dex/extrair-especialidade",
+    "kind": "endpoint",
+    "source": "src/app/api/dex/extrair-especialidade/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/dex/formatar-evolucao",
+    "kind": "endpoint",
+    "source": "src/app/api/dex/formatar-evolucao/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/dex/mes",
+    "kind": "endpoint",
+    "source": "src/app/api/dex/mes/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/dex/patient-context",
+    "kind": "endpoint",
+    "source": "src/app/api/dex/patient-context/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/dex/retencao",
+    "kind": "endpoint",
+    "source": "src/app/api/dex/retencao/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/dex/simplificar",
+    "kind": "endpoint",
+    "source": "src/app/api/dex/simplificar/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/dex/sugerir-evolucao",
+    "kind": "endpoint",
+    "source": "src/app/api/dex/sugerir-evolucao/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/extrair-imagem",
+    "kind": "endpoint",
+    "source": "src/app/api/extrair-imagem/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/extrair-texto",
+    "kind": "endpoint",
+    "source": "src/app/api/extrair-texto/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/fichas/[id]/pdf",
+    "kind": "endpoint",
+    "source": "src/app/api/fichas/[id]/pdf/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/gerar-planejamento",
+    "kind": "endpoint",
+    "source": "src/app/api/gerar-planejamento/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/importar-procedimentos",
+    "kind": "endpoint",
+    "source": "src/app/api/importar-procedimentos/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/landing/ficha-exemplo",
+    "kind": "endpoint",
+    "source": "src/app/api/landing/ficha-exemplo/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/orcamentos/[id]/pdf",
+    "kind": "endpoint",
+    "source": "src/app/api/orcamentos/[id]/pdf/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/pacientes/[id]/prontuario",
+    "kind": "endpoint",
+    "source": "src/app/api/pacientes/[id]/prontuario/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/processar-documento",
+    "kind": "endpoint",
+    "source": "src/app/api/processar-documento/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/sugerir-orcamento",
+    "kind": "endpoint",
+    "source": "src/app/api/sugerir-orcamento/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/transcrever",
+    "kind": "endpoint",
+    "source": "src/app/api/transcrever/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/user/clinicas",
+    "kind": "endpoint",
+    "source": "src/app/api/user/clinicas/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/user/switch-clinic",
+    "kind": "endpoint",
+    "source": "src/app/api/user/switch-clinic/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/webhooks/abacate",
+    "kind": "endpoint",
+    "source": "src/app/api/webhooks/abacate/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/webhooks/abacatepay",
+    "kind": "endpoint",
+    "source": "src/app/api/webhooks/abacatepay/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/webhooks/stripe",
+    "kind": "endpoint",
+    "source": "src/app/api/webhooks/stripe/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/whatsapp/enviar-teste",
+    "kind": "endpoint",
+    "source": "src/app/api/whatsapp/enviar-teste/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/whatsapp/run-reminders",
+    "kind": "endpoint",
+    "source": "src/app/api/whatsapp/run-reminders/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/whatsapp/testar-fluxo",
+    "kind": "endpoint",
+    "source": "src/app/api/whatsapp/testar-fluxo/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/api/whatsapp/webhook",
+    "kind": "endpoint",
+    "source": "src/app/api/whatsapp/webhook/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/auth/callback",
+    "kind": "endpoint",
+    "source": "src/app/auth/callback/route.ts",
+    "ui_status": "NAO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/bem-vindo-agregado",
+    "kind": "page",
+    "source": "src/app/bem-vindo-agregado/page.tsx",
+    "ui_status": "CICLO observado antes da isenção; conteúdo funcional NÃO TESTADO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/checkout/retorno",
+    "kind": "page",
+    "source": "src/app/checkout/retorno/page.tsx",
+    "ui_status": "NÃO TESTADO: não houve compra/checkout",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/convite/[token]",
+    "kind": "page",
+    "source": "src/app/convite/[token]/page.tsx",
+    "ui_status": "NÃO TESTADO: nenhum convite válido criado/enviado",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/convite-expirado",
+    "kind": "page",
+    "source": "src/app/convite-expirado/page.tsx",
+    "ui_status": "OBSERVADO: aviso sem criar convite",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/dashboard/agendamentos",
+    "kind": "page",
+    "source": "src/app/dashboard/agendamentos/page.tsx",
+    "ui_status": "OBSERVADO: semana/dia/mês, encaixe e formulários sem outros envios",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/dashboard/arquivo-clinico",
+    "kind": "page",
+    "source": "src/app/dashboard/arquivo-clinico/page.tsx",
+    "ui_status": "OBSERVADO: lista QA, sem exportar",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/dashboard/bot",
+    "kind": "page",
+    "source": "src/app/dashboard/bot/page.tsx",
+    "ui_status": "IMPEDIDO PELO PLANO SOLO: redirecionou ao Plano",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/dashboard/configuracoes",
+    "kind": "page",
+    "source": "src/app/dashboard/configuracoes/page.tsx",
+    "ui_status": "OBSERVADO: cinco seções e formulários; sem salvar alterações",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/dashboard/configuracoes/usuarios",
+    "kind": "page",
+    "source": "src/app/dashboard/configuracoes/usuarios/page.tsx",
+    "ui_status": "REDIRECIONAMENTO indicado no código para Configurações; sem tela independente",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/dashboard/configuracoes/whatsapp",
+    "kind": "page",
+    "source": "src/app/dashboard/configuracoes/whatsapp/page.tsx",
+    "ui_status": "NÃO TESTADO diretamente: código exige plano; conta QA SOLO",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/dashboard/financeiro",
+    "kind": "page",
+    "source": "src/app/dashboard/financeiro/page.tsx",
+    "ui_status": "OBSERVADO: resumo/extrato, formulários; receita manual sintética persistida, COD-01",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/dashboard/meu-dia",
+    "kind": "page",
+    "source": "src/app/dashboard/meu-dia/page.tsx",
+    "ui_status": "OBSERVADO: fila, encaixe, captura manual e painéis; IA NÃO TESTADA",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/dashboard/orcamentos",
+    "kind": "page",
+    "source": "src/app/dashboard/orcamentos/page.tsx",
+    "ui_status": "REDIRECIONAMENTO indicado no código para Pacientes; operação capturada no perfil",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/dashboard/pacientes/[id]",
+    "kind": "page",
+    "source": "src/app/dashboard/pacientes/[id]/page.tsx",
+    "ui_status": "OBSERVADO: abas, Ficha, orçamento, apresentação e documentos com dados QA; limites em INTERFACE.md",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/dashboard/pacientes/demo",
+    "kind": "page",
+    "source": "src/app/dashboard/pacientes/demo/page.tsx",
+    "ui_status": "OBSERVADO: fixture João Silva (Demonstração), prontuário",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/dashboard/pacientes/novo",
+    "kind": "page",
+    "source": "src/app/dashboard/pacientes/novo/page.tsx",
+    "ui_status": "OBSERVADO: formulário e cadastro sintético",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/dashboard/pacientes",
+    "kind": "page",
+    "source": "src/app/dashboard/pacientes/page.tsx",
+    "ui_status": "OBSERVADO: lista vazia/preenchida",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/dashboard",
+    "kind": "page",
+    "source": "src/app/dashboard/page.tsx",
+    "ui_status": "OBSERVADO: dentista QA vazio/preenchido, claro/escuro; recepção NÃO TESTADA",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/dashboard/perfil",
+    "kind": "page",
+    "source": "src/app/dashboard/perfil/page.tsx",
+    "ui_status": "OBSERVADO: perfil pessoal sem alterações",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/dashboard/protetico",
+    "kind": "page",
+    "source": "src/app/dashboard/protetico/page.tsx",
+    "ui_status": "IMPEDIDO PELO PERFIL: redirecionou ao Dashboard",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/dashboard/whatsapp",
+    "kind": "page",
+    "source": "src/app/dashboard/whatsapp/page.tsx",
+    "ui_status": "NÃO TESTADO diretamente: depende de papel/plano",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/onboarding",
+    "kind": "page",
+    "source": "src/app/onboarding/page.tsx",
+    "ui_status": "NÃO TESTADO nesta conta já cadastrada",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/",
+    "kind": "page",
+    "source": "src/app/page.tsx",
+    "ui_status": "OBSERVADO: landing, seções e FAQ",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/planos",
+    "kind": "page",
+    "source": "src/app/planos/page.tsx",
+    "ui_status": "OBSERVADO como destino comercial/redirecionamento para Plano na sessão QA",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/primeiro-acesso",
+    "kind": "page",
+    "source": "src/app/primeiro-acesso/page.tsx",
+    "ui_status": "NÃO TESTADO: exige estado de primeiro acesso",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  },
+  {
+    "route": "/termos-de-uso",
+    "kind": "page",
+    "source": "src/app/termos-de-uso/page.tsx",
+    "ui_status": "NÃO TESTADO: estado de aceite pendente não provocado",
+    "note": "Inventario de codigo; existencia nao comprova funcionamento."
+  }
+]

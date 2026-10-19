@@ -1,0 +1,60 @@
+Browser tab: 2115955912, Title: "Odonto.IA | Inteligência Odontológica", URL: "https://odontoia.app/dashboard/pacientes/290b050a-877c-40b7-8cf4-38e3488ce636".
+1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/dashboard/pacientes/290b050a-877c-40b7-8cf4-38e3488ce636
+	2 container
+		3 container
+			4 button Pacientes
+			5 button Editar paciente
+			6 button Exportar prontuário
+			7 button Excluir paciente
+			8 button Gerar TCLE do paciente
+			9 button Emitir documento (receita, atestado, pedido de exame)
+			10 button Apresentar
+			11 button Marcar retorno
+			12 text QA
+			13 heading QA Auditoria 18-10-2026, Value: 1
+				14 text QA Auditoria 18-10-2026
+			15 text · Paciente desde  out de 2026 OBSERVAÇÕES PACIENTE FICTÍCIO — auditoria autorizada de produção. Nenhum dado de pessoa real.
+			16 tab group
+				17 tab (selected, settable, boolean) Prontuário, Value: 1, ID: tab-fichas
+				18 tab (selectable, settable, boolean) Orçamentos, Value: 0, ID: tab-orcamento
+				19 tab (selectable, settable, boolean) Arquivos, Value: 0, ID: tab-documentos
+				20 tab (selectable, settable, boolean) Agenda, Value: 0, ID: base-ui-_r_7_
+			21 container Description: Prontuário, ID: base-ui-_r_9_
+				22 container Prontuário do paciente
+					23 text Prontuário
+					24 text Consultas e histórico clínico do paciente.
+					25 button Importar histórico
+					26 button Novo atendimento
+					27 button (collapsed) 1 atendimento, Secondary Actions: Expand
+					28 button (collapsed) 1 pendência, Secondary Actions: Expand
+					29 button Tudo
+					30 button Indicados
+					31 button Realizados
+					32 content list
+						33 container
+							34 text 18 de outubro de 2026 Atendimento pelo prontuário  ·  Dentista teste 1 1  procedimento Sem evolução textual registrada. Canal  · 32
+							35 button Abrir ficha · Canal · 32 0% · 0/1
+								36 text Abrir ficha · 
+								37 text Canal · 32
+								38 text 0
+								39 text % · 
+								40 text 0
+								41 text /
+								42 text 1
+							43 button Gerar orçamento
+							44 button Marcar retorno
+		45 container
+			46 image
+			47 text Odonto .IA
+			48 link Description: INÍCIO, Value: odontoia.app/dashboard
+			49 link Description: MEU DIA, Value: odontoia.app/dashboard/meu-dia
+			50 link Description: PACIENTES, Value: odontoia.app/dashboard/pacientes
+			51 link Description: AGENDA, Value: odontoia.app/dashboard/agendamentos
+			52 link Description: FINANCEIRO, Value: odontoia.app/dashboard/financeiro
+			53 link Description: CONFIG, Value: odontoia.app/dashboard/configuracoes
+			54 button Abrir DEX
+			55 button Modo Claro
+			56 pop up button (collapsed) DT, Help: Dentista teste 1, ID: radix-_r_0_, Secondary Actions: Expand
+		57 container Notifications alt+T
+
+The focused UI element is 55 button Modo Claro

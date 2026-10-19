@@ -1,0 +1,13 @@
+const fs=require('node:fs');
+const vm=require('node:vm');
+const ts=require(process.cwd()+'/node_modules/typescript');
+const root=process.cwd();
+const file=root+'/src/app/dashboard/financeiro/actions.ts';
+const rows={pagamentos:[{clinica_id:'synthetic-clinic',dentista_id:'synthetic-dentist',status:'pago',valor:100,data_pagamento:'2026-10-10'}],receitas_manuais:[{clinica_id:'synthetic-clinic',dentista_id:'synthetic-dentist',valor:50,data:'2026-10-10'}],despesas:[{clinica_id:'synthetic-clinic',dentista_id:'synthetic-dentist',valor:20,data:'2026-10-10'}]};
+const queries=[];
+const supabase={from(table){if(!rows[table])throw Error('Unexpected table '+table);queries.push(table);let data=rows[table];const q={select(){return q},eq(k,v){data=data.filter(x=>x[k]===v);return q},gte(k,v){data=data.filter(x=>x[k]>=v);return q},lt(k,v){data=data.filter(x=>x[k]<v);return q},then(resolve,reject){return Promise.resolve({data,error:null}).then(resolve,reject)}};return q}};
+class FixedDate extends Date{constructor(...args){super(...(args.length?args:['2026-10-18T12:00:00Z']))}static now(){return Date.parse('2026-10-18T12:00:00Z')}}
+const auditExports={};
+const context={exports:auditExports,Date:FixedDate,console,require(id){if(id==='@/server/auth/clinic')return{requireClinicContext:async()=>({supabase,clinicId:'synthetic-clinic',dentistaId:'synthetic-dentist',role:'dentista'})};if(['next/cache','@/lib/notificacoes','@/lib/export/csv','@/app/dashboard/orcamentos/actions'].includes(id))return{};throw Error('Forbidden dependency '+id)}};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,context,{filename:file});
+(async()=>{const saldo=await auditExports.calcularSaldoMes('2026-10');const series=await auditExports.listarUltimosMeses(6);const result={method:'Actual action source transpiled in isolated VM with synthetic in-memory query adapter. No network or production writes.',code_sha:'a1722c47c346a4a80c84ad6cd5efd0ee42afbf08',fixed_date:'2026-10-18',input:{pagamento:100,receita_manual:50,despesa:20},saldo,serie_outubro:series.at(-1),query_tables:queries,assertions:{saldo_includes_manual:saldo.receita===150,chart_omits_manual:series.at(-1).receita===100}};fs.writeFileSync(root+'/docs/auditoria-producao-2026-10-18/evidencias/repro-financeiro.json',JSON.stringify(result,null,2)+'\n');console.log(JSON.stringify(result))})().catch(e=>{console.error(e);process.exitCode=1});

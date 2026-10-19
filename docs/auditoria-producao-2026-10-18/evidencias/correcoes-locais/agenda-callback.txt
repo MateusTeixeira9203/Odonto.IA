@@ -1,0 +1,27 @@
+Browser tab: 4, Title: "Validação local Agenda", URL: "http://127.0.0.1:3101/".
+1 AXWebArea Validação local Agenda, URL: 127.0.0.1:3101/
+	2 container
+		3 container
+			4 heading Validação local — componente real da Agenda, dados sintéticos, Value: 1
+				5 text Validação local — componente real da Agenda, dados sintéticos
+			6 text Callback:  qa-appointment:confirmed
+			7 heading Outubro 2026, Value: 2
+				8 text Outubro 2026
+			9 button
+			10 button
+			11 text SEG TER QUA QUI SEX SÁB 18 HOJE 1 Consultas SELECIONADO 1 Agendadas
+			12 heading Domingo, 18 De Outubro, Value: 2
+				13 text Domingo, 18 De Outubro
+			14 text 1  agendamento
+			15 container
+				16 text 12:00
+				17 combo box (collapsed) Description: Status do agendamento, Value: CONFIRMADO, ID: base-ui-_r_2_, Secondary Actions: Expand
+					18 text CONFIRMADO
+				19 heading Paciente fictício, Value: 3
+					20 text Paciente fictício
+				21 text Registro fictício — sem conexão ao banco
+				22 container
+					23 button Iniciar consulta
+					24 button Ver Ficha
+
+The focused UI element is 17 combo box (collapsed) Description: Status do agendamento, Value: CONFIRMADO, ID: base-ui-_r_2_, Secondary Actions: Expand

@@ -1,0 +1,28 @@
+Browser tab: 2, Title: "Odonto.IA | Inteligência Odontológica", URL: "https://odontoia.app/verifique-email".
+1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/verifique-email
+	2 container
+		3 container
+			4 image
+			5 text Odonto .IA MENOS PAPELADA. MAIS CLÍNICA.
+			6 heading Você atende. A IA documenta., Value: 2
+				7 text Você atende.
+				8 text A IA documenta.
+			9 text Do atendimento ao prontuário estruturado, sem tirar o foco do paciente. ODONTO.IA
+		10 text CONFIRMAÇÃO DE EMAIL
+		11 heading Verifique sua caixa de entrada., Value: 1
+			12 text Verifique sua caixa de entrada.
+		13 text O link confirma sua identidade e devolve você ao ponto certo do fluxo.
+		14 text Enviamos um link de verificação para:
+		15 text o email informado no cadastro
+		16 container
+			17 text 1. Abra o email que enviamos
+		18 container
+			19 text 2. Clique em  "Confirmar email"
+		20 container
+			21 text 3. Você volta para continuar de onde parou
+		22 text Não encontrou? Verifique a pasta de spam ou lixo eletrônico.
+		23 button (disabled) Reenviar email de verificação
+		24 link Description: Voltar para o login, Value: odontoia.app/login?next=%2Fonboarding
+	25 container Notifications alt+T
+
+The focused UI element is 1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/verifique-email

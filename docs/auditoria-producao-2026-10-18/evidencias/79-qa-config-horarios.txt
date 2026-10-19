@@ -1,0 +1,3 @@
+Browser tab: 2115955912, Title: "Odonto.IA | Inteligência Odontológica", URL: "https://odontoia.app/dashboard/configuracoes".
+There has been no change in the accessibility tree.
+The focused UI element is 60 button Horários

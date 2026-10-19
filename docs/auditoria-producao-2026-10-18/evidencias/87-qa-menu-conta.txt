@@ -1,0 +1,76 @@
+Browser tab: 2115955912, Title: "Odonto.IA | Inteligência Odontológica", URL: "https://odontoia.app/dashboard/configuracoes".
+1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/dashboard/configuracoes
+	2 container
+		95 container
+			96 text CLINICA TESTE
+			97 heading Configurações, Value: 1
+				98 text Configurações
+			99 container
+				100 text Gerencie  consultório , horários, equipe e catálogo de procedimentos.
+			101 container dex-tour-procedimentos
+				102 button Meu Perfil
+				103 button Consultório
+				104 button Horários
+				105 button Procedimentos
+				106 button Plano
+			107 text GESTÃO COMPARTILHADA
+			108 heading Clinica teste, Value: 2
+				109 text Clinica teste
+			110 text Dados, equipe e convites em um só lugar. 1 /8 dentistas Clínica ativa
+			111 heading Equipe, Value: 2
+				112 text Equipe
+			113 container
+				114 text Gerencie dentistas e secretárias  do consultório
+			115 text 7 vagas disponívelis de 8 dentistas
+			116 button Adicionar
+			117 heading Membros do consultório (1), Value: 2
+				118 text Membros  do consultório  ( 1 )
+			119 text D Dentista teste 1 (você)
+			120 text mateusteixeira9203@gmail.com
+			121 text Dentista
+			122 heading Dados da clínica, Value: 3
+				123 text Dados da clínica
+			124 text Informações compartilhadas por toda a equipe. LOGO DO  CONSULTÓRIO A logo aparece nos PDFs de planejamento enviados aos pacientes.
+			125 button Enviar logo
+			126 text JPG, PNG ou WebP · máx. 2 MB
+			127 container
+				128 text NOME DO  CONSULTÓRIO
+			129 text field (settable) Clinica teste
+			130 text TELEFONE
+			131 text field (settable)
+			132 text ENDEREÇO
+			133 text field (settable)
+			134 text FORMAS DE PAGAMENTO ACEITAS
+			135 button DINHEIRO
+			136 button PIX
+			137 button CARTAO CREDITO
+			138 button CARTAO DEBITO
+			139 button BOLETO
+			140 text Aceita Convênio O  consultório  atende pacientes com plano odontológico.
+			141 checkbox (settable, integer) 0
+			142 button Salvar Alterações
+			143 heading WhatsApp da clínica, Value: 3
+				144 text WhatsApp da clínica
+			145 text EM BREVE Confirmações e mensagens compartilhadas chegarão na próxima atualização. Sair desta clínica Seu vínculo é encerrado; prontuários e autoria são preservados.
+			146 button Sair
+		147 container
+			148 image
+			149 text Odonto .IA
+			150 link Description: INÍCIO, Value: odontoia.app/dashboard
+			151 link Description: MEU DIA, Value: odontoia.app/dashboard/meu-dia
+			152 link Description: PACIENTES, Value: odontoia.app/dashboard/pacientes
+			153 link Description: AGENDA, Value: odontoia.app/dashboard/agendamentos
+			154 link Description: FINANCEIRO, Value: odontoia.app/dashboard/financeiro
+			155 link Description: CONFIG, Value: odontoia.app/dashboard/configuracoes
+			156 button Abrir DEX
+			157 button Modo Escuro
+			158 pop up button (expanded) DT, Help: Dentista teste 1, ID: radix-_r_0_, Secondary Actions: Collapse
+		67 container Notifications alt+T
+		159 menu DT, ID: radix-_r_1_
+			160 text DT
+			161 text Dentista teste 1
+			162 text Clinica teste
+			163 Meu Perfil
+			164 Sair
+
+The focused UI element is 159 menu DT, ID: radix-_r_1_

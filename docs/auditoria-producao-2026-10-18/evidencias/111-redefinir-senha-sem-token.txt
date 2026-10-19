@@ -1,0 +1,15 @@
+Browser tab: 2, Title: "Odonto.IA | Inteligência Odontológica", URL: "https://odontoia.app/redefinir-senha".
+1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/redefinir-senha
+	2 container
+		3 image
+		4 heading Nova senha, Value: 1
+			5 text Nova senha
+		6 text Escolha uma senha segura com pelo menos 8 caracteres.
+		8 heading Link Expirado, Value: 3
+			9 text Link Expirado
+		10 text Este link expirou ou já foi utilizado. Solicite um novo para continuar.
+		11 link Description: Solicitar novo link, Value: odontoia.app/esqueci-senha
+		12 link Description: Voltar para o Login, Value: odontoia.app/login
+	7 container Notifications alt+T
+
+The focused UI element is 1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/redefinir-senha

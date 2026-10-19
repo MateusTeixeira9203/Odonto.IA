@@ -1,0 +1,25 @@
+{
+  "baseline": "a1722c47c346a4a80c84ad6cd5efd0ee42afbf08",
+  "changed": [
+    "src/app/(auth)/cadastro/_components/cadastro-form.tsx",
+    "src/app/(auth)/login/page.tsx",
+    "src/app/dashboard/agendamentos/_components/month-view.tsx",
+    "src/app/dashboard/layout.tsx",
+    "src/components/landing/passo-ficha.tsx",
+    "src/proxy.ts"
+  ],
+  "added": [
+    "src/access-navigation.test.ts"
+  ],
+  "hashes": {
+    "src/app/(auth)/cadastro/_components/cadastro-form.tsx": "5aa7e8b3890d0d6d172fd0e93f76a7fe3354c4144e21545ee9d13a6b6d01ae65",
+    "src/app/(auth)/login/page.tsx": "98a695793471925d0a3835dc6620715c08350c5c10ff0740ca9e239ea5c1760e",
+    "src/app/dashboard/agendamentos/_components/month-view.tsx": "5cd56c9c4ff653a185cedd06b8031a5c585d494833c09c88243cae67c0447388",
+    "src/app/dashboard/layout.tsx": "a4f61d488307738719f57579f53eee4c8af363304f2659fdcc671a5649157ad7",
+    "src/components/landing/passo-ficha.tsx": "b3aaa18e9ef33ec3647f1bcd1b22eb7916051013c4a699d28a162e145ea3e7c1",
+    "src/proxy.ts": "e60e3fba7fccbe0acf8d2ee62573dfd4250019a2599dcf5a088295e6d425c350",
+    "src/access-navigation.test.ts": "bfa1fdcde55bd0a95702a742a247c4111814db14466aacd90828a72a47d919d4"
+  },
+  "docs_cleanup_included": false,
+  "migrations_changed": false
+}

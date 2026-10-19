@@ -1,0 +1,15 @@
+Browser tab: 2, Title: "Odonto.IA | Inteligência Odontológica", URL: "https://odontoia.app/esqueci-senha".
+0 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/esqueci-senha
+	1 container
+		2 image
+		3 heading Recuperar Senha, Value: 1
+			4 text Recuperar Senha
+		5 text Enviaremos um link para você criar uma nova senha. Verifique também a pasta de spam.
+		6 text E-mail
+		7 container
+			8 text field (settable)
+		9 button Enviar Link de Recuperação
+		10 link Description: Voltar para o Login, Value: odontoia.app/login
+	11 container Notifications alt+T
+
+The focused UI element is 0 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/esqueci-senha

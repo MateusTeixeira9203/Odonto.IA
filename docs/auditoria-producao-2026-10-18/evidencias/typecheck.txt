@@ -1,0 +1,17 @@
+
+<--- Last few GCs --->
+
+[44879:0x42d92000]    29799 ms: Scavenge 2023.8 (2037.1) -> 2021.7 (2045.4) MB, pooled: 0 MB, 3.11 / 0.00 ms  (average mu = 0.327, current mu = 0.316) allocation failure; 
+[44879:0x42d92000]    30278 ms: Mark-Compact (reduce) 2030.5 (2047.4) -> 2015.9 (2031.1) MB, pooled: 0 MB, 20.27 / 0.00 ms  (+ 403.0 ms in 82 steps since start of marking, biggest step 5.9 ms, walltime since start of marking 472 ms) (average mu = 0.314, c
+FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory
+----- Native stack trace -----
+
+ 1: 0x75356c node::OOMErrorHandler(char const*, v8::OOMDetails const&) [/home/mtx/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node]
+ 2: 0xc52cd0  [/home/mtx/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node]
+ 3: 0xc52dbf  [/home/mtx/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node]
+ 4: 0xef6695  [/home/mtx/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node]
+ 5: 0xef66c2  [/home/mtx/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node]
+ 6: 0xef69ba  [/home/mtx/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node]
+ 7: 0xf076ba  [/home/mtx/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node]
+ 8: 0xf0ba60  [/home/mtx/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node]
+ 9: 0x199e0d1  [/home/mtx/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node]

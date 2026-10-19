@@ -1,0 +1,8 @@
+Browser tab: 2115955912, Title: "Odonto.IA | Inteligência Odontológica", URL: "https://odontoia.app/dashboard/pacientes/290b050a-877c-40b7-8cf4-38e3488ce636".
+1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/dashboard/pacientes/290b050a-877c-40b7-8cf4-38e3488ce636
+	2 container
+		57 container Notifications alt+T
+		58 menu Mais ações da Ficha, ID: radix-_r_1a_
+			59 Apagar Ficha
+
+The focused UI element is 58 menu Mais ações da Ficha, ID: radix-_r_1a_

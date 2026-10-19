@@ -1,0 +1,10 @@
+Browser tab: 2115955912, Title: "Odonto.IA | Inteligência Odontológica", URL: "https://odontoia.app/dashboard/pacientes/290b050a-877c-40b7-8cf4-38e3488ce636".
+The following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 82-83
++				85 container
++					86 text Período (opcional)
++					87 text field (settable)
+~				84 text Assinatura do dentista *
++				88 text Assine no campo para incluir a assinatura manuscrita no documento.
++				89 button Limpar
+The focused UI element is 80 button Comparecimento

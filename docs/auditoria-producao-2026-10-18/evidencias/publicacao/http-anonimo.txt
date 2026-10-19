@@ -1,0 +1,9 @@
+HTTP/2 307 
+cache-control: public, max-age=0, must-revalidate
+content-type: text/plain
+date: Mon, 19 Oct 2026 00:29:12 GMT
+location: /login?redirectTo=%2Fdashboard
+server: Vercel
+strict-transport-security: max-age=63072000
+x-vercel-id: gru1::5dknc-1792369752067-92dfc927c4d9
+

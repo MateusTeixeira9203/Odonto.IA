@@ -1,0 +1,93 @@
+✖ login permanece acessível com sessão existente e preserva o cookie renovado (75.60999ms)
+✔ dashboard sem sessão continua protegido e conserva o destino de retorno (14.210261ms)
+✔ login anônimo, redefinição de senha e dashboard autenticado continuam acessíveis (31.243019ms)
+✖ vínculo já ativo com aguardando_formacao termina em planos, sem voltar à página de vínculo pendente (20.454284ms)
+✖ vínculo já ativo com checkout_pendente termina em planos, sem voltar à página de vínculo pendente (12.197645ms)
+✖ vínculo já ativo com cartao_pronto termina em planos, sem voltar à página de vínculo pendente (11.16092ms)
+✔ assinatura válida, isenção e formação autorizada preservam acesso (63.258834ms)
+✔ assinatura ausente/inadimplente não recebe acesso por causa da correção (37.235195ms)
+✔ bloqueio da clínica continua prevalecendo sobre assinatura válida (11.911365ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 5
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 961.144547
+
+✖ failing tests:
+
+test at src/access-navigation.test.ts:45:1
+✖ login permanece acessível com sessão existente e preserva o cookie renovado (75.60999ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  307 !== 200
+  
+      at TestContext.<anonymous> (/home/mtx/Documentos/Odonto.IA/src/access-navigation.test.ts:47:10)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 307,
+    expected: 200,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/access-navigation.test.ts:115:3
+✖ vínculo já ativo com aguardando_formacao termina em planos, sem voltar à página de vínculo pendente (20.454284ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + '/bem-vindo-agregado'
+  - '/planos?billing=required'
+  
+      at TestContext.<anonymous> (/home/mtx/Documentos/Odonto.IA/src/access-navigation.test.ts:116:12)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '/bem-vindo-agregado',
+    expected: '/planos?billing=required',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/access-navigation.test.ts:115:3
+✖ vínculo já ativo com checkout_pendente termina em planos, sem voltar à página de vínculo pendente (12.197645ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + '/bem-vindo-agregado'
+  - '/planos?billing=required'
+  
+      at TestContext.<anonymous> (/home/mtx/Documentos/Odonto.IA/src/access-navigation.test.ts:116:12)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '/bem-vindo-agregado',
+    expected: '/planos?billing=required',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/access-navigation.test.ts:115:3
+✖ vínculo já ativo com cartao_pronto termina em planos, sem voltar à página de vínculo pendente (11.16092ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + '/bem-vindo-agregado'
+  - '/planos?billing=required'
+  
+      at TestContext.<anonymous> (/home/mtx/Documentos/Odonto.IA/src/access-navigation.test.ts:116:12)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '/bem-vindo-agregado',
+    expected: '/planos?billing=required',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

@@ -1,0 +1,171 @@
+Browser tab: 2115955912, Title: "Odonto.IA | Inteligência Odontológica", URL: "https://odontoia.app/dashboard/meu-dia".
+1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/dashboard/meu-dia
+	2 container
+		3 container
+			4 text MEU DIA
+			5 heading Domingo, 18 De Outubro, Value: 1
+				6 text Domingo, 18 De Outubro
+			7 button 19:30 QA Auditoria 18-10-2026 AGUARDANDO
+				8 text 19:30
+				9 text QA Auditoria 18-10-2026
+				10 text AGUARDANDO
+			11 pop up button (collapsed, settable) Description: Mudar status do atendimento, Value: Aguardando, Secondary Actions: Expand
+				12 menu
+					13 (selected) Aguardando
+					14 Confirmado
+					15 Na recepção
+					16 Atendendo
+					17 Concluído
+					18 Faltou
+					19 Cancelado
+			20 button Encaixe
+			21 text 19:30
+			22 heading QA Auditoria 18-10-2026, Value: 2
+				23 text QA Auditoria 18-10-2026
+			24 text PACIENTE FICTÍCIO — auditoria autorizada de produção. Nenhum dado de pessoa real. 1  pendente
+			25 link Description: Ver perfil completo →, Value: odontoia.app/dashboard/pacientes/290b050a-877c-40b7-8cf4-38e3488ce636
+			26 text CAMPO MÁGICO Fale, cole ou anexe — o Dex monta a ficha
+			27 text entry area (settable) Relato para organizar com Dex
+			28 button Gravar voz
+			29 button Anexar
+			30 button (disabled) Organizar com Dex Ctrl ↵
+				31 text Organizar com Dex Ctrl ↵
+			32 text Revisão do atendimento 0
+			33 button Marcar retorno
+			34 button Gerar orçamento
+			35 text Nada registrado ainda nesta consulta.
+			36 checkbox Boca, Value: 1
+			37 button (collapsed) Plano e histórico 1, Secondary Actions: Expand
+				38 text Plano e histórico
+				39 text 1
+			40 button (collapsed) Anexos, Secondary Actions: Expand
+			41 text Selecione sem abrir o histórico REGISTRAR
+			42 checkbox Dentes/faces, Value: 1
+			43 checkbox Regiões, Value: 0
+			44 container
+				45 button Permanentes 1
+					46 text Permanentes
+					47 text 1
+				48 button Decíduos
+				49 button (collapsed) Description: Legenda do odontograma, Secondary Actions: Expand
+			50 text SUP. DIREITO SUP. ESQUERDO
+			51 button Dente 18 — Siso
+				52 text 18
+				53 image
+			54 button Dente 17 — 2º Molar
+				55 text 17
+				56 image
+			57 button Dente 16 — 1º Molar
+				58 text 16
+				59 image
+			60 button Dente 15 — 2º Pré-molar
+				61 text 15
+				62 image
+			63 button Dente 14 — 1º Pré-molar
+				64 text 14
+				65 image
+			66 button Dente 13 — Canino
+				67 text 13
+				68 image
+			69 button Dente 12 — Incisivo Lateral
+				70 text 12
+				71 image
+			72 button Dente 11 — Incisivo Central
+				73 text 11
+				74 image
+			75 button Dente 21 — Incisivo Central
+				76 text 21
+				77 image
+			78 button Dente 22 — Incisivo Lateral
+				79 text 22
+				80 image
+			81 button Dente 23 — Canino
+				82 text 23
+				83 image
+			84 button Dente 24 — 1º Pré-molar
+				85 text 24
+				86 image
+			87 button Dente 25 — 2º Pré-molar
+				88 text 25
+				89 image
+			90 button Dente 26 — 1º Molar
+				91 text 26
+				92 image
+			93 button Dente 27 — 2º Molar
+				94 text 27
+				95 image
+			96 button Dente 28 — Siso
+				97 text 28
+				98 image
+			99 button Dente 48 — Siso
+				100 image
+				101 text 48
+			102 button Dente 47 — 2º Molar
+				103 image
+				104 text 47
+			105 button Dente 46 — 1º Molar
+				106 image
+				107 text 46
+			108 button Dente 45 — 2º Pré-molar
+				109 image
+				110 text 45
+			111 button Dente 44 — 1º Pré-molar
+				112 image
+				113 text 44
+			114 button Dente 43 — Canino
+				115 image
+				116 text 43
+			117 button Dente 42 — Incisivo Lateral
+				118 image
+				119 text 42
+			120 button Dente 41 — Incisivo Central
+				121 image
+				122 text 41
+			123 button Dente 31 — Incisivo Central
+				124 image
+				125 text 31
+			126 button Dente 32 — Incisivo Lateral, a fazer
+				127 image
+				128 text 32
+			129 button Dente 33 — Canino
+				130 image
+				131 text 33
+			132 button Dente 34 — 1º Pré-molar
+				133 image
+				134 text 34
+			135 button Dente 35 — 2º Pré-molar
+				136 image
+				137 text 35
+			138 button Dente 36 — 1º Molar
+				139 image
+				140 text 36
+			141 button Dente 37 — 2º Molar
+				142 image
+				143 text 37
+			144 button Dente 38 — Siso
+				145 image
+				146 text 38
+			147 text INF. DIREITO INF. ESQUERDO Toque um dente para ver e editar o detalhe
+			148 text Selecione um ou mais dentes
+			149 text Para boca, arcada, quadrante ou manutenção, use a aba Regiões acima.
+			150 button + Evolução
+			151 text ✓ 1 ficha hoje
+			152 button (collapsed) Materiais / etiquetas 0, Secondary Actions: Expand
+				153 text Materiais / etiquetas
+				154 text 0
+			155 button (disabled) Salvar atendimento
+		156 container
+			157 image
+			158 text Odonto .IA
+			159 link Description: INÍCIO, Value: odontoia.app/dashboard
+			160 link Description: MEU DIA, Value: odontoia.app/dashboard/meu-dia
+			161 link Description: PACIENTES, Value: odontoia.app/dashboard/pacientes
+			162 link Description: AGENDA, Value: odontoia.app/dashboard/agendamentos
+			163 link Description: FINANCEIRO, Value: odontoia.app/dashboard/financeiro
+			164 link Description: CONFIG, Value: odontoia.app/dashboard/configuracoes
+			165 button Abrir DEX
+			166 button Modo Claro
+			167 pop up button (collapsed) DT, Help: Dentista teste 1, ID: radix-_r_0_, Secondary Actions: Expand
+		168 container Notifications alt+T
+
+The focused UI element is 27 text entry area (settable) Relato para organizar com Dex

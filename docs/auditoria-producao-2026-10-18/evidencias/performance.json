@@ -1,0 +1,2302 @@
+{
+  "result": {
+    "lints": [
+      {
+        "name": "unindexed_foreign_keys",
+        "title": "Unindexed foreign keys",
+        "level": "INFO",
+        "facing": "EXTERNAL",
+        "categories": [
+          "PERFORMANCE"
+        ],
+        "description": "Identifies foreign key constraints without a covering index, which can impact database performance.",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0001_unindexed_foreign_keys",
+        "count": 83,
+        "findings": [
+          {
+            "detail": "Table \\`public.aceites_termos\\` has a foreign key \\`aceites_termos_clinica_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "aceites_termos",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "aceites_termos_clinica_id_fkey",
+              "fkey_columns": [
+                3
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.acordos_repasse\\` has a foreign key \\`acordos_repasse_atualizado_por_usuario_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "acordos_repasse",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "acordos_repasse_atualizado_por_usuario_id_fkey",
+              "fkey_columns": [
+                12
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.acordos_repasse\\` has a foreign key \\`acordos_repasse_criado_por_usuario_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "acordos_repasse",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "acordos_repasse_criado_por_usuario_id_fkey",
+              "fkey_columns": [
+                11
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.acordos_repasse\\` has a foreign key \\`acordos_repasse_dentista_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "acordos_repasse",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "acordos_repasse_dentista_id_fkey",
+              "fkey_columns": [
+                3
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.activity_logs\\` has a foreign key \\`activity_logs_actor_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "activity_logs",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "activity_logs_actor_id_fkey",
+              "fkey_columns": [
+                3
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.agenda_bloqueios\\` has a foreign key \\`agenda_bloqueios_criado_por_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "agenda_bloqueios",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "agenda_bloqueios_criado_por_fkey",
+              "fkey_columns": [
+                7
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.agenda_bloqueios\\` has a foreign key \\`agenda_bloqueios_dentista_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "agenda_bloqueios",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "agenda_bloqueios_dentista_id_fkey",
+              "fkey_columns": [
+                3
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.agendamentos\\` has a foreign key \\`agendamentos_atendimento_origem_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "agendamentos",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "agendamentos_atendimento_origem_id_fkey",
+              "fkey_columns": [
+                17
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.ai_usage_logs\\` has a foreign key \\`ai_usage_logs_dentista_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "ai_usage_logs",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "ai_usage_logs_dentista_id_fkey",
+              "fkey_columns": [
+                8
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.ai_usage_logs\\` has a foreign key \\`ai_usage_logs_paciente_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "ai_usage_logs",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "ai_usage_logs_paciente_id_fkey",
+              "fkey_columns": [
+                10
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.assinaturas\\` has a foreign key \\`assinaturas_clinica_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "assinaturas",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "assinaturas_clinica_id_fkey",
+              "fkey_columns": [
+                2
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.assinaturas\\` has a foreign key \\`assinaturas_dentista_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "assinaturas",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "assinaturas_dentista_id_fkey",
+              "fkey_columns": [
+                7
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.assinaturas\\` has a foreign key \\`assinaturas_ficha_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "assinaturas",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "assinaturas_ficha_id_fkey",
+              "fkey_columns": [
+                5
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.assinaturas\\` has a foreign key \\`assinaturas_paciente_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "assinaturas",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "assinaturas_paciente_id_fkey",
+              "fkey_columns": [
+                3
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.assinaturas_dentista\\` has a foreign key \\`assinaturas_dentista_clinica_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "assinaturas_dentista",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "assinaturas_dentista_clinica_id_fkey",
+              "fkey_columns": [
+                2
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.assinaturas_dentista\\` has a foreign key \\`assinaturas_dentista_dentista_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "assinaturas_dentista",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "assinaturas_dentista_dentista_id_fkey",
+              "fkey_columns": [
+                4
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.atendimentos_clinicos\\` has a foreign key \\`atendimentos_clinicos_agendamento_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "atendimentos_clinicos",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "atendimentos_clinicos_agendamento_id_fkey",
+              "fkey_columns": [
+                5
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.atendimentos_clinicos\\` has a foreign key \\`atendimentos_clinicos_criado_por_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "atendimentos_clinicos",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "atendimentos_clinicos_criado_por_fkey",
+              "fkey_columns": [
+                10
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.atendimentos_clinicos\\` has a foreign key \\`atendimentos_clinicos_dentista_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "atendimentos_clinicos",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "atendimentos_clinicos_dentista_id_fkey",
+              "fkey_columns": [
+                4
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.atendimentos_clinicos\\` has a foreign key \\`atendimentos_clinicos_paciente_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "atendimentos_clinicos",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "atendimentos_clinicos_paciente_id_fkey",
+              "fkey_columns": [
+                3
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.billing_access_overrides\\` has a foreign key \\`billing_access_overrides_usuario_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "billing_access_overrides",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "billing_access_overrides_usuario_id_fkey",
+              "fkey_columns": [
+                3
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.clinica_acessos_auditoria\\` has a foreign key \\`clinica_acessos_auditoria_ator_usuario_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "clinica_acessos_auditoria",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "clinica_acessos_auditoria_ator_usuario_id_fkey",
+              "fkey_columns": [
+                3
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.clinica_governanca\\` has a foreign key \\`clinica_governanca_responsavel_usuario_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "clinica_governanca",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "clinica_governanca_responsavel_usuario_id_fkey",
+              "fkey_columns": [
+                2
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.clinica_governanca_auditoria\\` has a foreign key \\`clinica_governanca_auditoria_ator_usuario_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "clinica_governanca_auditoria",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "clinica_governanca_auditoria_ator_usuario_id_fkey",
+              "fkey_columns": [
+                3
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.clinica_usuarios\\` has a foreign key \\`clinica_usuarios_invited_by_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "clinica_usuarios",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "clinica_usuarios_invited_by_fkey",
+              "fkey_columns": [
+                6
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.clinica_vinculos_governanca\\` has a foreign key \\`clinica_vinculos_governanca_criado_por_usuario_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "clinica_vinculos_governanca",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "clinica_vinculos_governanca_criado_por_usuario_id_fkey",
+              "fkey_columns": [
+                6
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.convites\\` has a foreign key \\`convites_convidado_por_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "convites",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "convites_convidado_por_fkey",
+              "fkey_columns": [
+                8
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.convites_governanca\\` has a foreign key \\`convites_governanca_accepted_by_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "convites_governanca",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "convites_governanca_accepted_by_fkey",
+              "fkey_columns": [
+                10
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.convites_governanca\\` has a foreign key \\`convites_governanca_convidado_por_usuario_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "convites_governanca",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "convites_governanca_convidado_por_usuario_id_fkey",
+              "fkey_columns": [
+                9
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.despesas_recorrentes\\` has a foreign key \\`despesas_recorrentes_criado_por_usuario_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "despesas_recorrentes",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "despesas_recorrentes_criado_por_usuario_id_fkey",
+              "fkey_columns": [
+                8
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.despesas_recorrentes_competencias\\` has a foreign key \\`despesas_recorrentes_competencias_criado_por_usuario_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "despesas_recorrentes_competencias",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "despesas_recorrentes_competencias_criado_por_usuario_id_fkey",
+              "fkey_columns": [
+                11
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.documentos_aceite\\` has a foreign key \\`documentos_aceite_dentista_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "documentos_aceite",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "documentos_aceite_dentista_id_fkey",
+              "fkey_columns": [
+                4
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.documentos_aceite\\` has a foreign key \\`documentos_aceite_orcamento_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "documentos_aceite",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "documentos_aceite_orcamento_id_fkey",
+              "fkey_columns": [
+                6
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.documentos_aceite\\` has a foreign key \\`documentos_aceite_paciente_documento_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "documentos_aceite",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "documentos_aceite_paciente_documento_id_fkey",
+              "fkey_columns": [
+                16
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.documentos_aceite\\` has a foreign key \\`documentos_aceite_paciente_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "documentos_aceite",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "documentos_aceite_paciente_id_fkey",
+              "fkey_columns": [
+                3
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.estoque_auditoria\\` has a foreign key \\`estoque_auditoria_ator_usuario_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "estoque_auditoria",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "estoque_auditoria_ator_usuario_id_fkey",
+              "fkey_columns": [
+                3
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.estoque_itens\\` has a foreign key \\`estoque_itens_titular_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "estoque_itens",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "estoque_itens_titular_fkey",
+              "fkey_columns": [
+                2,
+                4
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.estoque_kit_componentes\\` has a foreign key \\`estoque_kit_componentes_item_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "estoque_kit_componentes",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "estoque_kit_componentes_item_fkey",
+              "fkey_columns": [
+                2,
+                4
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.estoque_kit_versoes\\` has a foreign key \\`estoque_kit_versoes_criado_por_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "estoque_kit_versoes",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "estoque_kit_versoes_criado_por_fkey",
+              "fkey_columns": [
+                6
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.estoque_kits\\` has a foreign key \\`estoque_kits_titular_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "estoque_kits",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "estoque_kits_titular_fkey",
+              "fkey_columns": [
+                2,
+                4
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.estoque_movimentos\\` has a foreign key \\`estoque_movimentos_ator_usuario_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "estoque_movimentos",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "estoque_movimentos_ator_usuario_id_fkey",
+              "fkey_columns": [
+                12
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.estoque_movimentos\\` has a foreign key \\`estoque_movimentos_original_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "estoque_movimentos",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "estoque_movimentos_original_fkey",
+              "fkey_columns": [
+                2,
+                3,
+                4,
+                11
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.estoque_operacoes\\` has a foreign key \\`estoque_operacoes_ator_usuario_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "estoque_operacoes",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "estoque_operacoes_ator_usuario_id_fkey",
+              "fkey_columns": [
+                3
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.estoque_usos\\` has a foreign key \\`estoque_usos_atendimento_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "estoque_usos",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "estoque_usos_atendimento_id_fkey",
+              "fkey_columns": [
+                3
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.estoque_usos\\` has a foreign key \\`estoque_usos_autor_usuario_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "estoque_usos",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "estoque_usos_autor_usuario_id_fkey",
+              "fkey_columns": [
+                6
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.estoque_usos\\` has a foreign key \\`estoque_usos_item_lote_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "estoque_usos",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "estoque_usos_item_lote_fkey",
+              "fkey_columns": [
+                2,
+                10,
+                11
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.estoque_usos\\` has a foreign key \\`estoque_usos_kit_versao_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "estoque_usos",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "estoque_usos_kit_versao_fkey",
+              "fkey_columns": [
+                2,
+                12
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.estoque_usos\\` has a foreign key \\`estoque_usos_movimento_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "estoque_usos",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "estoque_usos_movimento_fkey",
+              "fkey_columns": [
+                2,
+                10,
+                11,
+                13
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.estoque_usos\\` has a foreign key \\`estoque_usos_operacao_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "estoque_usos",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "estoque_usos_operacao_fkey",
+              "fkey_columns": [
+                2,
+                6,
+                14
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.estoque_usos\\` has a foreign key \\`estoque_usos_substituido_por_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "estoque_usos",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "estoque_usos_substituido_por_fkey",
+              "fkey_columns": [
+                2,
+                17
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.ficha_evolucoes\\` has a foreign key \\`ficha_evolucoes_atendimento_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "ficha_evolucoes",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "ficha_evolucoes_atendimento_id_fkey",
+              "fkey_columns": [
+                10
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.ficha_evolucoes\\` has a foreign key \\`ficha_evolucoes_clinica_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "ficha_evolucoes",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "ficha_evolucoes_clinica_id_fkey",
+              "fkey_columns": [
+                2
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.ficha_evolucoes\\` has a foreign key \\`ficha_evolucoes_dentista_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "ficha_evolucoes",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "ficha_evolucoes_dentista_id_fkey",
+              "fkey_columns": [
+                4
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.formacoes_clinica\\` has a foreign key \\`formacoes_clinica_criado_por_usuario_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "formacoes_clinica",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "formacoes_clinica_criado_por_usuario_id_fkey",
+              "fkey_columns": [
+                3
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.google_tokens\\` has a foreign key \\`google_tokens_clinica_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "google_tokens",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "google_tokens_clinica_id_fkey",
+              "fkey_columns": [
+                8
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.odontograma_eventos\\` has a foreign key \\`odontograma_eventos_dentista_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "odontograma_eventos",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "odontograma_eventos_dentista_id_fkey",
+              "fkey_columns": [
+                4
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.odontograma_eventos\\` has a foreign key \\`odontograma_eventos_encaminhado_para_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "odontograma_eventos",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "odontograma_eventos_encaminhado_para_fkey",
+              "fkey_columns": [
+                21
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.odontograma_eventos\\` has a foreign key \\`odontograma_eventos_procedimento_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "odontograma_eventos",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "odontograma_eventos_procedimento_id_fkey",
+              "fkey_columns": [
+                24
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.odontograma_eventos\\` has a foreign key \\`odontograma_eventos_retirado_por_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "odontograma_eventos",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "odontograma_eventos_retirado_por_fkey",
+              "fkey_columns": [
+                27
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.operational_incidents\\` has a foreign key \\`operational_incidents_clinica_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "operational_incidents",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "operational_incidents_clinica_id_fkey",
+              "fkey_columns": [
+                6
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.operational_incidents\\` has a foreign key \\`operational_incidents_usuario_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "operational_incidents",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "operational_incidents_usuario_id_fkey",
+              "fkey_columns": [
+                7
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.orcamento_cobrancas\\` has a foreign key \\`orcamento_cobrancas_cancelado_por_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "orcamento_cobrancas",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "orcamento_cobrancas_cancelado_por_id_fkey",
+              "fkey_columns": [
+                13
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.orcamento_cobrancas\\` has a foreign key \\`orcamento_cobrancas_dentista_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "orcamento_cobrancas",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "orcamento_cobrancas_dentista_id_fkey",
+              "fkey_columns": [
+                5
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.orcamento_cobrancas\\` has a foreign key \\`orcamento_cobrancas_orcamento_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "orcamento_cobrancas",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "orcamento_cobrancas_orcamento_id_fkey",
+              "fkey_columns": [
+                3
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.orcamento_cobrancas\\` has a foreign key \\`orcamento_cobrancas_paciente_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "orcamento_cobrancas",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "orcamento_cobrancas_paciente_id_fkey",
+              "fkey_columns": [
+                4
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.orcamento_eventos\\` has a foreign key \\`orcamento_eventos_item_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "orcamento_eventos",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "orcamento_eventos_item_id_fkey",
+              "fkey_columns": [
+                5
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.orcamento_eventos\\` has a foreign key \\`orcamento_eventos_retirado_por_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "orcamento_eventos",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "orcamento_eventos_retirado_por_fkey",
+              "fkey_columns": [
+                7
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.orcamento_itens\\` has a foreign key \\`orcamento_itens_retirado_por_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "orcamento_itens",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "orcamento_itens_retirado_por_fkey",
+              "fkey_columns": [
+                16
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.orcamentos\\` has a foreign key \\`orcamentos_plano_definido_por_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "orcamentos",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "orcamentos_plano_definido_por_id_fkey",
+              "fkey_columns": [
+                24
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.planejamento_etapas\\` has a foreign key \\`planejamento_etapas_imagem_arquivo_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "planejamento_etapas",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "planejamento_etapas_imagem_arquivo_id_fkey",
+              "fkey_columns": [
+                10
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.politicas_trial_assinatura\\` has a foreign key \\`politicas_trial_assinatura_usuario_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "politicas_trial_assinatura",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "politicas_trial_assinatura_usuario_id_fkey",
+              "fkey_columns": [
+                2
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.procedimentos\\` has a foreign key \\`procedimentos_dentista_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "procedimentos",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "procedimentos_dentista_id_fkey",
+              "fkey_columns": [
+                12
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.repasse_diarias\\` has a foreign key \\`repasse_diarias_clinica_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "repasse_diarias",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "repasse_diarias_clinica_id_fkey",
+              "fkey_columns": [
+                2
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.repasse_diarias\\` has a foreign key \\`repasse_diarias_criado_por_usuario_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "repasse_diarias",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "repasse_diarias_criado_por_usuario_id_fkey",
+              "fkey_columns": [
+                9
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.repasse_diarias\\` has a foreign key \\`repasse_diarias_dentista_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "repasse_diarias",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "repasse_diarias_dentista_id_fkey",
+              "fkey_columns": [
+                4
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.repasse_pagamentos\\` has a foreign key \\`repasse_pagamentos_clinica_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "repasse_pagamentos",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "repasse_pagamentos_clinica_id_fkey",
+              "fkey_columns": [
+                2
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.repasses\\` has a foreign key \\`repasses_cancelado_por_usuario_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "repasses",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "repasses_cancelado_por_usuario_id_fkey",
+              "fkey_columns": [
+                18
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.repasses\\` has a foreign key \\`repasses_criado_por_usuario_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "repasses",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "repasses_criado_por_usuario_id_fkey",
+              "fkey_columns": [
+                16
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.repasses\\` has a foreign key \\`repasses_dentista_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "repasses",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "repasses_dentista_id_fkey",
+              "fkey_columns": [
+                3
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.repasses\\` has a foreign key \\`repasses_pago_por_usuario_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "repasses",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "repasses_pago_por_usuario_id_fkey",
+              "fkey_columns": [
+                17
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.saldos_bancarios_informados\\` has a foreign key \\`saldos_bancarios_informados_informado_por_usuario_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "saldos_bancarios_informados",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "saldos_bancarios_informados_informado_por_usuario_id_fkey",
+              "fkey_columns": [
+                5
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.tratamentos\\` has a foreign key \\`tratamentos_paciente_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "tratamentos",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "tratamentos_paciente_id_fkey",
+              "fkey_columns": [
+                3
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.whatsapp_modelos_operacionais\\` has a foreign key \\`whatsapp_modelos_operacionais_atualizado_por_usuario_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+            "metadata": {
+              "name": "whatsapp_modelos_operacionais",
+              "type": "table",
+              "schema": "public",
+              "fkey_name": "whatsapp_modelos_operacionais_atualizado_por_usuario_id_fkey",
+              "fkey_columns": [
+                5
+              ]
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          }
+        ]
+      },
+      {
+        "name": "auth_rls_initplan",
+        "title": "Auth RLS Initialization Plan",
+        "level": "WARN",
+        "facing": "EXTERNAL",
+        "categories": [
+          "PERFORMANCE"
+        ],
+        "description": "Detects if calls to \\`current_setting()\\` and \\`auth.<function>()\\` in RLS policies are being unnecessarily re-evaluated for each row",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0003_auth_rls_initplan",
+        "count": 6,
+        "findings": [
+          {
+            "detail": "Table \\`public.users\\` has a row level security policy \\`users_select_own\\` that re-evaluates current_setting() or auth.<function>() for each row. This produces suboptimal query performance at scale. Resolve the issue by replacing \\`auth.<function>()\\` with \\`(select auth.<function>())\\`. See [docs](https://supabase.com/docs/guides/database/postgres/row-level-security#call-functions-with-select) for more info.",
+            "metadata": {
+              "name": "users",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.users\\` has a row level security policy \\`users_update_own\\` that re-evaluates current_setting() or auth.<function>() for each row. This produces suboptimal query performance at scale. Resolve the issue by replacing \\`auth.<function>()\\` with \\`(select auth.<function>())\\`. See [docs](https://supabase.com/docs/guides/database/postgres/row-level-security#call-functions-with-select) for more info.",
+            "metadata": {
+              "name": "users",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.secretarias\\` has a row level security policy \\`secretarias_select\\` that re-evaluates current_setting() or auth.<function>() for each row. This produces suboptimal query performance at scale. Resolve the issue by replacing \\`auth.<function>()\\` with \\`(select auth.<function>())\\`. See [docs](https://supabase.com/docs/guides/database/postgres/row-level-security#call-functions-with-select) for more info.",
+            "metadata": {
+              "name": "secretarias",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.clinica_usuarios\\` has a row level security policy \\`clinica_usuarios_select\\` that re-evaluates current_setting() or auth.<function>() for each row. This produces suboptimal query performance at scale. Resolve the issue by replacing \\`auth.<function>()\\` with \\`(select auth.<function>())\\`. See [docs](https://supabase.com/docs/guides/database/postgres/row-level-security#call-functions-with-select) for more info.",
+            "metadata": {
+              "name": "clinica_usuarios",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.google_tokens\\` has a row level security policy \\`google_tokens_own\\` that re-evaluates current_setting() or auth.<function>() for each row. This produces suboptimal query performance at scale. Resolve the issue by replacing \\`auth.<function>()\\` with \\`(select auth.<function>())\\`. See [docs](https://supabase.com/docs/guides/database/postgres/row-level-security#call-functions-with-select) for more info.",
+            "metadata": {
+              "name": "google_tokens",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.dentistas\\` has a row level security policy \\`dentistas_update_own\\` that re-evaluates current_setting() or auth.<function>() for each row. This produces suboptimal query performance at scale. Resolve the issue by replacing \\`auth.<function>()\\` with \\`(select auth.<function>())\\`. See [docs](https://supabase.com/docs/guides/database/postgres/row-level-security#call-functions-with-select) for more info.",
+            "metadata": {
+              "name": "dentistas",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          }
+        ]
+      },
+      {
+        "name": "unused_index",
+        "title": "Unused Index",
+        "level": "INFO",
+        "facing": "EXTERNAL",
+        "categories": [
+          "PERFORMANCE"
+        ],
+        "description": "Detects if an index has never been used and may be a candidate for removal.",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index",
+        "count": 44,
+        "findings": [
+          {
+            "detail": "Index \\`idx_planejamento_etapas_planejamento\\` on table \\`public.planejamento_etapas\\` has not been used",
+            "metadata": {
+              "name": "planejamento_etapas",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`idx_conversas_bot_ultimo_contato\\` on table \\`public.conversas_bot\\` has not been used",
+            "metadata": {
+              "name": "conversas_bot",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`idx_despesas_clinica_id\\` on table \\`public.despesas\\` has not been used",
+            "metadata": {
+              "name": "despesas",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`idx_convites_token\\` on table \\`public.convites\\` has not been used",
+            "metadata": {
+              "name": "convites",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`idx_convites_email\\` on table \\`public.convites\\` has not been used",
+            "metadata": {
+              "name": "convites",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`idx_planejamento_procedimentos_dentista\\` on table \\`public.planejamento_procedimentos\\` has not been used",
+            "metadata": {
+              "name": "planejamento_procedimentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`idx_tratamentos_dentista\\` on table \\`public.tratamentos\\` has not been used",
+            "metadata": {
+              "name": "tratamentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`idx_clinica_usuarios_clinica\\` on table \\`public.clinica_usuarios\\` has not been used",
+            "metadata": {
+              "name": "clinica_usuarios",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`idx_clinica_usuarios_status\\` on table \\`public.clinica_usuarios\\` has not been used",
+            "metadata": {
+              "name": "clinica_usuarios",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`idx_pp_paciente\\` on table \\`public.planejamento_procedimentos\\` has not been used",
+            "metadata": {
+              "name": "planejamento_procedimentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`idx_pp_clinica\\` on table \\`public.planejamento_procedimentos\\` has not been used",
+            "metadata": {
+              "name": "planejamento_procedimentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`idx_pacientes_cpf\\` on table \\`public.pacientes\\` has not been used",
+            "metadata": {
+              "name": "pacientes",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`ai_usage_logs_feature_created\\` on table \\`public.ai_usage_logs\\` has not been used",
+            "metadata": {
+              "name": "ai_usage_logs",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`estoque_movimentos_item_data_idx\\` on table \\`public.estoque_movimentos\\` has not been used",
+            "metadata": {
+              "name": "estoque_movimentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`estoque_auditoria_item_data_idx\\` on table \\`public.estoque_auditoria\\` has not been used",
+            "metadata": {
+              "name": "estoque_auditoria",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`idx_mensagens_bot_conversa\\` on table \\`public.mensagens_bot\\` has not been used",
+            "metadata": {
+              "name": "mensagens_bot",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`idx_mensagens_bot_conversa_ts\\` on table \\`public.mensagens_bot\\` has not been used",
+            "metadata": {
+              "name": "mensagens_bot",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`idx_convites_invited_by\\` on table \\`public.convites\\` has not been used",
+            "metadata": {
+              "name": "convites",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`idx_convites_accepted_by\\` on table \\`public.convites\\` has not been used",
+            "metadata": {
+              "name": "convites",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`tratamentos_clinica_paciente_idx\\` on table \\`public.tratamentos\\` has not been used",
+            "metadata": {
+              "name": "tratamentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`tratamentos_status_idx\\` on table \\`public.tratamentos\\` has not been used",
+            "metadata": {
+              "name": "tratamentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`idx_conversas_bot_clinica_id\\` on table \\`public.conversas_bot\\` has not been used",
+            "metadata": {
+              "name": "conversas_bot",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`idx_conversas_bot_telefone\\` on table \\`public.conversas_bot\\` has not been used",
+            "metadata": {
+              "name": "conversas_bot",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`idx_receitas_manuais_clinica_id\\` on table \\`public.receitas_manuais\\` has not been used",
+            "metadata": {
+              "name": "receitas_manuais",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`idx_receitas_manuais_clinica_data\\` on table \\`public.receitas_manuais\\` has not been used",
+            "metadata": {
+              "name": "receitas_manuais",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`idx_billing_events_clinica_id\\` on table \\`public.billing_events\\` has not been used",
+            "metadata": {
+              "name": "billing_events",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`idx_billing_events_processed_at\\` on table \\`public.billing_events\\` has not been used",
+            "metadata": {
+              "name": "billing_events",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`idx_convites_status\\` on table \\`public.convites\\` has not been used",
+            "metadata": {
+              "name": "convites",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`idx_dentistas_clinica_id\\` on table \\`public.dentistas\\` has not been used",
+            "metadata": {
+              "name": "dentistas",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`idx_clinicas_trial_ends_at\\` on table \\`public.clinicas\\` has not been used",
+            "metadata": {
+              "name": "clinicas",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`idx_planejamento_secoes_clinica_id\\` on table \\`public.planejamento_secoes\\` has not been used",
+            "metadata": {
+              "name": "planejamento_secoes",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`idx_receitas_manuais_dentista_id\\` on table \\`public.receitas_manuais\\` has not been used",
+            "metadata": {
+              "name": "receitas_manuais",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`assinaturas_dentista_usuario_idx\\` on table \\`public.assinaturas_dentista\\` has not been used",
+            "metadata": {
+              "name": "assinaturas_dentista",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`assinaturas_dentista_formacao_status_idx\\` on table \\`public.assinaturas_dentista\\` has not been used",
+            "metadata": {
+              "name": "assinaturas_dentista",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`billing_events_dentista_id_idx\\` on table \\`public.billing_events\\` has not been used",
+            "metadata": {
+              "name": "billing_events",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`orcamentos_financeiro_clinica_idx\\` on table \\`public.orcamentos\\` has not been used",
+            "metadata": {
+              "name": "orcamentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`pagamentos_financeiro_clinica_idx\\` on table \\`public.pagamentos\\` has not been used",
+            "metadata": {
+              "name": "pagamentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`despesas_financeiro_clinica_idx\\` on table \\`public.despesas\\` has not been used",
+            "metadata": {
+              "name": "despesas",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`receitas_manuais_financeiro_clinica_idx\\` on table \\`public.receitas_manuais\\` has not been used",
+            "metadata": {
+              "name": "receitas_manuais",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`clinica_acessos_auditoria_clinica_membro_data_idx\\` on table \\`public.clinica_acessos_auditoria\\` has not been used",
+            "metadata": {
+              "name": "clinica_acessos_auditoria",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`repasse_pagamentos_repasse_idx\\` on table \\`public.repasse_pagamentos\\` has not been used",
+            "metadata": {
+              "name": "repasse_pagamentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`assinaturas_dentista_reconciliation_due_idx\\` on table \\`public.assinaturas_dentista\\` has not been used",
+            "metadata": {
+              "name": "assinaturas_dentista",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`billing_events_stripe_pending_idx\\` on table \\`public.billing_events\\` has not been used",
+            "metadata": {
+              "name": "billing_events",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Index \\`operational_incidents_open_idx\\` on table \\`public.operational_incidents\\` has not been used",
+            "metadata": {
+              "name": "operational_incidents",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          }
+        ]
+      },
+      {
+        "name": "multiple_permissive_policies",
+        "title": "Multiple Permissive Policies",
+        "level": "WARN",
+        "facing": "EXTERNAL",
+        "categories": [
+          "PERFORMANCE"
+        ],
+        "description": "Detects if multiple permissive row level security policies are present on a table for the same \\`role\\` and \\`action\\` (e.g. insert). Multiple permissive policies are suboptimal for performance as each policy must be executed for every relevant query.",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0006_multiple_permissive_policies",
+        "count": 75,
+        "findings": [
+          {
+            "detail": "Table \\`public.atendimentos_clinicos\\` has multiple permissive policies for role \\`authenticated\\` for action \\`SELECT\\`. Policies include \\`{atendimentos_clinicos_select,atendimentos_clinicos_write_own}\\`",
+            "metadata": {
+              "name": "atendimentos_clinicos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.bot_config\\` has multiple permissive policies for role \\`authenticated\\` for action \\`SELECT\\`. Policies include \\`{bot_config_select,bot_config_write_admin_secretaria}\\`",
+            "metadata": {
+              "name": "bot_config",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.configuracoes_clinica\\` has multiple permissive policies for role \\`authenticated\\` for action \\`SELECT\\`. Policies include \\`{configuracoes_clinica_select,configuracoes_clinica_write_dentista}\\`",
+            "metadata": {
+              "name": "configuracoes_clinica",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.ficha_evolucoes\\` has multiple permissive policies for role \\`anon\\` for action \\`SELECT\\`. Policies include \\`{ficha_evolucoes_select,ficha_evolucoes_write_own}\\`",
+            "metadata": {
+              "name": "ficha_evolucoes",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.ficha_evolucoes\\` has multiple permissive policies for role \\`authenticated\\` for action \\`SELECT\\`. Policies include \\`{ficha_evolucoes_select,ficha_evolucoes_write_own}\\`",
+            "metadata": {
+              "name": "ficha_evolucoes",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.ficha_evolucoes\\` has multiple permissive policies for role \\`authenticator\\` for action \\`SELECT\\`. Policies include \\`{ficha_evolucoes_select,ficha_evolucoes_write_own}\\`",
+            "metadata": {
+              "name": "ficha_evolucoes",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.ficha_evolucoes\\` has multiple permissive policies for role \\`cli_login_postgres\\` for action \\`SELECT\\`. Policies include \\`{ficha_evolucoes_select,ficha_evolucoes_write_own}\\`",
+            "metadata": {
+              "name": "ficha_evolucoes",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.ficha_evolucoes\\` has multiple permissive policies for role \\`dashboard_user\\` for action \\`SELECT\\`. Policies include \\`{ficha_evolucoes_select,ficha_evolucoes_write_own}\\`",
+            "metadata": {
+              "name": "ficha_evolucoes",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.ficha_evolucoes\\` has multiple permissive policies for role \\`supabase_privileged_role\\` for action \\`SELECT\\`. Policies include \\`{ficha_evolucoes_select,ficha_evolucoes_write_own}\\`",
+            "metadata": {
+              "name": "ficha_evolucoes",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.fichas\\` has multiple permissive policies for role \\`anon\\` for action \\`SELECT\\`. Policies include \\`{fichas_select,fichas_write_own}\\`",
+            "metadata": {
+              "name": "fichas",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.fichas\\` has multiple permissive policies for role \\`authenticated\\` for action \\`SELECT\\`. Policies include \\`{fichas_select,fichas_write_own}\\`",
+            "metadata": {
+              "name": "fichas",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.fichas\\` has multiple permissive policies for role \\`authenticator\\` for action \\`SELECT\\`. Policies include \\`{fichas_select,fichas_write_own}\\`",
+            "metadata": {
+              "name": "fichas",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.fichas\\` has multiple permissive policies for role \\`cli_login_postgres\\` for action \\`SELECT\\`. Policies include \\`{fichas_select,fichas_write_own}\\`",
+            "metadata": {
+              "name": "fichas",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.fichas\\` has multiple permissive policies for role \\`dashboard_user\\` for action \\`SELECT\\`. Policies include \\`{fichas_select,fichas_write_own}\\`",
+            "metadata": {
+              "name": "fichas",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.fichas\\` has multiple permissive policies for role \\`supabase_privileged_role\\` for action \\`SELECT\\`. Policies include \\`{fichas_select,fichas_write_own}\\`",
+            "metadata": {
+              "name": "fichas",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.odontograma_eventos\\` has multiple permissive policies for role \\`anon\\` for action \\`SELECT\\`. Policies include \\`{odontograma_eventos_select,odontograma_eventos_write_own}\\`",
+            "metadata": {
+              "name": "odontograma_eventos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.odontograma_eventos\\` has multiple permissive policies for role \\`authenticated\\` for action \\`SELECT\\`. Policies include \\`{odontograma_eventos_select,odontograma_eventos_write_own}\\`",
+            "metadata": {
+              "name": "odontograma_eventos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.odontograma_eventos\\` has multiple permissive policies for role \\`authenticator\\` for action \\`SELECT\\`. Policies include \\`{odontograma_eventos_select,odontograma_eventos_write_own}\\`",
+            "metadata": {
+              "name": "odontograma_eventos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.odontograma_eventos\\` has multiple permissive policies for role \\`cli_login_postgres\\` for action \\`SELECT\\`. Policies include \\`{odontograma_eventos_select,odontograma_eventos_write_own}\\`",
+            "metadata": {
+              "name": "odontograma_eventos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.odontograma_eventos\\` has multiple permissive policies for role \\`dashboard_user\\` for action \\`SELECT\\`. Policies include \\`{odontograma_eventos_select,odontograma_eventos_write_own}\\`",
+            "metadata": {
+              "name": "odontograma_eventos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.odontograma_eventos\\` has multiple permissive policies for role \\`supabase_privileged_role\\` for action \\`SELECT\\`. Policies include \\`{odontograma_eventos_select,odontograma_eventos_write_own}\\`",
+            "metadata": {
+              "name": "odontograma_eventos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.paciente_documentos\\` has multiple permissive policies for role \\`anon\\` for action \\`SELECT\\`. Policies include \\`{paciente_documentos_select,paciente_documentos_write_own}\\`",
+            "metadata": {
+              "name": "paciente_documentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.paciente_documentos\\` has multiple permissive policies for role \\`authenticated\\` for action \\`SELECT\\`. Policies include \\`{paciente_documentos_select,paciente_documentos_write_own}\\`",
+            "metadata": {
+              "name": "paciente_documentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.paciente_documentos\\` has multiple permissive policies for role \\`authenticator\\` for action \\`SELECT\\`. Policies include \\`{paciente_documentos_select,paciente_documentos_write_own}\\`",
+            "metadata": {
+              "name": "paciente_documentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.paciente_documentos\\` has multiple permissive policies for role \\`cli_login_postgres\\` for action \\`SELECT\\`. Policies include \\`{paciente_documentos_select,paciente_documentos_write_own}\\`",
+            "metadata": {
+              "name": "paciente_documentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.paciente_documentos\\` has multiple permissive policies for role \\`dashboard_user\\` for action \\`SELECT\\`. Policies include \\`{paciente_documentos_select,paciente_documentos_write_own}\\`",
+            "metadata": {
+              "name": "paciente_documentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.paciente_documentos\\` has multiple permissive policies for role \\`supabase_privileged_role\\` for action \\`SELECT\\`. Policies include \\`{paciente_documentos_select,paciente_documentos_write_own}\\`",
+            "metadata": {
+              "name": "paciente_documentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.pacientes\\` has multiple permissive policies for role \\`anon\\` for action \\`SELECT\\`. Policies include \\`{pacientes_select,pacientes_write}\\`",
+            "metadata": {
+              "name": "pacientes",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.pacientes\\` has multiple permissive policies for role \\`authenticated\\` for action \\`SELECT\\`. Policies include \\`{pacientes_select,pacientes_write}\\`",
+            "metadata": {
+              "name": "pacientes",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.pacientes\\` has multiple permissive policies for role \\`authenticator\\` for action \\`SELECT\\`. Policies include \\`{pacientes_select,pacientes_write}\\`",
+            "metadata": {
+              "name": "pacientes",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.pacientes\\` has multiple permissive policies for role \\`cli_login_postgres\\` for action \\`SELECT\\`. Policies include \\`{pacientes_select,pacientes_write}\\`",
+            "metadata": {
+              "name": "pacientes",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.pacientes\\` has multiple permissive policies for role \\`dashboard_user\\` for action \\`SELECT\\`. Policies include \\`{pacientes_select,pacientes_write}\\`",
+            "metadata": {
+              "name": "pacientes",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.pacientes\\` has multiple permissive policies for role \\`supabase_privileged_role\\` for action \\`SELECT\\`. Policies include \\`{pacientes_select,pacientes_write}\\`",
+            "metadata": {
+              "name": "pacientes",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.planejamento_etapas\\` has multiple permissive policies for role \\`anon\\` for action \\`SELECT\\`. Policies include \\`{planejamento_etapas_select,planejamento_etapas_write_own}\\`",
+            "metadata": {
+              "name": "planejamento_etapas",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.planejamento_etapas\\` has multiple permissive policies for role \\`authenticated\\` for action \\`SELECT\\`. Policies include \\`{planejamento_etapas_select,planejamento_etapas_write_own}\\`",
+            "metadata": {
+              "name": "planejamento_etapas",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.planejamento_etapas\\` has multiple permissive policies for role \\`authenticator\\` for action \\`SELECT\\`. Policies include \\`{planejamento_etapas_select,planejamento_etapas_write_own}\\`",
+            "metadata": {
+              "name": "planejamento_etapas",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.planejamento_etapas\\` has multiple permissive policies for role \\`cli_login_postgres\\` for action \\`SELECT\\`. Policies include \\`{planejamento_etapas_select,planejamento_etapas_write_own}\\`",
+            "metadata": {
+              "name": "planejamento_etapas",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.planejamento_etapas\\` has multiple permissive policies for role \\`dashboard_user\\` for action \\`SELECT\\`. Policies include \\`{planejamento_etapas_select,planejamento_etapas_write_own}\\`",
+            "metadata": {
+              "name": "planejamento_etapas",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.planejamento_etapas\\` has multiple permissive policies for role \\`supabase_privileged_role\\` for action \\`SELECT\\`. Policies include \\`{planejamento_etapas_select,planejamento_etapas_write_own}\\`",
+            "metadata": {
+              "name": "planejamento_etapas",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.planejamento_procedimentos\\` has multiple permissive policies for role \\`anon\\` for action \\`SELECT\\`. Policies include \\`{planejamento_procedimentos_select,planejamento_procedimentos_write_own}\\`",
+            "metadata": {
+              "name": "planejamento_procedimentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.planejamento_procedimentos\\` has multiple permissive policies for role \\`authenticated\\` for action \\`SELECT\\`. Policies include \\`{planejamento_procedimentos_select,planejamento_procedimentos_write_own}\\`",
+            "metadata": {
+              "name": "planejamento_procedimentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.planejamento_procedimentos\\` has multiple permissive policies for role \\`authenticator\\` for action \\`SELECT\\`. Policies include \\`{planejamento_procedimentos_select,planejamento_procedimentos_write_own}\\`",
+            "metadata": {
+              "name": "planejamento_procedimentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.planejamento_procedimentos\\` has multiple permissive policies for role \\`cli_login_postgres\\` for action \\`SELECT\\`. Policies include \\`{planejamento_procedimentos_select,planejamento_procedimentos_write_own}\\`",
+            "metadata": {
+              "name": "planejamento_procedimentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.planejamento_procedimentos\\` has multiple permissive policies for role \\`dashboard_user\\` for action \\`SELECT\\`. Policies include \\`{planejamento_procedimentos_select,planejamento_procedimentos_write_own}\\`",
+            "metadata": {
+              "name": "planejamento_procedimentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.planejamento_procedimentos\\` has multiple permissive policies for role \\`supabase_privileged_role\\` for action \\`SELECT\\`. Policies include \\`{planejamento_procedimentos_select,planejamento_procedimentos_write_own}\\`",
+            "metadata": {
+              "name": "planejamento_procedimentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.planejamento_secoes\\` has multiple permissive policies for role \\`anon\\` for action \\`SELECT\\`. Policies include \\`{planejamento_secoes_select,planejamento_secoes_write_own}\\`",
+            "metadata": {
+              "name": "planejamento_secoes",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.planejamento_secoes\\` has multiple permissive policies for role \\`authenticated\\` for action \\`SELECT\\`. Policies include \\`{planejamento_secoes_select,planejamento_secoes_write_own}\\`",
+            "metadata": {
+              "name": "planejamento_secoes",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.planejamento_secoes\\` has multiple permissive policies for role \\`authenticator\\` for action \\`SELECT\\`. Policies include \\`{planejamento_secoes_select,planejamento_secoes_write_own}\\`",
+            "metadata": {
+              "name": "planejamento_secoes",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.planejamento_secoes\\` has multiple permissive policies for role \\`cli_login_postgres\\` for action \\`SELECT\\`. Policies include \\`{planejamento_secoes_select,planejamento_secoes_write_own}\\`",
+            "metadata": {
+              "name": "planejamento_secoes",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.planejamento_secoes\\` has multiple permissive policies for role \\`dashboard_user\\` for action \\`SELECT\\`. Policies include \\`{planejamento_secoes_select,planejamento_secoes_write_own}\\`",
+            "metadata": {
+              "name": "planejamento_secoes",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.planejamento_secoes\\` has multiple permissive policies for role \\`supabase_privileged_role\\` for action \\`SELECT\\`. Policies include \\`{planejamento_secoes_select,planejamento_secoes_write_own}\\`",
+            "metadata": {
+              "name": "planejamento_secoes",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.planejamentos\\` has multiple permissive policies for role \\`anon\\` for action \\`SELECT\\`. Policies include \\`{planejamentos_select,planejamentos_write_own}\\`",
+            "metadata": {
+              "name": "planejamentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.planejamentos\\` has multiple permissive policies for role \\`authenticated\\` for action \\`SELECT\\`. Policies include \\`{planejamentos_select,planejamentos_write_own}\\`",
+            "metadata": {
+              "name": "planejamentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.planejamentos\\` has multiple permissive policies for role \\`authenticator\\` for action \\`SELECT\\`. Policies include \\`{planejamentos_select,planejamentos_write_own}\\`",
+            "metadata": {
+              "name": "planejamentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.planejamentos\\` has multiple permissive policies for role \\`cli_login_postgres\\` for action \\`SELECT\\`. Policies include \\`{planejamentos_select,planejamentos_write_own}\\`",
+            "metadata": {
+              "name": "planejamentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.planejamentos\\` has multiple permissive policies for role \\`dashboard_user\\` for action \\`SELECT\\`. Policies include \\`{planejamentos_select,planejamentos_write_own}\\`",
+            "metadata": {
+              "name": "planejamentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.planejamentos\\` has multiple permissive policies for role \\`supabase_privileged_role\\` for action \\`SELECT\\`. Policies include \\`{planejamentos_select,planejamentos_write_own}\\`",
+            "metadata": {
+              "name": "planejamentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.procedimentos\\` has multiple permissive policies for role \\`anon\\` for action \\`INSERT\\`. Policies include \\`{procedimentos_insert_secretaria,procedimentos_write_own}\\`",
+            "metadata": {
+              "name": "procedimentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.procedimentos\\` has multiple permissive policies for role \\`anon\\` for action \\`SELECT\\`. Policies include \\`{procedimentos_select,procedimentos_write_own}\\`",
+            "metadata": {
+              "name": "procedimentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.procedimentos\\` has multiple permissive policies for role \\`authenticated\\` for action \\`INSERT\\`. Policies include \\`{procedimentos_insert_secretaria,procedimentos_write_own}\\`",
+            "metadata": {
+              "name": "procedimentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.procedimentos\\` has multiple permissive policies for role \\`authenticated\\` for action \\`SELECT\\`. Policies include \\`{procedimentos_select,procedimentos_write_own}\\`",
+            "metadata": {
+              "name": "procedimentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.procedimentos\\` has multiple permissive policies for role \\`authenticator\\` for action \\`INSERT\\`. Policies include \\`{procedimentos_insert_secretaria,procedimentos_write_own}\\`",
+            "metadata": {
+              "name": "procedimentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.procedimentos\\` has multiple permissive policies for role \\`authenticator\\` for action \\`SELECT\\`. Policies include \\`{procedimentos_select,procedimentos_write_own}\\`",
+            "metadata": {
+              "name": "procedimentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.procedimentos\\` has multiple permissive policies for role \\`cli_login_postgres\\` for action \\`INSERT\\`. Policies include \\`{procedimentos_insert_secretaria,procedimentos_write_own}\\`",
+            "metadata": {
+              "name": "procedimentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.procedimentos\\` has multiple permissive policies for role \\`cli_login_postgres\\` for action \\`SELECT\\`. Policies include \\`{procedimentos_select,procedimentos_write_own}\\`",
+            "metadata": {
+              "name": "procedimentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.procedimentos\\` has multiple permissive policies for role \\`dashboard_user\\` for action \\`INSERT\\`. Policies include \\`{procedimentos_insert_secretaria,procedimentos_write_own}\\`",
+            "metadata": {
+              "name": "procedimentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.procedimentos\\` has multiple permissive policies for role \\`dashboard_user\\` for action \\`SELECT\\`. Policies include \\`{procedimentos_select,procedimentos_write_own}\\`",
+            "metadata": {
+              "name": "procedimentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.procedimentos\\` has multiple permissive policies for role \\`supabase_privileged_role\\` for action \\`INSERT\\`. Policies include \\`{procedimentos_insert_secretaria,procedimentos_write_own}\\`",
+            "metadata": {
+              "name": "procedimentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.procedimentos\\` has multiple permissive policies for role \\`supabase_privileged_role\\` for action \\`SELECT\\`. Policies include \\`{procedimentos_select,procedimentos_write_own}\\`",
+            "metadata": {
+              "name": "procedimentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.tratamentos\\` has multiple permissive policies for role \\`anon\\` for action \\`SELECT\\`. Policies include \\`{tratamentos_select,tratamentos_write_own}\\`",
+            "metadata": {
+              "name": "tratamentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.tratamentos\\` has multiple permissive policies for role \\`authenticated\\` for action \\`SELECT\\`. Policies include \\`{tratamentos_select,tratamentos_write_own}\\`",
+            "metadata": {
+              "name": "tratamentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.tratamentos\\` has multiple permissive policies for role \\`authenticator\\` for action \\`SELECT\\`. Policies include \\`{tratamentos_select,tratamentos_write_own}\\`",
+            "metadata": {
+              "name": "tratamentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.tratamentos\\` has multiple permissive policies for role \\`cli_login_postgres\\` for action \\`SELECT\\`. Policies include \\`{tratamentos_select,tratamentos_write_own}\\`",
+            "metadata": {
+              "name": "tratamentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.tratamentos\\` has multiple permissive policies for role \\`dashboard_user\\` for action \\`SELECT\\`. Policies include \\`{tratamentos_select,tratamentos_write_own}\\`",
+            "metadata": {
+              "name": "tratamentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          },
+          {
+            "detail": "Table \\`public.tratamentos\\` has multiple permissive policies for role \\`supabase_privileged_role\\` for action \\`SELECT\\`. Policies include \\`{tratamentos_select,tratamentos_write_own}\\`",
+            "metadata": {
+              "name": "tratamentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.166Z"
+          }
+        ]
+      },
+      {
+        "name": "auth_db_connections_absolute",
+        "title": "Auth DB Connection Strategy is not Percentage",
+        "level": "INFO",
+        "facing": "EXTERNAL",
+        "categories": [
+          "PERFORMANCE"
+        ],
+        "description": "Using a percentage based allocation connection strategy for Auth can help to improve the server's performance when increasing instance size.",
+        "remediation": "https://supabase.com/docs/guides/deployment/going-into-prod",
+        "count": 1,
+        "findings": [
+          {
+            "detail": "Your project's Auth server is configured to use at most 10 connections. Increasing the instance size without manually adjusting this number will not improve the performance of the Auth server. Switch to a percentage based connection allocation strategy instead.",
+            "metadata": {
+              "type": "auth",
+              "entity": "Auth"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

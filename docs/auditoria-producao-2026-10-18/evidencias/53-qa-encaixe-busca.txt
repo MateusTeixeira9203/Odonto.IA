@@ -1,0 +1,19 @@
+Browser tab: 2115955912, Title: "Odonto.IA | Inteligência Odontológica", URL: "https://odontoia.app/dashboard/meu-dia".
+1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/dashboard/meu-dia
+	2 container
+		3 container Notifications alt+T
+		4 container Atender agora
+			5 heading Atender agora, Value: 2, ID: base-ui-_r_3v_
+				6 text Atender agora
+			7 text Busque o paciente ou cadastre um novo para iniciar a consulta imediatamente.
+			8 text field (settable) Value: QA Auditoria, ID: base-ui-_r_41_
+			10 button QA Auditoria 18-10-2026
+			11 text Não encontrou? Cadastre e atenda:
+			12 text field (settable) base-ui-_r_42_
+			13 button Cadastrar “QA Auditoria” e atender
+				14 text Cadastrar “
+				15 text QA Auditoria
+				16 text ” e atender
+			9 button Close
+
+The focused UI element is 8 text field (settable) Value: QA Auditoria, ID: base-ui-_r_41_

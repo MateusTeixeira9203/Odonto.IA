@@ -1,0 +1,33 @@
+Browser tab: 5, Title: "Odonto.IA | Inteligência Odontológica", URL: "https://odontoia.app/login?redirectTo=%2Fdashboard".
+0 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/login?redirectTo=%2Fdashboard
+	1 container
+		2 container
+			3 image
+			4 text Odonto .IA MENOS PAPELADA. MAIS CLÍNICA.
+			5 heading Você atende. A IA documenta., Value: 2
+				6 text Você atende.
+				7 text A IA documenta.
+			8 text Do atendimento ao prontuário estruturado, sem tirar o foco do paciente. ODONTO.IA
+		9 text ÁREA DO DENTISTA
+		10 heading Bem-vindo de volta., Value: 1
+			11 text Bem-vindo de volta.
+		12 text Acesse sua conta e continue de onde parou.
+		13 container
+			14 text E-MAIL
+			15 text field (settable) E-MAIL
+			16 text SENHA
+			17 link Description: Esqueceu a senha?, Value: odontoia.app/esqueci-senha
+			18 text field (settable) SENHA
+			19 button Mostrar senha
+			20 button Entrar
+		21 container
+			22 text ou
+		23 button Entrar com Google
+			24 image
+			25 text Entrar com Google
+		26 container
+			27 text Não tem uma conta?
+			28 link Description: Cadastre-se, Value: odontoia.app/cadastro?next=%2Fdashboard
+	29 container Notifications alt+T
+
+The focused UI element is 0 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/login?redirectTo=%2Fdashboard

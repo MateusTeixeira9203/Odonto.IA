@@ -1,0 +1,3 @@
+Browser tab: 2115955912, Title: "Odonto.IA | Inteligência Odontológica", URL: "https://odontoia.app/dashboard/financeiro".
+There has been no change in the accessibility tree.
+The focused UI element is 52 text field (settable) base-ui-_r_78_

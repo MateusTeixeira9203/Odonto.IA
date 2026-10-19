@@ -1,0 +1,42 @@
+Browser tab: 2115955912, Title: "Odonto.IA | Inteligência Odontológica", URL: "https://odontoia.app/dashboard/pacientes".
+1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/dashboard/pacientes
+	2 container
+		3 container
+			4 heading Pacientes, Value: 1
+				5 text Pacientes
+			6 text Gerencie sua base de pacientes com elegância.
+			7 link Description: Novo Paciente, Value: odontoia.app/dashboard/pacientes/novo
+			8 search text field (settable)
+			9 table
+				10 row
+					11 cell
+						12 text PACIENTE
+					13 cell
+						14 text CONTATO
+					15 cell
+						16 text CADASTRADO EM
+				17 row
+					18 cell
+						19 text QA
+						20 link Description: QA Auditoria 18-10-2026, Value: odontoia.app/dashboard/pacientes/290b050a-877c-40b7-8cf4-38e3488ce636
+						21 text 290B050A
+					22 cell
+						23 text —
+					24 cell
+						25 text 18/10/2026
+			26 text 1 – 1 de 1 paciente
+		27 container
+			28 image
+			29 text Odonto .IA
+			30 link Description: INÍCIO, Value: odontoia.app/dashboard
+			31 link Description: MEU DIA, Value: odontoia.app/dashboard/meu-dia
+			32 link Description: PACIENTES, Value: odontoia.app/dashboard/pacientes
+			33 link Description: AGENDA, Value: odontoia.app/dashboard/agendamentos
+			34 link Description: FINANCEIRO, Value: odontoia.app/dashboard/financeiro
+			35 link Description: CONFIG, Value: odontoia.app/dashboard/configuracoes
+			36 button Abrir DEX
+			37 button Modo Claro
+			38 pop up button (collapsed) DT, Help: Dentista teste 1, ID: radix-_r_0_, Secondary Actions: Expand
+		39 container Notifications alt+T
+
+The focused UI element is 1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/dashboard/pacientes

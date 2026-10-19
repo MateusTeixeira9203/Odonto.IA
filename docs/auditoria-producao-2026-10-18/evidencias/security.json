@@ -1,0 +1,1209 @@
+{
+  "result": {
+    "lints": [
+      {
+        "name": "rls_enabled_no_policy",
+        "title": "RLS Enabled No Policy",
+        "level": "INFO",
+        "facing": "EXTERNAL",
+        "categories": [
+          "SECURITY"
+        ],
+        "description": "Detects cases where row level security (RLS) has been enabled on a table but no RLS policies have been created.",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy",
+        "count": 29,
+        "findings": [
+          {
+            "detail": "Table \\`public.acordos_repasse\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "acordos_repasse",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Table \\`public.assinaturas_dentista\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "assinaturas_dentista",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Table \\`public.billing_access_overrides\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "billing_access_overrides",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Table \\`public.billing_events\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "billing_events",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Table \\`public.billing_runtime_config\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "billing_runtime_config",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Table \\`public.clinica_governanca_auditoria\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "clinica_governanca_auditoria",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Table \\`public.clinica_vinculos_governanca\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "clinica_vinculos_governanca",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Table \\`public.convites_governanca\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "convites_governanca",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Table \\`public.despesas_recorrentes\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "despesas_recorrentes",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Table \\`public.despesas_recorrentes_competencias\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "despesas_recorrentes_competencias",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Table \\`public.estoque_auditoria\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "estoque_auditoria",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Table \\`public.estoque_itens\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "estoque_itens",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Table \\`public.estoque_kit_componentes\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "estoque_kit_componentes",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Table \\`public.estoque_kit_versoes\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "estoque_kit_versoes",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Table \\`public.estoque_kits\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "estoque_kits",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Table \\`public.estoque_lotes\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "estoque_lotes",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Table \\`public.estoque_movimentos\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "estoque_movimentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Table \\`public.estoque_operacoes\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "estoque_operacoes",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Table \\`public.estoque_usos\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "estoque_usos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Table \\`public.formacoes_clinica\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "formacoes_clinica",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Table \\`public.onboarding_clinica_auditoria\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "onboarding_clinica_auditoria",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Table \\`public.onboarding_comunicacoes\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "onboarding_comunicacoes",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Table \\`public.operational_incidents\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "operational_incidents",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Table \\`public.politicas_trial_assinatura\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "politicas_trial_assinatura",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Table \\`public.repasse_diarias\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "repasse_diarias",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Table \\`public.repasse_pagamentos\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "repasse_pagamentos",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Table \\`public.repasses\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "repasses",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Table \\`public.saldos_bancarios_informados\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "saldos_bancarios_informados",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Table \\`public.whatsapp_modelos_operacionais\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "whatsapp_modelos_operacionais",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          }
+        ]
+      },
+      {
+        "name": "function_search_path_mutable",
+        "title": "Function Search Path Mutable",
+        "level": "WARN",
+        "facing": "EXTERNAL",
+        "categories": [
+          "SECURITY"
+        ],
+        "description": "Detects functions where the search_path parameter is not set.",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0011_function_search_path_mutable",
+        "count": 2,
+        "findings": [
+          {
+            "detail": "Function \\`public.normalizar_nome\\` has a role mutable search_path",
+            "metadata": {
+              "name": "normalizar_nome",
+              "type": "function",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function \\`public.trg_pacientes_nome_busca\\` has a role mutable search_path",
+            "metadata": {
+              "name": "trg_pacientes_nome_busca",
+              "type": "function",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          }
+        ]
+      },
+      {
+        "name": "anon_security_definer_function_executable",
+        "title": "Public Can Execute SECURITY DEFINER Function",
+        "level": "WARN",
+        "facing": "EXTERNAL",
+        "categories": [
+          "SECURITY"
+        ],
+        "description": "Detects `SECURITY DEFINER` functions that are callable without signing in. Revoke `EXECUTE`, switch the function to `SECURITY INVOKER`, or move it out of your exposed API schema if it is not meant to be public.",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable",
+        "count": 3,
+        "findings": [
+          {
+            "detail": "Function `public.can_act_as_dentista(target_dentista_id uuid)` can be executed by the `anon` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/can_act_as_dentista`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "can_act_as_dentista",
+              "schema": "public",
+              "language": "sql",
+              "arguments": "target_dentista_id uuid",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.validar_evento_orcamento_da_ficha()` can be executed by the `anon` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/validar_evento_orcamento_da_ficha`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "validar_evento_orcamento_da_ficha",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.validar_item_orcamento_catalogo_dono()` can be executed by the `anon` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/validar_item_orcamento_catalogo_dono`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "validar_item_orcamento_catalogo_dono",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          }
+        ]
+      },
+      {
+        "name": "authenticated_security_definer_function_executable",
+        "title": "Signed-In Users Can Execute SECURITY DEFINER Function",
+        "level": "WARN",
+        "facing": "EXTERNAL",
+        "categories": [
+          "SECURITY"
+        ],
+        "description": "Detects `SECURITY DEFINER` functions that are callable by signed-in users. Revoke `EXECUTE`, switch the function to `SECURITY INVOKER`, or move it out of your exposed API schema if signed-in users should not call it.",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable",
+        "count": 74,
+        "findings": [
+          {
+            "detail": "Function `public.aceitar_convite_governanca(p_token uuid, p_cro text, p_especialidade text[])` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/aceitar_convite_governanca`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "aceitar_convite_governanca",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_token uuid, p_cro text, p_especialidade text[]",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.aceitar_orcamento(p_orcamento_id uuid, p_assinado_por text, p_assinatura_ref text)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/aceitar_orcamento`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "aceitar_orcamento",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_orcamento_id uuid, p_assinado_por text, p_assinatura_ref text",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.adicionar_itens_orcamento_com_eventos(p_orcamento_id uuid, p_itens jsonb)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/adicionar_itens_orcamento_com_eventos`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "adicionar_itens_orcamento_com_eventos",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_orcamento_id uuid, p_itens jsonb",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.adicionar_itens_orcamento_com_eventos_r157(p_orcamento_id uuid, p_itens jsonb)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/adicionar_itens_orcamento_com_eventos_r157`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "adicionar_itens_orcamento_com_eventos_r157",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_orcamento_id uuid, p_itens jsonb",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.adicionar_procedimentos_ficha(p_ficha_id uuid, p_paciente_id uuid, p_captura_id uuid, p_eventos jsonb)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/adicionar_procedimentos_ficha`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "adicionar_procedimentos_ficha",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_ficha_id uuid, p_paciente_id uuid, p_captura_id uuid, p_eventos jsonb",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.assinar_procedimentos(p_evento_ids uuid[], p_assinado_por text, p_assinatura_ref text)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/assinar_procedimentos`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "assinar_procedimentos",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_evento_ids uuid[], p_assinado_por text, p_assinatura_ref text",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.belongs_to_active_clinic(record_clinica_id uuid)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/belongs_to_active_clinic`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "belongs_to_active_clinic",
+              "schema": "public",
+              "language": "sql",
+              "arguments": "record_clinica_id uuid",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.can_act_as_dentista(target_dentista_id uuid)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/can_act_as_dentista`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "can_act_as_dentista",
+              "schema": "public",
+              "language": "sql",
+              "arguments": "target_dentista_id uuid",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.can_see_orcamento(record_dentista_id uuid)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/can_see_orcamento`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "can_see_orcamento",
+              "schema": "public",
+              "language": "sql",
+              "arguments": "record_dentista_id uuid",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.cancelar_cobranca_orcamento(p_cobranca_id uuid, p_motivo text)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/cancelar_cobranca_orcamento`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "cancelar_cobranca_orcamento",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_cobranca_id uuid, p_motivo text",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.cancelar_repasse(p_clinica_id_esperada uuid, p_repasse_id uuid)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/cancelar_repasse`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "cancelar_repasse",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_clinica_id_esperada uuid, p_repasse_id uuid",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.complete_onboarding(p_plano text, p_nome_clinica text, p_nome_usuario text, p_cro text, p_especialidade text[], p_telefone text, p_cidade text, p_estado text, p_email text, p_foco_principal text)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/complete_onboarding`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "complete_onboarding",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_plano text, p_nome_clinica text, p_nome_usuario text, p_cro text, p_especialidade text[], p_telefone text, p_cidade text, p_estado text, p_email text, p_foco_principal text",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.complete_onboarding_modalidade(p_nome_clinica text, p_modalidade text, p_criador_atende boolean, p_nome_usuario text, p_cro text, p_especialidade text[], p_email text, p_foco_principal text, p_chave_idempotencia uuid)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/complete_onboarding_modalidade`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "complete_onboarding_modalidade",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_nome_clinica text, p_modalidade text, p_criador_atende boolean, p_nome_usuario text, p_cro text, p_especialidade text[], p_email text, p_foco_principal text, p_chave_idempotencia uuid",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.complete_onboarding_modalidade(p_nome_clinica text, p_modalidade text, p_criador_atende boolean, p_nome_usuario text, p_cro text, p_especialidade text[], p_email text, p_foco_principal text, p_chave_idempotencia uuid, p_quantidade_dentistas_prevista integer)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/complete_onboarding_modalidade`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "complete_onboarding_modalidade",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_nome_clinica text, p_modalidade text, p_criador_atende boolean, p_nome_usuario text, p_cro text, p_especialidade text[], p_email text, p_foco_principal text, p_chave_idempotencia uuid, p_quantidade_dentistas_prevista integer",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.concluir_evento_encaminhado(p_evento_ids uuid[], p_novo_status text, p_realizado_em date)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/concluir_evento_encaminhado`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "concluir_evento_encaminhado",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_evento_ids uuid[], p_novo_status text, p_realizado_em date",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.configurar_governanca_inicial(p_clinica_id uuid, p_modalidade text, p_proprietario_membro_id uuid, p_versao_esperada integer, p_chave_idempotencia uuid)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/configurar_governanca_inicial`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "configurar_governanca_inicial",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_clinica_id uuid, p_modalidade text, p_proprietario_membro_id uuid, p_versao_esperada integer, p_chave_idempotencia uuid",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.confirmar_competencia_recorrente_paga(p_clinica_id_esperada uuid, p_competencia_id uuid, p_pago_em date)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/confirmar_competencia_recorrente_paga`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "confirmar_competencia_recorrente_paga",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_clinica_id_esperada uuid, p_competencia_id uuid, p_pago_em date",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.confirmar_previsao_orcamento(p_pagamento_id uuid, p_forma text, p_data date)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/confirmar_previsao_orcamento`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "confirmar_previsao_orcamento",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_pagamento_id uuid, p_forma text, p_data date",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.corrigir_recebimento_orcamento(p_pagamento_id uuid, p_valor numeric, p_forma text, p_data date)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/corrigir_recebimento_orcamento`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "corrigir_recebimento_orcamento",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_pagamento_id uuid, p_valor numeric, p_forma text, p_data date",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.criar_cobranca_orcamento(p_orcamento_id uuid, p_item_ids uuid[], p_desconto numeric, p_numero_parcelas smallint, p_primeiro_vencimento date, p_observacoes text, p_entrada_valor numeric, p_entrada_forma text, p_entrada_registrada boolean, p_parcelas_forma text)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/criar_cobranca_orcamento`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "criar_cobranca_orcamento",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_orcamento_id uuid, p_item_ids uuid[], p_desconto numeric, p_numero_parcelas smallint, p_primeiro_vencimento date, p_observacoes text, p_entrada_valor numeric, p_entrada_forma text, p_entrada_registrada boolean, p_parcelas_forma text",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.criar_convite_equipe(p_clinica_id uuid, p_nome text, p_email text, p_tipo text, p_chave_idempotencia uuid)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/criar_convite_equipe`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "criar_convite_equipe",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_clinica_id uuid, p_nome text, p_email text, p_tipo text, p_chave_idempotencia uuid",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.criar_orcamento_com_eventos(p_paciente_id uuid, p_dentista_id uuid, p_ficha_id uuid, p_desconto numeric, p_itens jsonb)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/criar_orcamento_com_eventos`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "criar_orcamento_com_eventos",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_paciente_id uuid, p_dentista_id uuid, p_ficha_id uuid, p_desconto numeric, p_itens jsonb",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.criar_orcamento_com_eventos_r157(p_paciente_id uuid, p_dentista_id uuid, p_ficha_id uuid, p_desconto numeric, p_itens jsonb)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/criar_orcamento_com_eventos_r157`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "criar_orcamento_com_eventos_r157",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_paciente_id uuid, p_dentista_id uuid, p_ficha_id uuid, p_desconto numeric, p_itens jsonb",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.definir_plano_avista(p_orcamento_id uuid, p_valor_acordado numeric, p_entrada_valor numeric, p_entrada_forma text)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/definir_plano_avista`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "definir_plano_avista",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_orcamento_id uuid, p_valor_acordado numeric, p_entrada_valor numeric, p_entrada_forma text",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.dispensar_retirada_orcamento(p_orcamento_id uuid, p_evento_id uuid, p_alteracao_id uuid)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/dispensar_retirada_orcamento`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "dispensar_retirada_orcamento",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_orcamento_id uuid, p_evento_id uuid, p_alteracao_id uuid",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.editar_cobranca_orcamento(p_cobranca_id uuid, p_item_ids uuid[], p_valor_final numeric)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/editar_cobranca_orcamento`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "editar_cobranca_orcamento",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_cobranca_id uuid, p_item_ids uuid[], p_valor_final numeric",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.editar_detalhes_evento_odontograma(p_evento_id uuid, p_detalhe jsonb, p_alterar_detalhe boolean, p_observacao text, p_alterar_observacao boolean, p_procedimento_nome text, p_alterar_nome boolean, p_original jsonb)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/editar_detalhes_evento_odontograma`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "editar_detalhes_evento_odontograma",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_evento_id uuid, p_detalhe jsonb, p_alterar_detalhe boolean, p_observacao text, p_alterar_observacao boolean, p_procedimento_nome text, p_alterar_nome boolean, p_original jsonb",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.editar_valores_orcamento_vinculado(p_orcamento_id uuid, p_itens jsonb, p_versao_esperada timestamp with time zone)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/editar_valores_orcamento_vinculado`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "editar_valores_orcamento_vinculado",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_orcamento_id uuid, p_itens jsonb, p_versao_esperada timestamp with time zone",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.encaminhar_eventos_odontograma(p_evento_ids uuid[], p_destino_id uuid)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/encaminhar_eventos_odontograma`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "encaminhar_eventos_odontograma",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_evento_ids uuid[], p_destino_id uuid",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.estornar_recebimento_orcamento(p_pagamento_id uuid, p_motivo text)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/estornar_recebimento_orcamento`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "estornar_recebimento_orcamento",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_pagamento_id uuid, p_motivo text",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.excluir_evento_odontograma(p_evento_id uuid)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/excluir_evento_odontograma`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "excluir_evento_odontograma",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_evento_id uuid",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.excluir_ficha_propria_preservando_financeiro(p_ficha_id uuid)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/excluir_ficha_propria_preservando_financeiro`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "excluir_ficha_propria_preservando_financeiro",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_ficha_id uuid",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.gerar_parcelas_orcamento(p_orcamento_id uuid, p_numero_parcelas smallint, p_primeiro_vencimento date, p_valor_acordado numeric, p_entrada_valor numeric, p_entrada_forma text, p_parcelas_forma text)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/gerar_parcelas_orcamento`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "gerar_parcelas_orcamento",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_orcamento_id uuid, p_numero_parcelas smallint, p_primeiro_vencimento date, p_valor_acordado numeric, p_entrada_valor numeric, p_entrada_forma text, p_parcelas_forma text",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.gerar_repasse_fixo(p_clinica_id_esperada uuid, p_acordo_id uuid, p_competencia date, p_data_trabalhada date)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/gerar_repasse_fixo`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "gerar_repasse_fixo",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_clinica_id_esperada uuid, p_acordo_id uuid, p_competencia date, p_data_trabalhada date",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.gerar_repasse_percentual(p_clinica_id_esperada uuid, p_acordo_id uuid, p_inicio date, p_fim date)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/gerar_repasse_percentual`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "gerar_repasse_percentual",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_clinica_id_esperada uuid, p_acordo_id uuid, p_inicio date, p_fim date",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.get_my_clinica_id()` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/get_my_clinica_id`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "get_my_clinica_id",
+              "schema": "public",
+              "language": "sql",
+              "arguments": "",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.get_my_dentista_id()` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/get_my_dentista_id`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "get_my_dentista_id",
+              "schema": "public",
+              "language": "sql",
+              "arguments": "",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.get_my_role()` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/get_my_role`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "get_my_role",
+              "schema": "public",
+              "language": "sql",
+              "arguments": "",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.has_active_membership()` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/has_active_membership`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "has_active_membership",
+              "schema": "public",
+              "language": "sql",
+              "arguments": "",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.is_clinic_admin()` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/is_clinic_admin`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "is_clinic_admin",
+              "schema": "public",
+              "language": "sql",
+              "arguments": "",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.is_clinic_dentista()` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/is_clinic_dentista`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "is_clinic_dentista",
+              "schema": "public",
+              "language": "sql",
+              "arguments": "",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.is_clinic_staff()` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/is_clinic_staff`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "is_clinic_staff",
+              "schema": "public",
+              "language": "sql",
+              "arguments": "",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.is_my_patient(patient_dentista_id uuid)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/is_my_patient`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "is_my_patient",
+              "schema": "public",
+              "language": "sql",
+              "arguments": "patient_dentista_id uuid",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.is_own_clinical_record(record_dentista_id uuid)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/is_own_clinical_record`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "is_own_clinical_record",
+              "schema": "public",
+              "language": "sql",
+              "arguments": "record_dentista_id uuid",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.is_own_finance_record(record_dentista_id uuid)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/is_own_finance_record`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "is_own_finance_record",
+              "schema": "public",
+              "language": "sql",
+              "arguments": "record_dentista_id uuid",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.obter_acoes_financeiras_clinica(p_clinica_id_esperada uuid)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/obter_acoes_financeiras_clinica`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "obter_acoes_financeiras_clinica",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_clinica_id_esperada uuid",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.obter_contexto_governanca(p_clinica_id_esperada uuid)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/obter_contexto_governanca`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "obter_contexto_governanca",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_clinica_id_esperada uuid",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.obter_extrato_financeiro_clinica(p_clinica_id_esperada uuid, p_mes_referencia date)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/obter_extrato_financeiro_clinica`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "obter_extrato_financeiro_clinica",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_clinica_id_esperada uuid, p_mes_referencia date",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.obter_financeiro_clinica(p_clinica_id_esperada uuid, p_mes_referencia date)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/obter_financeiro_clinica`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "obter_financeiro_clinica",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_clinica_id_esperada uuid, p_mes_referencia date",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.obter_financeiro_clinica_painel(p_clinica_id_esperada uuid, p_mes_referencia date)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/obter_financeiro_clinica_painel`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "obter_financeiro_clinica_painel",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_clinica_id_esperada uuid, p_mes_referencia date",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.obter_meu_financeiro_gerido(p_clinica_id_esperada uuid, p_mes_referencia date)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/obter_meu_financeiro_gerido`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "obter_meu_financeiro_gerido",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_clinica_id_esperada uuid, p_mes_referencia date",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.obter_modelos_whatsapp_operacionais(p_clinica_id_esperada uuid)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/obter_modelos_whatsapp_operacionais`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "obter_modelos_whatsapp_operacionais",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_clinica_id_esperada uuid",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.obter_recebido_por_modalidade_clinica(p_clinica_id_esperada uuid, p_mes_referencia date)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/obter_recebido_por_modalidade_clinica`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "obter_recebido_por_modalidade_clinica",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_clinica_id_esperada uuid, p_mes_referencia date",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.obter_repasses_clinica(p_clinica_id_esperada uuid, p_mes_referencia date)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/obter_repasses_clinica`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "obter_repasses_clinica",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_clinica_id_esperada uuid, p_mes_referencia date",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.paciente_tem_conflito_agenda(p_paciente_id uuid, p_inicio timestamp with time zone, p_duracao_min integer, p_ignorar_id uuid)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/paciente_tem_conflito_agenda`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "paciente_tem_conflito_agenda",
+              "schema": "public",
+              "language": "sql",
+              "arguments": "p_paciente_id uuid, p_inicio timestamp with time zone, p_duracao_min integer, p_ignorar_id uuid",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.pagar_repasse(p_clinica_id_esperada uuid, p_repasse_id uuid, p_data_pagamento date)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/pagar_repasse`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "pagar_repasse",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_clinica_id_esperada uuid, p_repasse_id uuid, p_data_pagamento date",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.preencher_detalhe_encaminhado(p_evento_id uuid, p_detalhe jsonb)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/preencher_detalhe_encaminhado`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "preencher_detalhe_encaminhado",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_evento_id uuid, p_detalhe jsonb",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.registrar_lancamento_clinica(p_clinica_id_esperada uuid, p_tipo text, p_valor numeric, p_data date, p_descricao text, p_categoria text, p_forma text, p_dentista_id uuid)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/registrar_lancamento_clinica`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "registrar_lancamento_clinica",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_clinica_id_esperada uuid, p_tipo text, p_valor numeric, p_data date, p_descricao text, p_categoria text, p_forma text, p_dentista_id uuid",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.registrar_lancamento_pessoal(p_clinica_id_esperada uuid, p_tipo text, p_valor numeric, p_data date, p_descricao text, p_categoria text, p_forma text)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/registrar_lancamento_pessoal`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "registrar_lancamento_pessoal",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_clinica_id_esperada uuid, p_tipo text, p_valor numeric, p_data date, p_descricao text, p_categoria text, p_forma text",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.registrar_pagamento_rapido_idempotente(p_operacao_id uuid, p_orcamento_id uuid, p_forma text, p_data date)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/registrar_pagamento_rapido_idempotente`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "registrar_pagamento_rapido_idempotente",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_operacao_id uuid, p_orcamento_id uuid, p_forma text, p_data date",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.registrar_recebimento_cobranca(p_cobranca_id uuid, p_valor numeric, p_forma text, p_data date)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/registrar_recebimento_cobranca`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "registrar_recebimento_cobranca",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_cobranca_id uuid, p_valor numeric, p_forma text, p_data date",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.registrar_recebimento_orcamento(p_orcamento_id uuid, p_valor numeric, p_forma text, p_data date)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/registrar_recebimento_orcamento`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "registrar_recebimento_orcamento",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_orcamento_id uuid, p_valor numeric, p_forma text, p_data date",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.registrar_recebimento_orcamento_idempotente(p_operacao_id uuid, p_orcamento_id uuid, p_valor numeric, p_forma text, p_data date)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/registrar_recebimento_orcamento_idempotente`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "registrar_recebimento_orcamento_idempotente",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_operacao_id uuid, p_orcamento_id uuid, p_valor numeric, p_forma text, p_data date",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.reorganizar_parcelas_orcamento(p_orcamento_id uuid, p_valor_acordado numeric, p_parcelas jsonb)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/reorganizar_parcelas_orcamento`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "reorganizar_parcelas_orcamento",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_orcamento_id uuid, p_valor_acordado numeric, p_parcelas jsonb",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.resolver_renomeacao_item_orcamento(p_orcamento_id uuid, p_evento_id uuid, p_item_id uuid, p_alteracao_id uuid, p_nome_atual text, p_manter_nome_historico boolean)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/resolver_renomeacao_item_orcamento`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "resolver_renomeacao_item_orcamento",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_orcamento_id uuid, p_evento_id uuid, p_item_id uuid, p_alteracao_id uuid, p_nome_atual text, p_manter_nome_historico boolean",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.retirar_evento_ficha_orcamento(p_evento_id uuid)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/retirar_evento_ficha_orcamento`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "retirar_evento_ficha_orcamento",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_evento_id uuid",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.retirar_itens_orcamento_da_ficha(p_orcamento_id uuid, p_item_id uuid, p_evento_ids uuid[], p_versao_esperada timestamp with time zone, p_confirmar_ajuste_financeiro boolean)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/retirar_itens_orcamento_da_ficha`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "retirar_itens_orcamento_da_ficha",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_orcamento_id uuid, p_item_id uuid, p_evento_ids uuid[], p_versao_esperada timestamp with time zone, p_confirmar_ajuste_financeiro boolean",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.revisar_orcamento_aceito(p_orcamento_id uuid, p_itens jsonb, p_valor_acordado numeric, p_versao_esperada timestamp with time zone)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/revisar_orcamento_aceito`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "revisar_orcamento_aceito",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_orcamento_id uuid, p_itens jsonb, p_valor_acordado numeric, p_versao_esperada timestamp with time zone",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.salvar_acordo_repasse(p_clinica_id_esperada uuid, p_dentista_id uuid, p_modalidade text, p_percentual numeric, p_valor_fixo numeric, p_vigente_desde date, p_vigente_ate date, p_observacao text)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/salvar_acordo_repasse`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "salvar_acordo_repasse",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_clinica_id_esperada uuid, p_dentista_id uuid, p_modalidade text, p_percentual numeric, p_valor_fixo numeric, p_vigente_desde date, p_vigente_ate date, p_observacao text",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.salvar_despesa_recorrente(p_clinica_id_esperada uuid, p_id uuid, p_descricao text, p_categoria text, p_valor numeric, p_dia_vencimento smallint, p_ativo boolean)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/salvar_despesa_recorrente`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "salvar_despesa_recorrente",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_clinica_id_esperada uuid, p_id uuid, p_descricao text, p_categoria text, p_valor numeric, p_dia_vencimento smallint, p_ativo boolean",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.salvar_modelos_whatsapp_operacionais(p_clinica_id_esperada uuid, p_modelos jsonb)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/salvar_modelos_whatsapp_operacionais`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "salvar_modelos_whatsapp_operacionais",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_clinica_id_esperada uuid, p_modelos jsonb",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.validar_evento_orcamento_da_ficha()` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/validar_evento_orcamento_da_ficha`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "validar_evento_orcamento_da_ficha",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.validar_item_orcamento_catalogo_dono()` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/validar_item_orcamento_catalogo_dono`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "validar_item_orcamento_catalogo_dono",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          },
+          {
+            "detail": "Function `public.vincular_eventos_legados_item_orcamento(p_orcamento_id uuid, p_item_id uuid, p_evento_ids uuid[])` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/vincular_eventos_legados_item_orcamento`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+            "metadata": {
+              "name": "vincular_eventos_legados_item_orcamento",
+              "schema": "public",
+              "language": "plpgsql",
+              "arguments": "p_orcamento_id uuid, p_item_id uuid, p_evento_ids uuid[]",
+              "security_definer": true
+            },
+            "observed_at": "2026-10-18T21:34:25.111Z"
+          }
+        ]
+      },
+      {
+        "name": "auth_leaked_password_protection",
+        "title": "Leaked Password Protection Disabled",
+        "level": "WARN",
+        "facing": "EXTERNAL",
+        "categories": [
+          "SECURITY"
+        ],
+        "description": "Leaked password protection is currently disabled.",
+        "remediation": "https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection",
+        "count": 1,
+        "findings": [
+          {
+            "detail": "Supabase Auth prevents the use of compromised passwords by checking against HaveIBeenPwned.org. Enable this feature to enhance security.",
+            "metadata": {
+              "type": "auth",
+              "entity": "Auth"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

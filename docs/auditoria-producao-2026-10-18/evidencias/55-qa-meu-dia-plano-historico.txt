@@ -1,0 +1,90 @@
+Browser tab: 2115955912, Title: "Odonto.IA | Inteligência Odontológica", URL: "https://odontoia.app/dashboard/meu-dia".
+1 AXWebArea Odonto.IA | Inteligência Odontológica, URL: odontoia.app/dashboard/meu-dia
+	2 container
+		3 container
+			4 text MEU DIA
+			5 heading Domingo, 18 De Outubro, Value: 1
+				6 text Domingo, 18 De Outubro
+			7 button 19:30 QA Auditoria 18-10-2026 AGUARDANDO
+				8 text 19:30
+				9 text QA Auditoria 18-10-2026
+				10 text AGUARDANDO
+			11 pop up button (collapsed, settable) Description: Mudar status do atendimento, Value: Aguardando, Secondary Actions: Expand
+				12 menu
+					13 (selected) Aguardando
+					14 Confirmado
+					15 Na recepção
+					16 Atendendo
+					17 Concluído
+					18 Faltou
+					19 Cancelado
+			20 button Encaixe
+			21 text 19:30
+			22 heading QA Auditoria 18-10-2026, Value: 2
+				23 text QA Auditoria 18-10-2026
+			24 text PACIENTE FICTÍCIO — auditoria autorizada de produção. Nenhum dado de pessoa real. 1  pendente
+			25 link Description: Ver perfil completo →, Value: odontoia.app/dashboard/pacientes/290b050a-877c-40b7-8cf4-38e3488ce636
+			26 text CAMPO MÁGICO Fale, cole ou anexe — o Dex monta a ficha
+			27 text entry area (settable) Relato para organizar com Dex
+			28 button Gravar voz
+			29 button Anexar
+			30 button (disabled) Organizar com Dex Ctrl ↵
+				31 text Organizar com Dex Ctrl ↵
+			32 text Revisão do atendimento 0
+			33 button Marcar retorno
+			34 button Gerar orçamento
+			35 text Nada registrado ainda nesta consulta.
+			36 checkbox Boca, Value: 0
+			37 button (expanded) Plano e histórico 1, Secondary Actions: Collapse
+				38 text Plano e histórico
+				39 text 1
+			40 button (collapsed) Anexos, Secondary Actions: Expand
+			169 container Plano da consulta
+				170 text PLANO DA CONSULTA
+				171 button Encaminhar procedimentos
+				172 text Atualize o que foi feito agora ou deixe separado para a próxima sessão.
+				173 text Nenhum procedimento separado para esta consulta.
+			174 text HISTÓRICO CLÍNICO
+			175 text Pendências antigas e visitas anteriores, com contexto completo do tratamento.
+			176 container Procedimentos em aberto
+				177 text EM ABERTO
+				178 text 1
+				179 container
+					180 text Canal  ·  dente 32 Em aberto desde 18/10/2026  ·  Dentista teste 1 A fazer
+					181 checkbox A fazer, Value: 1
+					182 checkbox Próxima sessão, Value: 0
+					183 button Registrar hoje
+			184 container
+				185 button (expanded) 18/10/2026 Dentista teste 1 Canal · dente 32 Ocultar detalhes, Secondary Actions: Collapse
+					186 text 18/10/2026
+					187 text Dentista teste 1
+					188 text Canal · dente 32
+					189 text Ocultar detalhes
+				190 text 1  em aberto
+				191 button Gerar orçamento
+				192 text Canal IDENTIFICADO NESTA CONSULTA
+				193 button (collapsed) Secondary Actions: Expand, Canal · dente 32 “QA fictício — teste de persistência, sem indicação clínica real.” Dentista teste 1 Planejado
+					194 text Canal · dente 32
+					195 text “QA fictício — teste de persistência, sem indicação clínica real.”
+					196 text Dentista teste 1
+					197 text Planejado
+			151 text ✓ 1 ficha hoje
+			152 button (collapsed) Materiais / etiquetas 0, Secondary Actions: Expand
+				153 text Materiais / etiquetas
+				154 text 0
+			155 button (disabled) Salvar atendimento
+		156 container
+			157 image
+			158 text Odonto .IA
+			159 link Description: INÍCIO, Value: odontoia.app/dashboard
+			160 link Description: MEU DIA, Value: odontoia.app/dashboard/meu-dia
+			161 link Description: PACIENTES, Value: odontoia.app/dashboard/pacientes
+			162 link Description: AGENDA, Value: odontoia.app/dashboard/agendamentos
+			163 link Description: FINANCEIRO, Value: odontoia.app/dashboard/financeiro
+			164 link Description: CONFIG, Value: odontoia.app/dashboard/configuracoes
+			165 button Abrir DEX
+			166 button Modo Escuro
+			167 pop up button (collapsed) DT, Help: Dentista teste 1, ID: radix-_r_0_, Secondary Actions: Expand
+		168 container Notifications alt+T
+
+The focused UI element is 37 button (expanded) Plano e histórico 1, Secondary Actions: Collapse

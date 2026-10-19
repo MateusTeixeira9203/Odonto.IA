@@ -1,146 +1,101 @@
-# Odonto.IA — visão de produto
+# Odonto.IA — produto atual
 
 STATUS: ACTIVE
-OWNER: Produto — decisões do usuário, consolidação pela Coordenação
-LAST_REVIEWED: 2026-10-11
-REPLACES: visão centrada exclusivamente na consulta; oferta solo/colaborativa para novos clientes; docs/ESTRATEGIA-PRODUTO.md
-CANONICAL_FOR: público, posicionamento, responsabilidades das capacidades e limites de evolução
+LAST_REVIEWED: 2026-10-18
+CANONICAL_FOR: descrição do produto atual, público e separação entre atual e desejado
 
-Este documento registra direção de produto, não comprova funcionalidades implantadas.
-Regras técnicas estão no [AGENTS](../AGENTS.md), versão publicada na
-[baseline](../01_BASELINE_E_ESTABILIDADE.md) e foco no [Estado](../plans/ESTADO.md).
-As decisões vêm da conversa de 11/10/2026; propostas e lacunas estão identificadas.
+## O que é hoje
 
-## Produto e público — decidido
+Sistema odontológico em uso que conecta **agenda → atendimento → Ficha →
+planejamento → orçamento → acompanhamento financeiro**. A IA auxilia a captura
+e a estruturação do registro; o profissional revisa. A Ficha é a unidade de
+tratamento dentro do prontuário do paciente; um atendimento representa uma visita.
 
-**Software de gestão para clínicas odontológicas geridas, com atendimento clínico integrado
-e documentação assistida por IA.**
+O usuário considera a versão de produção estável e útil, precisando de refino.
+O mapa abaixo foi conciliado com código da aplicação `a1722c4`, catálogo e interface QA. Não é uma nova homologação de todas as telas, integrações ou permissões.
+Versão e limites estão no [Estado](../plans/ESTADO.md).
 
-O cliente principal passa a ser a clínica com proprietário e gestão definida. O proprietário
-pode ser dentista que atende, dentista que só administra ou pessoa não dentista. O dentista
-continua sendo usuário central do atendimento; ampliar a gestão deve preservar sua experiência.
+A [auditoria dirigida de 18/10](auditoria-producao-2026-10-18/README.md) confirmou
+o deployment, examinou o catálogo vivo e reuniu 113 capturas públicas e internas
+com a conta QA isenta. Cadastro sintético, procedimento manual com recarga, orçamento,
+encaixe, apresentação e receita manual tiveram verificação dirigida. A isenção
+permitiu a coleta; a correção do ciclo foi publicada seletivamente em 18/10. Login com sessão e acesso QA
+foram verificados; novo login por senha e estados comerciais reais ainda não. Ver CODIGO.md
+no pacote da auditoria para a identidade da versão e limites.
+Há estruturas de gestão, estoque e repasses no banco que não comprovam entrega
+dessas capacidades na interface desta versão. Os relatórios separam esses níveis.
 
-Uma clínica com um único dentista também é clínica: a mesma pessoa acumula os papéis de
-proprietário e dentista, utiliza gestão e atendimento e pode convidar equipe no futuro.
-Essa acumulação não dispensa limites por papel e por clínica.
+## Capacidades da versão identificada
 
-Na direção da nova oferta, não haverá plano Solo nem entrada de novas clínicas colaborativas.
-Preço, cobrança, limites dos planos e transição técnica/comercial ainda exigem definição própria.
-
-**Exceções legadas confirmadas pelo usuário:** Clindent permanece colaborativa; Dra. Léia
-permanece na configuração solo existente. Ambas mantêm seus fluxos atuais. Os nomes são
-referências de negócio, não identificadores de banco. Nenhuma migração, cancelamento de plano,
-remoção de acesso ou alteração de dados está autorizada por esta decisão documental.
-
-## Valor esperado por papel
-
-| Papel | Resultado que o produto deve favorecer |
+| Capacidade | Responsabilidade atual / limite |
 | --- | --- |
-| Proprietário/gestor | Entender a operação e os números da clínica, identificar problemas e tomar decisões verificáveis. |
-| Proprietário que atende | Alternar gestão e atendimento conforme seus papéis, sem registrar o mesmo fato duas vezes. |
-| Dentista da equipe | Atender com fluidez, revisar a documentação assistida por IA e acompanhar o trabalho sob sua responsabilidade. |
-| Recepção e apoio | Executar suas tarefas com contexto suficiente e acesso limitado ao necessário. |
+| Entrada e conta | Landing, cadastro/login, recuperação, onboarding, convites e gates comerciais. A landing ainda enfatiza documentação clínica por IA. |
+| Início | Painel do dentista com métricas, próximo atendimento e pendências; composição própria para recepção. Ainda existe na versão publicada. |
+| Agenda | Organizar atendimentos, encaixes, retornos e compromissos; origem do contexto de paciente/visita. |
+| Meu Dia | Fila e registro da consulta, Campo Mágico, revisão estruturada, odontograma, detalhes de especialidade e continuidade para Ficha/orçamento. |
+| Pacientes / prontuário | Cadastro, acompanhamento longitudinal, Fichas, procedimentos, autoria, status, encaminhamentos e documentos conforme autorização. |
+| Perfil do paciente | Áreas de Prontuário, Orçamentos, Arquivos e Agenda; acesso à apresentação ao paciente. Visibilidade varia por papel. |
+| Orçamento | Proposta vinculada ao contexto clínico, aprovação, descontos, etapas, previsões, recebimentos e estornos pelos fluxos existentes. A operação está no perfil do paciente; `/dashboard/orcamentos` redireciona para Pacientes. |
+| Financeiro | Recebimentos de orçamento, receitas manuais, despesas, pendências, séries e estimativa de hora clínica. Acesso condicionado por papel/plano. Não equivale a saldo bancário conciliado nem a DRE completa. |
+| Equipe e configuração | Clínica, profissionais, convites, catálogo, horários e controles comerciais existentes. Não confundir com a nova Gestão de clínicas geridas. |
+| Protético e comunicação | Rotas/fluxos próprios de protético e integrações de comunicação no código. Cobertura operacional e configuração de integrações não foram revalidadas nesta curadoria. |
+| Acesso | Web responsiva/PWA, temas claro/escuro. Aplicativo nativo não é produto entregue nesta baseline. |
 
-Propriedade, vínculo com a clínica, responsabilidade pela cobrança e autorização clínica são
-conceitos distintos. Ser proprietário não concede automaticamente edição de prontuários de
-outros profissionais; ser proprietário não dentista não concede atuação clínica. A matriz de
-leitura, edição, aprovação e exportação por papel deverá ser explicitada antes de implementação.
+## Interface atual observada
 
-## Atual, desejado e lacuna
+A navegação principal tem Início, Meu Dia, Pacientes, Agenda, Financeiro e Config,
+com DEX, tema e menu pessoal. Meu Dia combina fila, captura e painel clínico; a Ficha
+permite odontograma, procedimentos por dente, status, detalhes e continuidade.
+O perfil reúne Prontuário, Orçamentos, Arquivos e Agenda; Apresentar abre editor e
+slides. Configurações reúne Meu Perfil, Consultório, Horários, Procedimentos e Plano.
 
-| Tema | O que sabemos agora | Direção / lacuna |
-| --- | --- | --- |
-| Atendimento clínico | O usuário considera o produto útil e bom para dentistas; é relato de uso, não auditoria completa. | Preservar o que funciona e verificar entradas, processamento, persistência e recuperação de falhas. |
-| Versão de referência | A versão publicada foi identificada no documento de baseline. | Identificação de SHA não prova estabilidade, segurança ou paridade do banco. |
-| Gestão para proprietário | Novo foco decidido nesta conversa. | Inventariar o comportamento real antes de classificar capacidades como prontas, ausentes ou incompletas. |
-| Oferta solo/colaborativa | Excluída da direção de aquisição; duas exceções preservadas. | Levantar onboarding, planos, vínculos e permissões antes de propor a transição. |
-| Necessidades de gestão | Há temas propostos pelo usuário e pesquisa inicial de concorrentes. | Ouvir três dentistas e incluir perspectiva de proprietário que não atende. |
+A captura distinguiu criação da proposta, aceite de itens e status global do orçamento;
+esses estados não devem ser tratados como equivalentes. Receita manual aparece no
+resumo/extrato, mas não na série mensal no cenário QA observado (COD-01).
+Recepção, protético e WhatsApp não foram homologados pela conta de dentista SOLO.
+[Índice visual](auditoria-producao-2026-10-18/PRINTS.md) e
+[cobertura/limites](auditoria-producao-2026-10-18/INTERFACE.md).
 
-## Núcleo clínico a preservar
+## Papéis e propriedade dos dados
 
-Captura → estruturação pela IA → Ficha → planejamento → orçamento, com continuidade nos
-fluxos existentes de agenda, pacientes e financeiro. A Ficha estruturada é um ativo do produto.
-Não substituir jornadas funcionais por uma reorganização de gestão sem inventário e regressão.
+O código atual trabalha com `admin`, `dentista`, `secretaria` e `protetico` e resolve
+usuário, clínica ativa, vínculo e perfil. Os rótulos não concedem por si só todas
+as capacidades. Autorização efetiva precisa ser verificada no servidor e banco.
 
-A IA organiza e reduz trabalho documental; o profissional revisa o conteúdo. Não inventa
-diagnóstico nem assume decisão clínica. Dex é a identidade dessa assistência operacional,
-com respostas claras e previsíveis. Planejamento e apresentação ajudam o paciente a entender
-o tratamento; decisões comerciais não devem alterar o registro clínico silenciosamente.
+Paciente/Ficha são contexto clínico; autoria, responsável pelo procedimento,
+responsável pelo orçamento e destinatário de repasse são conceitos distintos.
+Não consolidar orçamentos, ampliar acesso ou transferir autoria por reorganização visual.
+Clindent colaborativa e Dra. Léia na configuração solo existente permanecem preservadas.
 
-A gestão deve consumir os mesmos fatos de atendimento, produção e pagamento, respeitando
-suas diferenças e autorizações. Não criar controles paralelos que exijam recadastro manual.
+## Direção de produto já decidida, sem confundir com entrega
 
-## Capacidades de gestão a investigar
+O foco comercial desejado é **gestão para clínicas com proprietário, com atendimento
+clínico integrado e IA operacional**. O proprietário pode ou não atender; proprietário
+não clínico não recebe atuação clínica por ser dono. Uma clínica de um dentista
+continua contemplada pela direção. Transição comercial e de permissões exige contrato.
 
-Este mapa define responsabilidades; não é roadmap, lista de telas ou aprovação de entrega.
-A [pesquisa e roteiro de entrevistas](../memory/references/gestao-clinicas-geridas-2026-10-11.md)
-concentra fontes, perguntas, hipóteses e método de priorização.
+Gestão ampliada, cadastro de proprietário não clínico, estoque e repasses não são
+capacidades publicadas comprovadas nesta baseline. Não apresentar ideias ou trabalho
+local anterior como parte do produto entregue. A próxima atualização será definida
+com o usuário a partir do sistema atual.
 
-| Capacidade | Responsabilidade / decisão a apoiar | Definição ainda necessária |
-| --- | --- | --- |
-| Financeiro da clínica e por dentista | Entender entradas, saídas, valores a receber e atribuição aos profissionais. | Separar orçamento, produção, recebimento, repasse e despesas; regras, visibilidade e conciliação. |
-| Capacidade e hora clínica | Entender disponibilidade, ocupação e resultado associado ao tempo de atendimento. | Distinguir tempo disponível/agendado/realizado, custo por hora e receita por hora. |
-| Estoque | Entender disponibilidade, consumo, reposição e perdas. | Quem registra, unidade de consumo, vínculo com procedimentos e necessidade de lotes/validade. |
-| Contratos | Organizar documentos, responsáveis e acompanhamento dos acordos. | Contratos com pacientes, profissionais ou ambos; versões, assinatura e integrações. |
-| Equipe, configurações e permissões | Definir quem pode ver e executar cada ação da clínica. | Convite, saída, troca de responsabilidade e limites por papel; preservar legado. |
-| WhatsApp da clínica | Organizar comunicação e continuidade do atendimento pela equipe. | Caixa compartilhada, responsáveis, confirmações, retornos e cobranças: validar necessidade e integrações. |
+## Comportamentos que precisam sobreviver ao refino
 
-Ticket médio precisa de evento-base, período e denominador explícitos. “Hora clínica” pode
-significar custo, receita ou disponibilidade; não deve virar um único número ambíguo.
-“Folga” precisa ser esclarecida nas entrevistas: tempo ocioso, capacidade para encaixes ou
-margem financeira. Recebimento, produção e lucro não são sinônimos. Fórmulas e fontes de
-dados só serão fechadas no contrato do recorte escolhido.
+- Identidade de paciente, Ficha e visita; texto e dados clínicos sem perda silenciosa.
+- Autoria, assinatura, encaminhamento, permissões e isolamento por clínica.
+- Valores e estados consistentes entre orçamento, pagamento e Financeiro; repetição
+  de uma operação não pode duplicar efeitos. Saldo simplificado não é lucro.
+- Fluxos das clínicas existentes; apresentações visuais não alteram regras de negócio.
+- Revisão humana da IA: não inventar diagnóstico, execução clínica ou medições ausentes.
 
-## Sequência de evolução
+## Design e próximo planejamento
 
-1. **Estabilizar o produto existente — prioridade decidida.** Inventariar as jornadas e
-   verificar segurança, entradas, tratamento de dados, persistência, erros e retomada. Dividir
-   o pente-fino em marcos verificáveis, com evidências por critério e proteção das duas exceções.
-2. **Descobrir necessidades de gestão.** Pesquisa documental e entrevistas podem avançar
-   durante a estabilização, sem antecipar implementação. Separar problema observado, sugestão
-   do entrevistado e hipótese nossa. Três conversas orientam o primeiro recorte, não comprovam mercado.
-3. **Expandir por recortes aprovados.** Depois dos gates pertinentes de estabilidade, escolher
-   uma necessidade, inventariar o que já existe, fechar contrato e verificar ponta a ponta.
+O design do sistema atual é a base escolhida pelo usuário; Figma saiu do processo.
+O refino será debatido tela por tela a partir dos prints que o usuário apresentar.
+O plano futuro será externo (download/OneDrive), sem duplicação neste repositório.
+Este documento descreve o produto; não lista as mudanças da próxima atualização.
 
-A auditoria ainda precisa de contrato e cobertura acordados; esta visão não a declara iniciada
-nem concluída. Achados de segurança confirmados pedem contenção própria, sem esperar toda
-a reorganização. Critérios de regressão permanecem nas specs dos itens, conforme a governança.
-
-## Hipótese de diferenciação e recomendação
-
-Diretriz reforçada pelo usuário em 11/10: buscar gestão abrangente, melhorando a experiência
-das capacidades encontradas nos concorrentes. O elogio relatado — “feito com um dentista para
-um dentista” — é o princípio a preservar e estender à rotina do proprietário e da equipe.
-Abrangência é ambição de produto, não autorização para implementar todas as funções em lote.
-Mapear capacidades concorrentes, entender a decisão que cada uma apoia e simplificar sua
-operação; registrar lacunas de cobertura e validar prioridades, sem confundir completude
-com quantidade de telas. A pesquisa inicial de três fornecedores não é inventário exaustivo.
-
-A pesquisa encontrou ofertas de gestão odontológica e documentação por voz com IA. Portanto,
-“ter gestão” ou “ter IA” não demonstra exclusividade. **Hipótese a validar:** o Odonto.IA pode
-unir atendimento fluido a números confiáveis e compreensíveis para o proprietário, com menos
-retrabalho entre equipe clínica e administrativa.
-
-**Recomendação do coordenador, ainda não escopo aprovado:** investigar primeiro financeiro
-por clínica/profissional e capacidade de atendimento. Essas perguntas aproximam o novo público
-dos fatos já produzidos no atendimento. O risco é construir indicadores sobre registros
-incompletos; por isso, sua qualidade e rastreabilidade precedem um painel gerencial.
-
-Alternativa: expandir todos os módulos de gestão simultaneamente. Aumenta a abrangência, mas
-também a superfície de regressão e o risco de construir demandas não confirmadas. Manter apenas
-o posicionamento clínico reduziria o esforço, mas não atende à direção escolhida pelo usuário.
-
-## Limites e decisões em aberto
-
-- Primeiro problema de gestão e momento de valor para o proprietário que não atende.
-- Permissões e fronteiras dos dados financeiros/clínicos, inclusive o que cada dentista vê.
-- Modelo comercial e transição do cadastro de novos clientes; exceções legadas já definidas.
-- Integrações, automações, métricas e contratos específicos ainda sem homologação neste ciclo.
-- Auditoria funcional não executada nesta etapa documental; nenhum módulo ganhou status de pronto.
-
-Direção visual: clareza, consistência e baixa carga cognitiva. A referência global continua
-pendente; artefatos aprovados do item e regras de tokens estão no AGENTS e protocolo 06.
-PWA permanece a direção de acesso atual; aplicativo nativo não é compromisso desta fase.
-
-Filtro de evolução: **isso melhora o atendimento ou a gestão para o papel certo, com dados
-confiáveis e sem comprometer os fluxos existentes?**
+Fontes de código para consulta dirigida: `src/components/layout/floating-dock.tsx`,
+`src/app/dashboard/page.tsx`, `src/app/dashboard/meu-dia/_components/meu-dia-client.tsx`,
+`src/app/dashboard/pacientes/[id]/_components/paciente-detail-client.tsx`,
+`src/app/dashboard/financeiro/page.tsx`, `src/server/auth/clinic.ts`.
