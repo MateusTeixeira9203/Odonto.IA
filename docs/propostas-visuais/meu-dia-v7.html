@@ -1,0 +1,250 @@
+<!doctype html><!-- ARTEFATO · Meu Dia — entrega visual · rota /dashboard/meu-dia · 2026-10-18 · DIREÇÃO VISUAL APROVADA --><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Meu Dia · Atendimento integrado v7</title><style>
+:root{color-scheme:dark;--bg:#0d0d0d;--surface:#111112;--alt:#1c1c1e;--border:#27272a;--text:#fafafa;--muted:#a1a1aa;--teal:#5dbeb0;--brand:#2f9c85;--pale:#1e3a35}body.light{color-scheme:light;--bg:#f4f4f6;--surface:#fff;--alt:#dadade;--border:#c2c2c6;--text:#09090b;--muted:#4b5563;--teal:#1e7060;--pale:#e4f4f1}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 'Outfit',system-ui,sans-serif}button,input,textarea,select{font:inherit;color:inherit}button{border:1px solid var(--border);border-radius:8px;padding:8px 13px;background:transparent;cursor:pointer}button:hover{background:var(--pale)}:focus-visible{outline:2px solid var(--teal);outline-offset:3px}header{display:flex;align-items:center;justify-content:space-between;padding:18px 30px;border-bottom:1px solid var(--border)}.brand{font:25px Georgia,serif}.brand em{color:var(--teal)}nav{display:flex;gap:28px;color:var(--muted)}nav strong{color:var(--teal)}main{max-width:1800px;padding:24px 30px;margin:auto}h1{font:32px Georgia,serif;margin:0}h2{font-size:17px;margin:0}.muted,small{color:var(--muted)}.row{display:flex;justify-content:space-between;align-items:center;gap:14px}.queue{display:flex;gap:24px;padding:20px 0;flex-wrap:wrap}.queue strong{color:var(--teal)}article{background:var(--surface);border:1px solid var(--border);border-radius:12px}.patient{padding:18px 24px;border-bottom:1px solid var(--border)}.workspace{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(440px,1fr)}.editor{padding:25px 28px;min-height:470px}.sheet{margin-top:22px}textarea,input{background:transparent;border:0;width:100%;resize:vertical;padding:8px 0}textarea{min-height:85px}input::placeholder,textarea::placeholder{color:var(--muted)}.group{border-top:1px solid var(--border);margin:14px 0;padding-top:14px;display:grid;grid-template-columns:42px 1fr;gap:10px}.num{color:var(--teal);font:25px Georgia,serif}.procedure{margin-bottom:12px}.procedure .title{font-weight:600}.procedure input{font-size:13px}.procedure select{background:var(--surface);border:1px solid var(--border);padding:4px;border-radius:4px;font-size:12px}.entry{border-bottom:1px solid var(--border);margin-top:20px}#entry{min-height:65px}.hint{font-size:12px;margin-top:8px;color:var(--muted)}aside{padding:25px 24px;border-left:1px solid var(--border)}.arch{display:grid;grid-template-columns:repeat(16,minmax(0,1fr));gap:1px;margin:18px 0}.tooth{padding:3px 0;border:0;border-radius:4px;min-width:0;color:var(--muted);font-size:11px}.tooth svg{display:block;width:100%;height:95px;fill:var(--alt);stroke:var(--muted);stroke-width:1.2}.tooth[aria-pressed=true]{background:var(--pale);color:var(--teal)}.tooth[aria-pressed=true] svg{stroke:var(--teal)}.tooth.planned svg .crown{fill:var(--pale);stroke:var(--teal)}.manual{border-top:1px solid var(--border);padding-top:18px;margin-top:20px}.manual select{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px;max-width:100%}.faces{display:flex;gap:10px;margin:12px 0}.faces label{display:flex;gap:4px}.faces input{width:auto}.foot{padding:18px 24px;border-top:1px solid var(--border)}.primary{background:var(--pale);border-color:var(--teal);color:var(--teal);font-weight:600}#status{min-height:22px;color:var(--teal);font-size:13px}.disclaimer{font-size:12px;color:var(--muted);margin-top:14px}@media(max-width:1000px){.workspace{grid-template-columns:1fr}aside{border-left:0;border-top:1px solid var(--border)}nav{display:none}}@media(max-width:600px){main{padding:18px 10px}.editor,aside{padding:18px 14px}.patient,.foot{align-items:flex-start;flex-direction:column}.queue{gap:10px}.tooth svg{height:65px}}
+
+.editor{min-height:440px}.sheet{margin-top:18px}.group{margin:0;padding:0;border:0;grid-template-columns:38px 1fr;gap:12px}.num{font:19px/40px Georgia,serif}.procedure{margin:0;min-height:40px}.procedure summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;min-height:40px;border-radius:4px;padding:4px 0}.procedure summary::-webkit-details-marker{display:none}.procedure summary:hover{color:var(--teal)}.procedure summary:after{content:'＋';margin-left:auto;color:var(--muted);font-size:12px}.procedure[open] summary:after{content:'−'}.procedure .procedure-name{font-weight:500}.face-label{font-size:12px;color:var(--muted)}.state-label{font-size:11px;color:var(--muted);margin-left:8px}.observation{padding:0 0 10px 14px;color:var(--muted);min-height:36px;outline:none;font-size:14px}.observation:empty:before{content:attr(data-placeholder);color:var(--muted);pointer-events:none}.free-text{white-space:pre-wrap;min-height:45px;outline:none;line-height:1.8;padding:8px 0}.free-text:empty:before{content:attr(data-placeholder);color:var(--muted);pointer-events:none}.entry{border:0;margin-top:10px}#entry{min-height:100px}.sheet>.free-text{margin-bottom:12px}.hint{opacity:.85}.procedure:focus-within{background:var(--bg)}
+
+.procedure summary .procedure-name{min-width:140px;outline:none}.procedure summary .face-label{min-width:30px;outline:none}.procedure summary [contenteditable]:focus{box-shadow:0 1px var(--teal)}.delete{padding:2px 7px;font-size:12px;border:0;color:var(--muted)}.materials{padding:8px 14px 14px}.materials summary{font-size:13px;color:var(--muted)}.materials summary:after{content:none}.material-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:6px 0}.material-row input{border-bottom:1px solid var(--border);width:130px}.material-row input[type=number]{width:65px}.material-row select{max-width:100px}.material-row button{padding:3px 7px;font-size:12px}.secondary{display:flex;gap:8px;align-items:center}dialog{color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;width:min(650px,90vw)}dialog::backdrop{background:#0009}dialog table{width:100%;border-collapse:collapse;margin:20px 0}dialog td,dialog th{text-align:left;padding:10px 4px;border-bottom:1px solid var(--border)}dialog input{width:100px}a{color:var(--teal)}#undo[hidden]{display:none}
+.group[hidden]{display:none}.procedure .materials summary:after{content:none}.used{padding:20px 24px;border-top:1px solid var(--border)}.kitline{display:flex;gap:10px;align-items:center;margin:14px 0;flex-wrap:wrap}.kitline select{background:var(--surface);border:1px solid var(--border);padding:7px;border-radius:6px;color:var(--text)}.chips{margin-top:18px}.chips>div{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.chips button{border-radius:20px;font-size:13px}#usedRows{margin:12px 0}
+.kit-choice{display:flex;align-items:center;gap:10px;padding:12px 0}.kit-choice input{width:auto}.secondary{flex-wrap:wrap}</style><header><div class="brand">odonto<em>.ia</em></div><nav><strong>Meu Dia</strong><span>Agenda</span><span>Pacientes</span><span>Financeiro</span></nav><button id="theme">Alternar tema</button></header><main><div class="row"><div><small>TERÇA, 20 DE OUTUBRO</small><h1>Meu Dia</h1></div><small>Proposta de retomada · revisão pendente</small></div><div class="queue"><strong>09:00 · Marina · Em atendimento</strong><span class="muted">09:40 · Pedro · Aguardando</span><span class="muted">10:20 · Helena · Confirmado</span></div><article><div class="row patient"><div><strong>Marina Almeida</strong><span class="muted"> · 34 anos · Ficha de tratamento</span></div><small>Dra. Sofia · Dados fictícios</small></div><div class="resume-bar"><strong>Reabilitação e acompanhamento</strong> · Dra. Sofia <button id="resume">Retomar tratamento</button><span id="visitContext">Escolha retomar para abrir a sessão de hoje.</span><details><summary>Última sessão · 19/10 · Sofia</summary><p>Dente 46 · restauração DO concluída. Registro fictício: procedimento realizado e orientações registradas.</p></details></div><div class="workspace"><section class="editor"><div class="row"><h2>Atendimento</h2><button id="voice">◉ Gravar</button></div><div class="sheet"><small>Observações da sessão · ficam nesta visita</small><div class="free-text" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Observações gerais da sessão" data-placeholder="Observações desta consulta…"></div><div id="groups"></div><div id="notes"></div><div class="entry"><div id="entry" class="free-text" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Continuar atendimento" data-placeholder="Continue escrevendo… Ex.: Resina dente 36"></div></div><div class="hint">Enter organiza a linha · Shift + Enter continua o texto · Clique no procedimento para observar.</div><div id="status" role="status" aria-live="polite"></div><button id="undo" hidden>Desfazer exclusão</button></div></section><aside><div class="row"><h2>Odontograma</h2><small>Dentição permanente</small></div><div id="upper" class="arch"></div><div class="row muted"><small>Direito</small><small>Esquerdo</small></div><div id="lower" class="arch"></div><small>Selecione um ou vários dentes. Clique novamente para desmarcar.</small><div class="manual"><div class="row"><strong id="chosen">Dente 26</strong><small>Seleção múltipla</small></div><label for="kind" class="hint">Procedimento</label><br><select id="kind"><option>Restauração em resina</option><option>Tratamento endodôntico</option></select><div class="faces"><label><input type="checkbox" value="M">M</label><label><input type="checkbox" value="O">O</label><label><input type="checkbox" value="D">D</label><label><input type="checkbox" value="V">V</label><label><input type="checkbox" value="L">L</label></div><button id="add">Adicionar aos dentes selecionados</button><div class="chips"><small>Procedimentos rápidos · seleção atual</small><div><button type="button" data-quick="Restauração em resina">Resina</button><button type="button" data-quick="Tratamento endodôntico">Canal</button><button type="button" data-quick="Extração">Extração</button></div></div></div></aside></div><div class="row foot"><div><strong>Ficha e orçamento conectados</strong><div class="muted">Orçamento em rascunho · propostas aceitas protegidas</div></div><div class="secondary"><button id="materialsOpen">Adicionar materiais</button><button id="budget">Ver orçamento</button><button id="historyPreview" disabled>Ver sessão na ficha</button><button class="primary" id="save">Salvar atendimento</button></div></div></article><p class="disclaimer"><a href="MEU-DIA.md">Decisões, funcionalidades e fluxos</a> · Rascunho interativo, sem persistência. Linhas de procedimento recolhidas por padrão; clique para escrever observações. Itens novos permitem editar nome/faces e excluir com desfazer. Registros retomados ficam protegidos nesta proposta; observações são desta visita. O botão Adicionar materiais abre a seleção opcional de kits. Kits fictícios, sem estoque ou persistência. Enter reconhece apenas exemplos simples de resina/restauração + dente; demais textos permanecem como relato. Voz e salvamento são simulados. Geometria de coroas e raízes reutilizada do produto; os demais recursos clínicos do odontograma ainda não estão reproduzidos.</p></main><dialog id="materialsDialog"><h2>Materiais usados</h2><p class="muted">Selecione os kits usados neste atendimento.</p><label class="kit-choice"><input type="checkbox" value="rest"> Kit de restauração</label><label class="kit-choice"><input type="checkbox" value="endo"> Kit de endodontia</label><p class="disclaimer">Kits fictícios para avaliar o fluxo. Na implementação, mostrar os kits cadastrados da clínica. Sem previsão ou baixa de estoque.</p><div class="secondary"><button id="kitsCancel">Cancelar</button><button class="primary" id="kitsConfirm">Confirmar</button></div></dialog><dialog id="budgetDialog"><h2>Orçamento · rascunho</h2><p class="muted">Procedimentos vinculados à ficha de Marina. Simulação local, sem cobrança.</p><table><thead><tr><th>Dente</th><th>Procedimento</th><th>Valor</th></tr></thead><tbody id="budgetRows"></tbody></table><p>Valores a definir na proposta. Alterações de procedimento exigem revisão de preço; nenhum valor é herdado automaticamente.</p><p class="muted">Negociação → aceite → pagamento. Essas etapas não estão implementadas neste artefato. Propostas aceitas ficam protegidas.</p><form method="dialog"><button>Voltar ao atendimento</button></form></dialog><script>
+const CERVICAL = 0.78;
+const q = (n) => n.toFixed(1);
+
+// Crown com oclusal/incisal no TOPO (y=0), cervical embaixo (y=h).
+function crownPathOcclusalTop(w, h, family) {
+  const neck = w * CERVICAL;
+  const nL   = (w - neck) / 2;
+  const nR   = nL + neck;
+  const bul  = w * 0.045;
+
+  if (family === 'canine') {
+    const cx = w / 2;
+    return (
+      `M ${q(nL)} ${h} ` +
+      `C ${q(nL - bul)} ${q(h * 0.58)} ${q(nL * 0.12)} ${q(h * 0.28)} ${q(cx)} 0 ` +
+      `C ${q(w - nL * 0.12)} ${q(h * 0.28)} ${q(nR + bul)} ${q(h * 0.58)} ${q(nR)} ${h} Z`
+    );
+  }
+
+  if (family === 'molar') {
+    const cH  = h * 0.16;
+    const tip = cH * 0.42;
+    const val = cH;
+    const lx  = w * 0.25;
+    const rx2 = w * 0.75;
+    const tw  = w * 0.055;
+    return (
+      `M ${q(nL)} ${h} ` +
+      `C ${q(nL - bul)} ${q(h * 0.62)} ${q(nL * 0.1)} ${q(h * 0.35)} ${q(w * 0.07)} ${q(val)} ` +
+      `C ${q(w * 0.07)} ${q(val - cH * 0.42)} ${q(lx - tw)} ${q(tip)} ${q(lx)} ${q(tip)} ` +
+      `C ${q(lx + tw)} ${q(tip)} ${q(w / 2)} ${q(val - cH * 0.42)} ${q(w / 2)} ${q(val)} ` +
+      `C ${q(w / 2)} ${q(val - cH * 0.42)} ${q(rx2 - tw)} ${q(tip)} ${q(rx2)} ${q(tip)} ` +
+      `C ${q(rx2 + tw)} ${q(tip)} ${q(w * 0.93)} ${q(val - cH * 0.42)} ${q(w * 0.93)} ${q(val)} ` +
+      `C ${q(w - nL * 0.1)} ${q(h * 0.35)} ${q(nR + bul)} ${q(h * 0.62)} ${q(nR)} ${h} Z`
+    );
+  }
+
+  if (family === 'premolar') {
+    const cH  = h * 0.10;
+    const tip = cH * 0.38;
+    const val = cH;
+    const cx  = w / 2;
+    const tw  = w * 0.06;
+    return (
+      `M ${q(nL)} ${h} ` +
+      `C ${q(nL - bul)} ${q(h * 0.60)} 0 ${q(h * 0.30)} ${q(w * 0.07)} ${q(val)} ` +
+      `C ${q(w * 0.07)} ${q(val - cH * 0.5)} ${q(cx - tw)} ${q(tip)} ${q(cx)} ${q(tip)} ` +
+      `C ${q(cx + tw)} ${q(tip)} ${q(w * 0.93)} ${q(val - cH * 0.5)} ${q(w * 0.93)} ${q(val)} ` +
+      `C ${q(w)} ${q(h * 0.30)} ${q(nR + bul)} ${q(h * 0.60)} ${q(nR)} ${h} Z`
+    );
+  }
+
+  // anterior: straight incisal, convex sides
+  const ir = w * 0.06;
+  return (
+    `M ${q(nL)} ${h} ` +
+    `C ${q(nL - bul)} ${q(h * 0.60)} 0 ${q(h * 0.28)} ${q(ir)} ${q(ir)} ` +
+    `L ${q(w - ir)} ${q(ir)} ` +
+    `C ${q(w)} ${q(h * 0.28)} ${q(nR + bul)} ${q(h * 0.60)} ${q(nR)} ${h} Z`
+  );
+}
+
+// Crown com oclusal/incisal EMBAIXO (y = rootH + crownH), cervical no topo (y = rootH).
+function crownPathOcclusalBottom(w, crownH, rootH, family) {
+  const neck = w * CERVICAL;
+  const nL   = (w - neck) / 2;
+  const nR   = nL + neck;
+  const y0   = rootH;
+  const y1   = rootH + crownH;
+  const bul  = w * 0.045;
+
+  if (family === 'canine') {
+    const cx = w / 2;
+    return (
+      `M ${q(nL)} ${y0} ` +
+      `C ${q(nL - bul)} ${q(y0 + crownH * 0.42)} ${q(nL * 0.12)} ${q(y0 + crownH * 0.72)} ${q(cx)} ${y1} ` +
+      `C ${q(w - nL * 0.12)} ${q(y0 + crownH * 0.72)} ${q(nR + bul)} ${q(y0 + crownH * 0.42)} ${q(nR)} ${y0} Z`
+    );
+  }
+
+  if (family === 'molar') {
+    const cH  = crownH * 0.16;
+    const tip = y1 - cH * 0.42;
+    const val = y1 - cH;
+    const lx  = w * 0.25;
+    const rx2 = w * 0.75;
+    const tw  = w * 0.055;
+    return (
+      `M ${q(nL)} ${y0} ` +
+      `C ${q(nL - bul)} ${q(y0 + crownH * 0.38)} ${q(nL * 0.1)} ${q(y0 + crownH * 0.65)} ${q(w * 0.07)} ${q(val)} ` +
+      `C ${q(w * 0.07)} ${q(val + cH * 0.42)} ${q(lx - tw)} ${q(tip)} ${q(lx)} ${q(tip)} ` +
+      `C ${q(lx + tw)} ${q(tip)} ${q(w / 2)} ${q(val + cH * 0.42)} ${q(w / 2)} ${q(val)} ` +
+      `C ${q(w / 2)} ${q(val + cH * 0.42)} ${q(rx2 - tw)} ${q(tip)} ${q(rx2)} ${q(tip)} ` +
+      `C ${q(rx2 + tw)} ${q(tip)} ${q(w * 0.93)} ${q(val + cH * 0.42)} ${q(w * 0.93)} ${q(val)} ` +
+      `C ${q(w - nL * 0.1)} ${q(y0 + crownH * 0.65)} ${q(nR + bul)} ${q(y0 + crownH * 0.38)} ${q(nR)} ${y0} Z`
+    );
+  }
+
+  if (family === 'premolar') {
+    const cH  = crownH * 0.10;
+    const tip = y1 - cH * 0.38;
+    const val = y1 - cH;
+    const cx  = w / 2;
+    const tw  = w * 0.06;
+    return (
+      `M ${q(nL)} ${y0} ` +
+      `C ${q(nL - bul)} ${q(y0 + crownH * 0.40)} 0 ${q(y0 + crownH * 0.70)} ${q(w * 0.07)} ${q(val)} ` +
+      `C ${q(w * 0.07)} ${q(val + cH * 0.5)} ${q(cx - tw)} ${q(tip)} ${q(cx)} ${q(tip)} ` +
+      `C ${q(cx + tw)} ${q(tip)} ${q(w * 0.93)} ${q(val + cH * 0.5)} ${q(w * 0.93)} ${q(val)} ` +
+      `C ${q(w)} ${q(y0 + crownH * 0.70)} ${q(nR + bul)} ${q(y0 + crownH * 0.40)} ${q(nR)} ${y0} Z`
+    );
+  }
+
+  // anterior
+  const ir = w * 0.06;
+  return (
+    `M ${q(nL)} ${y0} ` +
+    `C ${q(nL - bul)} ${q(y0 + crownH * 0.40)} 0 ${q(y0 + crownH * 0.72)} ${q(ir)} ${q(y1 - ir)} ` +
+    `L ${q(w - ir)} ${q(y1 - ir)} ` +
+    `C ${q(w)} ${q(y0 + crownH * 0.72)} ${q(nR + bul)} ${q(y0 + crownH * 0.40)} ${q(nR)} ${y0} Z`
+  );
+}
+
+// Raiz apontando pra BAIXO a partir da cervical (crown em cima).
+function rootPathDown(w, crownH, rootH, family) {
+  const neck   = w * CERVICAL;
+  const nL     = (w - neck) / 2;
+  const nR     = nL + neck;
+  const totalH = crownH + rootH;
+
+  if (family === 'molar') {
+    const furcY  = crownH + rootH * 0.36;
+    const notchY = crownH + rootH * 0.22;
+    const rW     = neck * 0.42;
+    const lL = nL;          const lR = nL + rW;
+    const rL = nR - rW;     const rR = nR;
+    const lCx = (lL + lR) / 2;
+    const rCx = (rL + rR) / 2;
+    return (
+      `M ${q(nL)} ${crownH} ` +
+      `C ${q(nL + neck * 0.04)} ${q(crownH + rootH * 0.16)} ${q(lL + neck * 0.02)} ${q(furcY - rootH * 0.08)} ${q(lL)} ${q(furcY)} ` +
+      `C ${q(lL - 0.5)} ${q(furcY + rootH * 0.32)} ${q(lCx - 2)} ${q(totalH - 5)} ${q(lCx)} ${totalH} ` +
+      `C ${q(lCx + 2)} ${q(totalH - 5)} ${q(lR + 0.5)} ${q(furcY + rootH * 0.32)} ${q(lR)} ${q(furcY)} ` +
+      `C ${q(lR)} ${q(notchY)} ${q(rL)} ${q(notchY)} ${q(rL)} ${q(furcY)} ` +
+      `C ${q(rL - 0.5)} ${q(furcY + rootH * 0.32)} ${q(rCx - 2)} ${q(totalH - 5)} ${q(rCx)} ${totalH} ` +
+      `C ${q(rCx + 2)} ${q(totalH - 5)} ${q(rR + 0.5)} ${q(furcY + rootH * 0.32)} ${q(rR)} ${q(furcY)} ` +
+      `C ${q(nR - neck * 0.02)} ${q(furcY - rootH * 0.08)} ${q(nR - neck * 0.04)} ${q(crownH + rootH * 0.16)} ${q(nR)} ${crownH} Z`
+    );
+  }
+
+  // single root
+  const rW = neck * 0.54;
+  const rL = (w - rW) / 2;
+  const rR = rL + rW;
+  const cx = w / 2;
+  return (
+    `M ${q(nL)} ${crownH} ` +
+    `C ${q(nL)} ${q(crownH + rootH * 0.22)} ${q(rL)} ${q(crownH + rootH * 0.40)} ${q(rL)} ${q(crownH + rootH * 0.44)} ` +
+    `C ${q(rL - 0.5)} ${q(crownH + rootH * 0.74)} ${q(cx - 2)} ${q(totalH - 5)} ${q(cx)} ${totalH} ` +
+    `C ${q(cx + 2)} ${q(totalH - 5)} ${q(rR + 0.5)} ${q(crownH + rootH * 0.74)} ${q(rR)} ${q(crownH + rootH * 0.44)} ` +
+    `C ${q(rR)} ${q(crownH + rootH * 0.40)} ${q(nR)} ${q(crownH + rootH * 0.22)} ${q(nR)} ${crownH} Z`
+  );
+}
+
+// Raiz apontando pra CIMA a partir da cervical (crown embaixo; y0 = rootH, ápice em y = 0).
+function rootPathUp(w, crownH, rootH, family) {
+  const neck  = w * CERVICAL;
+  const nL    = (w - neck) / 2;
+  const nR    = nL + neck;
+  const y0    = rootH;
+  const furcY = rootH * 0.64;
+
+  if (family === 'molar') {
+    const notchY = rootH * 0.78;
+    const rW     = neck * 0.42;
+    const lL = nL;          const lR = nL + rW;
+    const rL = nR - rW;     const rR = nR;
+    const lCx = (lL + lR) / 2;
+    const rCx = (rL + rR) / 2;
+    return (
+      `M ${q(nL)} ${y0} ` +
+      `C ${q(nL + neck * 0.04)} ${q(y0 - rootH * 0.16)} ${q(lL + neck * 0.02)} ${q(furcY + rootH * 0.08)} ${q(lL)} ${q(furcY)} ` +
+      `C ${q(lL - 0.5)} ${q(furcY - rootH * 0.32)} ${q(lCx - 2)} 5 ${q(lCx)} 0 ` +
+      `C ${q(lCx + 2)} 5 ${q(lR + 0.5)} ${q(furcY - rootH * 0.32)} ${q(lR)} ${q(furcY)} ` +
+      `C ${q(lR)} ${q(notchY)} ${q(rL)} ${q(notchY)} ${q(rL)} ${q(furcY)} ` +
+      `C ${q(rL - 0.5)} ${q(furcY - rootH * 0.32)} ${q(rCx - 2)} 5 ${q(rCx)} 0 ` +
+      `C ${q(rCx + 2)} 5 ${q(rR + 0.5)} ${q(furcY - rootH * 0.32)} ${q(rR)} ${q(furcY)} ` +
+      `C ${q(nR - neck * 0.02)} ${q(furcY + rootH * 0.08)} ${q(nR - neck * 0.04)} ${q(y0 - rootH * 0.16)} ${q(nR)} ${y0} Z`
+    );
+  }
+
+  // single root
+  const rW = neck * 0.54;
+  const rL = (w - rW) / 2;
+  const rR = rL + rW;
+  const cx = w / 2;
+  return (
+    `M ${q(nL)} ${y0} ` +
+    `C ${q(nL)} ${q(y0 - rootH * 0.22)} ${q(rL)} ${q(y0 - rootH * 0.40)} ${q(rL)} ${q(y0 - rootH * 0.44)} ` +
+    `C ${q(rL - 0.5)} ${q(y0 - rootH * 0.74)} ${q(cx - 2)} 5 ${q(cx)} 0 ` +
+    `C ${q(cx + 2)} 5 ${q(rR + 0.5)} ${q(y0 - rootH * 0.74)} ${q(rR)} ${q(y0 - rootH * 0.44)} ` +
+    `C ${q(rR)} ${q(y0 - rootH * 0.40)} ${q(nR)} ${q(y0 - rootH * 0.22)} ${q(nR)} ${y0} Z`
+  );
+}
+
+
+const $=s=>document.querySelector(s), groups=new Map();let selected=26;const selectedTeeth=new Set([26]);
+function say(s){$('#status').textContent=s}
+let lastDeleted=null;
+function removeProcedure(p,group,tooth){lastDeleted={p,group,tooth,next:p.nextSibling};p.remove();if(!group.lastChild.children.length){group.hidden=true;selectedTeeth.delete(Number(tooth));syncSelection();document.querySelector('[data-tooth="'+tooth+'"]').classList.remove('planned')}$('#undo').hidden=false;say('Procedimento removido. Sem outros procedimentos, o grupo do dente e sua marcação também saem deste rascunho. O prontuário não é alterado.');}
+function add(tooth,name,faces='',state=''){let group=groups.get(tooth);if(!group){group=document.createElement('div');group.className='group';const n=document.createElement('div');n.className='num';n.textContent=tooth;const items=document.createElement('div');group.append(n,items);$('#groups').append(group);groups.set(tooth,group)}group.hidden=false;const p=document.createElement('details');p.className='procedure';p.dataset.tooth=tooth;const summary=document.createElement('summary');const title=document.createElement('span');title.className='procedure-name';title.textContent=name;title.contentEditable='true';title.setAttribute('role','textbox');title.setAttribute('aria-label','Procedimento no dente '+tooth);const f=document.createElement('span');f.className='face-label';f.textContent=faces;f.contentEditable='true';f.setAttribute('role','textbox');f.setAttribute('aria-label','Faces no dente '+tooth);[title,f].forEach(el=>{el.onclick=e=>e.stopPropagation();el.onkeydown=e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();el.blur()}}});title.onblur=()=>{if(!title.textContent.trim()){title.textContent=p.dataset.previousName||name;removeProcedure(p,group,tooth)}else if(title.textContent!==name){p.dataset.previousName=title.textContent;say('Nome alterado. Na implementação, conferir correspondência no catálogo, preço e materiais; não herdar silenciosamente.')}};summary.append(title,f);if(state){const st=document.createElement('span');st.className='state-label';st.textContent=state;summary.append(st)}const del=document.createElement('button');del.type='button';del.className='delete';del.textContent='×';del.setAttribute('aria-label','Excluir procedimento do dente '+tooth);del.onclick=e=>{e.preventDefault();e.stopPropagation();removeProcedure(p,group,tooth)};summary.append(del);const note=document.createElement('div');note.className='observation';note.contentEditable='true';note.setAttribute('role','textbox');note.setAttribute('aria-multiline','true');note.setAttribute('aria-label','Observação no dente '+tooth);note.dataset.placeholder='Escreva uma observação…';const materials=document.createElement('details');materials.className='materials';const ms=document.createElement('summary');ms.textContent='Materiais usados';const rows=document.createElement('div');const addMaterial=document.createElement('button');addMaterial.type='button';addMaterial.textContent='+ Registrar material usado';addMaterial.onclick=()=>{const row=document.createElement('div');row.className='material-row';const material=document.createElement('input');material.placeholder='Material usado';material.setAttribute('aria-label','Material usado no dente '+tooth);const qty=document.createElement('input');qty.type='number';qty.min='0.001';qty.step='any';qty.placeholder='Qtd.';qty.setAttribute('aria-label','Quantidade usada no dente '+tooth);const unit=document.createElement('select');unit.setAttribute('aria-label','Unidade do material no dente '+tooth);['Unidade','g','ml','un'].forEach(x=>{const o=document.createElement('option');o.textContent=x;unit.append(o)});const rm=document.createElement('button');rm.textContent='Remover';rm.onclick=()=>row.remove();row.append(material,qty,unit,rm);rows.append(row);material.focus()};const limit=document.createElement('small');limit.textContent='Uso efetivo. Sem previsão, cálculo de preço ou baixa de estoque.';materials.append(ms,rows,addMaterial,document.createElement('br'),limit);p.append(summary,note);group.lastChild.append(p);document.querySelector('[data-tooth="'+tooth+'"]').classList.add('planned')}
+function arch(ids,id,upper){ids.forEach(n=>{let digit=n%10,family=digit>=6?'molar':digit>=4?'premolar':digit===3?'canine':'anterior',w=digit>=6?48:digit>=4?37:32,h=45,r=34;const b=document.createElement('button');b.className='tooth';b.dataset.tooth=n;b.setAttribute('aria-label','Dente '+n);b.setAttribute('aria-pressed',n===selected);b.innerHTML='<span>'+n+'</span><svg aria-hidden="true" viewBox="-2 -2 '+(w+4)+' '+(h+r+4)+'"><path d="'+(upper?rootPathUp(w,h,r,family):rootPathDown(w,h,r,family))+'"/><path class="crown" d="'+(upper?crownPathOcclusalBottom(w,h,r,family):crownPathOcclusalTop(w,h,family))+'"/></svg>';b.onclick=()=>{selected=n;if(selectedTeeth.has(n))selectedTeeth.delete(n);else selectedTeeth.add(n);syncSelection()};$(id).append(b)})}
+arch([18,17,16,15,14,13,12,11,21,22,23,24,25,26,27,28],'#upper',true);arch([48,47,46,45,44,43,42,41,31,32,33,34,35,36,37,38],'#lower',false);add(26,'Restauração em resina','MOD','Planejado');add(36,'Restauração em resina','O');add(46,'Restauração em resina','DO');
+$('#entry').onkeydown=e=>{if(e.key!=='Enter'||e.shiftKey||e.isComposing)return;e.preventDefault();const text=e.target.innerText.trim();if(!text)return;const match=text.match(/^(?:resina|restaura[çc][aã]o(?: em resina)?)\s+(?:dente\s+|d\s*)?([1-4][1-8])(?:\s+(?:e\s+)?([MODVLmodvl]+))?[.!]?$/i);if(match){add(Number(match[1]),'Restauração em resina',(match[2]||'').toUpperCase());say('Procedimento adicionado. Clique na linha para acrescentar uma observação.')}else{const n=document.createElement('div');n.className='free-text';n.contentEditable='true';n.textContent=text;n.setAttribute('role','textbox');n.setAttribute('aria-label','Trecho do relato');$('#notes').append(n);say('Texto preservado como relato.')}e.target.textContent=''};
+$('#undo').onclick=()=>{if(!lastDeleted)return;const {p,group,tooth,next}=lastDeleted;group.hidden=false;group.lastChild.insertBefore(p,next&&next.parentNode===group.lastChild?next:null);document.querySelector('[data-tooth="'+tooth+'"]').classList.add('planned');lastDeleted=null;$('#undo').hidden=true;say('Procedimento restaurado com observações e materiais.')};
+$('#budget').onclick=()=>{const rows=$('#budgetRows');rows.replaceChildren();document.querySelectorAll('.procedure').forEach(p=>{const row=document.createElement('tr');[p.dataset.tooth,p.querySelector('.procedure-name').textContent+' '+p.querySelector('.face-label').textContent,'A definir'].forEach(text=>{const td=document.createElement('td');td.textContent=text;row.append(td)});rows.append(row)});if(!rows.children.length){const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=3;td.textContent='Nenhum procedimento no rascunho.';tr.append(td);rows.append(tr)}$('#budgetDialog').showModal()};
+function syncSelection(){document.querySelectorAll('.tooth').forEach(t=>t.setAttribute('aria-pressed',selectedTeeth.has(Number(t.dataset.tooth))));$('#chosen').textContent=selectedTeeth.size?'Dentes '+Array.from(selectedTeeth).join(', '):'Selecione os dentes'}
+function addSelected(name){if(!selectedTeeth.size){say('Selecione pelo menos um dente.');return}const faces=name==='Restauração em resina'?Array.from(document.querySelectorAll('.faces input:checked')).map(x=>x.value).join(''):'';selectedTeeth.forEach(n=>add(n,name,faces));say('Procedimento incluído nos dentes '+Array.from(selectedTeeth).join(', ')+'. Confira cada indicação.')}
+document.querySelectorAll('[data-quick]').forEach(b=>b.onclick=()=>addSelected(b.dataset.quick));
+let confirmedKits=[];
+$('#materialsOpen').onclick=()=>{document.querySelectorAll('.kit-choice input').forEach(x=>x.checked=confirmedKits.includes(x.value));$('#materialsDialog').showModal()};
+$('#kitsCancel').onclick=()=>$('#materialsDialog').close();
+$('#kitsConfirm').onclick=()=>{confirmedKits=Array.from(document.querySelectorAll('.kit-choice input:checked')).map(x=>x.value);$('#materialsOpen').textContent=confirmedKits.length?'Materiais · '+confirmedKits.length+' kit'+(confirmedKits.length>1?'s':''):'Adicionar materiais';$('#materialsDialog').close()};
+$('#theme').onclick=()=>document.body.classList.toggle('light');$('#add').onclick=()=>addSelected($('#kind').value);$('#voice').onclick=()=>say('Simulação: a voz preencherá esta mesma área. Nenhum áudio está sendo capturado.');$('#save').onclick=()=>say('Simulação: ficha e orçamento em rascunho salvos juntos. Propostas aceitas não seriam alteradas. Nada foi gravado.');
+</script><style>.resume-bar{padding:14px 24px;border-bottom:1px solid var(--border);font-size:13px}.resume-bar button{margin:0 12px}.resume-bar details{margin-top:7px;color:var(--muted)}#visitContext{color:var(--teal)}.done-today{display:inline-flex;align-items:center;gap:5px;font-size:12px;margin:5px 0 8px 42px}.done-today input{width:auto}.session-preview{max-width:720px;width:85vw;max-height:85vh;overflow:auto}.session-preview p{white-space:pre-wrap}.session-preview section{border-top:1px solid var(--border);padding:12px 0}</style><dialog id="sessionPreview" class="session-preview"><h2>Ficha · histórico das sessões</h2><p class="muted">Marina Almeida · Reabilitação e acompanhamento · Dra. Sofia</p><div id="sessionOutput"></div><details><summary>19/10/2026 · 09:00 · Dra. Sofia · anterior preservada</summary><p>Dente 46 · restauração DO concluída. Registro fictício: procedimento realizado e orientações registradas.</p></details><p class="disclaimer">Prévia do destino na ficha, dentro deste artefato. Não altera a ficha v9, não assina e não grava dados.</p><form method="dialog"><button>Voltar ao Meu Dia</button></form></dialog><script>
+let resumed=false, savedVisit=null;
+const sessionIdentity='demo-marina-sofia-20261020-0900';
+const work=$('.workspace');work.inert=true;$('#save').disabled=true;$('#materialsOpen').disabled=true;$('#budget').disabled=true;
+// Registros existentes são referências, não rascunhos descartáveis.
+document.querySelectorAll('.procedure').forEach((row,i)=>{
+ row.dataset.existing='true';row.dataset.recordId=['proc26','proc36','proc46'][i];
+ row.querySelectorAll('[contenteditable]').forEach(el=>{if(!el.classList.contains('observation'))el.contentEditable='false'});
+ row.querySelector('.delete').remove();
+ let state=row.querySelector('.state-label');if(!state){state=document.createElement('span');state.className='state-label';row.querySelector('summary').append(state)}state.textContent=i===2?'Concluído em 19/10':'Planejado antes desta visita';
+ row.querySelector('.observation').setAttribute('aria-label','Observação desta sessão no dente '+row.dataset.tooth);
+ if(i!==2){const label=document.createElement('label');label.className='done-today';const cb=document.createElement('input');cb.type='checkbox';cb.setAttribute('aria-label','Realizado hoje no dente '+row.dataset.tooth);cb.onchange=()=>row.dataset.doneToday=String(cb.checked);label.append(cb,'Realizado hoje');row.after(label)}
+});
+$('#resume').onclick=()=>{if(resumed){say('Você já está na mesma sessão de 20/10 às 09:00.');return}resumed=true;work.inert=false;$('#save').disabled=false;$('#materialsOpen').disabled=false;$('#budget').disabled=false;$('#visitContext').textContent='Sessão atual · 20/10/2026 · 09:00 · Dra. Sofia';$('#resume').textContent='Tratamento retomado';say('Procedimentos existentes carregados. Marque apenas o que realizou hoje; observações abaixo pertencem a esta sessão.');};
+function previewSession(){const root=$('#sessionOutput');root.replaceChildren();const sec=document.createElement('section');const h=document.createElement('h3');h.textContent='20/10/2026 · 09:00 · Dra. Sofia';sec.append(h);const note=document.createElement('p');note.textContent='Observações da sessão: '+(savedVisit.note||'Não informadas');sec.append(note);savedVisit.items.forEach(item=>{const line=document.createElement('p');line.textContent='Dente '+item.tooth+' · '+item.name+' '+item.faces+' · '+(item.done?'Concluído nesta sessão':item.existing?'Acompanhado; estado anterior preservado':'Novo planejamento')+(item.note?'\nObservação do procedimento nesta visita: '+item.note:'');sec.append(line)});if(!savedVisit.items.length){const empty=document.createElement('p');empty.textContent='Consulta registrada sem conclusão de procedimentos.';sec.append(empty)}const kit=document.createElement('p');kit.textContent='Kits informados nesta visita: '+(savedVisit.kits.join(', ')||'Nenhum');sec.append(kit);root.append(sec);$('#sessionPreview').showModal()}
+$('#save').onclick=()=>{if(!resumed)return;const note=[$('[aria-label="Observações gerais da sessão"]').innerText,...Array.from($('#notes').children).map(x=>x.innerText),$('#entry').innerText].map(x=>x.trim()).filter(Boolean).join('\n');const items=Array.from(document.querySelectorAll('.procedure')).filter(r=>r.dataset.doneToday==='true'||r.querySelector('.observation').innerText.trim()||!r.dataset.existing).map(r=>({id:r.dataset.recordId||null,tooth:r.dataset.tooth,name:r.querySelector('.procedure-name').textContent,faces:r.querySelector('.face-label').textContent,note:r.querySelector('.observation').innerText.trim(),done:r.dataset.doneToday==='true',existing:!!r.dataset.existing}));savedVisit={id:sessionIdentity,note,items,kits:confirmedKits.map(k=>k==='rest'?'Kit de restauração':'Kit de endodontia')};$('#historyPreview').disabled=false;say('Sessão de 20/10 às 09:00 atualizada na simulação. Salvar novamente atualiza esta sessão, sem duplicá-la. Assinatura e aceite não foram coletados.');previewSession()};
+$('#historyPreview').onclick=previewSession;
+</script></html>
