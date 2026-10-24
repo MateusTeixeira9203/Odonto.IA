@@ -17,12 +17,19 @@ export type PacienteExport = {
   created_at: string;
 };
 
+export type EvolucaoFichaExport = {
+  data: string | null;
+  texto: string | null;
+  automatica: boolean;
+};
+
 export type FichaExport = {
   id: string;
   created_at: string;
   data_atendimento: string;
   queixa_principal: string | null;
   anotacoes: string | null;
+  evolucoes?: EvolucaoFichaExport[];
   dentes_afetados: number[] | null;
   dentes_observacoes: Record<string, string> | null;
   procedimentos_concluidos: string[] | null;
@@ -236,8 +243,25 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,san
 
 // ── Partials ───────────────────────────────────────────────────────────────────
 
+export function evolucoesParaImpressao(f: FichaExport): {
+  titulo: string;
+  itens: { data: string | null; texto: string; automatica: boolean }[];
+} | null {
+  const itens = (f.evolucoes ?? []).flatMap((evolucao) => {
+    const texto = evolucao.texto;
+    return texto?.trim() ? [{ data: evolucao.data, texto, automatica: evolucao.automatica }] : [];
+  }).sort((a, b) => (a.data ?? '').localeCompare(b.data ?? ''));
+
+  if (itens.length > 0) return { titulo: 'Evolução clínica', itens };
+  if (f.anotacoes?.trim()) {
+    return { titulo: 'Anotações', itens: [{ data: null, texto: f.anotacoes, automatica: false }] };
+  }
+  return null;
+}
+
 function renderFichaCard(f: FichaExport): string {
   const dentes = (f.dentes_afetados ?? []).filter(d => d < 97);
+  const evolucao = evolucoesParaImpressao(f);
 
   const dentesHtml = dentes.length > 0 ? `
     <div class="field">
@@ -271,7 +295,7 @@ function renderFichaCard(f: FichaExport): string {
         <span class="badge badge-teal">${esc(badge)}</span>
         <span class="card-prof">Dr(a). ${esc(f.dentista?.nome ?? 'Profissional')}${f.dentista?.cro ? ` · CRO ${esc(f.dentista.cro)}` : ''}</span>
       </div>
-      ${f.anotacoes ? `<div class="field"><div class="field-lbl">Anotações</div><div class="field-val">${esc(f.anotacoes)}</div></div>` : ''}
+      ${evolucao ? `<div class="field"><div class="field-lbl">${esc(evolucao.titulo)}</div>${evolucao.itens.map((item) => `<div class="field-val">${item.data ? `${esc(fmtDateOnly(item.data))} — ` : ''}${esc(item.texto)}${item.automatica ? ' (registro automático)' : ''}</div>`).join('')}</div>` : ''}
       ${dentesHtml}
       ${concluidosHtml}
       ${f.assinado_em ? `<div class="signed">✓ Assinado digitalmente em ${esc(fmtDateTime(f.assinado_em))}</div>` : ''}

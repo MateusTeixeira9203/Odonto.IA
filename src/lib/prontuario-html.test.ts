@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildProntuarioHTML, buildOrcamentoHTML, type PacienteExport, type OrcamentoHtmlData } from './prontuario-html';
+import { buildFichaHTML, buildProntuarioHTML, buildOrcamentoHTML, evolucoesParaImpressao, type FichaComPaciente, type PacienteExport, type OrcamentoHtmlData } from './prontuario-html';
 
 const paciente: PacienteExport = {
   nome: 'Paciente Teste',
@@ -13,6 +13,93 @@ const paciente: PacienteExport = {
   estado: null,
   created_at: '2026-01-01T00:00:00Z',
 };
+
+const ficha: FichaComPaciente = {
+  id: 'ficha-qa', created_at: '2026-10-20T12:00:00Z', data_atendimento: '2026-10-20',
+  queixa_principal: null, anotacoes: 'QA texto antigo', dentes_afetados: null,
+  dentes_observacoes: null, procedimentos_concluidos: null,
+  assinatura_url: null, assinado_em: null, dentista: { nome: 'Dentista fictício' },
+  paciente: { nome: 'Paciente fictício', data_nascimento: null },
+};
+
+const fichaComEvolucao = {
+  ...ficha,
+  evolucoes: [{ data: '2026-10-20', texto: 'QA texto vigente', automatica: false }],
+};
+
+test('PDF da Ficha imprime a evolução vigente, não a anotação antiga', () => {
+  const html = buildFichaHTML(fichaComEvolucao);
+  assert.ok(html.includes('QA texto vigente'), 'deve imprimir o texto vigente');
+  assert.ok(!html.includes('QA texto antigo'), 'não deve imprimir a anotação antiga');
+});
+
+test('Fichas Clínicas do prontuário usa a evolução vigente', () => {
+  const html = buildProntuarioHTML(paciente, [fichaComEvolucao], [], [], []);
+  assert.ok(html.includes('QA texto vigente'), 'deve imprimir o texto vigente');
+  assert.ok(!html.includes('QA texto antigo'), 'não deve imprimir a anotação antiga');
+});
+
+test('ficha legada sem evolução continua imprimindo Anotações', () => {
+  for (const legado of [{ ...ficha, anotacoes: 'Texto legado' }, { ...ficha, anotacoes: 'Texto legado', evolucoes: [] }]) {
+    const html = buildFichaHTML(legado);
+    assert.ok(html.includes('Anotações'));
+    assert.ok(html.includes('Texto legado'));
+  }
+});
+
+test('evoluções são ordenadas por data sem mutar a entrada e preservam a ordem nos empates', () => {
+  const evolucoes = [
+    { data: '2026-10-21', texto: 'Segunda sessão', automatica: false },
+    { data: '2026-10-20', texto: 'Primeira sessão', automatica: true },
+    { data: '2026-10-21', texto: 'Terceira sessão', automatica: false },
+  ];
+  const original = structuredClone(evolucoes);
+  assert.deepEqual(evolucoesParaImpressao({ ...ficha, evolucoes }), {
+    titulo: 'Evolução clínica', itens: [evolucoes[1], evolucoes[0], evolucoes[2]],
+  });
+  assert.deepEqual(evolucoes, original);
+});
+
+test('evoluções ignoram texto vazio ou nulo e preservam texto e data nula válidos', () => {
+  const resultado = evolucoesParaImpressao({ ...ficha, evolucoes: [
+    { data: '2026-10-21', texto: null, automatica: false },
+    { data: '2026-10-21', texto: ' \n ', automatica: false },
+    { data: null, texto: ' Texto vigente sem data ', automatica: true },
+  ] });
+  assert.deepEqual(resultado, {
+    titulo: 'Evolução clínica',
+    itens: [{ data: null, texto: ' Texto vigente sem data ', automatica: true }],
+  });
+});
+
+test('sem evolução textual usa o legado; sem qualquer texto devolve null', () => {
+  const evolucoes = [{ data: null, texto: null, automatica: false }];
+  assert.equal(evolucoesParaImpressao({ ...ficha, evolucoes })?.titulo, 'Anotações');
+  assert.equal(evolucoesParaImpressao({ ...ficha, anotacoes: null, evolucoes }), null);
+  assert.equal(evolucoesParaImpressao({ ...ficha, anotacoes: ' \n ', evolucoes: [] }), null);
+});
+
+test('impressão marca registro automático e escapa o texto vigente e a data', () => {
+  const html = buildFichaHTML({ ...ficha, evolucoes: [{
+    data: '2026-10-20<script>', texto: '<script>QA</script> & "texto"', automatica: true,
+  }] });
+  assert.ok(html.includes('(registro automático)'));
+  assert.ok(html.includes('&lt;script&gt;QA&lt;/script&gt; &amp; &quot;texto&quot;'));
+  assert.ok(html.includes('20&lt;script&gt;/10/2026'));
+  assert.ok(!html.includes('<script>'));
+});
+
+test('ficha assinada imprime as duas evoluções vigentes sem recuperar anotações antigas', () => {
+  const html = buildFichaHTML({ ...ficha, assinado_em: '2026-10-21T12:45:00Z', evolucoes: [
+    { data: '2026-10-21', texto: 'Sessão S2 vigente', automatica: false },
+    { data: '2026-10-15', texto: 'Sessão S1 vigente', automatica: false },
+  ] });
+  assert.ok(html.includes('15/10/2026 — Sessão S1 vigente'));
+  assert.ok(html.includes('21/10/2026 — Sessão S2 vigente'));
+  assert.ok(html.indexOf('Sessão S1 vigente') < html.indexOf('Sessão S2 vigente'));
+  assert.ok(html.includes('Assinado digitalmente'));
+  assert.ok(!html.includes('QA texto antigo'));
+});
 
 test('exportação acrescenta Atendimentos e preserva Fichas Clínicas', () => {
   const html = buildProntuarioHTML(paciente, [], [], [], [{

@@ -7,6 +7,7 @@ import {
   type OrcamentoExport,
   type AgendamentoExport,
   type AtendimentoProntuarioExport,
+  type EvolucaoFichaExport,
 } from '@/lib/prontuario-html';
 import { getProntuarioLongitudinal } from '@/server/patients/get-prontuario-longitudinal';
 import { TIPO_LABEL } from '@/types/odontograma';
@@ -61,6 +62,29 @@ export async function GET(
 
   if (!pacienteRaw) return new Response('Paciente não encontrado', { status: 404 });
 
+  let fichasExport = (fichasRaw ?? []) as unknown as FichaExport[];
+  if (fichasExport.length > 0) {
+    const { data: evolucoesRaw, error: evolucoesError } = await supabase
+      .from('ficha_evolucoes')
+      .select('ficha_id, data, texto, automatica')
+      .eq('clinica_id', dentista.clinica_id)
+      .in('ficha_id', fichasExport.map((ficha) => ficha.id))
+      .order('data', { ascending: true })
+      .order('created_at', { ascending: true });
+
+    if (evolucoesError) {
+      console.error('[prontuario] Erro ao ler evoluções para impressão:', evolucoesError);
+    } else {
+      const porFicha = new Map<string, EvolucaoFichaExport[]>();
+      for (const evolucao of (evolucoesRaw ?? []) as (EvolucaoFichaExport & { ficha_id: string })[]) {
+        const itens = porFicha.get(evolucao.ficha_id) ?? [];
+        itens.push({ data: evolucao.data, texto: evolucao.texto, automatica: evolucao.automatica });
+        porFicha.set(evolucao.ficha_id, itens);
+      }
+      fichasExport = fichasExport.map((ficha) => ({ ...ficha, evolucoes: porFicha.get(ficha.id) ?? [] }));
+    }
+  }
+
   const longitudinal = await getProntuarioLongitudinal({ patientId: id, clinicId: dentista.clinica_id });
   const nomeFicha = new Map(longitudinal.atendimentos.flatMap((atendimento) => (
     atendimento.fichas.map((ficha) => [ficha.id, ficha.nome] as const)
@@ -90,7 +114,7 @@ export async function GET(
 
   const html = buildProntuarioHTML(
     pacienteRaw as PacienteExport,
-    (fichasRaw ?? []) as unknown as FichaExport[],
+    fichasExport,
     (orcamentosRaw ?? []) as unknown as OrcamentoExport[],
     (agendamentosRaw ?? []) as unknown as AgendamentoExport[],
     atendimentosExport,
