@@ -23,8 +23,8 @@ export default function MeuDiaError({
   }, [error]);
 
   return (
-    <PageContainer variant="wide">
-      <div className="mx-auto flex max-w-xl flex-col items-center gap-4 rounded-2xl border border-border bg-surface p-10 text-center">
+    <PageContainer variant="wide" className="max-w-[1800px]! px-[30px]! py-6! max-[600px]:px-2.5! max-[600px]:py-[18px]!">
+      <div className="mx-auto flex max-w-xl flex-col items-center gap-4 rounded-[12px] border border-border bg-surface px-6 py-[25px] text-center">
         <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-coral-pale border border-coral/20">
           <AlertTriangle className="h-7 w-7 text-coral" />
         </div>

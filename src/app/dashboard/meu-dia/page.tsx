@@ -55,17 +55,18 @@ export default async function MeuDiaPage({ searchParams }: MeuDiaPageProps) {
   const agendamentoInicialId = ag && slots.some((s) => s.agendamentoId === ag) ? ag : undefined;
 
   return (
-    <PageContainer variant="wide">
-      <header className="mb-6">
-        <p className="mb-1 text-xs font-bold uppercase tracking-[0.2em] text-text-secondary/60">
-          Meu dia
-        </p>
-        <h1 className="font-heading text-3xl font-bold capitalize text-text-primary">
+    <PageContainer variant="wide" className="max-w-[1800px]! px-[30px]! py-6! max-[600px]:px-2.5! max-[600px]:py-[18px]!">
+      <header className="mb-0">
+        <p className="mb-1 text-[12.5px] uppercase tracking-wider text-text-secondary">
           {dataExtensaBRT(now)}
+        </p>
+        <h1 className="font-heading text-[32px] leading-tight text-text-primary">
+          Meu Dia
         </h1>
       </header>
 
       <MeuDiaClient
+        profissionalNome={dentista.nome}
         slots={slots}
         contextoPorPaciente={contextoPorPaciente}
         agendamentoInicialId={agendamentoInicialId}

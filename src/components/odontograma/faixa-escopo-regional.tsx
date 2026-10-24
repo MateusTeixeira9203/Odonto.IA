@@ -27,6 +27,7 @@ const MODOS: Array<{ id: ModoLancamento; label: string }> = [
 ];
 
 interface FaixaEscopoRegionalProps {
+  variante?: 'meu-dia';
   escopo: EscopoRegional | null;
   onEscopoChange: (escopo: EscopoRegional | null) => void;
   eventosDraft: OdontogramaEventoDraft[];
@@ -53,7 +54,10 @@ export function FaixaEscopoRegional({
   manutencaoOrtodonticaAtiva,
   onManutencaoOrtodontica,
   layout = 'linha',
+  variante,
 }: FaixaEscopoRegionalProps) {
+  const meuDia = variante === 'meu-dia';
+  const chipClass = 'rounded-[20px] border border-border bg-surface px-[13px] py-[7px] text-[13px] leading-[20.8px] text-text-primary hover:border-teal-ink hover:bg-teal-pale';
   const [busca, setBusca] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const sugestoes = useMemo(
@@ -107,11 +111,11 @@ export function FaixaEscopoRegional({
         aria-pressed={escopo === item.id}
         onClick={() => selecionarEscopo(item.id)}
         className={cn(
-          'rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors',
+          meuDia ? 'rounded-[20px] border px-[13px] py-[7px] text-[13px] leading-[20.8px] transition-colors' : 'rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors',
           escopo === item.id
-            ? 'border-teal bg-teal/15 text-teal-ink'
-            : 'border-border bg-surface-alt text-text-secondary hover:border-teal/40 hover:text-teal-ink',
-          className,
+            ? meuDia ? 'border-teal-ink bg-teal-pale text-teal-ink' : 'border-teal bg-teal/15 text-teal-ink'
+            : meuDia ? 'border-border bg-surface text-text-secondary hover:border-teal-ink hover:bg-teal-pale' : 'border-border bg-surface-alt text-text-secondary hover:border-teal/40 hover:text-teal-ink',
+          !meuDia && className,
         )}
       >
         {item.label}
@@ -126,24 +130,24 @@ export function FaixaEscopoRegional({
     <div className="flex flex-col gap-2">
       {layout === 'grade' ? (
         <div className="flex flex-col gap-1.5">
-          <div className="grid grid-cols-3 gap-1.5">
+          <div className={meuDia ? "flex flex-wrap gap-1.5" : "grid grid-cols-3 gap-1.5"}>
             {botaoEscopo(escoposPrincipais[0], 'min-h-9 whitespace-normal leading-tight')}
             <button
               type="button"
               aria-pressed={manutencaoOrtodonticaAtiva}
               onClick={onManutencaoOrtodontica}
               className={cn(
-                'min-h-9 rounded-full border px-2.5 text-[11px] font-semibold leading-tight transition-colors',
+                meuDia ? chipClass : 'min-h-9 rounded-full border px-2.5 text-[11px] font-semibold leading-tight transition-colors',
                 manutencaoOrtodonticaAtiva
-                  ? 'border-teal bg-teal/10 text-teal-ink'
-                  : 'border-border bg-surface-alt text-text-secondary hover:border-teal/40 hover:text-teal-ink',
+                  ? meuDia ? 'border-teal-ink bg-teal-pale text-teal-ink' : 'border-teal bg-teal/10 text-teal-ink'
+                  : meuDia ? 'border-border bg-surface text-text-secondary hover:border-teal-ink hover:bg-teal-pale' : 'border-border bg-surface-alt text-text-secondary hover:border-teal/40 hover:text-teal-ink',
               )}
             >
               Manutenção ortodôntica
             </button>
             {botaoEscopo(escoposPrincipais[1], 'min-h-9 whitespace-normal leading-tight')}
           </div>
-          <div className="grid grid-cols-6 gap-1.5">
+          <div className={meuDia ? "flex flex-wrap gap-1.5" : "grid grid-cols-6 gap-1.5"}>
             {escoposPorArcada.map((item) => botaoEscopo(item, 'min-h-9 whitespace-normal px-1.5 text-[10px] leading-tight'))}
           </div>
         </div>
@@ -168,10 +172,10 @@ export function FaixaEscopoRegional({
       )}
 
       {escopo && (
-        <div className="flex flex-col gap-1.5 rounded-lg border border-teal/30 bg-teal/5 px-3 py-2">
+        <div className={meuDia ? "mt-4 flex flex-col border-t border-border pt-4" : "flex flex-col gap-1.5 rounded-lg border border-teal/30 bg-teal/5 px-3 py-2"}>
           <div className="flex items-center justify-between gap-2">
-            <p className="text-[11px] font-semibold text-text-primary">
-              {labelDoEscopoRegional(escopo)} selecionada
+            <p className={meuDia ? "text-[15px] font-bold leading-6 text-text-primary" : "text-[11px] font-semibold text-text-primary"}>
+              {labelDoEscopoRegional(escopo)}{!meuDia && ' selecionada'}
             </p>
             <button
               type="button"
@@ -183,17 +187,18 @@ export function FaixaEscopoRegional({
             </button>
           </div>
 
-          <div className="flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <span className="mr-0.5 shrink-0 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
+          {meuDia && <p className="mb-[6px] mt-[10px] text-[12.5px] leading-5 text-text-secondary">Registrar como</p>}
+          <div className={meuDia ? "flex w-fit max-w-full flex-wrap overflow-hidden rounded-[8px] border border-border" : "flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"}>
+            {!meuDia && <span className="mr-0.5 shrink-0 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
               Registrar como
-            </span>
+            </span>}
             {MODOS.map((modo) => (
               <button
                 key={modo.id}
                 type="button"
                 aria-pressed={modoLancamento === modo.id}
                 onClick={() => onModoLancamentoChange(modo.id)}
-                className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold transition-colors ${
+                className={meuDia ? `px-[11px] py-[6px] text-[13px] leading-[20.8px] transition-colors ${modoLancamento === modo.id ? 'bg-teal-pale font-semibold text-teal-ink' : 'text-text-secondary hover:bg-teal-pale'}` : `shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold transition-colors ${
                   modoLancamento === modo.id
                     ? 'border-teal bg-teal/15 text-teal-ink'
                     : 'border-border bg-surface text-text-secondary hover:border-teal/40 hover:text-teal-ink'
@@ -204,8 +209,9 @@ export function FaixaEscopoRegional({
             ))}
           </div>
 
+          {meuDia && <p className="mb-[6px] mt-[10px] text-[12.5px] leading-5 text-text-secondary">Procedimento</p>}
           <div className="flex items-center gap-1.5">
-            <Search className="h-3 w-3 shrink-0 text-text-muted" strokeWidth={2.4} aria-hidden />
+            {!meuDia && <Search className="h-3 w-3 shrink-0 text-text-muted" strokeWidth={2.4} aria-hidden />}
             <input
               ref={inputRef}
               type="text"
@@ -224,18 +230,18 @@ export function FaixaEscopoRegional({
               }}
               placeholder={`Procedimento em ${labelDoEscopoRegional(escopo).toLowerCase()}`}
               aria-label={`Buscar ou digitar procedimento em ${labelDoEscopoRegional(escopo).toLowerCase()}`}
-              className="min-w-0 flex-1 rounded-md border border-border bg-surface-alt px-2 py-1 text-[11px] text-text-primary outline-none focus:border-teal"
+              className={meuDia ? "min-w-0 flex-1 rounded-[8px] border border-border bg-bg px-[10px] py-[8px] text-[13px] leading-[20.8px] text-text-primary outline-none focus:border-teal-ink" : "min-w-0 flex-1 rounded-md border border-border bg-surface-alt px-2 py-1 text-[11px] text-text-primary outline-none focus:border-teal"}
             />
           </div>
 
           {busca.trim() && (
-            <div className="flex flex-wrap gap-1">
+            <div className={meuDia ? "mt-[10px] flex flex-wrap gap-1.5" : "flex flex-wrap gap-1"}>
               {sugestoes.map((opcao) => (
                 <button
                   key={opcao.id}
                   type="button"
                   onClick={() => adicionarOpcao(opcao)}
-                  className="rounded-full border border-teal/30 bg-surface px-2 py-0.5 text-[10px] font-semibold text-teal-ink"
+                  className={meuDia ? chipClass : "rounded-full border border-teal/30 bg-surface px-2 py-0.5 text-[10px] font-semibold text-teal-ink"}
                 >
                   {opcao.label}
                 </button>

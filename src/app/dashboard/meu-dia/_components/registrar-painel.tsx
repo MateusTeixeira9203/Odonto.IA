@@ -52,13 +52,16 @@
 // linha ficava sem fundo, "flutuando"). `ToothDetailPanel` sem esse prop já renderiza a
 // tabela de especialidade inline, dentro do próprio card do perfil (555px).
 
-import { useEffect, useEffectEvent, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
+import { useEffect, useEffectEvent, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { Check, AlertTriangle, CalendarPlus, FileText, Loader2, ScanLine, X } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Odontograma } from '@/components/odontograma/Odontograma';
 import { salvarEventosOdontograma } from '@/server/patients/registro-actions';
 import { CampoMagicoMeuDia } from './campo-magico-meu-dia';
+import type { DocumentoControlado } from './documento-atendimento';
+import { temConteudo } from '@/lib/meu-dia/documento-atendimento';
 import type { CapturaDexState } from '@/components/fichas/captura-livre-card';
 import { OrtoForm } from '@/components/fichas/orto-form';
 import { DexLoader } from '@/components/ui/dex-loader';
@@ -183,6 +186,15 @@ interface RegistrarPainelProps {
   realceCampoMagico?: boolean;
   /** R-105a §4.2.1 — idem: passagem pura pro campo mágico, que é quem sabe se já foi aberto. */
   dicaCampoMagico?: boolean;
+  /** Somente o Meu Dia opta pelo rodapé redesenhado. */
+  variante?: 'meu-dia';
+  onVerSessao?: () => void;
+  onAnexar?: () => void;
+  documento?: DocumentoControlado;
+  rascunhoInicial?: { contextoId: string; orto: OrtoManutencaoDetalhe | null; alerta: string | null };
+  impedeSalvar?: boolean;
+  antesDeSalvar?: () => Promise<boolean>;
+  onDuplicataIgnorada?: (dentes: number[], rotulo: string) => void;
 }
 
 /** Converte a pendência (já um evento real no banco, `status='indicado'`) num draft que
@@ -234,6 +246,7 @@ export interface RegistrarPainelSlots {
   rodape: ReactNode;
   /** Manutenção é estado estruturado da visita, mas precisa ser revisável antes do save. */
   ortoManutencao: OrtoManutencaoDetalhe | null;
+  rascunhoAtual: { orto: OrtoManutencaoDetalhe | null; alerta: string | null };
   abrirManutencao: () => void;
 }
 
@@ -256,6 +269,14 @@ export function useRegistrarPainel({
   onAbrirDetalheEndo,
   realceCampoMagico,
   dicaCampoMagico,
+  variante,
+  onVerSessao,
+  onAnexar,
+  documento,
+  rascunhoInicial,
+  impedeSalvar,
+  antesDeSalvar,
+  onDuplicataIgnorada,
 }: RegistrarPainelProps): RegistrarPainelSlots {
   const [capturaDex, setCapturaDex] = useState<CapturaDexState>({
     fase: 'idle', busy: false, impedeSalvar: false, audioParaRetry: false,
@@ -291,6 +312,14 @@ export function useRegistrarPainel({
   /** R-60 — preenchimento manual sempre começa limpo. Só a voz pode abrir o painel já preenchido. */
   const [ortoChipAberto, setOrtoChipAberto] = useState(false);
   const [ortoValor, setOrtoValor] = useState<OrtoManutencaoDetalhe | null>(null);
+  const [rascunhoAplicado, setRascunhoAplicado] = useState<typeof rascunhoInicial>();
+  if (rascunhoInicial !== rascunhoAplicado) {
+    setRascunhoAplicado(rascunhoInicial);
+    if (rascunhoInicial?.contextoId === contextoId) {
+      setOrtoValor(rascunhoInicial.orto);
+      setAlertaNovo(rascunhoInicial.alerta);
+    }
+  }
 
   // R-63 §4.1 — 1 ocupante por vez no slot central. Troca CONDICIONAL: só cede o mapa pra
   // conteúdo que precisa do espaço e não usa o mapa pra nada (orto, tabela de
@@ -303,6 +332,10 @@ export function useRegistrarPainel({
   const reduceMotion = useReducedMotion();
 
   const [isSaving, setIsSaving] = useState(false);
+  const salvamentoAtual = useRef<AbortController | null>(null);
+  const [salvamentoDemorado, setSalvamentoDemorado] = useState(false);
+  const [erroSalvamento, setErroSalvamento] = useState<string | null>(null);
+  useEffect(() => () => { salvamentoAtual.current?.abort(); }, [contextoId]);
   const [savedFichaId, setSavedFichaId] = useState<string | null>(null);
   const [eventosPendentes, setEventosPendentes] = useState<OdontogramaEventoDraft[] | null>(null);
   const [isRegravando, setIsRegravando] = useState(false);
@@ -349,6 +382,8 @@ export function useRegistrarPainel({
     setOrtoChipAberto(false);
     setOrtoValor(null);
     setIsSaving(false);
+    setSalvamentoDemorado(false);
+    setErroSalvamento(null);
     setSavedFichaId(null);
     setEventosPendentes(null);
     setIsRegravando(false);
@@ -363,7 +398,8 @@ export function useRegistrarPainel({
   // pós-save. Trava 2 (slot já registrado hoje) é o MESMO estado vazio, só muda o rótulo.
   // 04/08 — visita só-de-orto (sem evento, sem texto) também é rascunho de verdade.
   const ortoParaSalvar = normalizarOrtoManutencao(ortoValor);
-  const semRascunho = eventosDraft.length === 0 && textoVisita.trim() === '' && ortoParaSalvar == null;
+  const semRascunho = eventosDraft.length === 0 && textoVisita.trim() === '' && ortoParaSalvar == null
+    && !(documento && (temConteudo(documento.valor) || alertaNovo != null));
   const podeSugerirEvolucao = textoVisita.trim() === ''
     && (eventosDraft.length > 0 || ortoParaSalvar != null);
 
@@ -568,50 +604,78 @@ export function useRegistrarPainel({
     setEscopoRegional(escopo);
   }
 
-  // I1 — 1 clique = 1 ficha: `salvarFicha` não é idempotente por agendamentoId, o `disabled`
-  // abaixo é a única proteção contra duplo clique/duplo submit (mesmo padrão de consulta-client).
   async function handleSalvar() {
+    if (impedeSalvar || (documento && salvamentoAtual.current && !salvamentoAtual.current.signal.aborted)) return;
     if (capturaDex.impedeSalvar) {
       toast.error(capturaDex.audioParaRetry
         ? 'Há um áudio aguardando transcrição. Tente novamente ou descarte o áudio antes de salvar.'
         : 'A captura do Dex ainda está em andamento. Aguarde antes de salvar.');
       return;
     }
+    const tentativa = new AbortController();
+    salvamentoAtual.current = tentativa;
     setIsSaving(true);
-    // R-86 — achado pela auditoria de 08/08: sem o try/catch (mesmo padrão que
-    // `handleRegravarEventos`, logo abaixo, já usa), uma falha de rede/servidor (503 visto ao
-    // vivo) lançava uma exceção não tratada — `isSaving` nunca voltava a `false`, nenhum toast
-    // aparecia, e o botão ficava travado (disabled) pros cliques seguintes. Parecia "não fez
-    // nada" quando na verdade tinha crashado silenciosamente.
-    let resultado: SalvarRegistroClinicoResult;
+    setErroSalvamento(null);
+    setSalvamentoDemorado(false);
+    let aviso: ReturnType<typeof setTimeout> | undefined;
+    let prazo: ReturnType<typeof setTimeout> | undefined;
+    let cancelar: (() => void) | undefined;
+    let prazoEsgotado = false;
     try {
-      resultado = await salvarRegistro({
-        // R-85 — se "Gerar orçamento" já criou a ficha (fichaRascunhoId), EDITA em vez de criar
-        // uma 2ª: mesmos eventos por id (upsert), sem duplicar o que o orçamento já gravou.
-        // finalizarAtendimento omitido (default true) — É este clique que fecha o atendimento.
-        visitaKey,
-        fichaId: fichaRascunhoId ?? undefined,
-        pacienteId, agendamentoId, textoVisita, eventosDraft, alertaNovo, ortoManutencao: ortoParaSalvar,
-        // R-108b — só governa o que NASCEU nesta sessão. A pendência concluída volta pra ficha
-        // onde foi planejada sozinha, decidida no servidor pelo `ficha_id` que ela já tem.
-        destinoNovos: { fichaId: destinoNovos },
+      const cancelado = new Promise<never>((_, rejeitar) => {
+        cancelar = () => rejeitar(new DOMException('Atendimento alterado.', 'AbortError'));
+        tentativa.signal.addEventListener('abort', cancelar, { once: true });
       });
+      if (antesDeSalvar && !await Promise.race([antesDeSalvar(), cancelado])) return;
+      if (tentativa.signal.aborted) return;
+      const dados = {
+        visitaKey, fichaId: fichaRascunhoId ?? undefined,
+        pacienteId, agendamentoId, textoVisita, eventosDraft, alertaNovo, ortoManutencao: ortoParaSalvar,
+        destinoNovos: { fichaId: destinoNovos },
+      };
+      let resultado: SalvarRegistroClinicoResult;
+      if (documento) {
+        // O prazo limita a espera do cliente; não cancela nem repete a escrita no servidor.
+        aviso = setTimeout(() => { if (!tentativa.signal.aborted) setSalvamentoDemorado(true); }, 20_000);
+        const limite = new Promise<never>((_, rejeitar) => {
+          prazo = setTimeout(() => { prazoEsgotado = true; rejeitar(new Error('Tempo de espera esgotado.')); }, 60_000);
+        });
+        resultado = await Promise.race([salvarRegistro(dados), limite, cancelado]);
+      } else {
+        resultado = await Promise.race([salvarRegistro(dados), cancelado]);
+      }
+      if (tentativa.signal.aborted) return;
+      if (!resultado.ok) {
+        if (documento) setErroSalvamento(resultado.error);
+        toast.error(resultado.error);
+        return;
+      }
+      setSavedFichaId(resultado.fichaId);
+      if (resultado.eventosFalharam) {
+        setEventosPendentes(eventosDraft);
+        return;
+      }
+      toast.success('Visita registrada.');
+      onSalvo(resultado);
     } catch {
-      resultado = { ok: false, error: 'Falha de conexão. Tente novamente.' };
+      if (tentativa.signal.aborted) return;
+      const mensagem = documento
+        ? prazoEsgotado
+          ? 'Não foi possível confirmar o salvamento a tempo. Seu rascunho foi mantido nesta aba. Tente de novo com segurança.'
+          : 'Falha de conexão. Seu rascunho foi mantido nesta aba. Tente de novo.'
+        : 'Falha de conexão. Tente novamente.';
+      if (documento) setErroSalvamento(mensagem);
+      toast.error(mensagem);
+    } finally {
+      if (aviso) clearTimeout(aviso);
+      if (prazo) clearTimeout(prazo);
+      if (cancelar) tentativa.signal.removeEventListener('abort', cancelar);
+      if (salvamentoAtual.current === tentativa) {
+        salvamentoAtual.current = null;
+        setIsSaving(false);
+        setSalvamentoDemorado(false);
+      }
     }
-    setIsSaving(false);
-    if (!resultado.ok) {
-      toast.error(resultado.error);
-      return;
-    }
-    setSavedFichaId(resultado.fichaId);
-    if (resultado.eventosFalharam) {
-      // I4 — a ficha salvou mas o desenho não; não avança sozinho até o dentista decidir.
-      setEventosPendentes(eventosDraft);
-      return;
-    }
-    toast.success('Visita registrada.');
-    onSalvo(resultado);
   }
 
   async function handleRegravarEventos() {
@@ -660,6 +724,7 @@ export function useRegistrarPainel({
   const campoMagico = (
     <CampoMagicoMeuDia
       key={contextoId}
+      documento={documento}
       pacienteNome={pacienteNome}
       eventosDraft={eventosDraft}
       onEventosDraftChange={setEventosDraft}
@@ -682,8 +747,10 @@ export function useRegistrarPainel({
   );
 
   const controlesOdontograma = (
-    <div className="flex min-h-[126px] flex-col justify-center">
-      {!onde && escopoRegional == null && !controlesAbertos && !catalogoPendente ? (
+    <div className={variante === 'meu-dia' ? "mt-4 flex flex-col border-t border-border pt-4" : "flex min-h-[126px] flex-col justify-center"}>
+      {!onde && escopoRegional == null && !controlesAbertos && !catalogoPendente ? (variante === 'meu-dia' ? (
+        <p className="text-[13px] leading-[20.8px] text-text-secondary">Selecione um ou vários dentes. O procedimento escolhido entra direto no atendimento, já no dente certo.</p>
+      ) : (
         <div className="flex items-end justify-between gap-3">
           <div>
             <p className="text-xs font-bold text-text-primary">Selecione um ou mais dentes</p>
@@ -699,7 +766,7 @@ export function useRegistrarPainel({
             + Evolução
           </button>
         </div>
-      ) : (
+      )) : (
         <div className="flex flex-col gap-2">
           {catalogoPendente && (
             <div className="rounded-lg border border-teal/30 bg-teal/5 px-3 py-2">
@@ -738,6 +805,7 @@ export function useRegistrarPainel({
 
           {!onde && (
             <FaixaEscopoRegional
+              variante={variante === 'meu-dia' ? 'meu-dia' : undefined}
               escopo={escopoRegional}
               onEscopoChange={selecionarEscopoRegional}
               eventosDraft={eventosDraft}
@@ -754,6 +822,8 @@ export function useRegistrarPainel({
 
           {onde && (
             <FaixaLote
+              variante={variante === 'meu-dia' ? 'meu-dia' : undefined}
+              onDuplicataIgnorada={onDuplicataIgnorada}
               dentes={onde.dentes}
               eventosDraft={eventosDraft}
               onEventosDraftChange={setEventosDraft}
@@ -778,7 +848,7 @@ export function useRegistrarPainel({
         </div>
       )}
 
-      {textoAberto && (
+      {variante !== 'meu-dia' && textoAberto && (
         <div className="mt-2 rounded-lg border border-border bg-surface-alt p-2.5">
           <div className="mb-1.5 flex items-center justify-between gap-2">
             <div>
@@ -892,8 +962,9 @@ export function useRegistrarPainel({
                 eventosPersistidos={boca}
                 selectedTeeth={onde?.dentes ?? []}
                 onToothToggle={onToothToggle}
-                compact
-                zoom={0.85}
+                layout={variante === 'meu-dia' ? 'colunas' : undefined}
+                compact={variante !== 'meu-dia'}
+                zoom={variante === 'meu-dia' ? undefined : 0.85}
                 hideFilters
               />
             </div>
@@ -934,8 +1005,17 @@ export function useRegistrarPainel({
     </div>
   );
 
+  const botaoRodapeMeuDia = 'inline-flex h-10 items-center justify-center gap-2 rounded-[8px] border border-border px-[13px] text-[13px] font-semibold text-text-secondary transition-colors hover:bg-teal-pale hover:text-teal-ink disabled:cursor-not-allowed disabled:opacity-40';
+
   const rodape = (
     <>
+      {documento && salvamentoDemorado && <p role="status" className="mb-3 text-sm text-warning-ink">Está demorando mais que o esperado. Seu rascunho continua nesta aba. Aguarde a confirmação.</p>}
+      {documento && erroSalvamento && <div role="alert" className="mb-3 rounded-lg border border-warning-ink/30 bg-warning-pale p-3 text-sm text-warning-ink">
+        <p>{erroSalvamento}</p>
+        <button type="button" className="mt-2 font-semibold underline disabled:opacity-50" disabled={isSaving || impedeSalvar || capturaDex.impedeSalvar} onClick={() => void handleSalvar()}>Tentar de novo</button>
+        {documento.onRecarregar && <button type="button" className="mt-2 ml-4 font-semibold underline disabled:opacity-50" disabled={isSaving} onClick={documento.onRecarregar}>Recarregar e conferir</button>}
+      </div>}
+
       {eventosPendentes && (
         <div role="status" className="mb-4 flex items-start gap-3 rounded-xl border border-warning/40 bg-warning-pale px-4 py-3">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning-ink" aria-hidden />
@@ -961,7 +1041,7 @@ export function useRegistrarPainel({
       {temFichaHoje && semRascunho && (
         <p className="mb-2 text-xs font-bold text-teal-ink">✓ 1 ficha hoje</p>
       )}
-      {materiaisAberto && (
+      {variante !== 'meu-dia' && materiaisAberto && (
         <section className="mb-3 flex items-start gap-3 rounded-xl border border-border bg-surface-alt px-3 py-2.5" aria-label="Materiais e etiquetas">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-teal/10 text-teal-ink">
             <ScanLine className="h-4 w-4" aria-hidden />
@@ -977,7 +1057,29 @@ export function useRegistrarPainel({
           </div>
         </section>
       )}
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className={variante === 'meu-dia' ? 'flex flex-col gap-3 min-[601px]:flex-row min-[601px]:items-center min-[601px]:justify-between' : 'flex flex-wrap items-center justify-between gap-2'}>
+        {variante === 'meu-dia' && <div className="text-[13px]">
+          <p className="font-bold text-text-primary">Ficha do atendimento</p>
+          <p className="text-text-secondary">{semRascunho ? 'Nenhuma alteração para salvar' : 'Rascunho desta consulta'}</p>
+        </div>}
+        <div className={variante === 'meu-dia' ? 'flex flex-col items-stretch gap-2 min-[601px]:flex-row min-[601px]:flex-wrap min-[601px]:items-center' : 'contents'}>
+        {variante === 'meu-dia' ? (
+          <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" aria-label="Mais ações do atendimento" disabled={isSaving} className={botaoRodapeMeuDia}>Mais ações ▾</button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {podeSugerirEvolucao && <DropdownMenuItem disabled={gerandoEvolucao || capturaDex.busy} onSelect={() => void handleSugerirEvolucao()}>Gerar evolução com Dex</DropdownMenuItem>}
+                <DropdownMenuItem onSelect={() => setRetornoModalAberto(true)}>Marcar retorno</DropdownMenuItem>
+                <DropdownMenuItem onSelect={onAbrirPickerOrcamento}>Gerar orçamento</DropdownMenuItem>
+                <DropdownMenuItem disabled={!onAnexar} onSelect={onAnexar}>Anexar documento de base</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <a href={`/dashboard/pacientes/${pacienteId}?tab=orcamentos`} target="_blank" rel="noopener" aria-disabled={isSaving} onClick={(event) => { if (isSaving) event.preventDefault(); }} className={`${botaoRodapeMeuDia} ${isSaving ? 'pointer-events-none opacity-40' : ''}`}>Ver orçamento</a>
+            <button type="button" onClick={onVerSessao} disabled={!onVerSessao || isSaving} title={!onVerSessao ? 'Sem sessão anterior' : undefined} className={botaoRodapeMeuDia}>Ver sessão na ficha</button>
+          </>
+        ) : (
         <button
           type="button"
           onClick={() => setMateriaisAberto((aberto) => !aberto)}
@@ -988,11 +1090,12 @@ export function useRegistrarPainel({
           Materiais / etiquetas
           <span className="rounded-full bg-surface px-1.5 py-0.5 font-mono text-[10px] text-text-secondary">0</span>
         </button>
+        )}
         <button
           type="button"
           onClick={() => void handleSalvar()}
-          disabled={isSaving || capturaDex.impedeSalvar || eventosPendentes != null || semRascunho}
-          className="flex min-h-11 min-w-[190px] items-center justify-center gap-2 rounded-xl bg-teal-dark px-5 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+          disabled={isSaving || capturaDex.impedeSalvar || eventosPendentes != null || semRascunho || impedeSalvar}
+          className={variante === 'meu-dia' ? 'flex h-10 items-center justify-center gap-2 rounded-[8px] border border-teal-ink bg-teal-pale px-[13px] py-2 text-[13px] font-semibold text-teal-ink transition-opacity hover:opacity-90 disabled:opacity-40' : 'flex min-h-11 min-w-[190px] items-center justify-center gap-2 rounded-xl bg-teal-dark px-5 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-40'}
         >
           {isSaving
             ? <><Loader2 className="h-4 w-4 animate-spin" /> Salvando…</>
@@ -1004,6 +1107,7 @@ export function useRegistrarPainel({
         </button>
       </div>
 
+      </div>
       <MarcarRetornoModal
         open={retornoModalAberto}
         onOpenChange={(open) => {
@@ -1029,7 +1133,7 @@ export function useRegistrarPainel({
   // R-123 — atalhos só reaproveitam as ações existentes: Ctrl+Enter é tratado pela captura;
   // Ctrl+S chama o mesmo salvar que o botão do rodapé. Nenhum atalho cria rota paralela.
   const salvarPorAtalho = useEffectEvent(() => {
-    if (!isSaving && eventosPendentes == null && !semRascunho) void handleSalvar();
+    if (!isSaving && eventosPendentes == null && !semRascunho && !impedeSalvar) void handleSalvar();
   });
 
   useEffect(() => {
@@ -1062,6 +1166,7 @@ export function useRegistrarPainel({
     slotCentral,
     rodape,
     ortoManutencao: ortoParaSalvar,
+    rascunhoAtual: { orto: ortoValor, alerta: alertaNovo },
     abrirManutencao,
   };
 }

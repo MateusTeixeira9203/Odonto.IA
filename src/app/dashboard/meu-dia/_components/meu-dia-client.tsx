@@ -46,7 +46,7 @@
 // DENTRO do card do perfil) — `ToothDetailPanel` sem esse prop já renderiza a seção inline,
 // dentro do próprio card (555px é bem mais que os 312px que motivaram o portal originalmente).
 // Faltam F3 (gavetas, provavelmente já cobertas) e F5 (rótulo do rodapé).
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type SetStateAction } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -60,13 +60,16 @@ import { salvarVisitaMeuDia } from '@/app/dashboard/meu-dia/actions';
 import type { SalvarFichaResult } from '@/server/patients/salvar-ficha';
 import { EncaminharBar } from '@/components/fichas/encaminhar-bar';
 import { Rail } from './rail';
+import { documentoVazio, semNovasDuplicatas, temConteudo, sincronizarEventos, unirFacesDaCaptura, chaveRascunho, lerRascunho, serializarRascunho, textoParaSalvar, LIMITE_TEXTO_SALVAR, relatoParaDex, type RascunhoAtendimento } from '@/lib/meu-dia/documento-atendimento';
+import { chaveDedupEvento } from '@/lib/odontograma/dedup-eventos-draft';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { AtenderAgoraModal } from '@/app/dashboard/agendamentos/_components/atender-agora-modal';
 import { atualizarStatusAgendamento } from '@/app/dashboard/agendamentos/actions';
 import type { AgendamentoStatus } from '@/types/database';
 import { HistoricoBloco } from './historico-bloco';
 import { AnexarDocumentosBloco } from './anexar-documentos-bloco';
-import { NestaSessaoBloco } from './nesta-sessao-bloco';
-import { FaixaGavetas, type GavetaId } from './faixa-gavetas';
+import { OrtoCard } from '@/components/fichas/orto-card';
+
 import { ondeLabel } from './meu-dia-format';
 import { useRegistrarPainel, pendenciaParaDraft } from './registrar-painel';
 
@@ -147,6 +150,7 @@ type UltimaAcaoPlano = {
 };
 
 interface MeuDiaClientProps extends MeuDiaData {
+  profissionalNome: string;
   agendamentoInicialId?: string;
   /** R-46h — o hook de orçamento compartilhado (pacientes/[id]/_components) precisa disto
    *  pra escopar a query; MeuDiaData não carrega (é parâmetro do fetch, não parte do retorno). */
@@ -156,7 +160,7 @@ interface MeuDiaClientProps extends MeuDiaData {
 }
 
 export function MeuDiaClient({
-  slots, contextoPorPaciente, agendamentoInicialId, catalogoProcedimentos, meuDentistaId,
+  profissionalNome, slots, contextoPorPaciente, agendamentoInicialId, catalogoProcedimentos, meuDentistaId,
   destinosEncaminhar, clinicaId, primeiraSessao,
   progressoOnboarding, emFormacaoClinica,
 }: MeuDiaClientProps) {
@@ -176,6 +180,7 @@ export function MeuDiaClient({
   }, [slots, agendamentoInicialId]);
 
   const [selecionadoId, setSelecionadoId] = useState<string | null>(defaultAgendamentoId);
+  const [trocaPendenteId, setTrocaPendenteId] = useState<string | null>(null);
 
   // R-57 F1 — encaixe criado no rail: fica na rota (não vai pro /consulta que o R-15
   // aposentou), refaz o refresh e seleciona o slot novo assim que ele aparecer em `slots`.
@@ -189,7 +194,51 @@ export function MeuDiaClient({
     setAguardandoSlot(null);
   }
 
-  const [eventosDraft, setEventosDraft] = useState<OdontogramaEventoDraft[]>([]);
+  const [estadoDraft, setEstadoDraft] = useState<ReturnType<typeof semNovasDuplicatas>>({ eventos: [], descartados: [] });
+  const eventosDraft = estadoDraft.eventos;
+  const [documento, setDocumento] = useState(documentoVazio);
+  const acoesDocumento = useRef<{ organizar: () => void; corrigirPendentes: () => void } | null>(null);
+  const recargaSegura = useRef(false);
+  const confirmarSalvar = useRef<((confirmado: boolean) => void) | null>(null);
+  const [escolhaSalvar, setEscolhaSalvar] = useState<{ textoNovo: boolean; semDente: number } | null>(null);
+
+  const [rascunhoInicial, setRascunhoInicial] = useState<{ contextoId: string; orto: RascunhoAtendimento['orto']; alerta: string | null }>();
+  const [rascunhoCarregado, setRascunhoCarregado] = useState<string | null>(null);
+  const [selecaoRecuperada, setSelecaoRecuperada] = useState(false);
+  const timerRascunho = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const chaveDescartada = useRef<string | null>(null);
+
+  const [documentoBloqueado, setDocumentoBloqueado] = useState(false);
+  const setEventosDraft = useCallback((atualizacao: SetStateAction<OdontogramaEventoDraft[]>) => {
+    setEstadoDraft((atual) => semNovasDuplicatas(atual.eventos,
+      unirFacesDaCaptura(atual.eventos, typeof atualizacao === 'function' ? atualizacao(atual.eventos) : atualizacao)));
+  }, []);
+  const [eventosNoDocumento, setEventosNoDocumento] = useState(eventosDraft);
+  if (eventosNoDocumento !== eventosDraft) {
+    setEventosNoDocumento(eventosDraft);
+    setDocumento((atual) => sincronizarEventos(atual, eventosDraft));
+  }
+  function avisarDuplicataDoLote(dentes: number[], rotulo: string) {
+    for (const dente of dentes) {
+      toast.warning(`${dente} já tem ${rotulo} em aberto`);
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) continue;
+      for (const evento of eventosDraft.filter((atual) => atual.ancora.dente === dente)) {
+        document.querySelector<HTMLElement>(`[data-documento-evento="${CSS.escape(evento.id)}"]`)
+          ?.animate([{ opacity: 0.5 }, { opacity: 1 }], { duration: 500, iterations: 4 });
+      }
+    }
+  }
+  useEffect(() => {
+    for (const evento of estadoDraft.descartados) {
+      const nome = evento.procedimentoNome || TIPO_LABEL[evento.tipo];
+      toast.warning(`${evento.ancora.dente ?? 'Boca'} já tem ${nome} ${evento.ancora.faces?.join('') ?? ''} em aberto`, { id: `duplicata:${evento.id}` });
+      const existente = estadoDraft.eventos.find((atual) => chaveDedupEvento(atual) === chaveDedupEvento(evento));
+      if (existente && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        document.querySelector<HTMLElement>(`[data-documento-evento="${CSS.escape(existente.id)}"]`)
+          ?.animate([{ opacity: 0.5, backgroundColor: 'var(--color-teal-pale)' }, { opacity: 1, backgroundColor: 'transparent' }], { duration: 500, iterations: 4 });
+      }
+    }
+  }, [estadoDraft]);
   /** R-140a — não é refeito no orçamento antecipado; só quando muda o atendimento do rail. */
   const [visitaKey, setVisitaKey] = useState(() => crypto.randomUUID());
   /** R-85 — quando "Gerar orçamento" precisa gravar a ficha cedo (ver `onAbrirPickerOrcamento`
@@ -215,20 +264,11 @@ export function MeuDiaClient({
   const [leituraGrande, setLeituraGrande] = useState<MeuDiaVisita | null>(null);
   const [textoVisita, setTextoVisita] = useState('');
   const [gruposAbertos, setGruposAbertos] = useState<GrupoAberto[]>([]);
-  /** R-46d D8 — "Anexar documentos": preso ao paciente, sem persistência (mesmo reset de
-   *  eventosDraft/textoVisita abaixo). `documentoNonce` sinaliza "usar como base" pro campo
-   *  mágico (append, nunca substituição — captura-livre-card.tsx). */
+  /** Documento de referência: entra na escrita somente ao pedir "Usar como base". */
   const [documentoNome, setDocumentoNome] = useState<string | null>(null);
   const [documentoTexto, setDocumentoTexto] = useState<string | null>(null);
-  const [documentoNonce, setDocumentoNonce] = useState(0);
   const [documentoOrigem, setDocumentoOrigem] = useState<'audio' | 'documento'>('documento');
-  // R-82 — memoizado por valor: sem isso, este objeto nascia de novo a cada render (referência
-  // instável) e o `useEffect` de `captura-livre-card.tsx` que depende dele reavaliava a cada
-  // re-render deste componente inteiro, não só quando o anexo de fato mudava.
-  const anexarTexto = useMemo(
-    () => (documentoTexto != null ? { texto: documentoTexto, nonce: documentoNonce, origem: documentoOrigem } : undefined),
-    [documentoTexto, documentoNonce, documentoOrigem],
-  );
+  const [anexarTexto, setAnexarTexto] = useState<{ texto: string; nonce: number; origem: 'audio' | 'documento' }>();
 
   // Reset explícito ao trocar de paciente (contrato §5.4) — o `key={agendamentoId}` do
   // RegistrarPainel não alcança mais estes campos, que agora moram aqui. Ajuste durante o
@@ -246,7 +286,7 @@ export function MeuDiaClient({
   // (lista única, sempre visível); Histórico/A fazer/Anexos viraram gaveta — 1 aberta por
   // vez, mas agora FECHADA por padrão (nenhuma "aba default" — a lista+espelho é o que fica
   // sempre visível, gaveta é sob demanda, T5/orçamento vertical).
-  const [gavetaAberta, setGavetaAberta] = useState<GavetaId | null>(null);
+  const [anexosAbertos, setAnexosAbertos] = useState(false);
 
   /** R-108b — destino dos eventos que NASCEM nesta sessão (spec §4). `undefined` = o dentista
    *  ainda não tocou no seletor, então vale o pré-marcado (1º tratamento aberto — "caso comum
@@ -257,6 +297,10 @@ export function MeuDiaClient({
   if (selecionadoId !== idAoResetar) {
     setIdAoResetar(selecionadoId);
     setEventosDraft([]);
+    setDocumento(documentoVazio());
+    setDocumentoBloqueado(false);
+    setRascunhoInicial(undefined);
+    setRascunhoCarregado(null);
     setVisitaKey(crypto.randomUUID());
     setDestinoEscolhido(undefined); // R-108b — tratamento aberto é do paciente anterior
     setFichaRascunhoId(null); // R-85 — ficha do orçamento antecipado é do paciente anterior
@@ -265,7 +309,7 @@ export function MeuDiaClient({
     setRegistrandoDenteAberto(false); // R-78 F2 — idem, nunca herda o editor aberto
     setDetalheAlvoId(null);
     setLeituraGrande(null); // R-78 F4 — idem, nunca herda a leitura de visita do paciente anterior
-    setGavetaAberta(null); // G13 — troca de paciente reseta a gaveta pro default (fechada)
+    setAnexosAbertos(false); // G13 — troca de paciente reseta a gaveta pro default (fechada)
     setTextoVisita('');
     // Trocar de paciente com o modo de encaminhar ligado deixaria a barra selecionando
     // pendência do paciente ERRADO (contexto.pendencias troca, os ids selecionados não).
@@ -277,6 +321,7 @@ export function MeuDiaClient({
     // D8 — documento anexado é do paciente anterior, não sobrevive à troca.
     setDocumentoNome(null);
     setDocumentoTexto(null);
+    setAnexarTexto(undefined);
     setDocumentoOrigem('documento');
   }
 
@@ -285,6 +330,75 @@ export function MeuDiaClient({
   // Uma visita com âncora clínica finalizada é imutável neste cockpit. A revisão fica no perfil;
   // uma nova consulta no mesmo dia nasce por novo encaixe, sem herdar esse estado.
   const atendimentoJaRegistrado = slotSelecionado?.atendimentoRegistrado === true;
+  const chaveDaAba = slotSelecionado ? chaveRascunho({ clinicaId, dentistaId: meuDentistaId, pacienteId: slotSelecionado.pacienteId, agendamentoId: slotSelecionado.agendamentoId }) : null;
+  useEffect(() => {
+    try {
+      for (const slot of slots) {
+        if (!slot.atendimentoRegistrado) continue;
+        sessionStorage.removeItem(chaveRascunho({ clinicaId, dentistaId: meuDentistaId,
+          pacienteId: slot.pacienteId, agendamentoId: slot.agendamentoId }));
+      }
+    } catch { /* O Meu Dia segue disponível quando o storage está bloqueado. */ }
+  }, [slots, clinicaId, meuDentistaId]);
+
+  const observacoesPendentes = documento.blocos.flatMap((bloco) => bloco.tipo === 'pendente' && bloco.modelo.observacao.trim()
+    ? [`${bloco.modelo.procedimentoNome}: ${bloco.modelo.observacao}`] : []);
+  const textoDoDocumento = textoParaSalvar([textoVisita, ...observacoesPendentes].filter(Boolean).join('\n\n'), documento, true);
+
+  function resolverEscolhaSalvar(confirmado: boolean) {
+    const resolver = confirmarSalvar.current;
+    confirmarSalvar.current = null;
+    setEscolhaSalvar(null);
+    resolver?.(confirmado);
+  }
+
+  async function antesDeSalvar() {
+    if (textoDoDocumento.excede) return false;
+    const textoNovo = relatoParaDex(documento) !== null;
+    const semDente = documento.blocos.filter((bloco) => bloco.tipo === 'pendente').length;
+    if (!textoNovo && semDente === 0) return true;
+    confirmarSalvar.current?.(false);
+    return new Promise<boolean>((resolver) => {
+      confirmarSalvar.current = resolver;
+      setEscolhaSalvar({ textoNovo, semDente });
+    });
+  }
+  useEffect(() => () => {
+    const resolver = confirmarSalvar.current;
+    confirmarSalvar.current = null;
+    resolver?.(false);
+  }, []);
+
+
+  function limparRascunhoDaAba() {
+    if (timerRascunho.current) clearTimeout(timerRascunho.current);
+    chaveDescartada.current = chaveDaAba;
+    try { if (chaveDaAba) sessionStorage.removeItem(chaveDaAba); } catch { /* Memória continua disponível quando o storage não está. */ }
+  }
+
+
+  function limparEstadoDoAtendimento() {
+    limparRascunhoDaAba();
+    resolverEscolhaSalvar(false);
+    setTrocaPendenteId(null);
+    setEstadoDraft({ eventos: [], descartados: [] });
+    setDocumento(documentoVazio());
+    setDocumentoBloqueado(false);
+    setTextoVisita('');
+    setRascunhoInicial({ contextoId: selecionadoId ?? '', orto: null, alerta: null });
+    setVisitaKey(crypto.randomUUID());
+    setFichaRascunhoId(null);
+    setDenteAberto(null);
+    setDetalheEspecialidadeAberto(false);
+    setRegistrandoDenteAberto(false);
+    setDetalheAlvoId(null);
+    setLeituraGrande(null);
+    setDocumentoNome(null);
+    setDocumentoTexto(null);
+    setAnexarTexto(undefined);
+    setDocumentoOrigem('documento');
+  }
+
 
   // R-84 §3 — discriminador: id já existia no banco antes desta sessão (boca, R-61) vs.
   // indicação nova desta ficha. Derivado a cada render, nunca persistido — mesmo princípio de
@@ -410,6 +524,19 @@ export function MeuDiaClient({
   // ''/[]/null/false espelham o mesmo padrão que `useOrcamentoModal` acima já usa; a saída só
   // é RENDERIZADA dentro do `{slotSelecionado && contexto ? ... }` abaixo, nunca aparece vazia.
   const registrarPainel = useRegistrarPainel({
+    variante: 'meu-dia',
+    onVerSessao: contexto?.visitas[0] ? () => abrirLeituraGrande(contexto.visitas[0]) : undefined,
+    onAnexar: () => { handleDenteAbertoChange(null); setLeituraGrande(null); setAnexosAbertos(true); },
+    rascunhoInicial,
+    impedeSalvar: textoDoDocumento.excede || documentoBloqueado || rascunhoCarregado !== chaveDaAba,
+    antesDeSalvar,
+    onSalvarVisita: async (dados) => {
+      if (!dados.agendamentoId || textoDoDocumento.excede) return { ok: false, error: 'Confira o texto e o atendimento antes de salvar.' };
+      return salvarVisitaMeuDia({ ...dados, agendamentoId: dados.agendamentoId, textoVisita: textoDoDocumento.texto });
+    },
+    documento: { acoes: acoesDocumento, onRecarregar: recarregarComRascunho, valor: documento, onChange: setDocumento, onBloqueioChange: setDocumentoBloqueado,
+      textoVisita, onTextoVisitaChange: setTextoVisita, idsDeAntes, destinosEncaminhar, onAbrirDenteGrande: abrirDenteGrande },
+    onDuplicataIgnorada: avisarDuplicataDoLote,
     visitaKey,
     contextoId: slotSelecionado?.agendamentoId ?? '',
     pacienteId: slotSelecionado?.pacienteId ?? '',
@@ -490,6 +617,120 @@ export function MeuDiaClient({
     onIniciarPonte: iniciarPonte,
   });
 
+  const limparAtendimentoConfirmado = useEffectEvent(() => {
+    limparEstadoDoAtendimento();
+    setRascunhoCarregado(chaveDaAba);
+  });
+  // A confirmação pode chegar pelo refresh mesmo depois do prazo do cliente.
+  useEffect(() => {
+    if (atendimentoJaRegistrado) limparAtendimentoConfirmado();
+  }, [atendimentoJaRegistrado, chaveDaAba]);
+
+  const recuperarRascunho = useEffectEvent(() => {
+    if (!selecaoRecuperada) {
+      try {
+        const recuperaveis = slots.filter((slot) => !slot.atendimentoRegistrado && sessionStorage.getItem(chaveRascunho({
+          clinicaId, dentistaId: meuDentistaId, pacienteId: slot.pacienteId, agendamentoId: slot.agendamentoId,
+        })) !== null);
+        if (!agendamentoInicialId && recuperaveis.length === 1) setSelecionadoId(recuperaveis[0].agendamentoId);
+      } catch { /* Sem storage, a consulta segue somente na memória. */ }
+      setSelecaoRecuperada(true);
+      return;
+    }
+    if (!chaveDaAba || rascunhoCarregado === chaveDaAba) return;
+    chaveDescartada.current = null;
+    try {
+      const json = sessionStorage.getItem(chaveDaAba);
+      if (json && !atendimentoJaRegistrado) {
+        const leitura = lerRascunho(json);
+        if (leitura.ok) {
+          const rascunho = leitura.rascunho;
+          setEstadoDraft({ eventos: rascunho.eventosDraft, descartados: [] });
+          setEventosNoDocumento(rascunho.eventosDraft);
+          setDocumento(rascunho.documento);
+          setTextoVisita(rascunho.textoVisita);
+          setVisitaKey(rascunho.visitaKey);
+          setRascunhoInicial({ contextoId: selecionadoId ?? '', orto: rascunho.orto, alerta: rascunho.alerta });
+          toast.success('Rascunho desta aba recuperado');
+        } else {
+          toast.warning('Não foi possível recuperar o rascunho');
+          sessionStorage.removeItem(chaveDaAba);
+        }
+      } else if (atendimentoJaRegistrado) sessionStorage.removeItem(chaveDaAba);
+    } catch { /* Nenhuma exceção de storage interrompe a edição. */ }
+    setRascunhoCarregado(chaveDaAba);
+  });
+  useEffect(() => { recuperarRascunho(); }, [chaveDaAba, rascunhoCarregado, selecaoRecuperada]);
+
+  function gravarRascunho(): boolean {
+    if (!chaveDaAba || rascunhoCarregado !== chaveDaAba || chaveDescartada.current === chaveDaAba || atendimentoJaRegistrado) return false;
+    try {
+      if (temEdicaoNaoSalva()) {
+        const json = serializarRascunho({ documento, eventosDraft, textoVisita,
+          orto: registrarPainel.rascunhoAtual.orto, alerta: registrarPainel.rascunhoAtual.alerta, visitaKey });
+        sessionStorage.setItem(chaveDaAba, json);
+        return sessionStorage.getItem(chaveDaAba) === json;
+      }
+      sessionStorage.removeItem(chaveDaAba);
+      return true;
+    } catch { return false; }
+  }
+  const gravarRascunhoAgora = useEffectEvent(() => { gravarRascunho(); });
+
+  function recarregarComRascunho() {
+    if (!slotSelecionado || !gravarRascunho()) {
+      toast.error('Não foi possível guardar o rascunho na aba. Ele continua nesta tela; a página não foi recarregada.');
+      return;
+    }
+    const destino = new URL(window.location.href);
+    destino.searchParams.set('ag', slotSelecionado.agendamentoId);
+    recargaSegura.current = true;
+    setTimeout(() => { recargaSegura.current = false; }, 2000);
+    window.location.assign(destino.toString());
+  }
+  useEffect(() => {
+    timerRascunho.current = setTimeout(() => gravarRascunhoAgora(), 500);
+    return () => { if (timerRascunho.current) clearTimeout(timerRascunho.current); };
+  }, [chaveDaAba, rascunhoCarregado, documento, eventosDraft, textoVisita, visitaKey, registrarPainel.rascunhoAtual.orto, registrarPainel.rascunhoAtual.alerta, documentoTexto]);
+  useEffect(() => {
+    const guardar = () => gravarRascunhoAgora();
+    window.addEventListener('pagehide', guardar);
+    return () => window.removeEventListener('pagehide', guardar);
+  }, []);
+
+  // O modelo inclui o texto ainda não enviado ao Dex, sem consultar campos do DOM.
+  function temEdicaoNaoSalva() {
+    if (atendimentoJaRegistrado) return false;
+    return eventosDraft.length > 0 || textoVisita.trim() !== ''
+      || registrarPainel.rascunhoAtual.orto != null || registrarPainel.rascunhoAtual.alerta != null || documentoTexto != null
+      || temConteudo(documento);
+  }
+
+  function selecionarAtendimento(id: string) {
+    if (id === selecionadoId) return;
+    if (temEdicaoNaoSalva()) setTrocaPendenteId(id);
+    else setSelecionadoId(id);
+  }
+
+  function abrirEncaixe() {
+    if (temEdicaoNaoSalva()) setTrocaPendenteId('encaixe');
+    else setEncaixeAberto(true);
+  }
+
+  const avisarSaida = useEffectEvent((event: BeforeUnloadEvent) => {
+    if (recargaSegura.current) return;
+    if (!temEdicaoNaoSalva()) return;
+    gravarRascunhoAgora();
+    event.preventDefault();
+    event.returnValue = '';
+  });
+  useEffect(() => {
+    const avisar = (event: BeforeUnloadEvent) => avisarSaida(event);
+    window.addEventListener('beforeunload', avisar);
+    return () => window.removeEventListener('beforeunload', avisar);
+  }, []);
+
+
   // C6 — o Sheet precisa da mesma lista que o painel do dente sempre recebeu; migrado de
   // registrar-painel.tsx (era `useEffect` local ali, key `pacienteId`). Dep proposital só no
   // id, não no objeto inteiro — refetch só quando o PACIENTE muda, mesmo padrão de antes.
@@ -518,15 +759,8 @@ export function MeuDiaClient({
   // servidor. Fecha a janela de corrida de um duplo clique rápido logo após salvar (o
   // `router.refresh()` sozinho não seria rápido o bastante pra proteger o 2º clique).
   function handleSalvo() {
+    limparEstadoDoAtendimento();
     if (onboardingClinicoAtivo) void registrarMarcoOnboarding('primeira_ficha');
-    setEventosDraft([]);
-    setFichaRascunhoId(null);
-    setDenteAberto(null);
-    setDetalheEspecialidadeAberto(false);
-    setRegistrandoDenteAberto(false);
-    setDetalheAlvoId(null);
-    setLeituraGrande(null);
-    setTextoVisita('');
     avancarProximo();
     router.refresh();
   }
@@ -569,6 +803,7 @@ export function MeuDiaClient({
    *  aberto (mesma regra do ocupante único, §3.2) — a gaveta continua aberta, só o slot
    *  direito troca. */
   function abrirLeituraGrande(visita: MeuDiaVisita) {
+    setAnexosAbertos(false);
     setDenteAberto(null);
     setRegistrandoDenteAberto(false);
     setDetalheAlvoId(null);
@@ -620,7 +855,7 @@ export function MeuDiaClient({
       return;
     }
     setEventosDraft((anteriores) => [...anteriores, pendenciaParaDraft(pendencia, hojeBRT())]);
-    setGavetaAberta(null);
+    setAnexosAbertos(false);
     toast.success('Adicionado à revisão. Complete os detalhes e salve o atendimento.');
   }
 
@@ -732,7 +967,8 @@ export function MeuDiaClient({
     setDocumentoOrigem(origem);
   }
   function handleUsarComoBase() {
-    setDocumentoNonce((n) => n + 1);
+    if (documentoTexto == null) return;
+    setAnexarTexto((anterior) => ({ texto: documentoTexto, origem: documentoOrigem, nonce: (anterior?.nonce ?? 0) + 1 }));
   }
 
   // R-52 — "A fazer" é o TRABALHO QUE EU VOU FAZER (decisão dele, 03/08, com o número de
@@ -748,7 +984,7 @@ export function MeuDiaClient({
   // que a decisão do X1 condenou: duas leituras da mesma regra podem divergir em silêncio.
   //
   // R-63 F2 — subiu de dentro de `a-fazer-bloco.tsx` pra cá: o MESMO array agora alimenta a
-  // lista renderizada E o contador da gaveta (`FaixaGavetas`), nunca duas leituras da regra.
+  // lista renderizada no histórico, nunca duas leituras da regra.
   const minhasPendencias = (contexto?.pendencias ?? []).filter((p) =>
     responsavelPassaFiltro(p.encaminhadoParaId ?? p.dentistaId, FILTRO_MEUS, meuDentistaId),
   );
@@ -760,7 +996,7 @@ export function MeuDiaClient({
   );
 
   return (
-    <div className="flex flex-col gap-3">
+    <div inert={documentoBloqueado || chaveDaAba !== rascunhoCarregado} className="flex min-w-0 flex-col">
       {/* §4.2.2 — antes do primeiro atendimento quem explica é o Dex, num card inteiro (há
           espaço e não há ninguém na cadeira). Depois disso, só as dicas de zona. */}
       {primeiraSessao && progressoOnboarding && (
@@ -769,17 +1005,57 @@ export function MeuDiaClient({
           primeiraSessao={primeiraSessao}
           podeUsarDemo
           emFormacaoClinica={emFormacaoClinica}
-          onAtenderReal={() => setEncaixeAberto(true)}
+          onAtenderReal={abrirEncaixe}
         />
       )}
       <Rail
         slots={slots}
         selecionadoId={selecionadoId}
-        onSelecionar={setSelecionadoId}
-        onEncaixe={() => setEncaixeAberto(true)}
+        onSelecionar={selecionarAtendimento}
+        onEncaixe={abrirEncaixe}
         onMudarStatus={handleMudarStatus}
         primeiraSessao={primeiraSessao}
       />
+      <AlertDialog open={escolhaSalvar !== null} onOpenChange={(open) => { if (!open) resolverEscolhaSalvar(false); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{escolhaSalvar?.textoNovo ? 'Há texto que o Dex ainda não organizou' : `${escolhaSalvar?.semDente ?? 0} linha(s) sem dente`}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {escolhaSalvar?.textoNovo && 'Você pode organizar agora ou salvar o texto nas observações, como está. '}
+              {!!escolhaSalvar?.semDente && `${escolhaSalvar.semDente} linha(s) sem dente. Ao salvar assim mesmo, essas linhas ficam nas observações, sem criar procedimentos sem dente.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-wrap">
+            <AlertDialogCancel>Continuar editando</AlertDialogCancel>
+            {escolhaSalvar?.textoNovo && <button type="button" className="min-h-10 rounded-lg border border-border px-3 text-sm font-semibold text-teal-ink" onClick={() => {
+              resolverEscolhaSalvar(false);
+              setTimeout(() => acoesDocumento.current?.organizar(), 0);
+            }}>Organizar agora</button>}
+            {!!escolhaSalvar?.semDente && <button type="button" className="min-h-10 rounded-lg border border-border px-3 text-sm font-semibold text-teal-ink" onClick={() => {
+              resolverEscolhaSalvar(false);
+              setTimeout(() => acoesDocumento.current?.corrigirPendentes(), 0);
+            }}>Corrigir</button>}
+            <AlertDialogAction onClick={() => resolverEscolhaSalvar(true)}>Salvar assim mesmo</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={trocaPendenteId !== null} onOpenChange={(open) => { if (!open) setTrocaPendenteId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Descartar o que não foi salvo de {slotSelecionado?.pacienteNome}?</AlertDialogTitle>
+            <AlertDialogDescription>O rascunho desta consulta será descartado ao trocar de atendimento.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Continuar editando</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              if (trocaPendenteId === 'encaixe') {
+                setEncaixeAberto(true);
+              } else if (trocaPendenteId) { limparRascunhoDaAba(); setSelecionadoId(trocaPendenteId); }
+              setTrocaPendenteId(null);
+            }}>Descartar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <AtenderAgoraModal
         clinicaId={clinicaId}
         open={encaixeAberto}
@@ -790,194 +1066,37 @@ export function MeuDiaClient({
       <NovoOrcamentoModal {...orcamentoModal.modalProps} />
       {slotSelecionado && contexto ? (
         <>
-          {/* C1 — migrado de contexto-coluna.tsx (SAI): nome + "ver perfil" + alertas de
-              cadastro (alergia etc.) não têm mais um bloco próprio nesta fatia (o phead
-              completo — avatar, idade, badges de orto/endo — fica pra fatia posterior),
-              mas não podiam simplesmente sumir da tela. */}
-          <div className="flex w-full flex-col gap-3 rounded-xl border border-border bg-surface px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
-              <span className="shrink-0 font-mono text-xs font-bold text-text-secondary">
-                {slotSelecionado.horario}
-              </span>
-              <span
-                aria-hidden
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal/20 text-[11px] font-bold text-teal-ink"
-              >
-                {slotSelecionado.pacienteNome
-                  .split(/\s+/)
-                  .slice(0, 2)
-                  .map((parte) => parte[0])
-                  .join('')
-                  .toUpperCase()}
-              </span>
-              <h2 className="text-sm font-bold text-text-primary">{slotSelecionado.pacienteNome}</h2>
-              {slotSelecionado.pacienteIdade != null && (
-                <span className="shrink-0 rounded-full border border-border bg-surface-alt px-2 py-1 font-mono text-[10px] text-text-secondary">
-                  {slotSelecionado.pacienteIdade} anos
-                </span>
-              )}
+          <article data-meu-dia-cartao inert={documentoBloqueado || chaveDaAba !== rascunhoCarregado} aria-busy={documentoBloqueado} className="min-w-0 overflow-hidden rounded-[12px] border border-border bg-surface">
+          <div data-meu-dia-paciente className="flex flex-col gap-3 max-[600px]:min-h-[114.4px] max-[600px]:justify-between border-b border-border px-6 py-[18px] min-[601px]:flex-row min-[601px]:items-center min-[601px]:justify-between">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[15px]">
+              <h2 className="font-bold text-text-primary">{slotSelecionado.pacienteNome}</h2>
+              {slotSelecionado.pacienteIdade != null && <span className="text-text-secondary">· {slotSelecionado.pacienteIdade} anos</span>}
+              {(fichaRascunhoId || destinoNovos) && <span className="text-text-secondary">· Ficha de tratamento</span>}
               {contexto.alertas.map((alerta, i) => (
-                <span
-                  key={i}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-warning/40 bg-warning-pale px-3 py-1.5 text-xs font-semibold text-warning-ink"
-                >
-                  <AlertCircle className="h-3 w-3 shrink-0" />
-                  {alerta}
+                <span key={i} className="inline-flex items-center gap-1 text-xs text-warning-ink">
+                  <AlertCircle className="h-3 w-3 shrink-0" aria-hidden />{alerta}
                 </span>
               ))}
-              {/* D2 (R-78) — "A fazer" virou gaveta; o contador migra pra cá, mesmo padrão
-                  visual dos alertas de cadastro acima, pra não sumir da vista permanente. */}
               {minhasPendencias.length > 0 && (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-alt px-3 py-1.5 text-xs font-semibold text-text-secondary">
-                  <Hourglass className="h-3 w-3 shrink-0" />
+                <span className="inline-flex items-center gap-1 text-xs text-text-secondary">
+                  <Hourglass className="h-3 w-3 shrink-0" aria-hidden />
                   {minhasPendencias.length} pendente{minhasPendencias.length === 1 ? '' : 's'}
                 </span>
               )}
             </div>
-            <Link
-              href={`/dashboard/pacientes/${slotSelecionado.pacienteId}`}
-              className="shrink-0 self-end text-xs font-semibold text-text-secondary transition-colors hover:text-text-primary sm:self-auto"
-            >
-              Ver perfil completo →
-            </Link>
+            <div className="flex shrink-0 flex-wrap items-center gap-3 text-[12.5px] text-text-secondary">
+              <span>{profissionalNome}</span>
+              <Link href={`/dashboard/pacientes/${slotSelecionado.pacienteId}`} className="font-semibold hover:text-text-primary">Ver perfil completo →</Link>
+            </div>
           </div>
-
-          {atendimentoJaRegistrado ? (
-            <section
-              aria-label="Atendimento já registrado"
-              className="flex min-h-40 w-full flex-col items-center justify-center rounded-2xl border border-border bg-surface px-5 py-8 text-center"
-            >
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-teal/10 text-teal-ink">
-                <CheckCircle2 className="h-5 w-5" aria-hidden />
-              </span>
-              <p className="mt-3 text-sm font-bold text-text-primary">Atendimento já registrado</p>
-              <p className="mt-1 max-w-md text-xs leading-relaxed text-text-secondary">
-                Para uma nova consulta hoje, use Encaixe. O perfil do paciente continua disponível
-                quando você quiser revisar ou editar a ficha.
-              </p>
-            </section>
-          ) : (
-            <>
-          {/* R-78 F0 — campo mágico, full-width, topo do fluxo (era o topo do card
-              "Registrar" antigo — o card em si morreu, campo mágico ganha o próprio). */}
-          <div className="w-full rounded-2xl border border-teal/30 bg-surface p-2.5 sm:p-3">
-            {registrarPainel.campoMagico}
-          </div>
-
-          {/* R-140b — a bancada acompanha a largura da régua do dia. Revisão e contexto
-              preservam a mesma altura; a aba Boca inteira cabe sem rolagem interna. */}
-          <div className="grid w-full grid-cols-1 items-stretch gap-3 xl:grid-cols-[minmax(0,1.05fr)_minmax(720px,0.95fr)]">
-            <motion.div
-              layout="size"
-              transition={{ layout: { duration: 0.18, ease: 'easeOut' } }}
-              className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border bg-surface p-4 xl:h-[760px]"
-            >
-              {dicas.nestaFicha && (
-                <DicaZona titulo="Revisão da consulta">
-                  Tudo que o Dex entendeu cai aqui. Dá pra corrigir antes de salvar.
-                </DicaZona>
-              )}
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5">
-                  <p className="font-heading text-lg text-text-primary">Revisão do atendimento</p>
-                  <Contador n={eventosDraft.length + (registrarPainel.ortoManutencao ? 1 : 0)} />
-                </div>
-                {registrarPainel.acoesSecundarias}
-              </div>
-              <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-              {/* F0+F1: "Hoje" + "Novos" fundidos numa lista só (todo `eventosDraft`, os 2
-                  status juntos), `RegistroCard` editável — pill clicável, observação
-                  inline, detalhe de especialidade colapsável (`nesta-sessao-bloco.tsx`). */}
-              <NestaSessaoBloco
-                // R-105a §4.2 — na primeira sessão a frase deixa de constatar o vazio e passa
-                // a dizer o que vai acontecer ali quando o dentista falar.
-                vazio={primeiraSessao
-                  ? 'O que o Dex entender do seu relato aparece aqui.'
-                  : 'Nada registrado ainda nesta consulta.'}
-                eventosDraft={eventosDraft}
-                onEventosDraftChange={setEventosDraft}
-                textoVisita={textoVisita}
-                onTextoVisitaChange={setTextoVisita}
-                ortoManutencao={registrarPainel.ortoManutencao}
-                onEditarOrto={registrarPainel.abrirManutencao}
-                onAbrirDenteGrande={abrirDenteGrande}
-                idsDeAntes={idsDeAntes}
-                destinosEncaminhar={destinosEncaminhar}
-                nomeTratamentoPorEvento={contexto?.nomeTratamentoPorEvento ?? {}}
-              />
-
-              {/* R-108b — seletor "o novo vai para" (artefato bloco 8). Geometria portada por
-                  extração do artefato, não medida no olho: .drop mt 9px / p 7px / borda 0.8px
-                  --teal / raio 10px; opção 12px, p 7px 9px, raio 7px; ativa em --teal-pale +
-                  --teal-ink 700 (o artefato usa teal-ink no light e teal-lt no dark — é o par
-                  que `teal-ink` já resolve sozinho); "+ Novo tratamento" separado por borda
-                  superior, mt 4px, p 10px 9px 7px, --tx2.
-
-                  Só aparece com ambiguidade real, e os CONCLUÍDOS não entram nesta escolha —
-                  eles voltam pra ficha onde foram planejados, sempre (spec §2). */}
-              {mostraSeletor && (
-                <div className="mt-[9px] rounded-[10px] border-[0.8px] border-teal p-[7px]">
-                  <p className="px-[9px] pb-1.5 pt-[3px] text-[10px] font-extrabold uppercase tracking-[1.6px] text-text-secondary">
-                    {eventosNovosDaSessao.length === 1
-                      ? `O novo (${rotuloNovo(eventosNovosDaSessao[0])}) vai para`
-                      : `Os ${eventosNovosDaSessao.length} novos vão para`}
-                  </p>
-                  {tratamentosAbertos.map((t) => (
-                    <button
-                      key={t.fichaId}
-                      type="button"
-                      aria-pressed={destinoNovos === t.fichaId}
-                      onClick={() => setDestinoEscolhido(t.fichaId)}
-                      className={`flex w-full items-center justify-between gap-[9px] rounded-[7px] px-[9px] py-[7px] text-left text-[12px] transition-colors ${
-                        destinoNovos === t.fichaId
-                          ? 'bg-teal-pale font-bold text-teal-ink'
-                          : 'text-foreground hover:bg-surface-alt'
-                      }`}
-                    >
-                      <span className="min-w-0 truncate">{t.nome}</span>
-                      <span className="shrink-0 font-mono">{t.concluidos} de {t.totalProcedimentos}</span>
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    aria-pressed={destinoNovos === null}
-                    onClick={() => setDestinoEscolhido(null)}
-                    className={`mt-1 flex w-full items-center justify-between gap-[9px] rounded-[7px] border-t-[0.8px] border-border px-[9px] pb-[7px] pt-[10px] text-left text-[12px] transition-colors ${
-                      destinoNovos === null
-                        ? 'bg-teal-pale font-bold text-teal-ink'
-                        : 'text-text-secondary hover:bg-surface-alt'
-                    }`}
-                  >
-                    <span className="min-w-0 truncate">+ Novo tratamento</span>
-                    {/* Medido a 820px (card de 190px): sem `truncate` aqui o rótulo estourava
-                        o card em 32px. A coluna é `minmax(0,1fr)` ao lado de um espelho fixo
-                        de 555px, então ela encolhe de verdade em tela pequena. */}
-                    <span className="shrink truncate font-mono">ficha à parte</span>
-                  </button>
-                </div>
-              )}
-              </div>
-            </motion.div>
-
-            {/* R-140b — contexto clínico lateral. Boca não rola; gavetas e formulários longos
-                podem rolar dentro da altura fixa sem deslocar o restante da página. */}
-            <motion.div
-              layout="size"
-              transition={{ layout: { duration: 0.18, ease: 'easeOut' } }}
-              className={`h-full rounded-2xl border border-border bg-surface p-4 xl:h-[760px] xl:sticky xl:top-4 ${
-                gavetaAberta !== null || (denteAberto == null && leituraGrande == null)
-                  ? 'overflow-hidden'
-                  : 'overflow-y-auto'
-              }`}
-            >
-              <FaixaGavetas
-                aberta={gavetaAberta}
-                onAbertaChange={setGavetaAberta}
-                planoHistoricoCount={minhasPendencias.length}
-                pacienteId={slotSelecionado.pacienteId}
-                contextual
-                onOdontograma={() => setGavetaAberta(null)}
-                historicoBody={
+          <div data-meu-dia-retomada className="border-b border-border px-6 py-3.5 text-[13px]">
+            <p className="text-text-primary"><strong>{tratamentosAbertos.find((t) => t.fichaId === destinoNovos)?.nome ?? 'Nova ficha'}</strong></p>
+            <p className="mt-1 text-teal-ink">Sessão atual · {hojeBRT().split('-').reverse().join('/')} · {slotSelecionado.horario} · {profissionalNome}</p>
+            <details className="mt-[7px] text-text-secondary">
+              <summary className="cursor-pointer">Última sessão{contexto.visitas[0]
+                ? ` · ${contexto.visitas[0].data.split('-').reverse().join('/')} · ${contexto.visitas[0].dentistaNome}`
+                : ' · Sem sessão anterior'}</summary>
+              <div data-meu-dia-historico role="region" aria-label="Plano e histórico das sessões" tabIndex={0} className="mt-3 max-h-[min(50dvh,480px)] overflow-y-auto overscroll-contain pr-2">
                   <HistoricoBloco
                     visitas={contexto.visitas}
                     pacienteId={slotSelecionado.pacienteId}
@@ -998,24 +1117,111 @@ export function MeuDiaClient({
                     onToggleSelecaoEncaminhar={toggleSelecaoEncaminhar}
                     onLerGrande={abrirLeituraGrande}
                   />
-                }
-                anexosBody={
-                  <AnexarDocumentosBloco
-                    documentoNome={documentoNome}
-                    documentoTexto={documentoTexto}
-                    onAnexado={handleAnexado}
-                    onUsarComoBase={handleUsarComoBase}
-                  />
-                }
-              />
-              {gavetaAberta === null && !denteAberto && !leituraGrande && (
-                <div className="mb-3 mt-3 flex items-center justify-between gap-3">
-                  <span className="text-[11px] text-text-secondary">Selecione sem abrir o histórico</span>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Registrar</span>
-                </div>
+              </div>
+            </details>
+            {mostraSeletor && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <p className="w-full text-xs text-text-secondary">
+                  {eventosNovosDaSessao.length === 1
+                    ? `O novo (${rotuloNovo(eventosNovosDaSessao[0])}) vai para`
+                    : `Os ${eventosNovosDaSessao.length} novos vão para`}
+                </p>
+                {tratamentosAbertos.map((t) => (
+                  <button
+                    key={t.fichaId}
+                    type="button"
+                    aria-pressed={destinoNovos === t.fichaId}
+                    onClick={() => setDestinoEscolhido(t.fichaId)}
+                    className={`flex min-h-10 max-w-full items-center justify-between gap-3 rounded-lg border border-border px-[13px] py-2 text-left text-[13px] transition-colors ${
+                      destinoNovos === t.fichaId
+                        ? 'bg-teal-pale font-bold text-teal-ink'
+                        : 'text-text-secondary hover:bg-surface-alt'
+                    }`}
+                  >
+                    <span className="min-w-0 truncate">{t.nome}</span>
+                    <span className="shrink-0 font-mono">{t.concluidos} de {t.totalProcedimentos}</span>
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  aria-pressed={destinoNovos === null}
+                  onClick={() => setDestinoEscolhido(null)}
+                  className={`flex min-h-10 max-w-full items-center justify-between gap-3 rounded-lg border border-border px-[13px] py-2 text-left text-[13px] transition-colors ${
+                    destinoNovos === null
+                      ? 'bg-teal-pale font-bold text-teal-ink'
+                      : 'text-text-secondary hover:bg-surface-alt'
+                  }`}
+                >
+                  <span className="min-w-0 truncate">+ Novo tratamento</span>
+                  <span className="shrink truncate font-mono">ficha à parte</span>
+                </button>
+              </div>
+            )}
+
+          </div>
+
+          {atendimentoJaRegistrado ? (
+            <section
+              aria-label="Atendimento já registrado"
+              className="flex min-h-40 w-full flex-col items-center justify-center rounded-2xl border border-border bg-surface px-5 py-8 text-center"
+            >
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-teal/10 text-teal-ink">
+                <CheckCircle2 className="h-5 w-5" aria-hidden />
+              </span>
+              <p className="mt-3 text-sm font-bold text-text-primary">Atendimento já registrado</p>
+              <p className="mt-1 max-w-md text-xs leading-relaxed text-text-secondary">
+                Para uma nova consulta hoje, use Encaixe. O perfil do paciente continua disponível
+                quando você quiser revisar ou editar a ficha.
+              </p>
+            </section>
+          ) : (
+            <>
+          {/* OD-001b — captura/revisão e contexto clínico na mesma superfície. */}
+          <div data-meu-dia-workspace className="grid w-full min-w-0 grid-cols-1 items-stretch min-[1001px]:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+            <motion.div
+              layout="size"
+              transition={{ layout: { duration: 0.18, ease: 'easeOut' } }}
+              data-meu-dia-atendimento className="flex min-w-0 flex-col px-7 py-[25px] max-[600px]:px-3.5 max-[600px]:py-[18px]"
+            >
+              {dicas.nestaFicha && (
+                <DicaZona titulo="Revisão da consulta">
+                  Tudo que o Dex entendeu cai aqui. Dá pra corrigir antes de salvar.
+                </DicaZona>
               )}
-              {gavetaAberta === null && <AnimatePresence mode="wait" initial={false}>
-                {denteAberto != null && registrandoDenteAberto ? (
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5">
+                  <p className="text-[17px] font-bold text-text-primary">Atendimento</p>
+                  <Contador n={eventosDraft.length + (registrarPainel.ortoManutencao ? 1 : 0)} />
+                </div>
+              </div>
+              <div data-meu-dia-captura className="mb-[18px] min-w-0">{registrarPainel.campoMagico}</div>
+              {registrarPainel.ortoManutencao && <div className="mt-3 border-t border-border pt-3">
+                <button type="button" onClick={registrarPainel.abrirManutencao} className="mb-2 text-xs font-semibold text-teal-ink">Editar manutenção ortodôntica</button>
+                <OrtoCard valor={registrarPainel.ortoManutencao} />
+              </div>}
+            </motion.div>
+
+            {/* Os controles existentes seguem na coluna de contexto, sem altura fixa. */}
+            <motion.div
+              layout="size"
+              transition={{ layout: { duration: 0.18, ease: 'easeOut' } }}
+              data-meu-dia-odontograma
+              className="min-w-0 overflow-x-auto border-t border-border px-6 py-[25px] min-[1001px]:border-l min-[1001px]:border-t-0 max-[600px]:px-4 max-[600px]:py-[18px]"
+            >
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-[17px] font-bold text-text-primary">Odontograma</h2>
+                <span className="text-[12.5px] text-text-secondary">Dentição permanente</span>
+              </div>
+              <AnimatePresence mode="wait" initial={false}>
+                {anexosAbertos ? (
+                  <motion.div key="anexos" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <h3 className="text-[15px] font-bold text-text-primary">Documento de base</h3>
+                      <button type="button" aria-label="Fechar documento de base" onClick={() => setAnexosAbertos(false)} className="flex h-8 w-8 items-center justify-center rounded text-text-secondary hover:bg-surface-alt">×</button>
+                    </div>
+                    <AnexarDocumentosBloco documentoNome={documentoNome} documentoTexto={documentoTexto} onAnexado={handleAnexado} onUsarComoBase={handleUsarComoBase} />
+                  </motion.div>
+                ) : denteAberto != null && registrandoDenteAberto ? (
                   <motion.div
                     key="editor-dente"
                     initial={{ opacity: 0, y: -8 }}
@@ -1084,23 +1290,25 @@ export function MeuDiaClient({
                       </DicaZona>
                     )}
                     {registrarPainel.slotCentral}
-                    <div className="mt-2 border-t border-border pt-2">
-                      {registrarPainel.controlesOdontograma}
-                    </div>
+                    {registrarPainel.controlesOdontograma}
                   </motion.div>
                 )}
-              </AnimatePresence>}
+              </AnimatePresence>
             </motion.div>
           </div>
 
           {/* R-140b — rodapé da bancada: retorno e orçamento ficam na revisão; aqui permanece
               apenas o estado da ficha e o CTA primário de salvar o atendimento. */}
-          <div className="min-h-[70px] w-full rounded-2xl border border-border bg-surface p-3 sm:p-4 xl:sticky xl:bottom-3 xl:z-20">
+          <div data-meu-dia-rodape className="w-full border-t border-border px-6 py-[20.5px]">
             {dicas.rodape && (
               <DicaZona titulo="O que sai daqui">
                 Da ficha salva saem o orçamento e o retorno, sem redigitar nada.
               </DicaZona>
             )}
+            {textoDoDocumento.tamanho >= 4500 && <p role={textoDoDocumento.excede ? 'alert' : 'status'} className={`mb-3 text-sm ${textoDoDocumento.excede ? 'text-warning-ink' : 'text-text-secondary'}`}>
+              {textoDoDocumento.tamanho.toLocaleString('pt-BR')} / {LIMITE_TEXTO_SALVAR.toLocaleString('pt-BR')} caracteres
+              {textoDoDocumento.excede && <span className="mt-1 block">Organize com o Dex ou encurte a evolução. Nenhum texto será cortado.</span>}
+            </p>}
             {registrarPainel.rodape}
           </div>
 
@@ -1123,6 +1331,7 @@ export function MeuDiaClient({
           </AnimatePresence>
             </>
           )}
+          </article>
         </>
       ) : slots.length > 0 ? (
         <div className="rounded-2xl border border-border bg-surface px-5 py-10 text-center">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion } from "motion/react";
 import { ArrowRight, AlertCircle, Eye, EyeOff } from "lucide-react";
+import { limparDadosMeuDiaDaAba } from "@/hooks/use-logout";
 import { createClient } from "@/lib/supabase/client";
 import { getDentistaLoginInfo } from "@/lib/auth";
 import { toast } from "sonner";
@@ -38,6 +39,7 @@ const loginSchema = z.object({
 type LoginFormData = z.infer<typeof loginSchema>;
 
 function LoginFormContent(): React.JSX.Element {
+  useEffect(() => { limparDadosMeuDiaDaAba(); }, []);
   const searchParams = useSearchParams();
   const requestedNext = searchParams.get("next") ?? searchParams.get("redirectTo");
   const redirectTo = safeReturnPath(requestedNext);

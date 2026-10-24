@@ -772,6 +772,8 @@ export interface OdontogramaProps {
   showCheckbox?: boolean;
   className?: string;
   compact?: boolean;
+  /** Grade responsiva usada apenas pelo Meu Dia. */
+  layout?: 'colunas';
   /** R-78 F0 — sobrescreve o zoom implícito de `compact` (0.85). O espelho (~555px, achado
    *  A1 da spec) precisa de 0.68: a arcada real (739px em largura de conteúdo) transborda o
    *  card a 0.85 (628px) — 0.68 é conta, não escolha estética. Sem isto, `compact` sozinho
@@ -809,6 +811,7 @@ export function Odontograma({
   showCheckbox = false,
   className,
   compact = false,
+  layout,
   zoom,
   hideFilters = false,
   eventos,
@@ -821,6 +824,7 @@ export function Odontograma({
   const [activeFilterId, setActiveFilterId] = useState<string>('arcadas');
   const [legendOpen, setLegendOpen]       = useState(false);
 
+  const colunas = layout === 'colunas';
   const clinico = eventos != null || eventosPersistidos != null;
   const resumos = useMemo(
     () => buildResumos(eventos ?? [], eventosPersistidos ?? []),
@@ -881,7 +885,7 @@ export function Odontograma({
 
       return (
         <Fragment key={num}>
-          {isMidlineStart && (
+          {!colunas && isMidlineStart && (
             <div
               className="self-stretch w-px mx-0.5 shrink-0"
               style={{ background: 'var(--color-border)', opacity: 0.6 }}
@@ -896,17 +900,21 @@ export function Odontograma({
             onFocus={() => setHoveredTooth(num)}
             onBlur={() => setHoveredTooth(null)}
             className={cn(
-              'relative flex flex-col items-center outline-none focus-visible:ring-1 focus-visible:ring-teal rounded-sm',
+              'relative flex flex-col items-center outline-none focus-visible:ring-1 focus-visible:ring-teal',
+              colunas
+                ? 'min-w-0 w-full rounded-[4px] py-[3px] [&>svg]:h-[38px] [&>svg]:w-[22px] [&>svg]:max-w-full'
+                : 'rounded-sm',
+              colunas && selectedTeeth.includes(num) && 'bg-teal-pale text-teal-ink',
               isUpper ? 'justify-end' : 'justify-start',
               isActive || isHov ? 'z-10' : 'z-0',
             )}
             style={{
-              transform: isHov ? 'scale(1.10)' : isActive ? 'scale(1.04)' : 'scale(1)',
+              transform: colunas ? undefined : isHov ? 'scale(1.10)' : isActive ? 'scale(1.04)' : 'scale(1)',
               transition: 'transform 0.13s ease',
-              gap: 5,
+              gap: colunas ? 3 : 5,
             }}
             aria-label={`Dente ${num} — ${TOOTH_NAMES[num] ?? ''}${resumo?.cor ? `, ${STATUS_CLINICO_LABEL[resumo.cor]}` : ''}${resumo?.mexido ? ', alterado nesta consulta' : ''}`}
-            aria-pressed={clinico ? undefined : isActive}
+            aria-pressed={colunas ? selectedTeeth.includes(num) : clinico ? undefined : isActive}
           >
             {/* R-61 — ponto no canto: dente tem evento no rascunho desta sessão (não
                 confundir com o anel de seleção, que é stroke DENTRO do dente). Cor sozinha
@@ -932,11 +940,11 @@ export function Odontograma({
               <span
                 style={{
                   fontSize: '11px',
-                  fontFamily: 'ui-monospace, SFMono-Regular, monospace',
-                  fontWeight: numWeight,
-                  color: numColor,
-                  lineHeight: 1,
-                  letterSpacing: '-0.3px',
+                  fontFamily: colunas ? 'inherit' : 'ui-monospace, SFMono-Regular, monospace',
+                  fontWeight: colunas ? selectedTeeth.includes(num) ? 700 : 400 : numWeight,
+                  color: colunas && selectedTeeth.includes(num) ? 'var(--color-teal-ink)' : numColor,
+                  lineHeight: colunas ? 1.6 : 1,
+                  letterSpacing: colunas ? undefined : '-0.3px',
                   transition: 'color 0.13s',
                   userSelect: 'none',
                   pointerEvents: 'none',
@@ -961,11 +969,11 @@ export function Odontograma({
               <span
                 style={{
                   fontSize: '11px',
-                  fontFamily: 'ui-monospace, SFMono-Regular, monospace',
-                  fontWeight: numWeight,
-                  color: numColor,
-                  lineHeight: 1,
-                  letterSpacing: '-0.3px',
+                  fontFamily: colunas ? 'inherit' : 'ui-monospace, SFMono-Regular, monospace',
+                  fontWeight: colunas ? selectedTeeth.includes(num) ? 700 : 400 : numWeight,
+                  color: colunas && selectedTeeth.includes(num) ? 'var(--color-teal-ink)' : numColor,
+                  lineHeight: colunas ? 1.6 : 1,
+                  letterSpacing: colunas ? undefined : '-0.3px',
                   transition: 'color 0.13s',
                   userSelect: 'none',
                   pointerEvents: 'none',
@@ -1028,7 +1036,8 @@ export function Odontograma({
 
   return (
     <div
-      className={cn('flex flex-col gap-3 select-none', className)}
+      className={cn(colunas ? 'flex min-w-0 flex-col select-none' : 'flex flex-col gap-3 select-none', className)}
+      data-layout={layout}
       // 0.82 deixava o incisivo lateral com ~23.8px de alvo de toque, abaixo do
       // piso de 24px (achado auditoria UX 19/07, MEDIUM #6) — usado no Modo
       // Consulta chairside, onde errar o dente vizinho é um risco real. 0.85
@@ -1124,10 +1133,10 @@ export function Odontograma({
 
       {/* ── Chart ── */}
       <div className="overflow-x-auto">
-        <div className="flex flex-col items-center gap-0 min-w-max px-1">
+        <div className={colunas ? "flex w-full min-w-0 flex-col gap-0" : "flex flex-col items-center gap-0 min-w-max px-1"}>
 
           {/* Quadrant labels — upper */}
-          {viewFilter !== 'lower' && (
+          {!colunas && viewFilter !== 'lower' && (
             <div className="flex w-full justify-between mb-2 px-1">
               <span className="text-[9px] uppercase tracking-[0.22em] font-semibold"
                 style={{ color: 'var(--color-text-muted)' }}>
@@ -1142,13 +1151,18 @@ export function Odontograma({
 
           {/* Upper arch — raízes pra cima, coroas pro plano oclusal */}
           {viewFilter !== 'lower' && (
-            <div className="flex items-end gap-[3px]">
+            <div className={colunas ? "grid w-full items-end gap-[3px]" : "flex items-end gap-[3px]"}
+              style={colunas ? { gridTemplateColumns: `repeat(${upperTeeth.length}, minmax(0, 1fr))` } : undefined}>
               {renderArch(upperTeeth, true)}
             </div>
           )}
 
           {/* Midline separator — o plano oclusal */}
-          {viewFilter === 'all' && (
+          {viewFilter === 'all' && (colunas ? (
+            <div className="my-2 flex justify-between text-[12px] leading-[19.2px] text-text-secondary">
+              <span>Direito</span><span>Esquerdo</span>
+            </div>
+          ) : (
             <div
               className="w-full my-[8px]"
               style={{
@@ -1156,17 +1170,18 @@ export function Odontograma({
                 background: 'linear-gradient(90deg, transparent, var(--color-border) 15%, var(--color-border) 85%, transparent)',
               }}
             />
-          )}
+          ))}
 
           {/* Lower arch — coroas pra cima, raízes pra baixo */}
           {viewFilter !== 'upper' && (
-            <div className="flex items-start gap-[3px]">
+            <div className={colunas ? "grid w-full items-start gap-[3px]" : "flex items-start gap-[3px]"}
+              style={colunas ? { gridTemplateColumns: `repeat(${lowerTeeth.length}, minmax(0, 1fr))` } : undefined}>
               {renderArch(lowerTeeth, false)}
             </div>
           )}
 
           {/* Quadrant labels — lower */}
-          {viewFilter !== 'upper' && (
+          {!colunas && viewFilter !== 'upper' && (
             <div className="flex w-full justify-between mt-2 px-1">
               <span className="text-[9px] uppercase tracking-[0.22em] font-semibold"
                 style={{ color: 'var(--color-text-muted)' }}>
@@ -1182,7 +1197,7 @@ export function Odontograma({
       </div>
 
       {/* ── Info bar ── */}
-      <div className="h-5 flex items-center px-1">
+      <div className={colunas ? "hidden" : "h-5 flex items-center px-1"}>
         {hoveredTooth ? (
           <div className="flex items-center gap-1.5 text-[11px] leading-none">
             <span className="font-bold font-mono" style={{ color: 'var(--color-text-primary)' }}>

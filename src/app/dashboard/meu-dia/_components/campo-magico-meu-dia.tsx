@@ -16,7 +16,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Bot, ChevronUp } from 'lucide-react';
 import { CapturaLivreCard, type CapturaDexState } from '@/components/fichas/captura-livre-card';
 import { DicaZona } from './dica-zona';
-import { mesclarEventosSemPerda } from '@/lib/odontograma/dedup-eventos-draft';
+import { chaveDedupEvento, mesclarEventosSemPerda } from '@/lib/odontograma/dedup-eventos-draft';
+import { semNovasDuplicatas } from '@/lib/meu-dia/documento-atendimento';
 import { hojeBRT } from '@/lib/hora-brt';
 import { extrairEndoDeterministico } from '@/lib/especialidades/extrair-endo-deterministico';
 import { mesclarDetalheEndo } from '@/lib/especialidades/mesclar-endo-extracao';
@@ -25,8 +26,10 @@ import type { OdontogramaEventoDraft, OrtoManutencaoInfo } from '@/types/odontog
 import type { EvolucaoFormatada } from '@/app/api/dex/formatar-evolucao/route';
 import type { SugestaoLocal } from '@/lib/odontograma/casar-procedimento-local';
 import type { MeuDiaCatalogoProcedimento } from '@/server/dashboard/get-meu-dia';
+import { DocumentoAtendimentoEditor, mesclarTabelasDocumento, type DocumentoControlado } from './documento-atendimento';
 
 export interface CampoMagicoMeuDiaProps {
+  documento?: DocumentoControlado;
   pacienteNome: string;
   eventosDraft: OdontogramaEventoDraft[];
   onEventosDraftChange: (eventos: OdontogramaEventoDraft[]) => void;
@@ -63,7 +66,7 @@ export interface CampoMagicoMeuDiaProps {
 export function CampoMagicoMeuDia({
   pacienteNome, eventosDraft, onEventosDraftChange, textoVisita, onTextoVisitaChange,
   onAlertaNovoChange, onOrtoDetectado, onEndoDetectado, anexarTexto, catalogoProcedimentos, onAplicarSugestao,
-  realce, dica, compacto = false, onCapturaStateChange,
+  realce, dica, compacto = false, onCapturaStateChange, documento,
 }: CampoMagicoMeuDiaProps) {
   const [aberto, setAberto] = useState(compacto);
   const [jaAbriu, setJaAbriu] = useState(false);
@@ -88,10 +91,22 @@ export function CampoMagicoMeuDia({
     return () => cancelAnimationFrame(frame);
   }, [eventosDraft]);
 
+  const complementosPendentes = useRef(new Set<AbortController>());
+  useEffect(() => {
+    const pendentes = complementosPendentes.current;
+    return () => {
+      for (const controller of pendentes) controller.abort();
+      pendentes.clear();
+    };
+  }, []);
+
   async function complementarEndoComIA(relato: string, dentes: number[]) {
     if (dentes.length === 0) return;
+    const controller = new AbortController();
+    complementosPendentes.current.add(controller);
     try {
       const resposta = await fetch('/api/dex/extrair-especialidade', {
+        signal: controller.signal,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ especialidade: 'endodontia', texto: relato, contexto: { dentes } }),
@@ -100,7 +115,7 @@ export function CampoMagicoMeuDia({
         ok: boolean;
         itens?: Array<{ dente: number; detalhe: EndoDetalhe }>;
       };
-      if (!resposta.ok || !data.ok || !data.itens?.length) return;
+      if (controller.signal.aborted || !resposta.ok || !data.ok || !data.itens?.length) return;
 
       const porDente = new Map(data.itens.map((item) => [item.dente, item.detalhe]));
       const atuais = eventosRef.current;
@@ -122,8 +137,11 @@ export function CampoMagicoMeuDia({
       const primeiro = atualizados.find((evento) => evento.tipo === 'endodontia' && evento.ancora.dente != null && porDente.has(evento.ancora.dente));
       if (primeiro?.ancora.dente != null) onEndoDetectado(primeiro.ancora.dente, primeiro.id);
     } catch (error) {
+      if (controller.signal.aborted) return;
       // Passo 2 é enriquecimento: falha não desfaz pass 1 nem bloqueia o form manual.
       console.warn('[campo-magico] complemento endodôntico indisponível:', error);
+    } finally {
+      complementosPendentes.current.delete(controller);
     }
   }
 
@@ -169,6 +187,36 @@ export function CampoMagicoMeuDia({
     if (data.alerta_novo) onAlertaNovoChange(data.alerta_novo); // I3
     if (data.orto_manutencao) onOrtoDetectado(data.orto_manutencao); // R-50 — vira estado, não texto
     void complementarEndoComIA(relato, dentesEndo);
+    return comDetalhe;
+  }
+
+  if (documento) {
+    function aplicarDocumento(data: EvolucaoFormatada, relato: string) {
+      const anteriores = new Set(eventosRef.current.map((evento) => evento.id));
+      const propostas = mesclarEventosSemPerda([], data.odontograma_eventos, hojeBRT(), { capturaId: crypto.randomUUID() });
+      const mescla = mesclarTabelasDocumento(eventosRef.current, propostas, relato);
+      const atualizados = semNovasDuplicatas(eventosRef.current, mescla.eventos).eventos;
+      eventosRef.current = atualizados;
+      onEventosDraftChange(atualizados);
+      onTextoVisitaChange([textoVisita, data.anotacoes, data.conduta && `Conduta: ${data.conduta}`].filter(Boolean).join('\n\n'));
+      if (data.alerta_novo) onAlertaNovoChange(data.alerta_novo);
+      if (data.orto_manutencao) onOrtoDetectado(data.orto_manutencao);
+      const novos = atualizados.filter((evento) => !anteriores.has(evento.id));
+      const porChave = new Map(novos.map((evento) => [chaveDedupEvento(evento), evento]));
+      const ordenados: OdontogramaEventoDraft[] = [];
+      for (const recebido of data.odontograma_eventos) {
+        const chave = chaveDedupEvento(recebido);
+        const evento = porChave.get(chave);
+        if (evento) { ordenados.push(evento); porChave.delete(chave); }
+      }
+      return ordenados;
+    }
+    return <DocumentoAtendimentoEditor
+      documento={documento} pacienteNome={pacienteNome} eventos={eventosDraft}
+      onEventosChange={onEventosDraftChange} catalogo={catalogoProcedimentos}
+      onAplicarSugestao={onAplicarSugestao} onOrganizado={aplicarDocumento}
+      anexarTexto={anexarTexto} onCapturaStateChange={onCapturaStateChange}
+    />;
   }
 
   if (!aberto) {
@@ -216,7 +264,7 @@ export function CampoMagicoMeuDia({
         <CapturaLivreCard
           pacienteNome={pacienteNome}
           formDirty={eventosDraft.length > 0 || textoVisita.trim() !== ''}
-          onOrganizado={aplicar}
+          onOrganizado={(data, relato) => { aplicar(data, relato); }}
           aplicacao="acrescentar"
           anexarTexto={anexarTexto}
           catalogoProcedimentos={catalogoProcedimentos}

@@ -9,6 +9,7 @@ import {
   CHIPS_LOTE, FACES_LOTE, acrescentarRestauracoesDoLote,
   eventosDoLote, eventosDoLoteAusente, eventosDoLoteAvulso, eventosDoLoteRestauracao,
 } from '@/lib/odontograma/lote-multidente';
+import { TEETH_UPPER, TEETH_LOWER } from './Odontograma';
 import type { ContextoLancamento } from '@/lib/odontograma/criar-eventos-contextuais';
 import type { MeuDiaCatalogoProcedimento } from '@/server/dashboard/get-meu-dia';
 import { ehDenteAnteriorFDI, faceAbreviacao, faceLabel, TIPO_LABEL, type FaceDental, type ModoLancamento, type OdontogramaEventoDraft, type TipoRegistroOdontograma } from '@/types/odontograma';
@@ -36,6 +37,7 @@ const MODOS: Array<{ id: ModoLancamento; label: string }> = [
  * sinal de "terminei de selecionar"); quem desenha o botão continua sendo cada tela.
  */
 export interface FaixaLoteProps {
+  variante?: 'meu-dia';
   /** Dentes selecionados. A faixa aparece com 1+; com vários, aplica em lote. */
   dentes: number[];
   eventosDraft: OdontogramaEventoDraft[];
@@ -54,13 +56,19 @@ export interface FaixaLoteProps {
   onAbrirDetalheDental?: (dente: number) => void;
   /** R-130 — abre o fluxo seguro de ponte já no pilar selecionado. */
   onIniciarPonte?: (dente: number) => void;
+  onDuplicataIgnorada?: (dentes: number[], rotulo: string) => void;
 }
 
 export function FaixaLote({
-  dentes, eventosDraft, onEventosDraftChange, autorDentistaId, catalogoProcedimentos, dataPadrao,
+  dentes: dentesSelecionados, eventosDraft, onEventosDraftChange, autorDentistaId, catalogoProcedimentos, dataPadrao,
   modoLancamento, onModoLancamentoChange, onLimpar, onModoMultidenteChange, onAbrirDetalheDental,
-  onIniciarPonte,
+  onIniciarPonte, onDuplicataIgnorada, variante,
 }: FaixaLoteProps) {
+  const meuDia = variante === 'meu-dia';
+  const dentes = meuDia ? [...dentesSelecionados].sort((a, b) => a - b) : dentesSelecionados;
+  const chipClass = meuDia
+    ? 'rounded-[20px] border border-border bg-surface px-[13px] py-[7px] text-[13px] leading-[20.8px] text-text-primary hover:border-teal-ink hover:bg-teal-pale'
+    : 'rounded-full border border-teal/30 bg-surface px-2.5 py-1 text-[11px] font-semibold text-teal-ink hover:bg-teal/10';
   const [facePendente, setFacePendente] = useState(false);
   const [facesSelecionadas, setFacesSelecionadas] = useState<FaceDental[]>([]);
   const [busca, setBusca] = useState('');
@@ -113,6 +121,8 @@ export function FaixaLote({
       contexto(),
       procedimento,
     );
+    const ignorados = dentes.filter((dente) => !novos.some((evento) => evento.ancora.dente === dente));
+    if (ignorados.length) onDuplicataIgnorada?.(ignorados, procedimento?.nome ?? TIPO_LABEL[tipo]);
     if (novos.length > 0) onEventosDraftChange([...eventosDraft, ...novos]);
     onModoMultidenteChange(false);
   }
@@ -129,6 +139,11 @@ export function FaixaLote({
     const novos = facesSelecionadas.flatMap((face) => (
       eventosDoLoteRestauracao(face, dentes, dataPadrao, contextoAtual, autorDentistaId)
     ));
+    if (onDuplicataIgnorada) {
+      const aceitos = new Set(acrescentarRestauracoesDoLote(eventosDraft, novos).map((evento) => evento.id));
+      const ignorados = [...new Set(novos.filter((evento) => !aceitos.has(evento.id)).flatMap((evento) => evento.ancora.dente == null ? [] : [evento.ancora.dente]))];
+      if (ignorados.length) onDuplicataIgnorada(ignorados, `${TIPO_LABEL.carie_restauracao} ${facesSelecionadas.join('')}`);
+    }
     onEventosDraftChange((atuais) => acrescentarRestauracoesDoLote(atuais, novos));
     setFacesSelecionadas([]);
     setFacePendente(false);
@@ -137,6 +152,8 @@ export function FaixaLote({
 
   function aplicarAusente() {
     const novos = eventosDoLoteAusente(dentes, eventosDraft, dataPadrao, contexto('preexistente'));
+    const ignorados = dentes.filter((dente) => !novos.some((evento) => evento.ancora.dente === dente));
+    if (ignorados.length) onDuplicataIgnorada?.(ignorados, 'Dente ausente');
     if (novos.length > 0) onEventosDraftChange([...eventosDraft, ...novos]);
     onModoMultidenteChange(false);
   }
@@ -197,10 +214,12 @@ export function FaixaLote({
   }
 
   return (
-    <div className="rounded-lg border border-teal/30 bg-teal/5 px-3 py-2 flex flex-col gap-1.5">
+    <div className={meuDia ? "flex min-w-0 flex-col" : "rounded-lg border border-teal/30 bg-teal/5 px-3 py-2 flex flex-col gap-1.5"}>
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] font-semibold text-text-primary">
-          {dentes.length === 1 ? `Dente ${dentes[0]} selecionado` : `${dentes.length} dentes selecionados: ${dentes.join(', ')}`}
+        <p className={meuDia ? "text-[15px] font-bold leading-6 text-text-primary" : "text-[11px] font-semibold text-text-primary"}>
+          {meuDia
+            ? dentes.length === 1 ? `Dente ${dentes[0]}` : `${dentes.length} dentes: ${dentes.join(', ')}`
+            : dentes.length === 1 ? `Dente ${dentes[0]} selecionado` : `${dentes.length} dentes selecionados: ${dentes.join(', ')}`}
         </p>
         <div className="flex items-center gap-2">
           {dentes.length === 1 && onAbrirDetalheDental && (
@@ -209,7 +228,7 @@ export function FaixaLote({
               onClick={() => onAbrirDetalheDental(dentes[0])}
               className="text-[11px] font-semibold text-teal-ink hover:text-teal"
             >
-              Abrir detalhe dental
+              {meuDia ? 'Detalhe do dente' : 'Abrir detalhe dental'}
             </button>
           )}
           <button
@@ -224,15 +243,18 @@ export function FaixaLote({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-1.5" aria-label="Como registrar os procedimentos selecionados">
-        <span className="mr-0.5 text-[10px] font-bold uppercase tracking-wider text-text-secondary">Registrar como</span>
+      {meuDia && <p className="mb-[6px] mt-[10px] text-[12.5px] leading-5 text-text-secondary">Registrar como</p>}
+      <div className={meuDia ? "flex w-fit max-w-full flex-wrap overflow-hidden rounded-[8px] border border-border" : "flex flex-wrap items-center gap-1.5"} aria-label="Como registrar os procedimentos selecionados">
+        {!meuDia && <span className="mr-0.5 text-[10px] font-bold uppercase tracking-wider text-text-secondary">Registrar como</span>}
         {MODOS.map((modo) => (
           <button
             key={modo.id}
             type="button"
             aria-pressed={modoLancamento === modo.id}
             onClick={() => onModoLancamentoChange(modo.id)}
-            className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold transition-colors ${
+            className={meuDia
+              ? `px-[11px] py-[6px] text-[13px] leading-[20.8px] transition-colors ${modoLancamento === modo.id ? 'bg-teal-pale font-semibold text-teal-ink' : 'text-text-secondary hover:bg-teal-pale'}`
+              : `rounded-full border px-2 py-0.5 text-[10px] font-semibold transition-colors ${
               modoLancamento === modo.id
                 ? 'border-teal bg-teal/15 text-teal-ink'
                 : 'border-border bg-surface text-text-secondary hover:border-teal/40 hover:text-teal-ink'
@@ -243,19 +265,21 @@ export function FaixaLote({
         ))}
       </div>
 
-      {facePendente ? (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">
-            Restauração — selecione uma ou mais faces
+      {(facePendente || meuDia) && (
+        <div className={meuDia ? "mt-[10px] flex flex-wrap items-center gap-[5px]" : "flex flex-wrap items-center gap-1.5"}>
+          <span className={meuDia ? "mb-px w-full text-[12.5px] leading-5 text-text-secondary" : "text-[10px] font-bold uppercase tracking-wider text-text-secondary"}>
+            {meuDia ? 'Faces (opcional)' : 'Restauração — selecione uma ou mais faces'}
           </span>
-          {FACES_LOTE.map((face) => (
+          {(meuDia ? [...FACES_LOTE].sort((a, b) => 'MODVL'.indexOf(a) - 'MODVL'.indexOf(b)) : FACES_LOTE).map((face) => (
             <button
               key={face}
               type="button"
               aria-label={faceAriaLabelLote(face)}
               aria-pressed={facesSelecionadas.includes(face)}
               onClick={() => alternarFaceRestauracao(face)}
-              className={`rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors ${
+              className={meuDia
+                ? `h-[32px] w-[34px] rounded-[6px] border text-[13px] transition-colors ${facesSelecionadas.includes(face) ? 'border-teal-ink bg-teal-pale font-bold text-teal-ink' : 'border-border text-text-secondary hover:bg-teal-pale'}`
+                : `rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors ${
                 facesSelecionadas.includes(face)
                   ? 'border-teal bg-teal text-white'
                   : 'border-teal/30 bg-surface text-teal-ink hover:bg-teal/10'
@@ -264,7 +288,7 @@ export function FaixaLote({
               {faceLabelLote(face)}
             </button>
           ))}
-          <button
+          {!meuDia && <><button
             type="button"
             disabled={facesSelecionadas.length === 0}
             onClick={aplicarRestauracao}
@@ -278,50 +302,59 @@ export function FaixaLote({
             className="text-[11px] font-semibold text-text-secondary hover:text-coral"
           >
             Cancelar
-          </button>
+          </button></>}
         </div>
-      ) : (
+      )}
+      {(!facePendente || meuDia) && (
+        <>
+        {meuDia && <p className="mb-[6px] mt-[10px] text-[12.5px] leading-5 text-text-secondary">Procedimento</p>}
         <div className="flex flex-wrap gap-1.5">
           {CHIPS_LOTE.map((tipo) => (
             <button
               key={tipo}
               type="button"
               onClick={() => aplicar(tipo)}
-              className="rounded-full border border-teal/30 bg-surface px-2.5 py-1 text-[11px] font-semibold text-teal-ink hover:bg-teal/10"
+              className={chipClass}
             >
               {TIPO_LABEL[tipo]}
             </button>
           ))}
           <button
             type="button"
-            onClick={() => setFacePendente(true)}
-            className="rounded-full border border-teal/30 bg-surface px-2.5 py-1 text-[11px] font-semibold text-teal-ink hover:bg-teal/10"
+            onClick={() => {
+              if (meuDia) {
+                if (facesSelecionadas.length) aplicarRestauracao();
+                else aplicar('carie_restauracao');
+              } else setFacePendente(true);
+            }}
+            className={meuDia ? `order-first ${chipClass}` : chipClass}
           >
-            Restauração ▾
+            {meuDia ? 'Restauração' : 'Restauração ▾'}
           </button>
           <button
             type="button"
             onClick={aplicarAusente}
-            className="rounded-full border border-teal/30 bg-surface px-2.5 py-1 text-[11px] font-semibold text-teal-ink hover:bg-teal/10"
+            className={chipClass}
           >
             Dente ausente
           </button>
-          {dentes.length === 1 && onIniciarPonte && (
+          {dentes.length === 1 && onIniciarPonte && (!meuDia || TEETH_UPPER.includes(dentes[0]) || TEETH_LOWER.includes(dentes[0])) && (
             <button
               type="button"
               onClick={() => onIniciarPonte(dentes[0])}
-              className="rounded-full border border-teal/30 bg-surface px-2.5 py-1 text-[11px] font-semibold text-teal-ink hover:bg-teal/10"
+              className={chipClass}
             >
               Ponte fixa
             </button>
           )}
         </div>
+        </>
       )}
 
-      {!facePendente && (
+      {(!facePendente || meuDia) && (
         <div className="flex flex-col gap-1.5">
-          <div className="flex items-center gap-1.5">
-            <Search size={12} strokeWidth={2.4} className="text-text-muted shrink-0" aria-hidden />
+          <div className={meuDia ? "mt-[10px] flex items-center" : "flex items-center gap-1.5"}>
+            {!meuDia && <Search size={12} strokeWidth={2.4} className="text-text-muted shrink-0" aria-hidden />}
             <input
               type="text"
               value={busca}
@@ -333,9 +366,9 @@ export function FaixaLote({
                 if (sugestoes.length > 0) aplicarSugestao(sugestoes[0]);
                 else lancarAvulso();
               }}
-              placeholder="Outro procedimento pros dentes selecionados"
+              placeholder={meuDia ? "Outro procedimento… (Enter adiciona)" : "Outro procedimento pros dentes selecionados"}
               aria-label="Buscar ou digitar procedimento pros dentes selecionados"
-              className="min-w-0 flex-1 rounded-md border border-border bg-surface-alt px-2 py-1 text-[11px] text-text-primary outline-none focus:border-teal"
+              className={meuDia ? "min-w-0 flex-1 rounded-[8px] border border-border bg-bg px-[10px] py-[8px] text-[13px] leading-[20.8px] text-text-primary outline-none focus:border-teal-ink" : "min-w-0 flex-1 rounded-md border border-border bg-surface-alt px-2 py-1 text-[11px] text-text-primary outline-none focus:border-teal"}
             />
           </div>
 

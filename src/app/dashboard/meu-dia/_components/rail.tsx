@@ -23,7 +23,7 @@ const STATUS_LABEL: Record<string, string> = {
   scheduled: 'Aguardando',
   confirmed: 'Confirmado',
   checked_in: 'Na recepção',
-  in_progress: 'Atendendo',
+  in_progress: 'Em atendimento',
   completed: 'Concluído',
   cancelled: 'Cancelado',
   no_show: 'Faltou',
@@ -36,15 +36,6 @@ const STATUS_LABEL: Record<string, string> = {
 const STATUS_OPTIONS: AgendamentoStatus[] = [
   'scheduled', 'confirmed', 'checked_in', 'in_progress', 'completed', 'no_show', 'cancelled',
 ];
-
-const STATUS_COLOR: Record<string, string> = {
-  scheduled: 'bg-surface-alt text-text-secondary',
-  confirmed: 'bg-teal/10 text-teal',
-  checked_in: 'bg-teal/20 text-teal font-bold',
-  in_progress: 'bg-teal text-white',
-  completed: 'bg-surface-alt text-text-secondary',
-  no_show: 'bg-coral/10 text-coral',
-};
 
 export interface RailProps {
   slots: MeuDiaSlot[];
@@ -83,14 +74,14 @@ function BotaoEncaixe(
       type="button"
       data-rail-alvo="encaixe"
       onClick={onEncaixe}
-      className={`flex min-w-[112px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl border px-3 py-2.5 transition-colors [scroll-snap-align:start] ${
+      className={`inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg border px-[13px] py-2 transition-colors [scroll-snap-align:start] ${
         aceso
-          ? 'border-teal bg-teal/[0.06] text-teal-ink'
+          ? 'border-teal bg-teal-pale text-teal-ink'
           : 'border-dashed border-border text-text-secondary hover:border-teal/40 hover:text-teal'
       }`}
     >
       <Plus className="h-4 w-4" />
-      <span className="text-[10.5px] font-bold">{primeiraSessao ? 'Atender agora' : 'Encaixe'}</span>
+      <span className="text-[13px] font-semibold">{primeiraSessao ? 'Atender agora' : 'Encaixe'}</span>
     </button>
   );
 }
@@ -192,7 +183,7 @@ export function Rail({ slots, selecionadoId, onSelecionar, onEncaixe, onMudarSta
 
   if (slots.length === 0) {
     return (
-      <div className="flex items-center gap-3 rounded-2xl border border-border bg-surface px-5 py-6">
+      <div className="flex flex-wrap items-center gap-6 py-5">
         {/* R-105a §4.2 — "Nenhum atendimento hoje." é uma frase de beco sem saída pra quem
             acabou de se cadastrar; na primeira sessão ela vira o convite. */}
         <p className={`flex-1 text-sm font-medium ${primeiraSessao ? 'text-text-primary' : 'text-text-secondary'}`}>
@@ -205,8 +196,9 @@ export function Rail({ slots, selecionadoId, onSelecionar, onEncaixe, onMudarSta
     );
   }
 
+  const atual = slots.find((slot) => slot.agendamentoId === selecionadoId);
   return (
-    <div className="relative">
+    <div className="relative min-w-0" data-meu-dia-fila>
       <div
         ref={scrollRef}
         onPointerDown={onPointerDown}
@@ -214,75 +206,44 @@ export function Rail({ slots, selecionadoId, onSelecionar, onEncaixe, onMudarSta
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
         onClickCapture={onClickCapture}
-        className={`flex items-start gap-2 overflow-x-auto scrollbar-hide rounded-2xl border border-border bg-surface p-3 [scroll-snap-type:x_proximity] ${
+        className={`flex min-w-0 items-center gap-6 overflow-x-auto py-[11.25px] scrollbar-hide [scroll-snap-type:x_proximity] ${
           arrastando ? 'cursor-grabbing' : 'cursor-grab'
         }`}
       >
         {slots.map((slot) => {
           const selecionado = slot.agendamentoId === selecionadoId;
           const semRegistro = slot.statusAgendamento === 'completed' && !slot.atendimentoRegistrado;
-
           return (
-            <div
+            <button
               key={slot.agendamentoId}
-              className={`min-w-[112px] shrink-0 overflow-hidden rounded-xl border transition-colors [scroll-snap-align:start] ${
-                selecionado
-                  ? 'border-teal bg-teal/[0.06]'
-                  : semRegistro
-                    ? 'border-coral/30 hover:border-coral/50'
-                    : 'border-border hover:border-teal/40 hover:bg-surface-alt'
+              type="button"
+              data-rail-alvo={slot.agendamentoId}
+              aria-pressed={selecionado}
+              onClick={() => onSelecionar(slot.agendamentoId)}
+              className={`min-h-10 shrink-0 rounded py-2 text-left text-[15px] [scroll-snap-align:start] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal ${
+                selecionado ? 'font-bold text-teal-ink' : 'text-text-secondary hover:text-text-primary'
               }`}
             >
-              <button
-                type="button"
-                data-rail-alvo={slot.agendamentoId}
-                onClick={() => onSelecionar(slot.agendamentoId)}
-                className="w-full px-3 py-2.5 text-left"
-              >
-                <span className="font-mono text-[10px] text-text-secondary">{slot.horario}</span>
-                <p className="mt-0.5 truncate text-[12.5px] font-semibold text-text-primary">
-                  {slot.pacienteNome}
-                </p>
-                <div className="mt-1.5 flex items-center gap-1.5">
-                  <span
-                    className={`font-mono text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                      STATUS_COLOR[slot.statusAgendamento] ?? STATUS_COLOR.scheduled
-                    }`}
-                  >
-                    {STATUS_LABEL[slot.statusAgendamento] ?? slot.statusAgendamento}
-                  </span>
-                </div>
-                {slot.atendimentoRegistrado && (
-                  <p className="mt-1 text-[10px] font-semibold text-teal">✓ registrado</p>
-                )}
-                {semRegistro && (
-                  <p className="mt-1 text-[10px] font-semibold text-coral">⚠ sem registro</p>
-                )}
-              </button>
-              {selecionado && !slot.atendimentoRegistrado && (
-                <select
-                  aria-label="Mudar status do atendimento"
-                  value={slot.statusAgendamento}
-                  onChange={(e) => onMudarStatus(slot.agendamentoId, e.target.value as AgendamentoStatus)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="block w-full border-t border-border bg-transparent px-3 py-1.5 text-center text-[10.5px] font-semibold text-text-secondary outline-none transition-colors hover:bg-surface-alt hover:text-text-primary"
-                >
-                  {STATUS_OPTIONS.map((s) => (
-                    <option key={s} value={s}>{STATUS_LABEL[s] ?? s}</option>
-                  ))}
-                </select>
-              )}
-            </div>
+              <span>{slot.horario} · {slot.pacienteNome} · {STATUS_LABEL[slot.statusAgendamento] ?? slot.statusAgendamento}</span>
+              {slot.atendimentoRegistrado && <span className="ml-2 text-[11px] text-teal-ink">✓ registrado</span>}
+              {semRegistro && <span className="ml-2 text-[11px] text-coral">⚠ sem registro</span>}
+            </button>
           );
         })}
+        {atual && !atual.atendimentoRegistrado && (
+          <select
+            aria-label="Mudar status do atendimento"
+            value={atual.statusAgendamento}
+            onChange={(e) => onMudarStatus(atual.agendamentoId, e.target.value as AgendamentoStatus)}
+            onClick={(e) => e.stopPropagation()}
+            className="min-h-10 shrink-0 rounded-lg border border-border bg-surface px-3 text-[13px] text-text-secondary focus-visible:outline-2 focus-visible:outline-teal"
+          >
+            {STATUS_OPTIONS.map((status) => <option key={status} value={status}>{STATUS_LABEL[status] ?? status}</option>)}
+          </select>
+        )}
         <BotaoEncaixe onEncaixe={onEncaixe} primeiraSessao={primeiraSessao} />
       </div>
-      {temMais && (
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-y-3 right-3 w-8 rounded-r-2xl bg-gradient-to-l from-surface to-transparent"
-        />
-      )}
+      {temMais && <span aria-hidden className="pointer-events-none absolute right-0 top-0 text-xs text-text-secondary">→</span>}
     </div>
   );
 }
