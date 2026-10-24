@@ -66,11 +66,13 @@ export function OrcamentoDaFicha({ fichaId, clinicaId, dentistaId, revisao, even
     };
   }, [clinicaId, dentistaId, fichaId, revisao, tentativa, eventosConfirmadosKey]);
 
-  if (estado.tipo === 'carregando') return <Button variant="outline" disabled className="min-h-11"><Loader2 className="h-4 w-4 animate-spin" /> Conferindo orçamento</Button>;
+  const classeAtalho = 'h-10 max-w-full rounded-[8px] px-[13px] text-[15px] font-normal';
+
+  if (estado.tipo === 'carregando') return <Button variant="outline" disabled className={classeAtalho}><Loader2 className="h-4 w-4 animate-spin" /> Conferindo orçamento</Button>;
   if (estado.tipo === 'erro') return (
     <div className="space-y-2">
       <p role="alert" className="text-sm text-destructive">{estado.mensagem}</p>
-      <Button variant="outline" className="min-h-11" onClick={() => setTentativa((valor) => valor + 1)}><RefreshCw className="h-4 w-4" /> Tentar novamente</Button>
+      <Button variant="outline" className={classeAtalho} onClick={() => setTentativa((valor) => valor + 1)}><RefreshCw className="h-4 w-4" /> Tentar novamente</Button>
     </div>
   );
   const confirmadosDaLeituraAtual = new Set(confirmadosNaUltimaResposta);
@@ -102,7 +104,7 @@ export function OrcamentoDaFicha({ fichaId, clinicaId, dentistaId, revisao, even
       )}
       <Button
         variant="outline"
-        className={`min-h-11 whitespace-normal ${pendente ? 'border-warning bg-warning-pale text-warning-ink hover:bg-warning-pale hover:text-warning-ink' : ''}`}
+        className={`${classeAtalho} whitespace-normal ${pendente ? 'border-warning bg-warning-pale text-warning-ink hover:bg-warning-pale hover:text-warning-ink' : ''}`}
         onClick={() => void abrir()}
         disabled={abrindo}
         aria-label={pendente ? `${quantidade} procedimentos da ficha disponíveis para adicionar ao orçamento` : undefined}

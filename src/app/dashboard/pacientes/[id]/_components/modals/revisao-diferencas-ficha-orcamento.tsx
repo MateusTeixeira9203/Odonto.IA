@@ -209,9 +209,9 @@ export function RevisaoDiferencasFichaOrcamento({ diferencas, itens, onAtualizad
   if (!temRevisao) return null;
 
   return (
-    <section className="space-y-3 rounded-xl border border-border bg-surface-alt/40 p-3" aria-labelledby={tituloId}>
+    <section className="space-y-3 border-l-2 border-border pl-3 text-xs" aria-labelledby={tituloId}>
       <div>
-        <p id={tituloId} className="text-sm font-semibold text-text-primary">Revisão da ficha</p>
+        <p id={tituloId} className="text-xs font-semibold text-text-primary">Revisão da ficha</p>
         <p className="mt-1 text-xs text-text-secondary">Cada decisão altera somente o orçamento. O registro clínico continua preservado.</p>
       </div>
       {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
@@ -220,7 +220,7 @@ export function RevisaoDiferencasFichaOrcamento({ diferencas, itens, onAtualizad
       <legend className="sr-only">Ações da revisão do orçamento</legend>
 
       {diferencas.faltantes.length > 0 && (
-        <div className="rounded-lg border border-warning/50 bg-card p-3">
+        <div className="border-l-2 border-warning/40 px-3 py-2">
           <p className="font-semibold text-warning-ink">Há {diferencas.faltantes.length} procedimento{diferencas.faltantes.length === 1 ? '' : 's'} nesta ficha que ainda não está neste orçamento.</p>
           <ul className="mt-2 space-y-1 text-xs text-text-secondary">
             {diferencas.faltantes.map((faltante) => (
@@ -234,8 +234,8 @@ export function RevisaoDiferencasFichaOrcamento({ diferencas, itens, onAtualizad
       )}
 
       {diferencas.renomeacoesPendentes.map((alteracao) => (
-        <div key={alteracao.alteracaoId} className="rounded-lg border border-border bg-card p-3">
-          <p className="text-sm font-semibold text-text-primary">Nome clínico alterado</p>
+        <div key={alteracao.alteracaoId} className="border-l-2 border-border px-3 py-2">
+          <p className="text-xs font-semibold text-text-primary">Nome clínico alterado</p>
           <p className="mt-1 text-xs text-text-secondary">{alteracao.nomeAnterior} → <strong className="text-text-primary">{alteracao.nomeAtual}</strong></p>
           {alteracao.itemId && (vinculosPorItem.get(alteracao.itemId)?.length ?? 0) > 1 && (
             <div className="mt-2 rounded-md bg-surface-alt p-2 text-xs text-text-secondary">
@@ -274,8 +274,8 @@ export function RevisaoDiferencasFichaOrcamento({ diferencas, itens, onAtualizad
       {diferencas.retiradasPendentes.map((alteracao) => {
         const eventosDoItem = alteracao.itemId ? vinculosPorItem.get(alteracao.itemId) ?? [] : [];
         return (
-          <div key={alteracao.alteracaoId} className="rounded-lg border border-border bg-card p-3">
-            <p className="text-sm font-semibold text-text-primary">Este procedimento foi retirado da ficha e continua neste orçamento</p>
+          <div key={alteracao.alteracaoId} className="border-l-2 border-border px-3 py-2">
+            <p className="text-xs font-semibold text-text-primary">Este procedimento foi retirado da ficha e continua neste orçamento</p>
             <p className="mt-1 text-xs text-text-secondary">{alteracao.nome} · retirada em {dataCurta(alteracao.retiradoEm)}</p>
             {alteracao.itemId ? (
               <div className="mt-3 flex flex-wrap gap-2">
@@ -324,8 +324,8 @@ export function RevisaoDiferencasFichaOrcamento({ diferencas, itens, onAtualizad
         const item = itensPorId.get(itemId);
         if (!item || diferencas.retiradasPendentes.some((pendencia) => pendencia.itemId === itemId)) return null;
         return (
-          <div key={itemId} className="rounded-lg border border-border bg-card p-3">
-            <p className="text-sm font-semibold text-text-primary">{item.descricao ?? 'Item comercial'}</p>
+          <div key={itemId} className="border-l-2 border-border px-3 py-2">
+            <p className="text-xs font-semibold text-text-primary">{item.descricao ?? 'Item comercial'}</p>
             <p className="mt-1 text-xs text-text-secondary">Vinculado a {eventos.length} procedimento{eventos.length === 1 ? '' : 's'} da ficha.</p>
             <Button size="sm" variant="outline" className="mt-2 min-h-11 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => iniciarRetirada(itemId, eventos.map((evento) => evento.eventoId), item.descricao ?? 'Item comercial', true)}>
               Retirar somente do orçamento
@@ -336,8 +336,8 @@ export function RevisaoDiferencasFichaOrcamento({ diferencas, itens, onAtualizad
       </fieldset>
 
       {vinculosLegados.length > 0 && (
-        <details className="rounded-lg border border-border bg-card p-3">
-          <summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold text-text-primary">Revisar itens do orçamento</summary>
+        <details className="border-l-2 border-border px-3 py-2">
+          <summary className="min-h-11 cursor-pointer py-2 text-xs font-semibold text-text-primary">Revisar itens do orçamento</summary>
           <p className="mt-1 text-xs text-text-secondary">Associe registros legados a uma linha comercial antes de resolver ou retirar o item. Nenhuma associação é deduzida pelo nome.</p>
           <fieldset disabled={salvando !== null} className="mt-3 space-y-3">
             {vinculosLegados.map((vinculo) => (
@@ -419,7 +419,7 @@ function RetiradaComercial({ retirada, eventos, previa, confirmada, salvando, on
       <div className="flex gap-2">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
         <div>
-          <p className="text-sm font-semibold text-foreground">Confirmar retirada de {retirada.titulo}</p>
+          <p className="text-xs font-semibold text-foreground">Confirmar retirada de {retirada.titulo}</p>
           <p className="mt-1 text-xs text-text-secondary">
             {retirada.apenasComercial ? 'O procedimento continua ativo na ficha clínica.' : 'Esta revisão resolve a retirada já registrada na ficha.'}
           </p>

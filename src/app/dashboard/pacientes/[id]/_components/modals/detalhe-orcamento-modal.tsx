@@ -17,9 +17,8 @@ import { ToggleSwitch } from '@/components/ui/toggle-switch';
 import type { DiferencasFichaOrcamento } from '@/server/orcamentos/ficha-orcamento-actions';
 import { RevisaoDiferencasFichaOrcamento } from './revisao-diferencas-ficha-orcamento';
 import {
-  Dialog, DialogContent, DialogTitle, DialogDescription,
+  Dialog, DialogContent, DialogTitle, DialogDescription, DialogTrigger,
 } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -742,8 +741,6 @@ export function DetalheOrcamentoModal({
   onRecarregarDiferencasFicha,
 }: Props) {
   const hoje = hojeBRT();
-  /** R-39a: só Procedimentos e Atividade — Pagamentos virou a coluna do dinheiro. */
-  const [tab, setTab] = useState<'procedimentos' | 'atividade'>('procedimentos');
   const [showAceiteModal, setShowAceiteModal] = useState(false);
   const [motivoEstorno, setMotivoEstorno] = useState('');
   const [activityLogs, setActivityLogs] = useState<{ id: string; actor_nome: string | null; action: string; created_at: string }[]>([]);
@@ -869,7 +866,7 @@ export function DetalheOrcamentoModal({
   return (
     <Dialog open={!!detalheOrcId} onOpenChange={open => { if (!open) onClose(); }}>
       <DialogContent
-        className="flex flex-col rounded-3xl bg-surface border-border p-0 overflow-hidden gap-0 w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] sm:w-[82vw] sm:max-w-[1280px] sm:max-h-[90vh]"
+        className="flex flex-col rounded-[16px] bg-surface border-border p-0 overflow-hidden gap-0 w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] sm:w-[calc(100vw-2rem)] sm:max-w-[1280px] sm:max-h-[90vh]"
         showCloseButton={false}
       >
         {detalheOrc && (
@@ -878,88 +875,49 @@ export function DetalheOrcamentoModal({
                 Sem gradiente hardcoded e sem seletor de status. O canto direito é
                 reservado — nada de conteúdo cai embaixo do ✕. A única pergunta que a
                 tabela de procedimentos não responde ("está sendo pago?") vive aqui. */}
-            <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-border shrink-0">
-              <div className="flex items-center gap-3 min-w-0">
-                <DialogTitle className="font-heading font-semibold text-xl text-text-primary leading-tight">
-                  Orçamento
-                </DialogTitle>
-                {/* R-114 — badge deriva de item aprovado × pagamento, não é mais declarado.
-                    Nenhuma transição manual: "Proposto"/"Aceito"/"Quitado" só mudam quando o
-                    paciente aceita um procedimento (aba Procedimentos) ou paga. */}
-                <span
-                  className={`inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md shrink-0 ${
-                    estado === 'quitado'
-                      ? 'bg-teal-ink text-white'
-                      : estado === 'aceito'
-                        ? 'bg-warning-pale text-warning-ink'
-                        : 'bg-surface-alt text-text-secondary'
-                  }`}
-                >
+            <div className="grid grid-cols-[minmax(0,1fr)_40px] items-start gap-3 border-b border-border px-6 py-5 shrink-0">
+              <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+                <div>
+                  <DialogTitle className="font-heading text-[28px] font-normal leading-tight text-text-primary">Orçamento</DialogTitle>
+                  <DialogDescription className="mt-1 text-[13px] text-text-secondary">
+                    {format(parseISO(detalheOrc.created_at), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                  </DialogDescription>
+                </div>
+                <div className="flex flex-col items-start gap-1 sm:items-end">
+                  <span className={`inline-flex items-center gap-1.5 text-[15px] ${estado === 'proposto' ? 'text-text-secondary' : 'text-teal-ink'}`}>
                   {estado === 'quitado' && <CheckCircle2 className="w-3 h-3" />}
                   {rotuloEstado({ estado, valorDevido, valorPago: totalPago, valorAprovado })}
-                </span>
-                <DialogDescription className="text-text-muted text-xs truncate">
-                  {format(parseISO(detalheOrc.created_at), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-                </DialogDescription>
-              </div>
-
-              <div className="flex items-center gap-3 shrink-0">
+                  </span>
                 {quitado ? (
-                  <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-teal-ink text-white">
+                  <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-teal-ink text-surface">
                     <CheckCircle2 className="w-3 h-3" />
                     Quitado
                   </span>
                 ) : valorAprovado > 0 ? (
-                  <span className="font-mono text-sm font-medium text-text-primary hidden sm:inline">
+                  <span className="font-mono text-[13px] font-medium text-text-primary hidden sm:inline">
                     <span className="text-teal-ink">R$ {fmt(totalPago)}</span>
                     <span className="font-sans text-xs text-text-secondary"> de </span>
                     R$ {fmt(valorDevido)}
                     <span className="font-sans text-xs text-text-secondary"> pagos</span>
                   </span>
                 ) : null}
-
-                <button
-                  onClick={onClose}
-                  aria-label="Fechar"
-                  className="p-1.5 rounded-lg text-text-secondary hover:bg-surface-alt hover:text-text-primary transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+                </div>
               </div>
+              <button onClick={onClose} aria-label="Fechar" className="flex h-10 w-10 items-center justify-center rounded-[8px] text-text-secondary transition-colors hover:bg-surface-alt hover:text-text-primary">
+                <X className="h-4 w-4" />
+              </button>
             </div>
 
             {/* ── Corpo: procedimentos à esquerda, dinheiro à direita (R-39a) ──────
-                Empilha com o dinheiro ACIMA no celular (flex-col-reverse): é a
+                Empilha com o dinheiro ACIMA no celular: é a
                 pergunta que se responde primeiro num gesto de balcão. */}
-            <div className="flex-1 min-w-0 min-h-0 flex flex-col-reverse sm:flex-row">
+            <div className="flex-1 min-w-0 min-h-0 grid grid-cols-1 auto-rows-max overflow-y-auto [&>div:first-child]:order-2 [&>div:last-child]:order-1 sm:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] sm:auto-rows-[minmax(0,1fr)] sm:[&>div:first-child]:order-1 sm:[&>div:last-child]:order-2 sm:overflow-hidden [@media(max-height:570px)]:overflow-y-auto">
 
               {/* ── Coluna clínica ─────────────────────────────────────── */}
-              <div className="min-w-0 flex flex-col min-h-0 sm:basis-[36%] sm:flex-none">
-                <Tabs
-                  value={tab}
-                  onValueChange={(v) => setTab(v as typeof tab)}
-                  className="flex flex-col flex-1 min-h-0 gap-0"
-                >
-                  <TabsList className="h-auto shrink-0 justify-start gap-1 rounded-none border-b border-border bg-transparent px-6 py-0 overflow-x-auto">
-                    {([
-                      { value: 'procedimentos', label: 'Procedimentos', count: detalheOrc.itens.length },
-                      { value: 'atividade',     label: 'Atividade',     count: null },
-                    ] as const).map(t => (
-                      <TabsTrigger
-                        key={t.value}
-                        value={t.value}
-                        className="rounded-none border-b-2 border-transparent px-3 py-2.5 font-semibold data-[active]:bg-transparent data-[active]:shadow-none data-[active]:border-teal data-[active]:text-teal-ink"
-                      >
-                        {t.label}
-                        {t.count !== null && (
-                          <span className="ml-1.5 font-mono text-[11px] text-text-muted">{t.count}</span>
-                        )}
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
+              <div className="flex min-w-0 min-h-0 flex-col">
+                <div className="shrink-0 border-b border-border px-6 py-3 text-[17px] font-bold text-text-primary">Procedimentos <span className="ml-1 text-xs font-normal text-text-secondary">{detalheOrc.itens.length}</span></div>
+                <div className="min-h-0 flex-1 overflow-y-auto p-6 space-y-6">
 
-                  {/* ── Aba: procedimentos ─────────────────────────────────── */}
-                  <TabsContent value="procedimentos" className="mt-0 flex-1 min-h-0 overflow-y-auto p-6 space-y-6">
                     {diferencasFicha && (
                       <RevisaoDiferencasFichaOrcamento
                         diferencas={diferencasFicha}
@@ -972,26 +930,34 @@ export function DetalheOrcamentoModal({
                         onRevisarAdicao={onRevisarAdicao}
                       />
                     )}
-                    <div className="space-y-2">
+                    <div className="overflow-x-auto">
+                      <div role="table" aria-label="Procedimentos do orçamento" className="min-w-[550px]">
+                        <div role="row" className={`grid items-center gap-2 border-b border-border px-[6px] py-2 text-xs text-text-secondary ${orcEditMode ? 'grid-cols-[24px_minmax(180px,1fr)_64px_110px_28px]' : 'grid-cols-[24px_minmax(180px,1fr)_100px_110px]'}`}>
+                          <span role="columnheader" aria-label="Incluir">✓</span>
+                          <span role="columnheader">Procedimento</span>
+                          <span role="columnheader">{orcEditMode ? 'Qtd' : 'Qtd × unitário'}</span>
+                          <span role="columnheader">{orcEditMode ? 'Unitário' : 'Valor'}</span>
+                          {orcEditMode && <span role="columnheader" aria-label="Ações" />}
+                        </div>
                       {orcEditMode ? (
                         <div className="space-y-2">
                           {orcEditItens.map((item, idx) => (
-                            <div key={idx} className="grid grid-cols-[24px_1fr_64px_112px_28px] items-center gap-2 rounded-xl border border-border bg-surface-alt px-3 py-2.5">
-                              <span className="w-6 h-6 rounded-lg bg-teal/10 text-teal text-xs font-bold flex items-center justify-center shrink-0">
+                            <div key={idx} role="row" className="grid min-h-[59px] grid-cols-[24px_minmax(180px,1fr)_64px_110px_28px] items-center gap-2 border-b border-border px-[6px] py-[9px]">
+                              <span role="cell" className="w-6 h-6 rounded-lg bg-teal/10 text-teal text-xs font-bold flex items-center justify-center shrink-0">
                                 {idx + 1}
                               </span>
-                              <Input
+                              <div role="cell" className="min-w-0"><Input
                                 placeholder="Descrição do procedimento"
                                 value={item.descricao}
                                 onChange={e => setOrcEditItens(prev => prev.map((it, i) => i === idx ? { ...it, descricao: e.target.value } : it))}
-                                className="rounded-lg bg-surface border-border text-text-primary text-sm h-9"
-                              />
-                              <Input
+                                className="rounded-none border-0 border-b border-border bg-transparent px-0 text-[13px] text-text-primary shadow-none h-9"
+                              /></div>
+                              <div role="cell" className="min-w-0"><Input
                                 type="number" min="1" value={item.quantidade}
                                 onChange={e => setOrcEditItens(prev => prev.map((it, i) => i === idx ? { ...it, quantidade: parseInt(e.target.value) || 1 } : it))}
-                                className="rounded-lg bg-surface border-border text-text-primary text-sm font-mono h-9 text-center"
-                              />
-                              <Input
+                                className="rounded-none border-0 border-b border-border bg-transparent px-1 text-[13px] text-text-primary font-mono shadow-none h-9 text-center"
+                              /></div>
+                              <div role="cell" className="min-w-0"><Input
                                 type="text" inputMode="decimal" placeholder="0,00"
                                 value={item.preco_unitario}
                                 onChange={e => setOrcEditItens(prev => prev.map((it, i) => i === idx ? { ...it, preco_unitario: e.target.value } : it))}
@@ -999,8 +965,9 @@ export function DetalheOrcamentoModal({
                                   const parsed = parseValorBR(e.target.value);
                                   setOrcEditItens(prev => prev.map((it, i) => i === idx ? { ...it, preco_unitario: parsed > 0 ? formatValorBR(parsed) : it.preco_unitario } : it));
                                 }}
-                                className="rounded-lg bg-surface border-border text-text-primary text-sm font-mono h-9"
-                              />
+                                className="rounded-none border-0 border-b border-border bg-transparent px-1 text-[13px] text-text-primary font-mono shadow-none h-9"
+                              /></div>
+                              <div role="cell">
                               {(!revisaoObrigatoria || !item.id) ? (
                                 <button
                                   onClick={() => setOrcEditItens(prev => prev.filter((_, i) => i !== idx))}
@@ -1010,6 +977,7 @@ export function DetalheOrcamentoModal({
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                               ) : <span aria-hidden="true" />}
+                              </div>
                             </div>
                           ))}
                           <button
@@ -1020,7 +988,7 @@ export function DetalheOrcamentoModal({
                           </button>
                         </div>
                       ) : (
-                        <div className="rounded-2xl border border-border overflow-hidden">
+                        <div className="min-w-0">
                           {detalheOrc.itens.length === 0 ? (
                             <div className="p-6 text-center text-sm text-text-secondary">Nenhum procedimento registrado.</div>
                           ) : (
@@ -1028,13 +996,15 @@ export function DetalheOrcamentoModal({
                               {detalheOrc.itens.map((item) => (
                                 <div
                                   key={item.id}
-                                  className={`flex items-center gap-3 px-4 py-3 border-b border-border/60 last:border-b-0 transition-colors ${
+                                  role="row"
+                                  className={`grid min-h-[59px] grid-cols-[24px_minmax(180px,1fr)_100px_110px] items-center gap-2 px-[6px] py-[9px] border-b border-border transition-colors ${
                                     item.aprovado ? 'hover:bg-surface-alt/40' : 'bg-surface-alt/30'
                                   }`}
                                 >
                                   {/* R-114 — o gesto de aprovação: o paciente aceitou este
                                       procedimento? Item desmarcado NUNCA some — só deixa de
                                       contar no devido e no PDF (I2). */}
+                                  <div role="cell">
                                   <button
                                     type="button"
                                     role="checkbox"
@@ -1043,14 +1013,15 @@ export function DetalheOrcamentoModal({
                                     onClick={() => onAlternarAprovacaoItem(item.id, !item.aprovado)}
                                     className={`w-6 h-6 rounded-lg border flex items-center justify-center shrink-0 transition-colors ${
                                       item.aprovado
-                                        ? 'bg-teal-ink border-teal-ink text-white'
+                                        ? 'bg-teal-ink border-teal-ink text-surface'
                                         : 'border-border bg-surface hover:border-teal/40'
                                     }`}
                                   >
                                     {item.aprovado && <Check className="w-3.5 h-3.5" strokeWidth={3} />}
                                   </button>
-                                  <div className="flex-1 min-w-0">
-                                    <p className={`text-sm font-medium truncate ${item.aprovado ? 'text-text-primary' : 'text-text-secondary'}`}>
+                                  </div>
+                                  <div role="cell" className="min-w-0">
+                                    <p className={`text-[15px] font-medium break-words ${item.aprovado ? 'text-text-primary' : 'text-text-secondary'}`}>
                                       {item.descricao ?? '—'}
                                       {!item.aprovado && (
                                         <span className="ml-2 inline-block text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-md bg-surface-alt text-text-secondary align-middle">
@@ -1059,18 +1030,21 @@ export function DetalheOrcamentoModal({
                                       )}
                                     </p>
                                       {item.composicao?.length ? <ul className="mt-1 space-y-1 text-xs text-muted-foreground">{item.composicao.map((membro, index) => <li key={index}>{membro.quantidade} × {membro.descricao}</li>)}</ul> : null}
-                                    {item.quantidade > 1 && (
+
+                                  </div>
+                                  <div role="cell">
+                                    {item.quantidade > 1 ? (
                                       <p className="text-[11px] text-text-secondary font-mono">
                                         {item.quantidade} unidades × R$ {fmt((item.preco_total ?? 0) / item.quantidade)}
                                       </p>
-                                    )}
+                                    ) : <span className="font-mono text-[11px] text-text-secondary">{item.quantidade} × R$ {fmt(item.preco_total ?? 0)}</span>}
                                   </div>
-                                  <span className={`font-mono text-sm font-semibold shrink-0 ${item.aprovado ? 'text-text-primary' : 'text-text-secondary'}`}>
+                                  <span role="cell" className={`font-mono text-[13px] font-medium shrink-0 text-right ${item.aprovado ? 'text-text-primary' : 'text-text-secondary'}`}>
                                     R$ {fmt(item.preco_total ?? 0)}
                                   </span>
                                 </div>
                               ))}
-                              <div className="flex items-center justify-between px-4 py-3 bg-teal/5 gap-3">
+                              <div className="flex flex-wrap items-center justify-between px-[6px] py-3 gap-3">
                                 <div>
                                   <span className="text-sm font-bold text-text-primary block">Aprovado</span>
                                   {valorAprovado < (detalheOrc.total ?? 0) && (
@@ -1101,75 +1075,10 @@ export function DetalheOrcamentoModal({
                           )}
                         </div>
                       )}
+                      </div>
                     </div>
-                  </TabsContent>
 
-                  {/* ── Aba: atividade ────────────────────────────────────────
-                      Ganha lugar próprio: antes era um rodapé espremido no fim da coluna
-                      esquerda, junto da auditoria de aprovação. */}
-                  <TabsContent value="atividade" className="mt-0 flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
-                    {/* R-03c-1 — aceite assinado: prova de que o paciente concordou em pagar
-                        (distinta da aprovação de status acima, que não afirma nada em 4 dos 5
-                        caminhos que a disparam). */}
-                    {detalheOrc.aceite ? (
-                      <div className="flex items-start gap-2 bg-teal/5 border border-teal/15 rounded-xl px-3 py-2.5">
-                        <PenLine className="w-3.5 h-3.5 text-teal-ink shrink-0 mt-0.5" />
-                        <p className="text-xs text-text-secondary">
-                          Aceite assinado por <span className="font-semibold text-text-primary">{detalheOrc.aceite.assinadoPor}</span>
-                          {' '}em {format(parseISO(detalheOrc.aceite.assinadoEm), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                          {detalheOrc.aceite.croNoAto && <> · CRO {detalheOrc.aceite.croNoAto}</>}
-                        </p>
-                        <p className="text-xs text-text-muted">Documento final disponível em Documentos.</p>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => setShowAceiteModal(true)}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-border text-sm font-semibold text-text-secondary hover:bg-teal/5 hover:text-teal-ink hover:border-teal/30 transition-all"
-                      >
-                        <PenLine className="w-4 h-4" />
-                        Coletar aceite do paciente
-                      </button>
-                    )}
-
-                    {/* R-114 — `aprovado_por`/`aprovado_em` são legado (só a ponte da tela
-                        antiga da secretária ainda escreve). `status` fica inerte pra
-                        orçamento tocado por aqui; o gate é só presença do dado. */}
-                    {(detalheOrc.aprovado_por || detalheOrc.aprovado_em) && (
-                      <div className="flex items-center gap-2 bg-teal/5 border border-teal/15 rounded-xl px-3 py-2.5">
-                        <User className="w-3.5 h-3.5 text-teal shrink-0" />
-                        <p className="text-xs text-text-secondary">
-                          {detalheOrc.aprovado_por && (
-                            <span>Aprovado por <span className="font-semibold text-text-primary">{detalheOrc.aprovado_por.nome}</span></span>
-                          )}
-                          {detalheOrc.aprovado_em && (
-                            <span> em {format(parseISO(detalheOrc.aprovado_em), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>
-                          )}
-                        </p>
-                      </div>
-                    )}
-
-                    {activityLogs.length === 0 ? (
-                      <p className="text-sm text-text-secondary text-center py-8">Nenhuma atividade registrada ainda.</p>
-                    ) : (
-                      <div className="space-y-0">
-                          {activityLogs.map(log => (
-                            <div key={log.id} className="flex items-center gap-2 py-1.5 border-b border-border/30 last:border-0">
-                              <div className="w-1.5 h-1.5 rounded-full bg-teal/40 shrink-0" />
-                              <p className="text-xs flex-1 min-w-0">
-                                <span className="font-medium text-text-primary">{ACTION_LABEL[log.action] ?? log.action}</span>
-                                {log.actor_nome && (
-                                  <span className="ml-1 text-text-secondary/60">por {log.actor_nome.split(' ')[0]}</span>
-                                )}
-                              </p>
-                              <span className="font-mono text-xs text-text-secondary shrink-0">
-                                {format(parseISO(log.created_at), 'dd/MM HH:mm', { locale: ptBR })}
-                              </span>
-                            </div>
-                          ))}
-                      </div>
-                    )}
-                  </TabsContent>
-                </Tabs>
+                </div>
               </div>
 
               {/* ── Coluna do dinheiro (R-39a) ─────────────────────────────
@@ -1729,24 +1638,24 @@ export function DetalheOrcamentoModal({
             {/* ── Rodapé único (R-27a) — fora das colunas ─────────────────
                 "Registrar pagamento" saiu daqui — a coluna do dinheiro já é
                 permanente, não precisa de atalho pra abrir nada. */}
-            <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 px-6 py-4 border-t border-border">
+            <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 px-6 py-4 border-t border-border [&_button]:h-10 [&_button]:rounded-[8px]">
               {orcEditMode ? (
                 <>
                   {orcEditError && (
-                    <p className="text-xs text-coral-ink bg-coral-pale rounded-xl px-3 py-2 w-full">{orcEditError}</p>
+                    <p className="text-xs text-coral-ink bg-coral-pale rounded-[8px] px-3 py-2 w-full">{orcEditError}</p>
                   )}
                   <Button
                     variant="outline"
                     onClick={() => { setOrcEditMode(false); setOrcEditError(null); setOrcEditAceiteConfirmado(false); setOrcEditValorAcordado(null); }}
                     disabled={orcEditSaving}
-                    className="rounded-xl border-border text-text-primary hover:bg-surface-alt"
+                    className="rounded-[8px] border-border text-text-primary hover:bg-surface-alt"
                   >
                     Cancelar
                   </Button>
                   <Button
                     onClick={onSalvarEdicaoOrc}
                     disabled={orcEditSaving}
-                    className="bg-teal text-white hover:bg-teal-lt rounded-xl font-bold ml-auto"
+                    className="bg-teal text-surface hover:bg-teal-lt rounded-[8px] font-bold ml-auto"
                   >
                     {orcEditSaving
                       ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Salvando...</>
@@ -1760,23 +1669,94 @@ export function DetalheOrcamentoModal({
                     <Button
                       variant="outline"
                       onClick={() => onDeleteClick(detalheOrcId)}
-                      className="rounded-xl border-coral/40 text-coral-ink hover:bg-coral-pale"
+                      className="rounded-[8px] border-coral/40 text-coral-ink hover:bg-coral-pale"
                     >
                       <Trash2 className="w-4 h-4 mr-1.5" />
                       Excluir
                     </Button>
                   )}
-                  <div className="flex items-center gap-2 ml-auto">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2 sm:ml-auto">
                     <Button
                       variant="outline"
                       onClick={onOpenEditOrc}
                       disabled={!revisaoObrigatoria && detalheOrc.itens.some((item) => item.composicao?.length)}
                       title={!revisaoObrigatoria && detalheOrc.itens.some((item) => item.composicao?.length) ? "A composição dos grupos é preservada após salvar." : undefined}
-                      className="rounded-xl border-border text-text-primary hover:bg-surface-alt"
+                      className="rounded-[8px] border-border text-text-primary hover:bg-surface-alt"
                     >
                       <Edit2 className="w-4 h-4 mr-1.5" />
                       {revisaoObrigatoria ? 'Revisar orçamento' : 'Editar'}
                     </Button>
+                    <Dialog key={detalheOrc.id}>
+                      <DialogTrigger className="h-10 rounded-[8px] px-2 text-xs text-text-secondary hover:text-teal-ink">Atividade</DialogTrigger>
+                      <DialogContent className="max-w-[650px] rounded-[16px] border-border bg-surface p-[25px]">
+                        <DialogTitle className="font-heading text-xl text-text-primary">Atividade</DialogTitle>
+                        <DialogDescription className="text-xs text-text-secondary">Registros deste orçamento.</DialogDescription>
+                        <div className="space-y-4">
+
+                    {/* R-03c-1 — aceite assinado: prova de que o paciente concordou em pagar
+                        (distinta da aprovação de status acima, que não afirma nada em 4 dos 5
+                        caminhos que a disparam). */}
+                    {detalheOrc.aceite ? (
+                      <div className="flex items-start gap-2 bg-teal/5 border border-teal/15 rounded-xl px-3 py-2.5">
+                        <PenLine className="w-3.5 h-3.5 text-teal-ink shrink-0 mt-0.5" />
+                        <p className="text-xs text-text-secondary">
+                          Aceite assinado por <span className="font-semibold text-text-primary">{detalheOrc.aceite.assinadoPor}</span>
+                          {' '}em {format(parseISO(detalheOrc.aceite.assinadoEm), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                          {detalheOrc.aceite.croNoAto && <> · CRO {detalheOrc.aceite.croNoAto}</>}
+                        </p>
+                        <p className="text-xs text-text-muted">Documento final disponível em Documentos.</p>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setShowAceiteModal(true)}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-border text-sm font-semibold text-text-secondary hover:bg-teal/5 hover:text-teal-ink hover:border-teal/30 transition-all"
+                      >
+                        <PenLine className="w-4 h-4" />
+                        Coletar aceite do paciente
+                      </button>
+                    )}
+
+                    {/* R-114 — `aprovado_por`/`aprovado_em` são legado (só a ponte da tela
+                        antiga da secretária ainda escreve). `status` fica inerte pra
+                        orçamento tocado por aqui; o gate é só presença do dado. */}
+                    {(detalheOrc.aprovado_por || detalheOrc.aprovado_em) && (
+                      <div className="flex items-center gap-2 bg-teal/5 border border-teal/15 rounded-xl px-3 py-2.5">
+                        <User className="w-3.5 h-3.5 text-teal shrink-0" />
+                        <p className="text-xs text-text-secondary">
+                          {detalheOrc.aprovado_por && (
+                            <span>Aprovado por <span className="font-semibold text-text-primary">{detalheOrc.aprovado_por.nome}</span></span>
+                          )}
+                          {detalheOrc.aprovado_em && (
+                            <span> em {format(parseISO(detalheOrc.aprovado_em), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>
+                          )}
+                        </p>
+                      </div>
+                    )}
+
+                    {activityLogs.length === 0 ? (
+                      <p className="text-sm text-text-secondary text-center py-8">Nenhuma atividade registrada ainda.</p>
+                    ) : (
+                      <div className="space-y-0">
+                          {activityLogs.map(log => (
+                            <div key={log.id} className="flex items-center gap-2 py-1.5 border-b border-border/30 last:border-0">
+                              <div className="w-1.5 h-1.5 rounded-full bg-teal/40 shrink-0" />
+                              <p className="text-xs flex-1 min-w-0">
+                                <span className="font-medium text-text-primary">{ACTION_LABEL[log.action] ?? log.action}</span>
+                                {log.actor_nome && (
+                                  <span className="ml-1 text-text-secondary/60">por {log.actor_nome.split(' ')[0]}</span>
+                                )}
+                              </p>
+                              <span className="font-mono text-xs text-text-secondary shrink-0">
+                                {format(parseISO(log.created_at), 'dd/MM HH:mm', { locale: ptBR })}
+                              </span>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                     <div
                       className="hidden sm:flex items-center gap-1.5 text-xs text-text-secondary"
                       title="Mostrar o valor de cada procedimento no PDF"
@@ -1787,7 +1767,7 @@ export function DetalheOrcamentoModal({
                         onCheckedChange={(checked) => onToggleMostrarValorPorItem(detalheOrc.id, checked)}
                       />
                     </div>
-                    <div className="flex items-center gap-0.5 border border-border rounded-xl px-0.5">
+                    <div className="flex items-center gap-0.5 border border-border rounded-[8px] px-0.5">
                       <BotaoDownloadPDF orcamentoId={detalheOrc.id} />
                       <BotaoEnviarWhatsApp
                         orcamentoId={detalheOrc.id}
@@ -1799,7 +1779,7 @@ export function DetalheOrcamentoModal({
                     <Button
                       variant="outline"
                       onClick={onClose}
-                      className="rounded-xl border-border text-text-primary hover:bg-surface-alt"
+                      className="rounded-[8px] border-border text-text-primary hover:bg-surface-alt"
                     >
                       Fechar
                     </Button>
