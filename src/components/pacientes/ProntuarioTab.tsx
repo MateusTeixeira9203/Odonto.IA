@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AlertTriangle, ArrowLeft, CalendarPlus, Check, ChevronDown, ChevronRight, ClipboardCheck, Download, Ellipsis, FileText, FolderOpen, Forward, Loader2, PenLine, Plus, Star, Stethoscope, Trash2 } from 'lucide-react';
@@ -13,11 +13,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ToothDetailPanel } from '@/components/odontograma/ToothDetailPanel';
 import { Odontograma } from '@/components/odontograma/Odontograma';
+import { outrasFichasDaSessao } from '@/lib/ficha/outras-fichas-da-sessao';
 import { OrcamentoDaFicha } from '@/components/pacientes/orcamento-da-ficha';
 import type { ResumoOrcamentoDaFicha } from '@/server/orcamentos/ficha-orcamento-actions';
 import { ProcedimentoDetalheFicha } from '@/components/pacientes/procedimento-detalhe-ficha';
 import { AdicionarProcedimentosFicha } from '@/components/pacientes/adicionar-procedimentos-ficha';
-import { EvolucaoClinicaFicha } from '@/components/pacientes/evolucao-clinica-ficha';
+import { EvolucaoClinicaFicha, GrupoEditoresEvolucao } from '@/components/pacientes/evolucao-clinica-ficha';
 import { NestaSessaoBloco } from '@/app/dashboard/meu-dia/_components/nesta-sessao-bloco';
 import {
   useRegistrarPainel,
@@ -115,10 +116,6 @@ function formatarDataHora(data: string): string {
   return format(new Date(data), "d 'de' MMMM 'às' HH:mm", { locale: ptBR });
 }
 
-function dataDaAgenda(data: string): string {
-  return format(new Date(data), "d 'de' MMMM 'às' HH:mm", { locale: ptBR });
-}
-
 function rotuloStatusAgenda(status: string): string {
   const rotulos: Record<string, string> = {
     scheduled: 'Agendado',
@@ -202,6 +199,8 @@ export function ProntuarioTab({
   const [linhasProcedimentoAbertas, setLinhasProcedimentoAbertas] = useState<Set<string>>(new Set());
   const [eventoDetalheAbertoId, setEventoDetalheAbertoId] = useState<string | null>(null);
   const [fichaComAdicaoAbertaId, setFichaComAdicaoAbertaId] = useState<string | null>(null);
+  const [fichasComHistoricoCompleto, setFichasComHistoricoCompleto] = useState<Set<string>>(new Set());
+  const ultimaSessaoRolada = useRef<string | null>(null);
   const painelAdicionarId = useId();
   const [acaoProcedimento, setAcaoProcedimento] = useState<string | null>(null);
   const [encaminhamentoEventoIds, setEncaminhamentoEventoIds] = useState<string[]>([]);
@@ -320,6 +319,25 @@ export function ProntuarioTab({
     : superficie.tipo === 'legado'
       ? atendimentos.find((atendimento) => atendimento.id === superficie.atendimentoId) ?? null
       : null;
+  useEffect(() => {
+    const visitaId = superficie.tipo === 'ficha' || superficie.tipo === 'legado'
+      ? superficie.atendimentoId : null;
+    if (!visitaId) {
+      ultimaSessaoRolada.current = null;
+      return;
+    }
+    const fichaId = superficie.tipo === 'ficha' ? superficie.fichaId : 'legado';
+    const alvoId = `sessao-ficha-${fichaId}-${visitaId}`;
+    if (ultimaSessaoRolada.current === alvoId) return;
+    const alvo = document.getElementById(alvoId);
+    if (!alvo) return;
+    ultimaSessaoRolada.current = alvoId;
+    alvo.scrollIntoView({
+      block: 'start',
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    });
+  }, [superficie, dadosLocais]);
+
   const atendimentosVisiveis = atendimentos.filter((atendimento) => (
     filtroClinico === 'tudo' || atendimento.eventos.some((evento) => evento.status === filtroClinico)
   ));
@@ -615,6 +633,12 @@ export function ProntuarioTab({
     const eventosDaFicha = fichaAberta?.eventos ?? atendimentoAberto.eventos;
     const gruposProcedimento = agruparProcedimentos(eventosDaFicha);
     const historicoDaFicha = fichaAberta?.atendimentos ?? [atendimentoAberto];
+    const chaveDoHistorico = superficie.tipo === 'ficha' ? superficie.fichaId : `legado:${atendimentoAberto.id}`;
+    const idFichaDoHistorico = superficie.tipo === 'ficha' ? superficie.fichaId : 'legado';
+    const visitaSolicitadaId = superficie.tipo === 'ficha' || superficie.tipo === 'legado' ? superficie.atendimentoId : null;
+    const mostrarHistoricoCompleto = fichasComHistoricoCompleto.has(chaveDoHistorico)
+      || historicoDaFicha.findIndex((visita) => visita.id === visitaSolicitadaId) >= 10;
+    const sessoesVisiveis = mostrarHistoricoCompleto ? historicoDaFicha : historicoDaFicha.slice(0, 10);
     const progressoDaFicha = fichaAberta && fichaAberta.totalProcedimentos > 0
       ? Math.round((fichaAberta.procedimentosRealizados / fichaAberta.totalProcedimentos) * 100)
       : 0;
@@ -631,9 +655,10 @@ export function ProntuarioTab({
       || eventosDaFicha.some((evento) => evento.encaminhadoParaId === dentistaId && evento.retiradoEm == null)
     );
     const podeComplementar = podeEscreverFicha;
+    const sessaoMaisRecenteDaFicha = historicoDaFicha[0] ?? atendimentoAberto;
     const podeMarcarRetornoDaVisita = podeEscreverFicha
-      && atendimentoAberto.atendimentoId != null
-      && atendimentoAberto.profissional.id === dentistaId;
+      && sessaoMaisRecenteDaFicha.atendimentoId != null
+      && sessaoMaisRecenteDaFicha.profissional.id === dentistaId;
 
     const atalhoFicha = 'h-10 max-w-full rounded-[8px] px-[13px] text-[15px] font-normal';
     const temDocumentoAssinadoDaFicha = Boolean(fichaAtual?.assinaturaUrl)
@@ -657,16 +682,41 @@ export function ProntuarioTab({
                 <span>{fichaAberta.procedimentosRealizados} de {fichaAberta.totalProcedimentos} procedimentos</span>
                 <span role="progressbar" aria-label="Progresso da Ficha" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressoDaFicha} className="h-[2px] w-[120px] overflow-hidden rounded-full bg-border"><span className="block h-full bg-teal-ink" style={{ width: `${progressoDaFicha}%` }} /></span>
               </div>}
+              <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-text-secondary">
+                <span>Próximo retorno: {sessaoMaisRecenteDaFicha.retorno ? (
+                  <>{format(new Date(sessaoMaisRecenteDaFicha.retorno.dataHora), 'dd/MM HH:mm')} · {sessaoMaisRecenteDaFicha.retorno.dentistaNome ?? 'Dentista não identificado'} · {rotuloStatusAgenda(sessaoMaisRecenteDaFicha.retorno.status)}</>
+                ) : 'não marcado'}</span>
+                {sessaoMaisRecenteDaFicha.retorno && (
+                  <button type="button" className="min-h-8 text-teal-ink hover:underline" onClick={() => router.push(`/dashboard/agendamentos?v=dia&d=${sessaoMaisRecenteDaFicha.retorno!.dataHora.slice(0, 10)}`)}>
+                    Abrir na Agenda
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {fichaAtual && <Button variant="outline" className={atalhoFicha} aria-label="Baixar PDF da Ficha" onClick={() => window.open(`/api/fichas/${fichaAtual.id}/pdf`, '_blank', 'noopener,noreferrer')}><Download className="h-4 w-4" /><span className="hidden min-[480px]:inline">Baixar PDF</span></Button>}
-              {podeEscreverFicha && fichaAtual && <Button variant="outline" className={`${atalhoFicha} border-teal-ink bg-teal-pale font-semibold text-teal-ink hover:bg-teal-pale hover:text-teal-ink`} onClick={() => abrirNovoRegistro({ fichaId: fichaAtual.id })}><Plus className="h-4 w-4" /> Novo atendimento</Button>}
-              {podeEscreverFicha && fichaAtual && <DropdownMenu>
-                <DropdownMenuTrigger asChild><Button variant="outline" size="icon" className="h-10 w-10 rounded-[8px]" aria-label="Mais ações da Ficha"><Ellipsis className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="min-w-52">
-                  <DropdownMenuItem className="text-destructive focus:bg-destructive/10 focus:text-destructive" disabled={carregandoExclusao} onSelect={() => void abrirExclusaoFicha(fichaAtual.id)}>{carregandoExclusao ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}Apagar Ficha</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>}
+            <div className="w-full min-w-0 min-[801px]:w-[380px] min-[801px]:shrink-0">
+              <div className="flex flex-wrap items-center gap-2">
+                {fichaAtual && <Button variant="outline" className={atalhoFicha} aria-label="Baixar PDF da Ficha" onClick={() => window.open(`/api/fichas/${fichaAtual.id}/pdf`, '_blank', 'noopener,noreferrer')}><Download className="h-4 w-4" /><span className="hidden min-[480px]:inline">Baixar PDF</span></Button>}
+                {podeEscreverFicha && fichaAtual && <Button variant="outline" className={`${atalhoFicha} border-teal-ink bg-teal-pale font-semibold text-teal-ink hover:bg-teal-pale hover:text-teal-ink`} onClick={() => abrirNovoRegistro({ fichaId: fichaAtual.id })}><Plus className="h-4 w-4" /> Novo atendimento</Button>}
+                {podeEscreverFicha && fichaAtual && <DropdownMenu>
+                  <DropdownMenuTrigger asChild><Button variant="outline" size="icon" className="h-10 w-10 rounded-[8px]" aria-label="Mais ações da Ficha"><Ellipsis className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="min-w-52">
+                    <DropdownMenuItem className="text-destructive focus:bg-destructive/10 focus:text-destructive" disabled={carregandoExclusao} onSelect={() => void abrirExclusaoFicha(fichaAtual.id)}>{carregandoExclusao ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}Apagar Ficha</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>}
+              </div>
+              <div className="mx-auto mt-4 w-full max-w-[260px] space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="font-sans text-[17px] font-bold text-text-primary">Odontograma</h2>
+                  <button type="button" onClick={() => setOdontogramaCompletoAberto(true)} className="min-h-10 text-[13px] font-semibold text-teal-ink">Ampliar ↗</button>
+                </div>
+                <p className="text-[12.5px] text-text-secondary">Procedimentos da ficha · dentes permanentes</p>
+                <div className="mx-auto w-fit max-w-full overflow-hidden" data-ficha-odontograma>
+                  <div className={`w-max origin-top-left [zoom:0.35] [&_button>span[style*='font-size']]:text-[26px]! [&>div>div:last-child]:hidden ${podeComplementar ? '[&>div>div:first-child]:hidden' : ''}`}>
+                    <Odontograma selectedTeeth={[]} eventos={eventosDaFicha} onToothToggle={(dente) => abrirProcedimentoDoDente(eventosDaFicha, dente)} presentationMode={!podeComplementar} hideFilters />
+                  </div>
+                </div>
+                <p className="border-l-2 border-teal-ink py-2 pl-3 text-[12px] leading-[18px] text-text-secondary">Clique em um dente destacado para localizar seus procedimentos.</p>
+              </div>
             </div>
           </div>
           <div data-ficha-atalhos className="mt-5 flex flex-wrap items-center gap-2">
@@ -695,12 +745,20 @@ export function ProntuarioTab({
                       <ClipboardCheck className="h-4 w-4" /> Coletar assinatura
                     </Button>
             )}
+            {podeMarcarRetornoDaVisita && !sessaoMaisRecenteDaFicha.retorno && (
+              <Button variant="outline" className={atalhoFicha} onClick={() => {
+                setRetornoAtendimentoId(sessaoMaisRecenteDaFicha.atendimentoId);
+                setRetornoAberto(true);
+              }}>
+                <CalendarPlus className="h-4 w-4" /> Marcar retorno
+              </Button>
+            )}
             <Button variant="outline" className={atalhoFicha} onClick={onAbrirArquivos}><FolderOpen className="h-4 w-4" />Arquivos do paciente</Button>
             {temDocumentoAssinadoDaFicha && <Button variant="outline" className={atalhoFicha} onClick={onAbrirArquivos}><FileText className="h-4 w-4" />Ver documento assinado</Button>}
           </div>
         </header>
-        <div data-ficha-grid className="grid min-w-0 grid-cols-1 gap-[30px] p-2.5 min-[601px]:p-6 min-[1051px]:grid-cols-[minmax(0,1fr)_290px]">
-          <div className="order-2 min-w-0 space-y-4 min-[1051px]:order-1">
+        <div data-ficha-grid className="grid min-w-0 grid-cols-1 gap-[30px] p-2.5 min-[601px]:p-6">
+          <div className="min-w-0 space-y-4">
             <article data-ficha-procedimentos className="min-w-0">
               <div className="flex flex-wrap items-center gap-3">
                 <h2 className="font-sans text-[17px] font-bold text-text-primary">Procedimentos</h2>
@@ -950,90 +1008,60 @@ export function ProntuarioTab({
                 </div>
               )}
             </article>
-            {fichaAtual && (
-              <details data-ficha-historico className="mt-5! border-t border-border pt-3.5">
-                <summary className="cursor-pointer text-[15px] text-text-primary">Histórico das sessões</summary>
-                <p className="mt-2 text-[15px] text-text-secondary">Atendimentos desta ficha · mais recentes primeiro</p>
-                <div>
-                  {historicoDaFicha.map((visita) => {
-                    const procedimentos = visita.eventos
-                      .map((evento) => `${nomeClinicoProcedimento(evento)} · ${rotuloLocalEvento(evento)}`)
-                      .filter((item, indice, itens) => itens.indexOf(item) === indice);
-                    const atual = visita.id === atendimentoAberto.id;
-                    return (
-                      <section key={visita.id} data-sessao={visita.id} aria-current={atual ? 'page' : undefined} className="border-b border-border py-3.5">
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <h3 className="font-sans text-sm font-bold text-text-primary">{formatarData(visita.dataAtendimento)} · {visita.profissional.nome}</h3>
-                          {atual ? (
-                            <span className="text-xs text-teal-ink">Em exibição</span>
-                          ) : (
-                            <button type="button" onClick={() => abrirFicha(fichaAtual.id, visita.id)} className="min-h-8 rounded px-2 text-xs font-semibold text-teal-ink hover:bg-teal-pale">
-                              Ver detalhes
-                            </button>
-                          )}
-                        </div>
-                        <p className="mt-1.5 break-words text-[15px] text-text-secondary">{procedimentos.length > 0 ? procedimentos.join(' · ') : 'Sem procedimentos nesta sessão.'}</p>
-                        {atual && (
-                          <div className="mt-3">
-                            <EvolucaoClinicaFicha key={`${clinicaId}:${dentistaId}:${visita.id}`}
-                              atendimento={visita} pacienteId={patientId} dentistaId={dentistaId}
-                              canWrite={podeEscreverFicha} />
-                          </div>
-                        )}
-                      </section>
-                    );
-                  })}
-                </div>
-              </details>
-            )}
-          </div>
-
-          <aside data-ficha-lateral className="order-1 min-w-0 space-y-4 border-border px-6 py-[25px] min-[1051px]:order-2 min-[1051px]:border-l">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="font-sans text-[17px] font-bold text-text-primary">Odontograma</h2>
-              <button type="button" onClick={() => setOdontogramaCompletoAberto(true)} className="min-h-10 text-[13px] font-semibold text-teal-ink">Ampliar ↗</button>
-            </div>
-            <p className="text-[12.5px] text-text-secondary">Procedimentos da ficha · dentes permanentes</p>
-            <div className="mx-auto w-fit max-w-full overflow-hidden" data-ficha-odontograma>
-              <div className={`w-max origin-top-left [zoom:0.35] [&_button>span[style*='font-size']]:text-[26px]! [&>div>div:last-child]:hidden ${podeComplementar ? '[&>div>div:first-child]:hidden' : ''}`}>
-                <Odontograma selectedTeeth={[]} eventos={eventosDaFicha} onToothToggle={(dente) => abrirProcedimentoDoDente(eventosDaFicha, dente)} presentationMode={!podeComplementar} hideFilters />
-              </div>
-            </div>
-            <p className="border-l-2 border-teal-ink py-2 pl-3 text-[12px] leading-[18px] text-text-secondary">Clique em um dente destacado para localizar seus procedimentos.</p>
-            <article className="border-l-2 border-border py-2 pl-3 text-[12px] leading-[18px]">
-              <p className="font-semibold text-text-primary">Próximo retorno</p>
-              {atendimentoAberto.retorno ? (
-                <>
-                  <p className="mt-2 text-[12px] font-semibold text-text-primary">{dataDaAgenda(atendimentoAberto.retorno.dataHora)}</p>
-                  <p className="mt-1 text-xs text-text-secondary">{atendimentoAberto.retorno.dentistaNome ?? 'Dentista não identificado'} · {rotuloStatusAgenda(atendimentoAberto.retorno.status)}</p>
-                  <Button className="mt-2 min-h-10 w-full rounded-[8px] text-[12px]" variant="outline" onClick={() => router.push(`/dashboard/agendamentos?v=dia&d=${atendimentoAberto.retorno!.dataHora.slice(0, 10)}`)}>
-                    Abrir na Agenda
-                  </Button>
-                </>
-              ) : (
-                <p className="mt-2 text-[12px] text-text-primary">
-                  {atendimentoAberto.atendimentoId ? 'Nenhum retorno vinculado a esta visita.' : 'Próximo agendamento ainda não registrado.'}
-                </p>
-              )}
-              {podeMarcarRetornoDaVisita && !atendimentoAberto.retorno && (
-                <Button className="mt-2 min-h-10 w-full rounded-[8px] text-[12px]" variant="outline" onClick={() => {
-                  setRetornoAtendimentoId(atendimentoAberto.atendimentoId);
-                  setRetornoAberto(true);
-                }}>
-                  <CalendarPlus className="h-4 w-4" /> Marcar retorno
+            <GrupoEditoresEvolucao key={chaveDoHistorico}>
+            <section data-ficha-historico className="mt-5! border-t border-border pt-3.5" aria-label="Linha do tempo da ficha">
+              <h2 className="font-sans text-[17px] font-bold text-text-primary">Linha do tempo da ficha</h2>
+              <p className="mt-2 text-[12.5px] text-text-secondary">Sessões desta ficha · mais recentes primeiro</p>
+              {sessoesVisiveis.map((visita) => {
+                const procedimentos = visita.eventos
+                  .map((evento) => `${nomeClinicoProcedimento(evento)} · ${rotuloLocalEvento(evento)}`)
+                  .filter((item, indice, itens) => itens.indexOf(item) === indice);
+                const destacada = historicoDaFicha.length > 1 && visita.id === visitaSolicitadaId;
+                const temAssinatura = visita.documentos.length > 0
+                  || visita.eventos.some((evento) => evento.assinaturaId != null)
+                  || visita.fichas.some((ficha) => ficha.assinadoEm != null);
+                const outrasFichas = superficie.tipo === 'ficha'
+                  ? outrasFichasDaSessao(visita.id, superficie.fichaId, atendimentos) : [];
+                const hora = visita.dataAtendimento.includes('T') ? visita.dataAtendimento : visita.criadoEm;
+                return (
+                  <section key={visita.id} id={`sessao-ficha-${idFichaDoHistorico}-${visita.id}`}
+                    data-sessao={visita.id} aria-current={destacada ? 'true' : undefined}
+                    className={`scroll-mt-6 border-b border-border py-3.5 ${destacada ? 'bg-muted/20' : ''}`}>
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <h3 className="font-sans text-sm font-bold text-text-primary">
+                        {format(new Date(`${visita.dataAtendimento.slice(0, 10)}T12:00:00`), 'dd/MM/yyyy')} · {format(new Date(hora), 'HH:mm')} · {visita.profissional.nome}
+                      </h3>
+                      {temAssinatura && <span className="text-xs text-teal-ink">Assinado</span>}
+                    </div>
+                    <p className="mt-1.5 break-words text-[15px] text-text-secondary">{procedimentos.length > 0 ? procedimentos.join(' · ') : 'Sem procedimentos nesta sessão.'}</p>
+                    <div className="mt-3">
+                      <EvolucaoClinicaFicha key={`${clinicaId}:${dentistaId}:${chaveDoHistorico}:${visita.id}`}
+                        atendimento={visita} pacienteId={patientId} dentistaId={dentistaId}
+                        canWrite={podeEscreverFicha} />
+                    </div>
+                    {visita.retorno && (
+                      <p className="mt-2 flex flex-wrap items-center gap-x-2 text-xs text-text-secondary">
+                        <span>Retorno: {format(new Date(visita.retorno.dataHora), 'dd/MM HH:mm')} · {rotuloStatusAgenda(visita.retorno.status)}</span>
+                        <button type="button" className="min-h-8 text-teal-ink hover:underline" onClick={() => router.push(`/dashboard/agendamentos?v=dia&d=${visita.retorno!.dataHora.slice(0, 10)}`)}>Ver na Agenda</button>
+                      </p>
+                    )}
+                    {outrasFichas.map((outraFicha) => (
+                      <p key={outraFicha.id} className="mt-2 text-xs text-text-secondary">
+                        Também na ficha{' '}
+                        <button type="button" className="min-h-8 break-words text-left text-teal-ink hover:underline" onClick={() => abrirFicha(outraFicha.id, visita.id)}>{outraFicha.nome}</button>
+                      </p>
+                    ))}
+                  </section>
+                );
+              })}
+              {!mostrarHistoricoCompleto && historicoDaFicha.length > 10 && (
+                <Button variant="outline" className="mt-3 h-10 rounded-[8px]" onClick={() => setFichasComHistoricoCompleto((atuais) => new Set(atuais).add(chaveDoHistorico))}>
+                  Mostrar sessões anteriores ({historicoDaFicha.length - 10})
                 </Button>
               )}
-            </article>
-
-            <article className="border-l-2 border-border py-2 pl-3 text-[12px] leading-[18px]">
-              <p className="font-semibold text-text-primary">Rastreabilidade</p>
-              <p className="mt-2 text-[12px] text-text-primary">Materiais não informados</p>
-              <p className="mt-1 text-xs leading-relaxed text-text-secondary">
-                    A leitura de etiquetas será registrada nesta consulta quando o módulo de materiais estiver disponível.
-              </p>
-            </article>
-
-          </aside>
+            </section>
+            </GrupoEditoresEvolucao>
+          </div>
         </div>
 
         </article>
