@@ -3,7 +3,6 @@
 import { useState, useTransition, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  ArrowLeft,
   Phone,
   Mail,
   MapPin,
@@ -27,6 +26,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import {
   Dialog,
   DialogContent,
@@ -1372,75 +1372,39 @@ export function PacienteDetailClient({
   return (
     <PageContainer variant="wide">
 
-      {/* ── NAV + PATIENT CARD ──────────────────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-6 space-y-3"
       >
-        {/* Breadcrumb nav */}
-        {/* R-111 — quebra linha no celular. São 7 ações à direita (editar, exportar, excluir,
-            emitir, Apresentar, Marcar retorno) contra o "Pacientes" à esquerda: 438px numa faixa
-            de 343px, 95px cortados. O rótulo do "Marcar retorno" já era `hidden sm:inline`, o que
-            ajudava mas não bastava. */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <button
-            onClick={() => router.push('/dashboard/pacientes')}
-            className="min-h-11 flex items-center gap-1.5 text-text-secondary hover:text-text-primary transition-colors text-sm font-medium"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Pacientes
-          </button>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => setIsEditModalOpen(true)}
-              className="h-11 w-11 rounded-xl border border-border/60 text-text-secondary hover:text-teal hover:border-teal/40 bg-surface transition-colors flex items-center justify-center"
-              title="Editar paciente"
-            >
-              <Edit2 className="w-4 h-4" />
+        <nav aria-label="Trilha do paciente" className="flex flex-wrap items-center gap-x-1.5 text-[12.5px] leading-[22.5px] text-text-secondary">
+          <button type="button" onClick={() => router.push('/dashboard/pacientes')} className="rounded text-[12.5px]! hover:text-teal-ink focus-visible:outline-2 focus-visible:outline-teal">Pacientes</button>
+          <span aria-hidden="true">/</span><span className="break-words">{displayNome}</span><span aria-hidden="true">/</span><span>Ficha de tratamento</span>
+        </nav>
+        <div data-paciente-cabecalho className="flex min-w-0 flex-wrap items-center justify-between gap-[14px] py-5">
+          <div className="min-w-0">
+            <h1 className="break-words font-heading text-[32px]! font-normal leading-[1.15] text-text-primary">{displayNome}</h1>
+            <div className="flex flex-wrap items-start gap-x-3 gap-y-1 text-[15px] leading-[22.5px] text-text-secondary">
+              <p>{idade !== null && <>{idade} anos · </>}Paciente desde {membroDesde}</p>
+              <details className="min-w-0 max-w-full">
+                <summary className="cursor-pointer rounded text-[12.5px] text-teal-ink focus-visible:outline-2 focus-visible:outline-teal">Contato</summary>
+                <div className="mt-2 flex max-w-full items-start gap-3 rounded-lg border border-border bg-surface p-3">
+                  <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-teal-pale text-sm font-semibold text-teal-ink">{iniciais}</span>
+                  <div className="min-w-0 space-y-1 text-sm text-text-secondary">
+                    {dataNascimento && <p>Nascimento: {dataNascimento}</p>}
+                    {displayTelefone && <p className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5 shrink-0 text-teal-ink" />{displayTelefone}</p>}
+                    {displayEmail && <p className="flex min-w-0 items-start gap-1.5"><Mail className="mt-0.5 h-3.5 w-3.5 shrink-0 text-teal-ink" /><span className="break-all">{displayEmail}</span></p>}
+                    {endereco && <p className="flex items-start gap-1.5"><MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-teal-ink" /><span className="break-words">{endereco}</span></p>}
+                    {!displayTelefone && !displayEmail && !endereco && <p>Contato não informado.</p>}
+                  </div>
+                </div>
+              </details>
+            </div>
+          </div>
+          <div data-paciente-acoes className="flex max-w-full flex-wrap items-center gap-2">
+            <button type="button" onClick={() => { retorno.limparErro(); setIsMarcarRetornoOpen(true); }} className="inline-flex h-10 shrink-0 items-center gap-2 rounded-[8px] border border-border bg-transparent px-[13px] py-2 text-[15px]! font-normal text-text-primary transition-colors hover:bg-surface-alt">
+              Marcar retorno
             </button>
-            <button
-              onClick={() => window.open(`/api/pacientes/${paciente.id}/prontuario`, '_blank')}
-              className="h-11 w-11 rounded-xl border border-border/60 text-text-secondary hover:text-text-primary bg-surface transition-colors flex items-center justify-center"
-              title="Exportar prontuário"
-            >
-              <FileDown className="w-4 h-4" />
-            </button>
-            <div className="w-px h-5 bg-border/60 mx-0.5" />
-            {/* Excluir paciente — sem gate de role de propósito (secretária é quem usa,
-                decisão dele 07/08). Confirmação com nome digitado mora no modal. */}
-            <button
-              onClick={() => setExcluirPacienteAberto(true)}
-              className="h-11 w-11 rounded-xl border border-border/60 text-text-secondary hover:text-coral hover:border-coral/40 bg-surface transition-colors flex items-center justify-center"
-              title="Excluir paciente"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-            {canWriteClinical && (
-              <button
-                onClick={() => setIsEmitirAceiteOpen(true)}
-                className="h-11 w-11 rounded-xl border border-border/60 text-text-secondary hover:text-teal hover:border-teal/40 bg-surface transition-colors flex items-center justify-center"
-                title="Gerar TCLE do paciente"
-              >
-                <FileSignature className="w-4 h-4" />
-              </button>
-            )}
-            {canWriteClinical && (
-              <button
-                onClick={() => setIsEmitirOpen(true)}
-                className="h-11 w-11 rounded-xl border border-border/60 text-text-secondary hover:text-teal hover:border-teal/40 bg-surface transition-colors flex items-center justify-center"
-                title="Emitir documento (receita, atestado, pedido de exame)"
-              >
-                <FilePlus className="w-4 h-4" />
-              </button>
-            )}
-            {/* Apresentar — R-98a: não depende mais de ter ficha. Antes exigia
-                fichasRecentes.length > 0 (a suposição de que Apresentar só existe em
-                cima de UMA ficha específica) — com bloco imagem/odontograma/modelo
-                reutilizável isso deixou de ser verdade: dá pra montar a apresentação
-                antes de qualquer ficha existir. Com ficha, mantém o picker (contexto
-                certo pro orçamento/procedimentos); sem ficha, abre direto. */}
-            {canViewClinical && (
+            {canViewClinical && <div className="[&>button>svg]:hidden [&>button]:h-10 [&>button]:min-h-10 [&>button]:rounded-[8px] [&>button]:border-teal-ink [&>button]:bg-teal-pale [&>button]:px-[13px] [&>button]:py-2 [&>button]:text-[15px]! [&>button]:font-semibold [&>button]:text-teal-ink [&>button:hover]:bg-teal-pale [&>button:hover]:border-teal-ink">
               <ApresentarPaciente
                 patientId={paciente.id}
                 clinicaId={clinicaId}
@@ -1449,73 +1413,27 @@ export function PacienteDetailClient({
                 mode={fichasRecentes.length > 0 ? 'picker' : 'direct'}
                 fichas={fichasRecentes}
                 variant="header"
+                label="Apresentar ↗"
                 glow={paciente.id === 'demo'}
               />
-            )}
-            <button
-              onClick={() => { retorno.limparErro(); setIsMarcarRetornoOpen(true); }}
-              className="min-h-11 shrink-0 flex items-center gap-2 px-4 py-2.5 bg-teal text-white rounded-xl text-xs font-bold hover:bg-teal-lt transition-colors shadow-md"
-            >
-              <Calendar className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Marcar retorno</span>
-            </button>
+            </div>}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild><button type="button" aria-label="Mais ações do paciente" className="inline-flex h-10 shrink-0 items-center gap-2 rounded-[8px] border border-border bg-transparent px-[13px] py-2 text-[15px]! text-text-primary hover:bg-surface-alt">Mais ▾</button></DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => setIsEditModalOpen(true)}><Edit2 className="h-4 w-4" />Editar paciente</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => window.open(`/api/pacientes/${paciente.id}/prontuario`, '_blank')}><FileDown className="h-4 w-4" />PDF do prontuário</DropdownMenuItem>
+                {canWriteClinical && <DropdownMenuItem onSelect={() => setIsEmitirAceiteOpen(true)}><FileSignature className="h-4 w-4" />Gerar TCLE do paciente</DropdownMenuItem>}
+                {canWriteClinical && <DropdownMenuItem onSelect={() => setIsEmitirOpen(true)}><FilePlus className="h-4 w-4" />Emitir documento</DropdownMenuItem>}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => setExcluirPacienteAberto(true)} className="text-destructive"><Trash2 className="h-4 w-4" />Excluir paciente</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
-
-        {/* Patient info card */}
-        <div className="bg-surface rounded-2xl border border-border/60 shadow-sm p-5">
-          <div className="flex items-start gap-4">
-            {/* Avatar */}
-            <div className="w-14 h-14 rounded-2xl bg-teal flex items-center justify-center text-white font-bold text-xl shadow-md shrink-0">
-              {iniciais}
-            </div>
-
-            {/* Info block */}
-            <div className="flex-1 min-w-0">
-              <h1 className="font-heading font-bold text-2xl text-text-primary leading-none">{displayNome}</h1>
-              <p className="text-text-secondary text-sm mt-1 flex items-center gap-2 flex-wrap">
-                {idade !== null && <span>{idade} anos</span>}
-                {dataNascimento && <span className="text-text-secondary/60">· {dataNascimento}</span>}
-                <span className="text-text-secondary/60">· Paciente desde {membroDesde}</span>
-              </p>
-
-              {/* Contact row */}
-              {(displayTelefone || displayEmail || endereco) && (
-                <div className="flex flex-wrap gap-x-5 gap-y-1.5 mt-3">
-                  {displayTelefone && (
-                    <div className="flex items-center gap-1.5 text-sm text-text-secondary">
-                      <Phone className="w-3.5 h-3.5 text-teal shrink-0" />
-                      {displayTelefone}
-                    </div>
-                  )}
-                  {displayEmail && (
-                    <div className="flex items-center gap-1.5 text-sm text-text-secondary">
-                      <Mail className="w-3.5 h-3.5 text-teal shrink-0" />
-                      <span className="truncate max-w-[220px]">{displayEmail}</span>
-                    </div>
-                  )}
-                  {endereco && (
-                    <div className="flex items-center gap-1.5 text-sm text-text-secondary">
-                      <MapPin className="w-3.5 h-3.5 text-teal shrink-0" />
-                      <span>{endereco}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Observações / Alertas */}
-              {paciente.observacoes && (
-                <div className="mt-3 px-3 py-2.5 rounded-xl bg-amber-500/6 border border-amber-500/20 flex items-start gap-2">
-                  <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-600 mb-0.5">Observações</p>
-                    <p className="text-sm text-text-secondary leading-relaxed">{paciente.observacoes}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        {paciente.observacoes && <div role="note" className="mb-3 flex items-start gap-2 rounded-lg border border-warning-ink/30 bg-warning-pale px-3 py-2.5 text-warning-ink">
+          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <div className="min-w-0"><p className="text-[12.5px] font-semibold">Observações</p><p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{paciente.observacoes}</p></div>
+        </div>}
       </motion.div>
 
       <div className="space-y-6">
@@ -1529,7 +1447,7 @@ export function PacienteDetailClient({
 
           {/* Tabs — IDs usados pelo tour DEX */}
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-            <TabsList className="flex flex-wrap gap-2 mb-6 h-auto bg-transparent p-0">
+            <TabsList className="mt-[18px] mb-6 flex h-auto flex-wrap gap-6 rounded-none border-b border-border bg-transparent p-0 pb-3 max-[600px]:gap-[15px]">
               {(
                 [
                   ...(canViewClinical  ? [['ficha-clinica','Prontuário','tab-fichas',       FileText]] : []),
@@ -1537,14 +1455,13 @@ export function PacienteDetailClient({
                   ['arquivos',      'Arquivos',     'tab-documentos',   Paperclip],
                   ['agenda',        'Agenda',        undefined,          Calendar],
                 ] as [string, string, string | undefined, React.ComponentType<{ className?: string }>][]
-              ).map(([val, label, tourId, Icon]) => (
+              ).map(([val, label, tourId]) => (
                 <TabsTrigger
                   key={val}
                   id={tourId}
                   value={val}
-                  className={`flex-1 min-w-[110px] flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold border transition-all duration-300 border-border/60 bg-surface text-text-secondary hover:text-text-primary hover:border-teal/30 data-[active]:bg-teal data-[active]:text-white data-[active]:border-teal data-[active]:shadow-[0_4px_14px_rgba(47,156,133,0.3)]${tourId && highlightedTab === tourId ? ' ring-2 ring-teal/60' : ''}`}
+                  className={`shrink-0 rounded-none border-0 bg-transparent p-0 text-[15px]! font-normal leading-[22.5px] text-text-secondary shadow-none transition-colors hover:text-teal-ink data-[active]:bg-transparent data-[active]:font-bold! data-[active]:text-teal-ink data-[active]:shadow-none${tourId && highlightedTab === tourId ? ' ring-2 ring-teal/60' : ''}`}
                 >
-                  <Icon className="w-4 h-4 shrink-0" />
                   <span>{label}</span>
                 </TabsTrigger>
               ))}
@@ -1743,13 +1660,13 @@ export function PacienteDetailClient({
                       <p>{orcamentosAviso}</p>
                     </div>
                   )}
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-text-secondary font-medium">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <span className="text-[15px] text-text-secondary font-medium">
                       {orcamentosState.length} orçamento{orcamentosState.length !== 1 ? 's' : ''}
                     </span>
                     <button
                       onClick={() => setActiveTab('ficha-clinica')}
-                      className="bg-teal text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 hover:bg-teal-lt transition-all shadow-md disabled:opacity-60"
+                      className="h-10 rounded-[8px] border border-teal-ink/30 bg-teal-pale px-4 text-[15px] font-semibold text-teal-ink inline-flex items-center gap-2 transition-colors hover:bg-teal-pale/80 disabled:opacity-60"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       Gerar pela ficha
@@ -1757,9 +1674,9 @@ export function PacienteDetailClient({
                   </div>
 
                   {orcamentosState.length === 0 ? (
-                    <div className="bg-surface rounded-2xl border border-border shadow-sm p-8 text-center">
+                    <div className="bg-surface rounded-[12px] border border-border p-8 text-center shadow-none">
                       <CreditCard className="w-12 h-12 text-teal/20 mx-auto mb-4" />
-                      <h3 className="font-heading text-2xl text-text-primary mb-2">
+                      <h3 className="font-sans text-[15px] font-semibold text-text-primary mb-2">
                         Nenhum orçamento
                       </h3>
                       <p className="text-text-secondary text-sm max-w-md mx-auto">
@@ -1777,10 +1694,10 @@ export function PacienteDetailClient({
                       });
                       const StatusIcon = derivado.estado === 'quitado' ? CheckCircle2 : AlertCircle;
                       const estadoCls = derivado.estado === 'quitado'
-                        ? 'bg-teal-ink text-white'
+                        ? 'text-teal-ink'
                         : derivado.estado === 'aceito'
-                          ? 'bg-warning-pale text-warning-ink'
-                          : 'bg-surface-alt text-text-secondary';
+                          ? 'text-teal-ink'
+                          : 'text-warning-ink';
                       return (
                         <div
                           key={orc.id}
@@ -1794,26 +1711,26 @@ export function PacienteDetailClient({
                           role="button"
                           tabIndex={0}
                           aria-label={`Abrir orçamento de ${format(parseISO(orc.created_at), 'dd/MM/yyyy', { locale: ptBR })}`}
-                          className={`rounded-2xl border shadow-sm p-6 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal ${
+                          className={`rounded-[12px] border shadow-none bg-surface p-4 sm:p-6 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal ${
                             derivado.estado === 'proposto'
-                              ? 'bg-amber-500/[0.03] border-amber-500/40 hover:border-amber-500/60'
-                              : 'bg-surface border-border/60 hover:border-teal/30'
+                              ? 'border-warning/30 hover:border-warning/50'
+                              : 'border-border hover:border-teal-ink/30'
                           }`}
                         >
-                          <div className="flex items-start justify-between mb-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-xl bg-surface-alt flex items-center justify-center">
+                          <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+                            <div className="flex min-w-0 items-center gap-3">
+                              <div className="w-8 h-8 shrink-0 flex items-center justify-center">
                                 <StatusIcon className="w-5 h-5 text-teal" />
                               </div>
                               <div>
                                 <div className="flex items-center gap-2">
                                   <span
-                                    className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md ${estadoCls}`}
+                                    className={`text-[15px] font-medium ${estadoCls}`}
                                   >
                                     {rotuloEstado(derivado)}
                                   </span>
                                 </div>
-                                <div className="text-xs text-text-secondary mt-0.5 flex items-center gap-1">
+                                <div className="text-[12.5px] text-text-secondary mt-0.5 flex flex-wrap items-center gap-1">
                                   <Calendar className="w-3 h-3" />
                                   {format(parseISO(orc.created_at), 'dd/MM/yyyy', {
                                     locale: ptBR,
@@ -1824,9 +1741,9 @@ export function PacienteDetailClient({
                                 </div>
                               </div>
                             </div>
-                            <div className="flex items-center gap-3">
+                            <div className="ml-auto flex shrink-0 items-center gap-3">
                               <div className="text-right">
-                                <div className="font-mono text-lg font-bold text-text-primary">
+                                <div className="font-mono text-[21px] font-medium text-teal-ink">
                                   R${' '}
                                   {(orc.total ?? 0).toLocaleString('pt-BR', {
                                     minimumFractionDigits: 2,
@@ -1842,16 +1759,16 @@ export function PacienteDetailClient({
                               {orc.itens.map((item) => (
                                 <div
                                   key={item.id}
-                                  className="flex items-center justify-between text-xs"
+                                  className="flex items-start justify-between gap-3 text-[13px]"
                                 >
-                                  <div className="flex items-center gap-2 text-text-secondary">
+                                  <div className="flex min-w-0 items-start gap-2 text-text-secondary">
                                     <FileText className="w-3 h-3" />
                                     {item.descricao ?? '—'}
                                     {item.quantidade > 1 && (
                                       <span className="font-mono">×{item.quantidade}</span>
                                     )}
                                   </div>
-                                  <span className="font-mono text-text-primary font-medium">
+                                  <span className="shrink-0 whitespace-nowrap font-mono text-text-primary font-medium">
                                     R${' '}
                                     {(item.preco_total ?? 0).toLocaleString('pt-BR', {
                                       minimumFractionDigits: 2,
@@ -1864,25 +1781,25 @@ export function PacienteDetailClient({
 
                           {orc.pagamentos.length > 0 && (
                             <div className="pt-3 border-t border-border/40">
-                              <div className="text-xs font-bold text-text-secondary uppercase tracking-widest mb-2">
+                              <div className="text-xs font-medium text-text-secondary mb-2">
                                 Pagamentos
                               </div>
                               {orc.pagamentos.map((pg) => (
                                 <div
                                   key={pg.id}
-                                  className="flex items-center justify-between text-xs"
+                                  className="flex items-start justify-between gap-3 text-[13px]"
                                 >
                                   <span className="text-text-secondary capitalize">
-                                    {pg.forma_pagamento ?? 'Não informado'} •{' '}
+                                    {pg.forma_pagamento ?? <span className="normal-case">Não informado</span>} •{' '}
                                     <span
                                       className={
-                                        pg.status === 'pago' ? 'text-teal' : 'text-yellow-600'
+                                        pg.status === 'pago' ? 'text-teal' : 'text-warning-ink'
                                       }
                                     >
-                                      {pg.status}
+                                      {pg.status === 'pago' ? 'Pago' : pg.status === 'pendente' ? 'Pendente' : pg.status}
                                     </span>
                                   </span>
-                                  <span className="font-mono font-medium text-text-primary">
+                                  <span className="shrink-0 whitespace-nowrap font-mono font-medium text-text-primary">
                                     R${' '}
                                     {pg.valor.toLocaleString('pt-BR', {
                                       minimumFractionDigits: 2,
@@ -2040,9 +1957,9 @@ export function PacienteDetailClient({
       />
 
       <Dialog open={seletorOrcamentoDaFicha !== null} onOpenChange={(aberto) => { if (!aberto) setSeletorOrcamentoDaFicha(null); }}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md rounded-[12px] border border-border bg-surface p-6 shadow-none">
           <DialogHeader>
-            <DialogTitle>Escolha o orçamento da ficha</DialogTitle>
+            <DialogTitle className="font-sans text-[15px] font-semibold text-text-primary">Escolha o orçamento da ficha</DialogTitle>
             <DialogDescription>Esta ficha tem mais de um orçamento. Escolha qual deseja revisar; nenhum será criado automaticamente.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-2">
@@ -2053,7 +1970,7 @@ export function PacienteDetailClient({
                   key={orcamentoId}
                   type="button"
                   variant="outline"
-                  className="min-h-11 h-auto justify-between whitespace-normal px-3 py-2 text-left"
+                  className="min-h-10 h-auto justify-between gap-3 whitespace-normal rounded-[8px] border-border bg-surface px-3 py-2 text-left text-[13px] shadow-none"
                   onClick={() => void selecionarOrcamentoDaFicha(seletorOrcamentoDaFicha.fichaId, orcamentoId)}
                 >
                   <span>Orçamento de {orcamento ? format(parseISO(orcamento.created_at), 'dd/MM/yyyy') : 'data indisponível'}</span>

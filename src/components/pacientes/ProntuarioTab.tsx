@@ -150,6 +150,18 @@ function agruparProcedimentos(eventos: ProntuarioAtendimento['eventos']): GrupoP
   }));
 }
 
+function agruparProcedimentosPorDente(procedimentos: GrupoProcedimento[]) {
+  const dentes = new Map<number | null, GrupoProcedimento[]>();
+  for (const procedimento of procedimentos) {
+    const dente = procedimento.eventoPrincipal.ancora.dente ?? null;
+    const linhas = dentes.get(dente) ?? [];
+    linhas.push(procedimento);
+    dentes.set(dente, linhas);
+  }
+  return Array.from(dentes, ([dente, linhas]) => ({ dente, linhas }))
+    .sort((a, b) => (a.dente ?? Infinity) - (b.dente ?? Infinity));
+}
+
 const ODONTOGRAMA_RESPONSIVO = 'origin-top-left [zoom:0.46] min-[480px]:[zoom:0.62] sm:[zoom:0.78] md:[zoom:0.9] xl:[zoom:1]';
 
 export function ProntuarioTab({
@@ -187,6 +199,7 @@ export function ProntuarioTab({
     atendimento: ProntuarioAtendimento;
     dente: number | null;
   } | null>(null);
+  const [linhasProcedimentoAbertas, setLinhasProcedimentoAbertas] = useState<Set<string>>(new Set());
   const [eventoDetalheAbertoId, setEventoDetalheAbertoId] = useState<string | null>(null);
   const [fichaComAdicaoAbertaId, setFichaComAdicaoAbertaId] = useState<string | null>(null);
   const painelAdicionarId = useId();
@@ -622,129 +635,56 @@ export function ProntuarioTab({
       && atendimentoAberto.atendimentoId != null
       && atendimentoAberto.profissional.id === dentistaId;
 
+    const atalhoFicha = 'h-10 max-w-full rounded-[8px] px-[13px] text-[15px] font-normal';
+    const temDocumentoAssinadoDaFicha = Boolean(fichaAtual?.assinaturaUrl)
+      || historicoDaFicha.some((visita) => visita.documentos.length > 0)
+      || eventosDaFicha.some((evento) => evento.assinaturaId != null);
+    const dataInicialDaFicha = historicoDaFicha.reduce((data, visita) => visita.dataAtendimento < data ? visita.dataAtendimento : data, atendimentoAberto.dataAtendimento);
+
     return (
       <section className="space-y-4" aria-label="Ficha aberta no prontuário">
-        <header className="border-b border-border pb-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+        <button type="button" onClick={voltarAoContextoAnterior} className="inline-flex min-h-10 items-center gap-1 text-[13px] font-semibold text-teal-ink hover:underline">
+          <ArrowLeft className="h-3.5 w-3.5" /> Voltar ao prontuário
+        </button>
+        <article data-ficha-cartao className="w-full max-w-[1335px] overflow-hidden rounded-[12px] border border-border bg-surface">
+        <header data-ficha-cabecalho className="border-b border-border px-[25px] py-[22px]">
+          <div className="flex flex-col gap-4 min-[801px]:flex-row min-[801px]:items-start min-[801px]:justify-between">
             <div className="min-w-0">
-            <button type="button" onClick={voltarAoContextoAnterior} className="mb-1 inline-flex min-h-11 items-center gap-1 text-xs font-bold text-teal-ink hover:underline">
-              <ArrowLeft className="h-3.5 w-3.5" /> Voltar ao prontuário
-            </button>
-            <p className="font-heading text-2xl text-text-primary">{fichaAtual?.nome ?? `Registro de ${formatarData(atendimentoAberto.dataAtendimento)}`}</p>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-text-secondary">
-              <span>{fichaAtual ? `Responsável: ${fichaAtual.responsavel.nome}` : atendimentoAberto.profissional.nome}</span>
-              <span aria-hidden>·</span>
-              <span>Consulta de {formatarData(atendimentoAberto.dataAtendimento)}</span>
-              {fichaAtual && (
-                <span className="rounded-full border border-border bg-surface-alt px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide">
-                  {fichaAtual.status === 'aberta' ? 'Em curso' : fichaAtual.status}
-                </span>
-              )}
+              <p className="text-[12.5px] uppercase leading-[18.75px] text-text-secondary">{fichaAtual ? 'Ficha de tratamento' : 'Registro clínico'}{fichaAtual && ` · ${fichaAtual.status === 'aberta' ? 'Em curso' : fichaAtual.status}`}</p>
+              <h2 className="mt-1 w-fit max-w-full break-words border-b border-border font-heading text-[27px] font-normal leading-[40px] text-text-primary">{fichaAtual?.nome ?? `Registro de ${formatarData(atendimentoAberto.dataAtendimento)}`}</h2>
+              <p className="mt-1 text-[15px] leading-[22.5px] text-text-secondary">Responsável: {fichaAtual?.responsavel.nome ?? atendimentoAberto.profissional.nome} · {fichaAtual ? 'Iniciada em' : 'Consulta de'} {formatarData(dataInicialDaFicha)}</p>
+              {fichaAberta && <div className="mt-3 flex flex-wrap items-center gap-3 text-[12.5px] text-text-secondary">
+                <span>{fichaAberta.procedimentosRealizados} de {fichaAberta.totalProcedimentos} procedimentos</span>
+                <span role="progressbar" aria-label="Progresso da Ficha" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressoDaFicha} className="h-[2px] w-[120px] overflow-hidden rounded-full bg-border"><span className="block h-full bg-teal-ink" style={{ width: `${progressoDaFicha}%` }} /></span>
+              </div>}
             </div>
-            {fichaAberta && (
-              <div className="mt-3 grid max-w-md gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-3">
-                <span
-                  role="progressbar"
-                  aria-label="Progresso da Ficha"
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={progressoDaFicha}
-                  className="h-1.5 w-full overflow-hidden rounded-full bg-border"
-                >
-                  <span className="block h-full rounded-full bg-teal" style={{ width: `${progressoDaFicha}%` }} />
-                </span>
-                <span className="whitespace-nowrap text-xs font-bold tabular-nums text-text-secondary">
-                  {progressoDaFicha}% · {fichaAberta.procedimentosRealizados} de {fichaAberta.totalProcedimentos} procedimentos
-                </span>
-              </div>
-            )}
-            </div>
-            <div className="flex w-full items-center gap-2 sm:w-auto sm:flex-none">
-              {podeEscreverFicha && fichaAtual && (
-                <Button className="min-h-11 flex-1 sm:min-h-8 sm:flex-none" onClick={() => abrirNovoRegistro({ fichaId: fichaAtual.id })}>
-                  <Plus className="h-4 w-4" /> Novo atendimento
-                </Button>
-              )}
-              {fichaAtual && (
-                <Button
-                  variant="outline"
-                  className="min-h-11 px-3 sm:min-h-8"
-                  aria-label="Baixar PDF da Ficha"
-                  onClick={() => window.open(`/api/fichas/${fichaAtual.id}/pdf`, '_blank', 'noopener,noreferrer')}
-                >
-                  <Download className="h-4 w-4" /> <span className="hidden min-[480px]:inline">Baixar PDF</span>
-                </Button>
-              )}
-              {podeEscreverFicha && fichaAtual && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="icon" className="min-h-11 sm:min-h-8" aria-label="Mais ações da Ficha">
-                      <Ellipsis className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="min-w-52">
-                    <DropdownMenuItem
-                      className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-                      disabled={carregandoExclusao}
-                      onSelect={() => void abrirExclusaoFicha(fichaAtual.id)}
-                    >
-                      {carregandoExclusao ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                      Apagar Ficha
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
+            <div className="flex flex-wrap items-center gap-2">
+              {fichaAtual && <Button variant="outline" className={atalhoFicha} aria-label="Baixar PDF da Ficha" onClick={() => window.open(`/api/fichas/${fichaAtual.id}/pdf`, '_blank', 'noopener,noreferrer')}><Download className="h-4 w-4" /><span className="hidden min-[480px]:inline">Baixar PDF</span></Button>}
+              {podeEscreverFicha && fichaAtual && <Button variant="outline" className={`${atalhoFicha} border-teal-ink bg-teal-pale font-semibold text-teal-ink hover:bg-teal-pale hover:text-teal-ink`} onClick={() => abrirNovoRegistro({ fichaId: fichaAtual.id })}><Plus className="h-4 w-4" /> Novo atendimento</Button>}
+              {podeEscreverFicha && fichaAtual && <DropdownMenu>
+                <DropdownMenuTrigger asChild><Button variant="outline" size="icon" className="h-10 w-10 rounded-[8px]" aria-label="Mais ações da Ficha"><Ellipsis className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-52">
+                  <DropdownMenuItem className="text-destructive focus:bg-destructive/10 focus:text-destructive" disabled={carregandoExclusao} onSelect={() => void abrirExclusaoFicha(fichaAtual.id)}>{carregandoExclusao ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}Apagar Ficha</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>}
             </div>
           </div>
-        </header>
-
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,2.05fr)_minmax(300px,0.72fr)]">
-          <div className="space-y-4">
-            <EvolucaoClinicaFicha key={`${clinicaId}:${dentistaId}:${atendimentoAberto.id}`}
-              atendimento={atendimentoAberto} pacienteId={patientId} dentistaId={dentistaId}
-              canWrite={podeEscreverFicha} />
-
-            <article className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-text-secondary">Odontograma da ficha</p>
-                  <p className="mt-1 text-xs text-text-secondary">Clique em um dente para ir ao procedimento desta ficha. Dentes sem procedimento não abrem formulário.</p>
-                </div>
-                <Button variant="outline" size="sm" className="min-h-11" onClick={() => setOdontogramaCompletoAberto(true)}>
-                  Ver odontograma completo
-                </Button>
-              </div>
-              <div className="mt-3 min-h-[360px] overflow-hidden">
-                <div className={ODONTOGRAMA_RESPONSIVO}>
-                  <Odontograma
-                    selectedTeeth={[]}
-                    eventos={eventosDaFicha}
-                    onToothToggle={(dente) => abrirProcedimentoDoDente(eventosDaFicha, dente)}
-                    presentationMode={!podeComplementar}
-                  />
-                </div>
-              </div>
-            </article>
-
-            <article className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-text-secondary">Procedimentos</p>
-                  <p className="mt-1 text-xs text-text-secondary">Status clínico e organização da próxima sessão são controles separados.</p>
-                </div>
-                {podeEscreverFicha && fichaAtual && !fichaAtual.assinadoEm && (
-                  <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
-                    {podeAdicionarNaFicha && <Button
-                      className="min-h-11 flex-1 sm:flex-none"
-                      aria-controls={painelAdicionarId}
-                      aria-expanded={fichaComAdicaoAbertaId === fichaAtual.id}
-                      onClick={() => setFichaComAdicaoAbertaId((idAberto) => idAberto === fichaAtual.id ? null : fichaAtual.id)}
-                    >
-                      <Plus className="h-4 w-4" /> {fichaComAdicaoAbertaId === fichaAtual.id ? 'Fechar adição' : 'Adicionar procedimentos'}
-                    </Button>}
+          <div data-ficha-atalhos className="mt-5 flex flex-wrap items-center gap-2">
+            {superficie.tipo === 'ficha' && fichaAtual && onGerarOrcamento && (
+                <OrcamentoDaFicha
+                  key={`${clinicaId}:${dentistaId}:${fichaAtual.id}`}
+                  clinicaId={clinicaId}
+                  dentistaId={dentistaId}
+                  fichaId={fichaAtual.id}
+                  revisao={`${orcamentoRevisao ?? ''}:${eventosDaFicha.map((item) => `${item.id}:${item.procedimentoNome}:${item.retiradoEm ?? ''}`).join('|')}`}
+                  eventosConfirmados={eventosOrcamentoConfirmados}
+                  onAbrir={(resumo) => Promise.resolve(onGerarOrcamento(fichaAtual.id, resumo))}
+                />
+            )}
+            {podeEscreverFicha && fichaAtual && !fichaAtual.assinadoEm && (
                     <Button
                       variant="outline"
-                      className="min-h-11 flex-1 sm:flex-none"
+                      className={atalhoFicha}
                       disabled={elegiveisParaAssinatura.length === 0}
                       onClick={() => {
                         setAssinaturaSelecionados(elegiveisParaAssinatura.map((evento) => evento.id));
@@ -754,13 +694,32 @@ export function ProntuarioTab({
                     >
                       <ClipboardCheck className="h-4 w-4" /> Coletar assinatura
                     </Button>
+            )}
+            <Button variant="outline" className={atalhoFicha} onClick={onAbrirArquivos}><FolderOpen className="h-4 w-4" />Arquivos do paciente</Button>
+            {temDocumentoAssinadoDaFicha && <Button variant="outline" className={atalhoFicha} onClick={onAbrirArquivos}><FileText className="h-4 w-4" />Ver documento assinado</Button>}
+          </div>
+        </header>
+        <div data-ficha-grid className="grid min-w-0 grid-cols-1 gap-[30px] p-2.5 min-[601px]:p-6 min-[1051px]:grid-cols-[minmax(0,1fr)_290px]">
+          <div className="order-2 min-w-0 space-y-4 min-[1051px]:order-1">
+            <article data-ficha-procedimentos className="min-w-0">
+              <div className="flex flex-wrap items-center gap-3">
+                <h2 className="font-sans text-[17px] font-bold text-text-primary">Procedimentos</h2>
+                {podeEscreverFicha && fichaAtual && !fichaAtual.assinadoEm && (
+                  <div className="flex flex-wrap gap-2">
+                    {podeAdicionarNaFicha && <Button
+                      variant="ghost"
+                      className="h-auto min-h-8 px-[9px] py-1.5 text-teal-ink"
+                      aria-controls={painelAdicionarId}
+                      aria-expanded={fichaComAdicaoAbertaId === fichaAtual.id}
+                      onClick={() => setFichaComAdicaoAbertaId((idAberto) => idAberto === fichaAtual.id ? null : fichaAtual.id)}
+                    >
+                      <Plus className="h-4 w-4" /> {fichaComAdicaoAbertaId === fichaAtual.id ? 'Fechar adição' : 'Adicionar procedimentos'}
+                    </Button>}
+
                   </div>
                 )}
-                {atendimentoAberto.documentos.length > 0 && (
-                  <Button variant="outline" onClick={onAbrirArquivos}>
-                    <FileText className="h-4 w-4" /> Ver documento assinado
-                  </Button>
-                )}
+
+                <span className="ml-auto text-[15px] text-text-secondary">por dente</span>
               </div>
               {fichaComAdicaoAbertaId === fichaAtual?.id && fichaAtual && podeAdicionarNaFicha && (
                 <div id={painelAdicionarId}>
@@ -780,232 +739,284 @@ export function ProntuarioTab({
               {eventosDaFicha.length === 0 ? (
                 <p className="mt-3 text-sm text-text-secondary">Nenhum procedimento estruturado nesta ficha.</p>
               ) : (
-                <ul className="mt-3 space-y-2">
-                  {gruposProcedimento.map((grupo) => {
-                    const evento = grupo.eventoPrincipal;
-                    const eventoIds = grupo.eventos.map((item) => item.id);
-                    const assinado = grupo.eventos.some((item) => item.assinaturaId != null);
-                    const retirado = grupo.eventos.some((item) => item.retiradoEm != null);
-                    const temEncaminhamento = grupo.eventos.some((item) => item.encaminhadoParaId != null);
-                    const autorAtual = grupo.eventos.every((item) => item.dentistaId === dentistaId);
-                    const encaminhadoAoAtual = grupo.eventos.every((item) => item.encaminhadoParaId === dentistaId);
-                    const ficha = evento.fichaId === fichaAtual?.id
-                      ? fichaAtual
-                      : evento.fichaId ? atendimentoAberto.fichas.find((item) => item.id === evento.fichaId) : null;
-                    const fichaAssinada = ficha?.assinadoEm != null;
-                    const podeAlterarStatus = podeEscreverFicha && !retirado && !assinado && !fichaAssinada
-                      && (temEncaminhamento ? encaminhadoAoAtual : autorAtual);
-                    const realizados = grupo.eventos.filter((item) => item.status === 'realizado').length;
-                    const todosRealizados = realizados === grupo.eventos.length;
-                    const todosAFazer = realizados === 0;
-                    const podeOrganizar = podeAlterarStatus && !temEncaminhamento && autorAtual && todosAFazer;
-                    const emProximaSessao = todosAFazer && grupo.eventos.every((item) => item.momento_planejado === 'proxima_sessao');
-                    const integrantesEditaveis = podeEscreverFicha && !fichaAssinada
-                      ? grupo.eventos.filter((item) => !item.retiradoEm && !item.assinaturaId && (
-                        item.encaminhadoParaId == null
-                          ? item.dentistaId === dentistaId
-                          : item.encaminhadoParaId === dentistaId && (item.tipo === 'endodontia' || item.tipo === 'implante')
-                      ))
-                      : [];
-                    const podeEditarDetalhes = integrantesEditaveis.length > 0;
-                    const eventoVisualizado = grupo.eventos.find((item) => item.id === eventoDetalheAbertoId);
-                    const eventoEmEdicao = integrantesEditaveis.find((item) => item.id === eventoDetalheAbertoId);
-                    const detalheAberto = eventoVisualizado != null;
-                    const podeVerDetalhes = grupo.eventos.some((item) => (
-                      (item.tipo === 'endodontia' || item.tipo === 'implante')
-                      && item.encaminhadoParaId != null
-                    ));
-                    const statusClasse = todosRealizados
-                      ? 'bg-clinical-done-pale text-clinical-done-ink'
-                      : !todosAFazer
-                        ? 'border border-border bg-surface text-text-secondary'
-                        : emProximaSessao
-                        ? 'bg-warning-pale text-warning-ink'
-                        : 'bg-coral-pale text-coral-ink';
-                    const carregando = acaoProcedimento?.startsWith(`${grupo.chave}:`) ?? false;
-                    return (
-                    <li id={`procedimento-${evento.id}`} key={grupo.chave} className="rounded-xl border border-border bg-surface-alt/40 p-3 text-sm">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-text-primary">
-                          {nomeClinicoProcedimento(evento)}
-                          {evento.ancora.dente != null ? ` · dente ${evento.ancora.dente}` : ''}
-                          {grupo.eventos.length > 1 ? ` · ${grupo.eventos.length} dentes/regiões` : ''}
-                        </p>
-                        {evento.observacao && <p className="mt-0.5 text-xs text-text-secondary">{evento.observacao}</p>}
-                        <p className="mt-1.5 text-xs text-text-secondary">
-                          Registrado por {evento.autorOriginal.nome}
-                          {evento.autorOriginal.cro ? ` · CRO ${evento.autorOriginal.cro}` : ''}
-                        </p>
-                        {evento.responsavelEncaminhado && (
-                          <p className="mt-1 text-xs font-medium text-teal-ink">
-                            Responsável clínico: {evento.responsavelEncaminhado.nome}
-                            {evento.responsavelEncaminhado.cro ? ` · CRO ${evento.responsavelEncaminhado.cro}` : ''}
-                          </p>
-                        )}
-                        {evento.ultimaAlteracao && (
-                          <p className="mt-1.5 text-xs text-text-secondary">
-                            Última alteração: {evento.ultimaAlteracao.atorNome ?? 'Profissional não identificado'} · {formatarDataHora(evento.ultimaAlteracao.alteradoEm)} · {rotuloUltimaAlteracao(evento.ultimaAlteracao.acao)}
-                          </p>
-                        )}
-                        {retirado && <p className="mt-1.5 text-xs font-semibold text-text-secondary">Retirado da ficha</p>}
-                        </div>
-                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${statusClasse}`}>
-                          {retirado
-                            ? 'Retirado da ficha'
-                            : todosRealizados
-                            ? 'Realizado'
-                            : !todosAFazer
-                              ? `Parcial · ${realizados} de ${grupo.eventos.length}`
-                              : emProximaSessao
-                                ? 'A fazer · próxima sessão'
-                                : 'A fazer'}
-                        </span>
-                      </div>
-
-                      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
-                        {podeAlterarStatus && (
-                          <div role="group" className="inline-flex rounded-lg border border-border bg-surface p-0.5" aria-label="Status clínico">
-                            <button
-                              type="button"
-                              disabled={carregando}
-                              aria-pressed={todosAFazer}
-                              onClick={() => void atualizarStatusGrupo(grupo, 'indicado')}
-                              className={todosAFazer
-                                ? 'min-h-11 rounded-md bg-coral-pale px-3 py-1.5 text-xs font-bold text-coral-ink'
-                                : 'min-h-11 rounded-md px-3 py-1.5 text-xs font-bold text-text-secondary hover:text-text-primary'}
-                            >
-                              A fazer
+                <div className="mt-3">
+                  {agruparProcedimentosPorDente(gruposProcedimento).map(({ dente, linhas }) => (
+                    <section key={dente ?? 'boca'} data-grupo-dente={dente ?? 'boca'} aria-label={dente == null ? 'Boca / região' : `Dente ${dente}`} className="grid min-w-0 grid-cols-[40px_minmax(0,1fr)] gap-3 border-t border-border py-2.5">
+                      <div className={dente == null ? 'pt-2 text-xs font-semibold text-teal-ink' : 'flex h-[38px] items-center font-heading text-[19px] leading-[38px] text-teal-ink'}>{dente ?? 'Boca / região'}</div>
+                      <ul className="min-w-0">
+                      {linhas.map((grupo) => {
+                        const evento = grupo.eventoPrincipal;
+                        const eventoIds = grupo.eventos.map((item) => item.id);
+                        const assinado = grupo.eventos.some((item) => item.assinaturaId != null);
+                        const retirado = grupo.eventos.some((item) => item.retiradoEm != null);
+                        const temEncaminhamento = grupo.eventos.some((item) => item.encaminhadoParaId != null);
+                        const autorAtual = grupo.eventos.every((item) => item.dentistaId === dentistaId);
+                        const encaminhadoAoAtual = grupo.eventos.every((item) => item.encaminhadoParaId === dentistaId);
+                        const ficha = evento.fichaId === fichaAtual?.id
+                          ? fichaAtual
+                          : evento.fichaId ? atendimentoAberto.fichas.find((item) => item.id === evento.fichaId) : null;
+                        const fichaAssinada = ficha?.assinadoEm != null;
+                        const podeAlterarStatus = podeEscreverFicha && !retirado && !assinado && !fichaAssinada
+                          && (temEncaminhamento ? encaminhadoAoAtual : autorAtual);
+                        const realizados = grupo.eventos.filter((item) => item.status === 'realizado').length;
+                        const todosRealizados = realizados === grupo.eventos.length;
+                        const todosAFazer = realizados === 0;
+                        const podeOrganizar = podeAlterarStatus && !temEncaminhamento && autorAtual && todosAFazer;
+                        const emProximaSessao = todosAFazer && grupo.eventos.every((item) => item.momento_planejado === 'proxima_sessao');
+                        const integrantesEditaveis = podeEscreverFicha && !fichaAssinada
+                          ? grupo.eventos.filter((item) => !item.retiradoEm && !item.assinaturaId && (
+                            item.encaminhadoParaId == null
+                              ? item.dentistaId === dentistaId
+                              : item.encaminhadoParaId === dentistaId && (item.tipo === 'endodontia' || item.tipo === 'implante')
+                          ))
+                          : [];
+                        const podeEditarDetalhes = integrantesEditaveis.length > 0;
+                        const eventoVisualizado = grupo.eventos.find((item) => item.id === eventoDetalheAbertoId);
+                        const eventoEmEdicao = integrantesEditaveis.find((item) => item.id === eventoDetalheAbertoId);
+                        const detalheAberto = eventoVisualizado != null;
+                        const podeVerDetalhes = grupo.eventos.some((item) => (
+                          (item.tipo === 'endodontia' || item.tipo === 'implante')
+                          && item.encaminhadoParaId != null
+                        ));
+                        const carregando = acaoProcedimento?.startsWith(`${grupo.chave}:`) ?? false;
+                        const linhaAberta = linhasProcedimentoAbertas.has(evento.id);
+                        return (
+                        <li id={`procedimento-${evento.id}`} key={grupo.chave} className="min-w-0 text-sm">
+                          <div data-procedimento-linha className="grid h-10 min-w-0 grid-cols-[minmax(0,1fr)_28px_96px_24px] items-center gap-[5px] min-[601px]:grid-cols-[minmax(0,1fr)_38px_135px_110px_24px] min-[601px]:gap-3">
+                            <span className="truncate text-[15px] text-text-primary" title={nomeClinicoProcedimento(evento)}>{nomeClinicoProcedimento(evento)}</span>
+                            <span className="text-xs text-text-secondary" aria-label="Faces">{evento.ancora.faces?.join('') || '—'}</span>
+                            <button type="button" disabled={!podeAlterarStatus || carregando}
+                              onClick={() => void atualizarStatusGrupo(grupo, todosRealizados ? 'indicado' : 'realizado')}
+                              title={podeAlterarStatus ? 'Alternar entre A fazer e Realizado' : assinado || fichaAssinada ? 'Assinado · registro bloqueado' : 'Status sem permissão de alteração'}
+                              aria-label={`Status de ${nomeClinicoProcedimento(evento)} no ${dente == null ? 'âmbito Boca / região' : `dente ${dente}`}: ${retirado ? 'Retirado da ficha' : todosRealizados ? 'Realizado' : emProximaSessao ? 'A fazer · próxima sessão' : 'A fazer'}`}
+                              className={`h-7 min-w-0 truncate rounded-[4px] bg-surface px-1 text-xs disabled:cursor-default ${retirado ? 'text-text-secondary' : 'text-teal-ink'}`}>
+                              {retirado ? 'Retirado da ficha' : todosRealizados ? 'Realizado' : !todosAFazer ? `Parcial · ${realizados} de ${grupo.eventos.length}` : emProximaSessao ? 'Próxima sessão' : 'A fazer'}
                             </button>
-                            <button
-                              type="button"
-                              disabled={carregando}
-                              aria-pressed={todosRealizados}
-                              onClick={() => void atualizarStatusGrupo(grupo, 'realizado')}
-                              className={todosRealizados
-                                ? 'min-h-11 rounded-md bg-clinical-done-pale px-3 py-1.5 text-xs font-bold text-clinical-done-ink'
-                                : 'min-h-11 rounded-md px-3 py-1.5 text-xs font-bold text-text-secondary hover:text-text-primary'}
-                            >
-                              Realizado
-                            </button>
+                            <span data-procedimento-autor className="hidden truncate text-xs text-text-secondary min-[601px]:block" title={evento.autorOriginal.nome}>{evento.autorOriginal.nome}</span>
+                            <button type="button" aria-expanded={linhaAberta} aria-controls={`detalhes-procedimento-${evento.id}`}
+                              aria-label={`${linhaAberta ? 'Recolher' : 'Expandir'} ${nomeClinicoProcedimento(evento)} · ${rotuloLocalEvento(evento)}`}
+                              onClick={() => setLinhasProcedimentoAbertas((atuais) => {
+                                const proximas = new Set(atuais);
+                                if (proximas.has(evento.id)) proximas.delete(evento.id);
+                                else proximas.add(evento.id);
+                                return proximas;
+                              })}
+                              className="flex h-8 w-6 items-center justify-center rounded text-lg text-text-secondary hover:bg-surface-alt hover:text-teal-ink">{linhaAberta ? '−' : '+'}</button>
                           </div>
-                        )}
-                        {podeOrganizar && (
-                          <button
-                            type="button"
-                            disabled={carregando}
-                            onClick={() => void atualizarProximaSessao(grupo)}
-                            className={emProximaSessao
-                              ? 'inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-warning-pale px-3 text-xs font-bold text-warning-ink'
-                              : 'inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-bold text-text-secondary hover:border-warning/40 hover:text-warning-ink'}
-                          >
-                            <Star className={`h-3.5 w-3.5 ${emProximaSessao ? 'fill-current' : ''}`} />
-                            {emProximaSessao ? 'Planejado para a próxima sessão' : 'Levar para próxima sessão'}
-                          </button>
-                        )}
-                        {podeEscreverFicha && autorAtual && !temEncaminhamento && !retirado && !assinado && !fichaAssinada && todosAFazer && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEncaminhamentoEventoIds(eventoIds);
-                              setDestinoEncaminhamentoId(evento.encaminhadoParaId ?? '');
-                            }}
-                            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-bold text-text-secondary hover:border-teal/40 hover:text-teal-ink"
-                          >
-                            <Forward className="h-3.5 w-3.5" /> {evento.encaminhadoParaId ? 'Alterar encaminhamento' : 'Encaminhar'}
-                          </button>
-                        )}
-                        {(podeEditarDetalhes || podeVerDetalhes) && (
-                          <button
-                            type="button"
-                            onClick={() => detalheAberto ? setEventoDetalheAbertoId(null) : abrirDetalhesDoEvento(
-                              integrantesEditaveis[0]
-                              ?? grupo.eventos.find((item) => item.tipo === 'endodontia' || item.tipo === 'implante')
-                              ?? grupo.eventos[0],
+                          <div id={`detalhes-procedimento-${evento.id}`} hidden={!linhaAberta} className="min-w-0 pb-4 pl-3.5 pt-3">
+                            <p className="mb-2 break-words text-sm font-semibold text-text-primary">{nomeClinicoProcedimento(evento)}</p>
+                            {evento.observacao && <p className="text-sm leading-[21px] text-text-secondary">{evento.observacao}</p>}
+                            <p className="mt-1.5 text-xs text-text-secondary">
+                              Registrado por {evento.autorOriginal.nome}
+                              {evento.autorOriginal.cro ? ` · CRO ${evento.autorOriginal.cro}` : ''}
+                            </p>
+                            {evento.responsavelEncaminhado && (
+                              <p className="mt-1 text-xs font-medium text-teal-ink">
+                                Responsável clínico: {evento.responsavelEncaminhado.nome}
+                                {evento.responsavelEncaminhado.cro ? ` · CRO ${evento.responsavelEncaminhado.cro}` : ''}
+                              </p>
                             )}
-                            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-xs font-bold text-text-secondary hover:bg-surface hover:text-text-primary"
-                          >
-                            <PenLine className="h-3.5 w-3.5" /> {detalheAberto ? 'Fechar detalhes' : podeEditarDetalhes ? grupo.eventos.length > 1 ? 'Editar integrantes' : autorAtual ? 'Editar procedimento' : 'Editar detalhes' : 'Ver detalhes'}
-                          </button>
-                        )}
-                        {ficha && podeEscreverFicha && autorAtual && (assinado || fichaAssinada) && (
-                          <button
-                            type="button"
-                            onClick={() => complementarAtendimento(atendimentoAberto, evento.ancora.dente ?? null)}
-                            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-xs font-bold text-text-secondary hover:bg-surface hover:text-text-primary"
-                          >
-                            <PenLine className="h-3.5 w-3.5" /> Adicionar retificação
-                          </button>
-                        )}
-                        {assinado && <span className="text-xs font-semibold text-text-secondary">Assinado · registro bloqueado</span>}
-                        {carregando && <Loader2 className="h-4 w-4 animate-spin text-teal" aria-label="Salvando" />}
-                      </div>
-                      {eventoVisualizado && (
-                        <div>
-                        {eventoEmEdicao && grupo.eventos.length > 1 && (
-                          <label className="mt-3 grid gap-1.5 text-xs font-semibold text-foreground">
-                            Integrante que deseja editar
-                            <select
-                              className="min-h-11 rounded-lg border border-border bg-card px-3 text-sm"
-                              value={eventoEmEdicao.id}
-                              onChange={(event) => setEventoDetalheAbertoId(event.target.value)}
-                            >
-                              {integrantesEditaveis.map((item) => (
-                                <option key={item.id} value={item.id}>{rotuloLocalEvento(item)} · {nomeClinicoProcedimento(item)}</option>
-                              ))}
-                            </select>
-                            <span className="font-normal text-muted-foreground">A alteração vale somente para o integrante selecionado.</span>
-                          </label>
-                        )}
-                        <ProcedimentoDetalheFicha
-                          key={eventoVisualizado.id}
-                          evento={eventoVisualizado}
-                          permitirNome={eventoEmEdicao?.dentistaId === dentistaId && eventoEmEdicao.encaminhadoParaId == null}
-                          permitirObservacao={eventoEmEdicao?.dentistaId === dentistaId && eventoEmEdicao.encaminhadoParaId == null}
-                          permitirDetalhe={eventoEmEdicao != null && (eventoEmEdicao.tipo === 'endodontia' || eventoEmEdicao.tipo === 'implante')}
-                          permitirExclusao={eventoEmEdicao?.dentistaId === dentistaId && eventoEmEdicao.encaminhadoParaId == null}
-                          somenteLeitura={eventoEmEdicao == null}
-                          onFechar={() => setEventoDetalheAbertoId(null)}
-                          onSalvo={() => {
-                            setEventoDetalheAbertoId(null);
-                            router.refresh();
-                          }}
-                          onExcluido={() => {
-                            setEventoDetalheAbertoId(null);
-                            router.refresh();
-                          }}
-                          onRevisarOrcamento={onGerarOrcamento && fichaAtual
-                            ? () => onGerarOrcamento(fichaAtual.id)
-                            : undefined}
-                        />
-                        </div>
-                      )}
-                    </li>
-                    );
-                  })}
-                </ul>
+                            {!evento.ultimaAlteracao && <p className="mt-1.5 text-xs text-text-secondary">Último registro: {/^\d{4}-\d{2}-\d{2}$/.test(evento.atualizadoEm) ? formatarData(evento.atualizadoEm) : formatarDataHora(evento.atualizadoEm)} · {evento.autorOriginal.nome}</p>}
+                            {evento.ultimaAlteracao && (
+                              <p className="mt-1.5 text-xs text-text-secondary">
+                                Última alteração: {evento.ultimaAlteracao.atorNome ?? 'Profissional não identificado'} · {formatarDataHora(evento.ultimaAlteracao.alteradoEm)} · {rotuloUltimaAlteracao(evento.ultimaAlteracao.acao)}
+                              </p>
+                            )}
+                            {retirado && <p className="mt-1.5 text-xs font-semibold text-text-secondary">Retirado da ficha</p>}
+                          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                            {podeAlterarStatus && (
+                              <div role="group" className="inline-flex rounded-lg border border-border bg-surface p-0.5" aria-label="Status clínico">
+                                <button
+                                  type="button"
+                                  disabled={carregando}
+                                  aria-pressed={todosAFazer}
+                                  onClick={() => void atualizarStatusGrupo(grupo, 'indicado')}
+                                  className={todosAFazer
+                                    ? 'min-h-11 rounded-md bg-coral-pale px-3 py-1.5 text-xs font-bold text-coral-ink'
+                                    : 'min-h-11 rounded-md px-3 py-1.5 text-xs font-bold text-text-secondary hover:text-text-primary'}
+                                >
+                                  A fazer
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={carregando}
+                                  aria-pressed={todosRealizados}
+                                  onClick={() => void atualizarStatusGrupo(grupo, 'realizado')}
+                                  className={todosRealizados
+                                    ? 'min-h-11 rounded-md bg-clinical-done-pale px-3 py-1.5 text-xs font-bold text-clinical-done-ink'
+                                    : 'min-h-11 rounded-md px-3 py-1.5 text-xs font-bold text-text-secondary hover:text-text-primary'}
+                                >
+                                  Realizado
+                                </button>
+                              </div>
+                            )}
+                            {podeOrganizar && (
+                              <button
+                                type="button"
+                                disabled={carregando}
+                                onClick={() => void atualizarProximaSessao(grupo)}
+                                className={emProximaSessao
+                                  ? 'inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-warning-pale px-3 text-xs font-bold text-warning-ink'
+                                  : 'inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-bold text-text-secondary hover:border-warning/40 hover:text-warning-ink'}
+                              >
+                                <Star className={`h-3.5 w-3.5 ${emProximaSessao ? 'fill-current' : ''}`} />
+                                {emProximaSessao ? 'Planejado para a próxima sessão' : 'Levar para próxima sessão'}
+                              </button>
+                            )}
+                            {podeEscreverFicha && autorAtual && !temEncaminhamento && !retirado && !assinado && !fichaAssinada && todosAFazer && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEncaminhamentoEventoIds(eventoIds);
+                                  setDestinoEncaminhamentoId(evento.encaminhadoParaId ?? '');
+                                }}
+                                className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-bold text-text-secondary hover:border-teal/40 hover:text-teal-ink"
+                              >
+                                <Forward className="h-3.5 w-3.5" /> {evento.encaminhadoParaId ? 'Alterar encaminhamento' : 'Encaminhar'}
+                              </button>
+                            )}
+                            {(podeEditarDetalhes || podeVerDetalhes) && (
+                              <button
+                                type="button"
+                                onClick={() => detalheAberto ? setEventoDetalheAbertoId(null) : abrirDetalhesDoEvento(
+                                  integrantesEditaveis[0]
+                                  ?? grupo.eventos.find((item) => item.tipo === 'endodontia' || item.tipo === 'implante')
+                                  ?? grupo.eventos[0],
+                                )}
+                                className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-xs font-bold text-text-secondary hover:bg-surface hover:text-text-primary"
+                              >
+                                <PenLine className="h-3.5 w-3.5" /> {detalheAberto ? 'Fechar detalhes' : podeEditarDetalhes ? grupo.eventos.length > 1 ? 'Editar integrantes' : autorAtual ? 'Editar procedimento' : 'Editar detalhes' : 'Ver detalhes'}
+                              </button>
+                            )}
+                            {ficha && podeEscreverFicha && autorAtual && (assinado || fichaAssinada) && (
+                              <button
+                                type="button"
+                                onClick={() => complementarAtendimento(atendimentoAberto, evento.ancora.dente ?? null)}
+                                className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-xs font-bold text-text-secondary hover:bg-surface hover:text-text-primary"
+                              >
+                                <PenLine className="h-3.5 w-3.5" /> Adicionar retificação
+                              </button>
+                            )}
+                            {assinado && <span className="text-xs font-semibold text-text-secondary">Assinado · registro bloqueado</span>}
+                            {carregando && <Loader2 className="h-4 w-4 animate-spin text-teal" aria-label="Salvando" />}
+                          </div>
+                          {eventoVisualizado && (
+                            <div>
+                            {eventoEmEdicao && grupo.eventos.length > 1 && (
+                              <label className="mt-3 grid gap-1.5 text-xs font-semibold text-foreground">
+                                Integrante que deseja editar
+                                <select
+                                  className="min-h-11 rounded-lg border border-border bg-card px-3 text-sm"
+                                  value={eventoEmEdicao.id}
+                                  onChange={(event) => setEventoDetalheAbertoId(event.target.value)}
+                                >
+                                  {integrantesEditaveis.map((item) => (
+                                    <option key={item.id} value={item.id}>{rotuloLocalEvento(item)} · {nomeClinicoProcedimento(item)}</option>
+                                  ))}
+                                </select>
+                                <span className="font-normal text-muted-foreground">A alteração vale somente para o integrante selecionado.</span>
+                              </label>
+                            )}
+                            <ProcedimentoDetalheFicha
+                              key={eventoVisualizado.id}
+                              evento={eventoVisualizado}
+                              permitirNome={eventoEmEdicao?.dentistaId === dentistaId && eventoEmEdicao.encaminhadoParaId == null}
+                              permitirObservacao={eventoEmEdicao?.dentistaId === dentistaId && eventoEmEdicao.encaminhadoParaId == null}
+                              permitirDetalhe={eventoEmEdicao != null && (eventoEmEdicao.tipo === 'endodontia' || eventoEmEdicao.tipo === 'implante')}
+                              permitirExclusao={eventoEmEdicao?.dentistaId === dentistaId && eventoEmEdicao.encaminhadoParaId == null}
+                              somenteLeitura={eventoEmEdicao == null}
+                              onFechar={() => setEventoDetalheAbertoId(null)}
+                              onSalvo={() => {
+                                setEventoDetalheAbertoId(null);
+                                router.refresh();
+                              }}
+                              onExcluido={() => {
+                                setEventoDetalheAbertoId(null);
+                                router.refresh();
+                              }}
+                              onRevisarOrcamento={onGerarOrcamento && fichaAtual
+                                ? () => onGerarOrcamento(fichaAtual.id)
+                                : undefined}
+                            />
+                            </div>
+                          )}
+                          </div>
+                        </li>
+                        );
+                      })}
+                      </ul>
+                    </section>
+                  ))}
+                </div>
               )}
             </article>
+            {fichaAtual && (
+              <details data-ficha-historico className="mt-5! border-t border-border pt-3.5">
+                <summary className="cursor-pointer text-[15px] text-text-primary">Histórico das sessões</summary>
+                <p className="mt-2 text-[15px] text-text-secondary">Atendimentos desta ficha · mais recentes primeiro</p>
+                <div>
+                  {historicoDaFicha.map((visita) => {
+                    const procedimentos = visita.eventos
+                      .map((evento) => `${nomeClinicoProcedimento(evento)} · ${rotuloLocalEvento(evento)}`)
+                      .filter((item, indice, itens) => itens.indexOf(item) === indice);
+                    const atual = visita.id === atendimentoAberto.id;
+                    return (
+                      <section key={visita.id} data-sessao={visita.id} aria-current={atual ? 'page' : undefined} className="border-b border-border py-3.5">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <h3 className="font-sans text-sm font-bold text-text-primary">{formatarData(visita.dataAtendimento)} · {visita.profissional.nome}</h3>
+                          {atual ? (
+                            <span className="text-xs text-teal-ink">Em exibição</span>
+                          ) : (
+                            <button type="button" onClick={() => abrirFicha(fichaAtual.id, visita.id)} className="min-h-8 rounded px-2 text-xs font-semibold text-teal-ink hover:bg-teal-pale">
+                              Ver detalhes
+                            </button>
+                          )}
+                        </div>
+                        <p className="mt-1.5 break-words text-[15px] text-text-secondary">{procedimentos.length > 0 ? procedimentos.join(' · ') : 'Sem procedimentos nesta sessão.'}</p>
+                        {atual && (
+                          <div className="mt-3">
+                            <EvolucaoClinicaFicha key={`${clinicaId}:${dentistaId}:${visita.id}`}
+                              atendimento={visita} pacienteId={patientId} dentistaId={dentistaId}
+                              canWrite={podeEscreverFicha} />
+                          </div>
+                        )}
+                      </section>
+                    );
+                  })}
+                </div>
+              </details>
+            )}
           </div>
 
-          <aside className="space-y-3">
-            <article className="rounded-2xl border border-border bg-surface p-4">
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-text-secondary">Retorno</p>
+          <aside data-ficha-lateral className="order-1 min-w-0 space-y-4 border-border px-6 py-[25px] min-[1051px]:order-2 min-[1051px]:border-l">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="font-sans text-[17px] font-bold text-text-primary">Odontograma</h2>
+              <button type="button" onClick={() => setOdontogramaCompletoAberto(true)} className="min-h-10 text-[13px] font-semibold text-teal-ink">Ampliar ↗</button>
+            </div>
+            <p className="text-[12.5px] text-text-secondary">Procedimentos da ficha · dentes permanentes</p>
+            <div className="mx-auto w-fit max-w-full overflow-hidden" data-ficha-odontograma>
+              <div className={`w-max origin-top-left [zoom:0.35] [&_button>span[style*='font-size']]:text-[26px]! [&>div>div:last-child]:hidden ${podeComplementar ? '[&>div>div:first-child]:hidden' : ''}`}>
+                <Odontograma selectedTeeth={[]} eventos={eventosDaFicha} onToothToggle={(dente) => abrirProcedimentoDoDente(eventosDaFicha, dente)} presentationMode={!podeComplementar} hideFilters />
+              </div>
+            </div>
+            <p className="border-l-2 border-teal-ink py-2 pl-3 text-[12px] leading-[18px] text-text-secondary">Clique em um dente destacado para localizar seus procedimentos.</p>
+            <article className="border-l-2 border-border py-2 pl-3 text-[12px] leading-[18px]">
+              <p className="font-semibold text-text-primary">Próximo retorno</p>
               {atendimentoAberto.retorno ? (
                 <>
-                  <p className="mt-2 text-sm font-semibold text-text-primary">{dataDaAgenda(atendimentoAberto.retorno.dataHora)}</p>
+                  <p className="mt-2 text-[12px] font-semibold text-text-primary">{dataDaAgenda(atendimentoAberto.retorno.dataHora)}</p>
                   <p className="mt-1 text-xs text-text-secondary">{atendimentoAberto.retorno.dentistaNome ?? 'Dentista não identificado'} · {rotuloStatusAgenda(atendimentoAberto.retorno.status)}</p>
-                  <Button className="mt-3 w-full" variant="outline" onClick={() => router.push(`/dashboard/agendamentos?v=dia&d=${atendimentoAberto.retorno!.dataHora.slice(0, 10)}`)}>
+                  <Button className="mt-2 min-h-10 w-full rounded-[8px] text-[12px]" variant="outline" onClick={() => router.push(`/dashboard/agendamentos?v=dia&d=${atendimentoAberto.retorno!.dataHora.slice(0, 10)}`)}>
                     Abrir na Agenda
                   </Button>
                 </>
               ) : (
-                <p className="mt-2 text-sm text-text-primary">
+                <p className="mt-2 text-[12px] text-text-primary">
                   {atendimentoAberto.atendimentoId ? 'Nenhum retorno vinculado a esta visita.' : 'Próximo agendamento ainda não registrado.'}
                 </p>
               )}
               {podeMarcarRetornoDaVisita && !atendimentoAberto.retorno && (
-                <Button className="mt-3 min-h-11 w-full" variant="outline" onClick={() => {
+                <Button className="mt-2 min-h-10 w-full rounded-[8px] text-[12px]" variant="outline" onClick={() => {
                   setRetornoAtendimentoId(atendimentoAberto.atendimentoId);
                   setRetornoAberto(true);
                 }}>
@@ -1014,96 +1025,38 @@ export function ProntuarioTab({
               )}
             </article>
 
-            <article className="rounded-2xl border border-border bg-surface p-4">
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-text-secondary">Rastreabilidade</p>
-              <p className="mt-2 text-sm text-text-primary">Materiais não informados</p>
+            <article className="border-l-2 border-border py-2 pl-3 text-[12px] leading-[18px]">
+              <p className="font-semibold text-text-primary">Rastreabilidade</p>
+              <p className="mt-2 text-[12px] text-text-primary">Materiais não informados</p>
               <p className="mt-1 text-xs leading-relaxed text-text-secondary">
                     A leitura de etiquetas será registrada nesta consulta quando o módulo de materiais estiver disponível.
               </p>
             </article>
 
-            <article className="rounded-2xl border border-border bg-surface p-4">
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-text-secondary">Materiais e documentos</p>
-              <p className="mt-2 text-sm text-text-primary">
-                {atendimentoAberto.documentos.length > 0
-                  ? `${atendimentoAberto.documentos.length} documento${atendimentoAberto.documentos.length === 1 ? '' : 's'} vinculado${atendimentoAberto.documentos.length === 1 ? '' : 's'} a esta consulta.`
-                  : 'Nenhum documento vinculado a esta consulta.'}
-              </p>
-              <div className="mt-3 grid gap-2">
-                <Button variant="ghost" className="justify-start" onClick={onAbrirArquivos}>
-                  <FileText className="h-4 w-4" />
-                  Abrir materiais e documentos
-                </Button>
-              </div>
-            </article>
-
-            {superficie.tipo === 'ficha' && fichaAtual && onGerarOrcamento && (
-              <article className="rounded-2xl border border-border bg-surface p-4">
-                <p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-text-secondary">Orçamento da ficha</p>
-                <OrcamentoDaFicha
-                  key={`${clinicaId}:${dentistaId}:${fichaAtual.id}`}
-                  clinicaId={clinicaId}
-                  dentistaId={dentistaId}
-                  fichaId={fichaAtual.id}
-                  revisao={`${orcamentoRevisao ?? ''}:${eventosDaFicha.map((item) => `${item.id}:${item.procedimentoNome}:${item.retiradoEm ?? ''}`).join('|')}`}
-                  eventosConfirmados={eventosOrcamentoConfirmados}
-                  onAbrir={(resumo) => Promise.resolve(onGerarOrcamento(fichaAtual.id, resumo))}
-                />
-              </article>
-            )}
-
-            {fichaAtual && (
-              <article className="rounded-2xl border border-border bg-surface p-4">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-text-secondary">Histórico da Ficha</p>
-                  <span className="text-[11px] font-bold text-text-secondary">{historicoDaFicha.length} visita{historicoDaFicha.length === 1 ? '' : 's'}</span>
-                </div>
-                <div className="mt-3 grid gap-2">
-                  {historicoDaFicha.map((visita) => {
-                    const procedimentos = visita.eventos
-                      .map((evento) => `${nomeClinicoProcedimento(evento)} · ${rotuloLocalEvento(evento)}`)
-                      .filter((item, indice, itens) => itens.indexOf(item) === indice);
-                    const atual = visita.id === atendimentoAberto.id;
-                    return (
-                      <button
-                        key={visita.id}
-                        type="button"
-                        aria-current={atual ? 'page' : undefined}
-                        onClick={() => abrirFicha(fichaAtual.id, visita.id)}
-                        className={atual
-                          ? 'rounded-xl border border-teal/40 bg-teal/10 px-3 py-3 text-left'
-                          : 'rounded-xl border border-border px-3 py-3 text-left transition-colors hover:border-teal/30 hover:bg-surface-alt'}
-                      >
-                        <span className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-bold text-text-primary">{formatarData(visita.dataAtendimento)}</span>
-                          <span className="text-[10px] font-bold text-teal-ink">{atual ? 'Em exibição' : 'Ver detalhes'}</span>
-                        </span>
-                        <span className="mt-0.5 block text-[11px] text-text-secondary">
-                          {visita.profissional.nome} · {visita.eventos.length} procedimento{visita.eventos.length === 1 ? '' : 's'}
-                        </span>
-                        {procedimentos.length > 0 && (
-                          <span className="mt-2 flex flex-wrap gap-1">
-                            {procedimentos.slice(0, 2).map((procedimento) => (
-                              <span key={procedimento} className="rounded-md bg-surface-alt px-2 py-1 text-[10px] font-semibold text-text-primary">
-                                {procedimento}
-                              </span>
-                            ))}
-                            {procedimentos.length > 2 && (
-                              <span className="rounded-md bg-surface-alt px-2 py-1 text-[10px] font-semibold text-text-secondary">
-                                +{procedimentos.length - 2}
-                              </span>
-                            )}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-
-                </div>
-              </article>
-            )}
           </aside>
         </div>
+
+        </article>
+
+      <MarcarRetornoModal
+        open={retornoAberto}
+        onOpenChange={(open) => {
+          setRetornoAberto(open);
+          if (!open) setRetornoAtendimentoId(null);
+        }}
+        pacienteNome={patientName}
+        role="dentista"
+        dentistasClinica={[]}
+        dentistaAlvoId={dentistaId}
+        onDentistaAlvoChange={() => undefined}
+        form={retorno.form}
+        setForm={retorno.setForm}
+        error={retorno.error}
+        saving={retorno.saving}
+        pedidoPendente={retorno.pedidoPendente}
+        onMarcarRetorno={() => void retorno.marcarRetorno(dentistaId)}
+        onTentarEnviarPedido={() => void retorno.tentarEnviarPedido(dentistaId)}
+      />
 
         <Dialog open={exclusaoFichaId != null} onOpenChange={(open) => {
           if (!open && !apagandoFicha) {
@@ -1320,24 +1273,24 @@ export function ProntuarioTab({
 
   return (
     <section className="space-y-4" aria-label="Prontuário do paciente">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-4 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-border bg-surface px-4 py-4">
         <div>
           <p className="font-heading text-xl text-text-primary">Prontuário</p>
-          <p className="mt-0.5 text-sm text-text-secondary">Consultas e histórico clínico do paciente.</p>
+          <p className="mt-0.5 text-[15px] text-text-secondary">Consultas e histórico clínico do paciente.</p>
         </div>
         {canWrite && (
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" onClick={() => setImportacaoHistoricoAberta(true)} className="min-h-11">
+            <Button variant="outline" onClick={() => setImportacaoHistoricoAberta(true)} className="h-10 rounded-[8px] text-[13px]">
               <FileText className="h-4 w-4" /> Importar histórico
             </Button>
-            <Button onClick={() => abrirNovoRegistro()} className="min-h-11">
+            <Button onClick={() => abrirNovoRegistro()} className="h-10 rounded-[8px] border border-teal-ink/30 bg-teal-pale text-[13px] text-teal-ink hover:bg-teal-pale/80">
               <Plus className="h-4 w-4" /> Novo atendimento
             </Button>
           </div>
         )}
       </div>
 
-      <div className="rounded-2xl border border-border bg-surface p-4">
+      <div className="rounded-[12px] border border-border bg-surface p-4 shadow-none">
             <div className="flex flex-wrap gap-2">
               {([
                 ['atendimentos', `${atendimentos.length} atendimento${atendimentos.length === 1 ? '' : 's'}`],
@@ -1355,8 +1308,8 @@ export function ProntuarioTab({
                       if (tipo === 'atendimentos') setFiltroClinico('tudo');
                     }}
                     className={tipo === 'pendencias'
-                      ? `inline-flex min-h-9 items-center gap-1 rounded-full border px-3 text-xs font-bold transition-colors ${aberto ? 'border-coral/50 bg-coral/15 text-coral-ink' : 'border-transparent bg-coral/10 text-coral-ink hover:border-coral/30'}`
-                      : `inline-flex min-h-9 items-center gap-1 rounded-full border px-3 text-xs font-bold transition-colors ${aberto ? 'border-teal/40 bg-teal/10 text-teal-ink' : 'border-border bg-surface-alt text-text-primary hover:border-teal/30'}`}
+                      ? `inline-flex min-h-10 items-center gap-1 rounded-[8px] border px-3 text-[12.5px] font-bold transition-colors ${aberto ? 'border-coral/50 bg-coral/15 text-coral-ink' : 'border-transparent bg-coral/10 text-coral-ink hover:border-coral/30'}`
+                      : `inline-flex min-h-10 items-center gap-1 rounded-[8px] border px-3 text-[12.5px] font-bold transition-colors ${aberto ? 'border-teal/40 bg-teal/10 text-teal-ink' : 'border-border bg-surface-alt text-text-primary hover:border-teal/30'}`}
                   >
                     {rotulo} <ChevronDown className={`h-3.5 w-3.5 transition-transform ${aberto ? 'rotate-180' : ''}`} />
                   </button>
@@ -1371,17 +1324,17 @@ export function ProntuarioTab({
                     {atendimentos.slice(0, 5).flatMap((atendimento) => (
                       atendimento.fichas.length > 0
                         ? atendimento.fichas.map((ficha) => (
-                          <button key={`${atendimento.id}:${ficha.id}`} type="button" onClick={() => abrirFicha(ficha.id, atendimento.id)} className="flex min-h-9 items-center justify-between gap-3 rounded-lg px-2 text-left text-xs font-semibold text-text-primary hover:bg-surface-alt">
+                          <button key={`${atendimento.id}:${ficha.id}`} type="button" onClick={() => abrirFicha(ficha.id, atendimento.id)} className="flex min-h-10 items-center justify-between gap-3 rounded-[8px] px-2 text-left text-[12.5px] font-semibold text-text-primary hover:bg-surface-alt">
                             <span>{formatarData(atendimento.dataAtendimento)} · {ficha.nome}</span><span className="text-text-secondary">Abrir ficha →</span>
                           </button>
                         ))
                         : [(
-                          <button key={atendimento.id} type="button" onClick={() => abrirLegado(atendimento.id)} className="flex min-h-9 items-center justify-between gap-3 rounded-lg px-2 text-left text-xs font-semibold text-text-primary hover:bg-surface-alt">
+                          <button key={atendimento.id} type="button" onClick={() => abrirLegado(atendimento.id)} className="flex min-h-10 items-center justify-between gap-3 rounded-[8px] px-2 text-left text-[12.5px] font-semibold text-text-primary hover:bg-surface-alt">
                             <span>{formatarData(atendimento.dataAtendimento)}</span><span className="text-text-secondary">Abrir legado →</span>
                           </button>
                         )]
                     ))}
-                    {atendimentos.length === 0 && <p className="text-xs text-text-secondary">Nenhum atendimento registrado.</p>}
+                    {atendimentos.length === 0 && <p className="text-[12.5px] text-text-secondary">Nenhum atendimento registrado.</p>}
                   </div>
                 )}
                 {resumoAberto === 'pendencias' && (
@@ -1398,21 +1351,21 @@ export function ProntuarioTab({
                             else abrirLegado(atendimento.id);
                           }}
                           disabled={!atendimento}
-                          className="flex min-h-9 items-center justify-between gap-3 rounded-lg px-2 text-left text-xs font-semibold text-text-primary hover:bg-surface-alt disabled:cursor-default disabled:opacity-60"
+                          className="flex min-h-10 items-center justify-between gap-3 rounded-[8px] px-2 text-left text-[12.5px] font-semibold text-text-primary hover:bg-surface-alt disabled:cursor-default disabled:opacity-60"
                         >
                           <span>{nomeClinicoProcedimento(evento)}{evento.ancora.dente ? ` · ${evento.ancora.dente}` : ''}</span>
                           <span className="text-text-secondary">{atendimento ? 'Abrir pendência →' : 'Pendente'}</span>
                         </button>
                       );
                     })}
-                    {eventosPendentes.length === 0 && <p className="text-xs text-text-secondary">Nenhuma pendência clínica.</p>}
+                    {eventosPendentes.length === 0 && <p className="text-[12.5px] text-text-secondary">Nenhuma pendência clínica.</p>}
                   </div>
                 )}
               </div>
             )}
           </div>
 
-      <div className="flex flex-wrap items-center gap-2 border-b border-border pb-3">
+      <div className="flex flex-wrap items-center gap-6 border-b border-border">
         {([
           ['tudo', 'Tudo'],
           ['indicado', 'Indicados'],
@@ -1421,10 +1374,11 @@ export function ProntuarioTab({
           <button
             key={valor}
             type="button"
+            aria-pressed={filtroClinico === valor}
             onClick={() => setFiltroClinico(valor)}
             className={filtroClinico === valor
-              ? 'rounded-lg bg-teal/10 px-3 py-1.5 text-xs font-bold text-teal-ink'
-              : 'rounded-lg px-3 py-1.5 text-xs font-bold text-text-secondary transition-colors hover:bg-surface-alt hover:text-text-primary'}
+              ? 'min-h-10 border-b-2 border-teal-ink pb-3 text-[15px] font-bold text-teal-ink'
+              : 'min-h-10 border-b-2 border-transparent pb-3 text-[15px] text-text-secondary transition-colors hover:text-text-primary'}
           >
             {rotulo}
           </button>
@@ -1433,24 +1387,24 @@ export function ProntuarioTab({
 
       {dadosLocais.errosParciais.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-coral/30 bg-coral/5 px-3 py-2.5">
-          <p className="flex items-center gap-2 text-xs text-text-primary">
+          <p className="flex items-center gap-2 text-[12.5px] text-text-primary">
             <AlertTriangle className="h-4 w-4 shrink-0 text-coral-ink" aria-hidden />
             Não foi possível carregar: {dadosLocais.errosParciais.join(', ')}. O restante do prontuário continua disponível.
           </p>
-          <Button variant="ghost" size="sm" onClick={() => router.refresh()}>Atualizar</Button>
+          <Button variant="ghost" size="sm" className="h-10 rounded-[8px]" onClick={() => router.refresh()}>Atualizar</Button>
         </div>
       )}
 
       {atendimentos.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border bg-surface px-6 py-12 text-center">
+        <div className="rounded-[12px] border border-dashed border-border bg-surface px-6 py-12 text-center">
           <FileText className="mx-auto h-9 w-9 text-text-secondary/40" aria-hidden />
-          <p className="mt-3 text-sm font-semibold text-text-primary">Nenhum atendimento registrado ainda.</p>
-          <p className="mt-1 text-xs text-text-secondary">O primeiro atendimento pode ser feito aqui, manualmente ou com o Dex.</p>
+          <p className="mt-3 text-[15px] font-semibold text-text-primary">Nenhum atendimento registrado ainda.</p>
+          <p className="mt-1 text-[12.5px] text-text-secondary">O primeiro atendimento pode ser feito aqui, manualmente ou com o Dex.</p>
         </div>
       ) : atendimentosVisiveis.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border bg-surface px-6 py-10 text-center">
-          <p className="text-sm font-semibold text-text-primary">Nenhum atendimento corresponde a este filtro.</p>
-          <button type="button" onClick={() => setFiltroClinico('tudo')} className="mt-2 text-xs font-bold text-teal-ink hover:underline">
+        <div className="rounded-[12px] border border-dashed border-border bg-surface px-6 py-10 text-center">
+          <p className="text-[15px] font-semibold text-text-primary">Nenhum atendimento corresponde a este filtro.</p>
+          <button type="button" onClick={() => setFiltroClinico('tudo')} className="mt-2 min-h-10 rounded-[8px] px-2 text-[12.5px] font-bold text-teal-ink hover:underline">
             Mostrar todos os atendimentos
           </button>
         </div>
@@ -1460,11 +1414,11 @@ export function ProntuarioTab({
             const texto = textoDaVisita(atendimento);
             const temAssinatura = atendimento.fichas.some((ficha) => ficha.assinadoEm != null);
             return (
-              <li key={atendimento.id} className="rounded-2xl border border-border bg-surface p-4">
+              <li key={atendimento.id} className="rounded-[12px] border border-border bg-surface p-4 shadow-none">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm font-bold text-text-primary">{formatarData(atendimento.dataAtendimento)}</p>
-                    <p className="mt-0.5 text-xs text-text-secondary">{rotuloOrigem(atendimento)} · {atendimento.profissional.nome}</p>
+                    <p className="text-[15px] font-bold text-text-primary">{formatarData(atendimento.dataAtendimento)}</p>
+                    <p className="mt-0.5 text-[12.5px] text-text-secondary">{rotuloOrigem(atendimento)} · {atendimento.profissional.nome}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="rounded-full border border-border bg-surface-alt px-2.5 py-1 text-[11px] font-bold text-text-secondary">
@@ -1475,19 +1429,19 @@ export function ProntuarioTab({
                 </div>
 
                 {texto ? (
-                  <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-text-primary">{texto}</p>
+                  <p className="mt-3 whitespace-pre-line break-words text-[15px] leading-relaxed text-text-primary">{texto}</p>
                 ) : (
-                  <p className="mt-3 text-sm italic text-text-secondary">Sem evolução textual registrada.</p>
+                  <p className="mt-3 text-[15px] italic text-text-secondary">Sem evolução textual registrada.</p>
                 )}
 
                 {atendimento.eventos.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {atendimento.eventos.slice(0, 8).map((evento) => (
-                      <span key={evento.id} className="rounded-lg border border-border bg-surface-alt px-2.5 py-1 text-xs text-text-secondary">
+                      <span key={evento.id} className="rounded-[8px] border border-border bg-surface-alt px-2.5 py-1 text-[12.5px] text-text-secondary">
                         {nomeClinicoProcedimento(evento)}{evento.ancora.dente ? ` · ${evento.ancora.dente}` : ''}
                       </span>
                     ))}
-                    {atendimento.eventos.length > 8 && <span className="px-2 py-1 text-xs text-text-secondary">+{atendimento.eventos.length - 8}</span>}
+                    {atendimento.eventos.length > 8 && <span className="px-2 py-1 text-[12.5px] text-text-secondary">+{atendimento.eventos.length - 8}</span>}
                   </div>
                 )}
 
@@ -1502,7 +1456,7 @@ export function ProntuarioTab({
                         key={ficha.id}
                         type="button"
                         onClick={() => abrirFicha(ficha.id, atendimento.id)}
-                        className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-border px-3 text-xs font-bold text-text-secondary transition-colors hover:border-teal/40 hover:text-teal-ink"
+                        className="inline-flex min-h-10 items-center gap-2 rounded-[8px] border border-border px-3 text-[12.5px] font-bold text-text-secondary transition-colors hover:border-teal/40 hover:text-teal-ink"
                       >
                         <FolderOpen className="h-3.5 w-3.5" /> Abrir ficha · {ficha.nome}
                         {total > 0 && <span className="border-l border-border pl-2 tabular-nums text-text-secondary">{progresso}% · {realizados}/{total}</span>}
@@ -1514,7 +1468,7 @@ export function ProntuarioTab({
                     <button
                       type="button"
                       onClick={() => abrirLegado(atendimento.id)}
-                      className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-bold text-text-secondary transition-colors hover:border-teal/40 hover:text-teal-ink"
+                      className="inline-flex min-h-10 items-center gap-1.5 rounded-[8px] border border-border px-3 text-[12.5px] font-bold text-text-secondary transition-colors hover:border-teal/40 hover:text-teal-ink"
                     >
                       Abrir registro legado <ChevronRight className="h-3.5 w-3.5" />
                     </button>
@@ -1523,7 +1477,7 @@ export function ProntuarioTab({
                     <button
                       type="button"
                       onClick={() => onGerarOrcamento(atendimento.fichas[0]!.id)}
-                      className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-bold text-text-secondary transition-colors hover:border-teal/40 hover:text-teal-ink"
+                      className="inline-flex min-h-10 items-center gap-1.5 rounded-[8px] border border-border px-3 text-[12.5px] font-bold text-text-secondary transition-colors hover:border-teal/40 hover:text-teal-ink"
                     >
                       Gerar orçamento
                     </button>
@@ -1532,7 +1486,7 @@ export function ProntuarioTab({
                     <button
                       type="button"
                       onClick={() => router.push(`/dashboard/agendamentos?v=dia&d=${atendimento.retorno!.dataHora.slice(0, 10)}`)}
-                      className="ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-bold text-text-secondary transition-colors hover:border-teal/40 hover:text-teal-ink"
+                      className="ml-auto inline-flex min-h-10 items-center gap-1.5 rounded-[8px] border border-border px-3 text-[12.5px] font-bold text-text-secondary transition-colors hover:border-teal/40 hover:text-teal-ink"
                     >
                       Ver retorno
                     </button>
@@ -1545,7 +1499,7 @@ export function ProntuarioTab({
                         setRetornoAtendimentoId(atendimento.atendimentoId);
                         setRetornoAberto(true);
                       }}
-                      className="ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-bold text-text-secondary transition-colors hover:border-teal/40 hover:text-teal-ink"
+                      className="ml-auto inline-flex min-h-10 items-center gap-1.5 rounded-[8px] border border-border px-3 text-[12.5px] font-bold text-text-secondary transition-colors hover:border-teal/40 hover:text-teal-ink"
                     >
                       <CalendarPlus className="h-3.5 w-3.5" /> Marcar retorno
                     </button>

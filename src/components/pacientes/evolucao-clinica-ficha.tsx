@@ -43,11 +43,10 @@ export function EvolucaoClinicaFicha({ atendimento, pacienteId, dentistaId, canW
   );
 
   return (
-    <article ref={blocoRef} className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
+    <article ref={blocoRef} className="min-w-0">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-text-secondary">Evolução clínica</p>
-          <p className="mt-1 text-xs text-text-secondary">Registro da consulta em exibição.</p>
+          <p className="text-xs text-text-secondary">Observações da sessão</p>
         </div>
         {unico && podeEditar(unico) && editandoId === null && botaoEditar(unico)}
       </div>
@@ -56,7 +55,7 @@ export function EvolucaoClinicaFicha({ atendimento, pacienteId, dentistaId, canW
           const confirmado = confirmados[registro.id];
           const texto = confirmado && registro.texto === confirmado.anterior ? confirmado.texto : registro.texto;
           return (
-            <div key={registro.id} className="border-l-2 border-teal/40 pl-3">
+            <div key={registro.id} className="border-b border-border pb-2">
               {editandoId === registro.id ? (
                 <EditorEvolucao key={registro.id} registro={registro} textoOriginal={texto}
                   atendimentoId={atendimento.atendimentoId} pacienteId={pacienteId}
@@ -66,20 +65,22 @@ export function EvolucaoClinicaFicha({ atendimento, pacienteId, dentistaId, canW
                     fecharEditor(registro.id);
                   }} />
               ) : (
-                <p className="whitespace-pre-line text-sm leading-relaxed text-foreground">
-                  {texto?.trim() || 'Sem evolução textual registrada.'}
+                <p className="whitespace-pre-line break-words py-2 text-xs leading-relaxed text-text-secondary">
+                  {texto?.trim() || 'Sem evolução'}
                 </p>
               )}
-              <p className="mt-1 text-xs text-text-secondary">
-                {registro.automatica ? 'Registro automático do sistema' : registro.profissional.nome}
-              </p>
+              {texto?.trim() && (
+                <p className="mt-1 text-xs text-text-secondary">
+                  {registro.automatica ? 'Registro automático do sistema' : registro.profissional.nome}
+                </p>
+              )}
               {!unico && podeEditar(registro) && editandoId !== registro.id && (
                 <div className="mt-2">{botaoEditar(registro)}</div>
               )}
             </div>
           );
         })}
-        {registros.length === 0 && <p className="text-sm italic text-muted-foreground">Sem evolução textual registrada.</p>}
+        {registros.length === 0 && <p className="text-xs text-text-secondary">Sem evolução</p>}
       </div>
     </article>
   );
@@ -114,7 +115,7 @@ function EditorEvolucao({ registro, textoOriginal, pacienteId, atendimentoId, on
   return (
     <form onSubmit={(event) => { event.preventDefault(); void salvar(); }} className="space-y-3">
       <label htmlFor={campoId} className="text-sm font-medium text-foreground">Evolução clínica</label>
-      <Textarea id={campoId} autoFocus value={texto} onChange={(event) => setTexto(event.target.value)}
+      <Textarea className="rounded-none border-0 border-b border-border bg-transparent px-0 text-xs shadow-none" id={campoId} autoFocus value={texto} onChange={(event) => setTexto(event.target.value)}
         rows={6} maxLength={20000} disabled={salvando} aria-invalid={!!erro}
         aria-describedby={erro ? `${campoId}-erro` : undefined} />
       {erro && <p id={`${campoId}-erro`} role="alert" className="text-sm text-destructive">{erro}</p>}
