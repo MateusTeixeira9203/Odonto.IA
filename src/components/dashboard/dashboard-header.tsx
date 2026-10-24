@@ -24,14 +24,18 @@ export function DashboardHeader({ nome, now, atendimentos }: DashboardHeaderProp
   const dataFormatada = dataExtensaBRT(now);
 
   return (
-    <div className="mb-8 md:mb-10">
-      <p className="text-[11px] font-bold text-text-secondary uppercase tracking-[0.2em] mb-2 font-mono capitalize">
-        {dataFormatada}
-      </p>
-      <h1 className="font-heading font-bold text-4xl md:text-5xl text-text-primary tracking-tight">
-        {saudacao}, Dr. {primeiroNome}.
-      </h1>
-      <DexDayButton atendimentos={atendimentos} dataHojeISO={now.toISOString()} />
-    </div>
+    <header className="mb-6 flex items-end justify-between gap-4 max-[600px]:flex-col max-[600px]:items-start">
+      <div className="min-w-0">
+        <p className="mb-2 text-[12.5px] uppercase tracking-wider text-text-secondary">
+          {dataFormatada}
+        </p>
+        <h1 className="font-heading text-[32px] font-normal leading-[1.15] text-text-primary">
+          {saudacao}, Dr. {primeiroNome}.
+        </h1>
+      </div>
+      {atendimentos.length > 0 && <div className="shrink-0 max-[600px]:w-full [&>button]:mt-0 [&>button]:h-10 [&>button]:rounded-[8px] [&>button]:border [&>button]:border-border [&>button]:px-[13px] [&>button]:text-[15px] [&>button]:text-text-secondary [&>button]:hover:bg-teal-pale [&>button]:hover:text-teal-ink [&>button]:focus-visible:outline-none [&>button]:focus-visible:ring-2 [&>button]:focus-visible:ring-teal/20 max-[600px]:[&>button]:w-full [&>button>span:first-child]:text-teal-ink">
+        <DexDayButton atendimentos={atendimentos} dataHojeISO={now.toISOString()} />
+      </div>}
+    </header>
   );
 }

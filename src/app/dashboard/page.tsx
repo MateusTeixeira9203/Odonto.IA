@@ -183,32 +183,28 @@ export default async function DashboardPage({
   const bloqueadoModoConsulta = sp.bloqueado === 'modo-consulta';
   return (
     <PageTransition>
-      <PageContainer variant="wide">
+      <PageContainer variant="tela">
         {/* FASE 1: guia desativado — ver roadmap-3-fases A2 */}
         {/* <PrimeirosPassosCard progresso={progresso} dentistaId={dentista.id} /> */}
-        {bloqueadoModoConsulta && (
-          <div className="mb-6 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-5 flex items-start gap-4">
-            <div className="w-8 h-8 rounded-xl bg-amber-500/15 flex items-center justify-center shrink-0">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-500">
-                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/>
-              </svg>
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-bold text-text-primary mb-0.5">Período de trial encerrado</p>
-              <p className="text-xs text-text-secondary leading-relaxed">
-                O Modo Consulta está disponível somente nos planos pagos. Suas fichas e histórico continuam acessíveis.
-              </p>
-            </div>
-            <a
-              href="/dashboard/configuracoes?aba=plano"
-              className="shrink-0 px-4 py-2 rounded-xl bg-gradient-to-r from-teal to-teal-lt text-white text-xs font-bold shadow-[0_4px_14px_rgba(47,156,133,0.3)] hover:-translate-y-0.5 transition-all whitespace-nowrap"
-            >
-              Assinar agora
-            </a>
-          </div>
-        )}
         <Suspense fallback={<DashboardSkeleton />}>
-          <DentistaDashboard dentista={dentista} />
+          <DentistaDashboard dentista={dentista}>
+            {bloqueadoModoConsulta && (
+              <div className="mb-6 flex items-center gap-4 border-l-2 border-warning py-2 pl-3 max-[600px]:flex-col max-[600px]:items-stretch">
+                <div className="min-w-0 flex-1">
+                  <p className="mb-0.5 text-[13px] font-bold text-warning-ink">Período de trial encerrado</p>
+                  <p className="text-[12px] leading-relaxed text-text-secondary">
+                    O Modo Consulta está disponível somente nos planos pagos. Suas fichas e histórico continuam acessíveis.
+                  </p>
+                </div>
+                <a
+                  href="/dashboard/configuracoes?aba=plano"
+                  className="inline-flex h-10 shrink-0 items-center justify-center rounded-[8px] border border-border px-[13px] text-[13px] text-text-secondary hover:bg-teal-pale hover:text-teal-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal/20"
+                >
+                  Assinar agora
+                </a>
+              </div>
+            )}
+          </DentistaDashboard>
         </Suspense>
       </PageContainer>
     </PageTransition>

@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 const VARIANT_CLASS = {
   wide: 'max-w-screen-2xl',
   comfortable: 'max-w-7xl',
+  tela: 'max-w-[1800px] px-[30px]! py-6! max-[600px]:px-2.5! max-[600px]:py-[18px]!',
 } as const;
 
 interface PageContainerProps {

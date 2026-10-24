@@ -4,6 +4,8 @@ import {
   startOfWeek,
   endOfWeek,
 } from 'date-fns';
+import type { ReactNode } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { createClient } from '@/lib/supabase/server';
 import type { DentistaCache } from '@/lib/get-dentista';
 import { DashboardHeader } from '@/components/dashboard/dashboard-header';
@@ -28,7 +30,7 @@ const DONE = new Set(['completed', 'no_show', 'cancelled']);
 
 // ── Server Component principal ────────────────────────────────────────────────
 
-export async function DentistaDashboard({ dentista }: { dentista: DentistaCache }) {
+export async function DentistaDashboard({ dentista, children }: { dentista: DentistaCache; children?: ReactNode }) {
   const supabase = await createClient();
   const now = new Date();
   const todayStart = startOfDay(now).toISOString();
@@ -201,6 +203,8 @@ export async function DentistaDashboard({ dentista }: { dentista: DentistaCache 
         atendimentos={atendimentosHoje}
       />
 
+      {children}
+
       <MetricsCards
         consultasHoje={consultasHoje ?? 0}
         agendaSemana={agendaSemana ?? 0}
@@ -228,53 +232,36 @@ export async function DentistaDashboard({ dentista }: { dentista: DentistaCache 
 
 export function DashboardSkeleton() {
   return (
-    <div className="animate-pulse">
-      {/* Header */}
-      <div className="mb-8 md:mb-10 space-y-2">
-        {/* R-111 — `max-w-full`: o `w-96` são 384px fixos e estouravam os 343px úteis do
-            celular. Skeleton com largura fixa é o defeito mais fácil de passar despercebido,
-            porque só aparece durante o carregamento. */}
-        <div className="h-3 w-32 max-w-full bg-surface-alt rounded" />
-        <div className="h-10 w-72 max-w-full bg-surface-alt rounded-xl" />
-        <div className="h-4 w-96 max-w-full bg-surface-alt rounded" />
-      </div>
-
-      {/* Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 mb-8 md:mb-10">
-        {[0, 1, 2].map((i) => (
-          <div
-            key={i}
-            className="bg-surface border border-border rounded-3xl p-6 h-[152px] flex flex-col justify-between"
-          >
-            <div className="h-2.5 w-24 bg-surface-alt rounded-full" />
-            <div className="h-12 w-16 bg-surface-alt rounded-xl" />
-            <div className="h-6 w-32 bg-surface-alt rounded-md" />
+    <div role="status" aria-label="Carregando o Início">
+      <div aria-hidden="true">
+        <div className="mb-6 flex items-end justify-between gap-4 max-[600px]:flex-col max-[600px]:items-start">
+          <div className="w-full min-w-0 space-y-2">
+            <Skeleton className="h-[19px] w-56 max-w-full" />
+            <Skeleton className="h-[37px] w-80 max-w-full" />
           </div>
-        ))}
-      </div>
-
-      {/* Hero */}
-      <div className="mb-8 md:mb-10 bg-surface border border-border rounded-3xl p-8 md:p-10 flex items-center justify-between gap-6">
-        <div className="flex-1 space-y-3">
-          <div className="h-3 w-32 bg-surface-alt rounded" />
-          <div className="h-9 w-64 bg-surface-alt rounded-xl" />
-          <div className="h-5 w-28 bg-surface-alt rounded" />
-          <div className="flex gap-2">
-            <div className="h-7 w-32 bg-surface-alt rounded-full" />
-            <div className="h-7 w-24 bg-surface-alt rounded-full" />
+          <Skeleton className="h-10 w-56 max-w-full shrink-0 max-[600px]:w-full" />
+        </div>
+        <div className="mb-6 grid grid-cols-3 divide-x divide-border overflow-hidden rounded-[12px] border border-border bg-surface max-[600px]:grid-cols-1 max-[600px]:divide-x-0 max-[600px]:divide-y">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="min-w-0 px-6 py-[18px]">
+              <Skeleton className="h-[19px] w-28 max-w-full" />
+              <Skeleton className="mt-1 h-[31.5px] w-10 max-w-full" />
+              <Skeleton className="mt-1 h-[18px] w-32 max-w-full" />
+            </div>
+          ))}
+        </div>
+        <div className="mb-6 space-y-3 rounded-[12px] border border-border bg-surface px-6 py-[25px]">
+          <Skeleton className="h-[19px] w-40 max-w-full" />
+          <Skeleton className="h-9 w-80 max-w-full" />
+          <Skeleton className="h-5 w-56 max-w-full" />
+          <div className="flex flex-wrap gap-2 pt-2">
+            <Skeleton className="h-10 w-44 max-w-full max-[600px]:w-full" />
+            <Skeleton className="h-10 w-36 max-w-full max-[600px]:w-full" />
           </div>
         </div>
-        <div className="shrink-0">
-          <div className="h-12 w-52 bg-surface-alt rounded-2xl" />
-        </div>
-      </div>
-
-      {/* Atenção */}
-      <div>
-        <div className="h-6 w-36 bg-surface-alt rounded mb-4" />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="h-24 bg-surface border border-border rounded-3xl" />
-          <div className="h-24 bg-surface border border-border rounded-3xl" />
+        <div className="rounded-[12px] border border-border bg-surface px-6 py-[18px]">
+          <Skeleton className="mb-4 h-[25.5px] w-36 max-w-full" />
+          <Skeleton className="h-10 w-full" />
         </div>
       </div>
     </div>
