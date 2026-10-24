@@ -5,6 +5,8 @@ import { requireClinicContext } from "@/server/auth/clinic";
 import { enviarEmailD0 } from "@/server/services/onboarding-emails";
 import type { FocoPrincipal } from "@/lib/persona";
 import type { Especialidade } from "@/lib/especialidades";
+import { limiteDentistasParaPlano } from "@/lib/planos";
+import { papelPodeAlterarPlano, MSG_SEM_PERMISSAO_PLANO } from "@/lib/billing/permissao-plano";
 
 export type PlanoClinica = "SOLO" | "CLINICA";
 
@@ -17,8 +19,6 @@ export interface IniciarOnboardingInput {
   /** Persona escolhida na identidade (Workstream E). */
   foco: FocoPrincipal;
 }
-
-const LIMITE_POR_PLANO: Record<PlanoClinica, number> = { SOLO: 1, CLINICA: 5 };
 
 // Extrai o código estruturado do erro lançado pela RPC. Formato: 'CODIGO: mensagem'.
 function rpcErrorCode(message: string): string {
@@ -87,15 +87,18 @@ export async function iniciarOnboarding(
 export async function definirPlano(
   plano: PlanoClinica,
 ): Promise<{ error?: string }> {
-  const { supabase, clinicId } = await requireClinicContext();
-  const { error } = await supabase
+  const { supabase, clinicId, role } = await requireClinicContext();
+  if (!papelPodeAlterarPlano(role)) return { error: MSG_SEM_PERMISSAO_PLANO };
+  const { data: gravadas, error } = await supabase
     .from("clinicas")
-    .update({ plano, limite_dentistas: LIMITE_POR_PLANO[plano] })
-    .eq("id", clinicId);
+    .update({ plano, limite_dentistas: limiteDentistasParaPlano(plano) })
+    .eq("id", clinicId)
+    .select("id");
   if (error) {
     console.error("[definirPlano]", error.message);
-    return { error: error.message };
+    return { error: "Não foi possível salvar o plano. Tente novamente." };
   }
+  if (!gravadas?.length) return { error: MSG_SEM_PERMISSAO_PLANO };
   return {};
 }
 
@@ -105,15 +108,19 @@ export async function definirPlano(
  * dentista, que agora é criado no meio do fluxo.
  */
 export async function marcarOnboardingCompleto(): Promise<{ error?: string }> {
-  const { supabase, clinicId } = await requireClinicContext();
-  const { error } = await supabase
+  const { supabase, clinicId, role } = await requireClinicContext();
+  const semPermissao = "Só o administrador da clínica pode concluir a configuração.";
+  if (!papelPodeAlterarPlano(role)) return { error: semPermissao };
+  const { data: gravadas, error } = await supabase
     .from("clinicas")
     .update({ onboarding_completo: true })
-    .eq("id", clinicId);
+    .eq("id", clinicId)
+    .select("id");
   if (error) {
     console.error("[marcarOnboardingCompleto]", error.message);
-    return { error: error.message };
+    return { error: "Não foi possível concluir a configuração. Tente novamente." };
   }
+  if (!gravadas?.length) return { error: semPermissao };
   return {};
 }
 

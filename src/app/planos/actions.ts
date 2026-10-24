@@ -7,6 +7,7 @@ import { isCicloCobranca } from '@/lib/billing/plan-catalog';
 import { criarCheckoutAssinaturaDentista } from '@/server/services/assinatura-dentista';
 import { iniciarFormacaoClinica } from '@/server/services/formacao-clinica';
 import { limiteDentistasParaPlano, type PlanoId } from '@/lib/planos';
+import { papelPodeAlterarPlano, MSG_SEM_PERMISSAO_PLANO } from '@/lib/billing/permissao-plano';
 
 export type AtivarTrialResult =
   | { ok: true; trialEndsAt: string }
@@ -98,7 +99,8 @@ export async function createCheckout(
 ): Promise<{ url?: string; error?: string }> {
   if (!isCicloCobranca(ciclo)) return { error: 'Ciclo de cobrança inválido.' };
   try {
-    const { user, clinicId, dentistaId } = await requireClinicContext();
+    const { user, clinicId, dentistaId, role } = await requireClinicContext();
+    if (!papelPodeAlterarPlano(role)) return { error: MSG_SEM_PERMISSAO_PLANO };
     const service = createServiceClient();
     const [{ data: assinaturaAtual }, { data: clinicaAtual }] = await Promise.all([
       service.from('assinaturas_dentista').select('status')
