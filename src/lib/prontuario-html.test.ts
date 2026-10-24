@@ -136,3 +136,39 @@ test('documento mostra desconto da etapa e não imprime previsão cancelada como
   assert.doesNotMatch(html, />Pendente/);
   assert.equal((html.match(/class="orc-payment-card /g) ?? []).length, 1);
 });
+
+test('modo administrativo omite seções clínicas mesmo recebendo conteúdo clínico', () => {
+  const html = buildProntuarioHTML(paciente, [{ ...fichaComEvolucao,
+    evolucoes: [{ data: '2026-10-20', texto: 'QA evolucao clinica', automatica: false }],
+  }], [{
+    id: 'orcamento-administrativo-qa', status: 'rascunho', total: 150,
+    valor_acordado: null, desconto: 0, cobrancas: [], created_at: '2026-10-20T12:00:00Z',
+    condicoes_pagamento: null,
+    orcamento_itens: [{ descricao: 'QA item orcamento', quantidade: 1, preco_total: 150, aprovado: true }],
+    pagamentos: [],
+  }], [{
+    data_hora: '2026-11-04T15:00:00Z', status: 'scheduled',
+    observacoes: 'QA observacao administrativa da agenda', dentista: { nome: 'Dentista fictício' },
+  }], [{
+    data: '2026-10-20', fonte: 'moderna', profissionalNome: 'Dentista fictício',
+    evolucoes: [{ fichaNome: 'QA ficha clinica', texto: 'QA atendimento clinico' }],
+    procedimentos: [{ nome: 'QA procedimento clinico', localizacao: 'Dente 16', status: 'realizado' }],
+  }], { modo: 'administrativo' });
+  for (const texto of ['QA evolucao clinica', 'QA atendimento clinico', 'QA procedimento clinico', 'QA texto antigo', 'Fichas Clínicas', 'Atendimentos']) {
+    assert.ok(!html.includes(texto), `não deve expor ${texto}`);
+  }
+  for (const texto of ['Paciente Teste', 'QA item orcamento', 'Orçamentos', 'Consultas', 'QA observacao administrativa da agenda', 'Versão administrativa: sem dados clínicos.']) {
+    assert.ok(html.includes(texto), `deve manter ${texto}`);
+  }
+});
+
+test('modo completo explícito mantém as seções e evoluções como o padrão', () => {
+  const padrao = buildProntuarioHTML(paciente, [fichaComEvolucao], [], []);
+  const completo = buildProntuarioHTML(paciente, [fichaComEvolucao], [], [], [], { modo: 'completo' });
+  for (const html of [padrao, completo]) {
+    assert.ok(html.includes('Fichas Clínicas'));
+    assert.ok(html.includes('Atendimentos'));
+    assert.ok(html.includes('QA texto vigente'));
+    assert.ok(!html.includes('Versão administrativa'));
+  }
+});

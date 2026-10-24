@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { getDentistaCached } from '@/lib/get-dentista';
+import { acessoPdfPorPapel } from '@/lib/prontuario/acesso-pdf';
 import {
   buildProntuarioHTML,
   type PacienteExport,
@@ -21,6 +22,9 @@ export async function GET(
   const dentista = await getDentistaCached();
   if (!dentista) return new Response('Não autorizado', { status: 401 });
 
+  const acesso = acessoPdfPorPapel(dentista.role);
+  if (acesso === 'negado') return new Response('Paciente não encontrado', { status: 404 });
+
   const supabase = await createClient();
 
   const [
@@ -35,12 +39,12 @@ export async function GET(
       .eq('id', id)
       .eq('clinica_id', dentista.clinica_id)
       .maybeSingle(),
-    supabase
+    acesso === 'completo' ? supabase
       .from('fichas')
       .select('id, created_at, data_atendimento, queixa_principal, anotacoes, dentes_afetados, dentes_observacoes, procedimentos_concluidos, assinatura_url, assinado_em, origem, dentista:dentistas(nome)')
       .eq('paciente_id', id)
       .eq('clinica_id', dentista.clinica_id)
-      .order('data_atendimento', { ascending: false }),
+      .order('data_atendimento', { ascending: false }) : Promise.resolve({ data: [] }),
     supabase
       .from('orcamentos')
       .select('id, status, total, valor_acordado, desconto, cobrancas:orcamento_cobrancas(desconto, situacao), created_at, condicoes_pagamento, orcamento_itens(descricao, preco_total, quantidade, aprovado), pagamentos(valor, status, forma_pagamento)')
@@ -63,7 +67,7 @@ export async function GET(
   if (!pacienteRaw) return new Response('Paciente não encontrado', { status: 404 });
 
   let fichasExport = (fichasRaw ?? []) as unknown as FichaExport[];
-  if (fichasExport.length > 0) {
+  if (acesso === 'completo' && fichasExport.length > 0) {
     const { data: evolucoesRaw, error: evolucoesError } = await supabase
       .from('ficha_evolucoes')
       .select('ficha_id, data, texto, automatica')
@@ -85,42 +89,46 @@ export async function GET(
     }
   }
 
-  const longitudinal = await getProntuarioLongitudinal({ patientId: id, clinicId: dentista.clinica_id });
-  const nomeFicha = new Map(longitudinal.atendimentos.flatMap((atendimento) => (
-    atendimento.fichas.map((ficha) => [ficha.id, ficha.nome] as const)
-  )));
-  const atendimentosExport: AtendimentoProntuarioExport[] = longitudinal.atendimentos.map((atendimento) => ({
-    data: atendimento.dataAtendimento,
-    fonte: atendimento.fonte,
-    profissionalNome: atendimento.profissional.nome,
-    evolucoes: atendimento.evolucoes.map((evolucao) => ({
-      fichaNome: nomeFicha.get(evolucao.fichaId) ?? 'Evolução clínica',
-      texto: evolucao.texto,
-    })),
-    procedimentos: atendimento.eventos.map((evento) => ({
-      nome: evento.procedimentoNome?.trim() || TIPO_LABEL[evento.tipo],
-      localizacao: evento.ancora.dente != null
-        ? `Dente ${evento.ancora.dente}`
-        : evento.ancora.quadrante != null
-          ? `Quadrante ${evento.ancora.quadrante}`
-          : evento.ancora.arcada != null
-            ? `Arcada ${evento.ancora.arcada}`
-            : evento.ancora.nivel === 'boca'
-              ? 'Boca toda'
-              : 'Sem localização registrada',
-      status: evento.status,
-    })),
-  }));
+  let atendimentosExport: AtendimentoProntuarioExport[] = [];
+  if (acesso === 'completo') {
+    const longitudinal = await getProntuarioLongitudinal({ patientId: id, clinicId: dentista.clinica_id });
+    const nomeFicha = new Map(longitudinal.atendimentos.flatMap((atendimento) => (
+      atendimento.fichas.map((ficha) => [ficha.id, ficha.nome] as const)
+    )));
+    atendimentosExport = longitudinal.atendimentos.map((atendimento) => ({
+      data: atendimento.dataAtendimento,
+      fonte: atendimento.fonte,
+      profissionalNome: atendimento.profissional.nome,
+      evolucoes: atendimento.evolucoes.map((evolucao) => ({
+        fichaNome: nomeFicha.get(evolucao.fichaId) ?? 'Evolução clínica',
+        texto: evolucao.texto,
+      })),
+      procedimentos: atendimento.eventos.map((evento) => ({
+        nome: evento.procedimentoNome?.trim() || TIPO_LABEL[evento.tipo],
+        localizacao: evento.ancora.dente != null
+          ? `Dente ${evento.ancora.dente}`
+          : evento.ancora.quadrante != null
+            ? `Quadrante ${evento.ancora.quadrante}`
+            : evento.ancora.arcada != null
+              ? `Arcada ${evento.ancora.arcada}`
+              : evento.ancora.nivel === 'boca'
+                ? 'Boca toda'
+                : 'Sem localização registrada',
+        status: evento.status,
+      })),
+    }));
+    }
 
-  const html = buildProntuarioHTML(
-    pacienteRaw as PacienteExport,
-    fichasExport,
-    (orcamentosRaw ?? []) as unknown as OrcamentoExport[],
-    (agendamentosRaw ?? []) as unknown as AgendamentoExport[],
-    atendimentosExport,
-  );
+    const html = buildProntuarioHTML(
+      pacienteRaw as PacienteExport,
+      fichasExport,
+      (orcamentosRaw ?? []) as unknown as OrcamentoExport[],
+      (agendamentosRaw ?? []) as unknown as AgendamentoExport[],
+      atendimentosExport,
+      { modo: acesso },
+    );
 
-  return new Response(html, {
-    headers: { 'Content-Type': 'text/html; charset=utf-8' },
-  });
-}
+    return new Response(html, {
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    });
+  }

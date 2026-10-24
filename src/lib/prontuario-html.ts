@@ -455,12 +455,14 @@ export function buildProntuarioHTML(
   orcamentos: OrcamentoExport[],
   agendamentos: AgendamentoExport[],
   atendimentos: AtendimentoProntuarioExport[] = [],
+  opcoes?: { modo?: 'completo' | 'administrativo' },
 ): string {
+  const administrativo = opcoes?.modo === 'administrativo';
   const now = fmtDateTime(new Date().toISOString());
   const idade = p.data_nascimento ? calcIdade(p.data_nascimento) : null;
   const endereco = [p.endereco, p.cidade && p.estado ? `${p.cidade}/${p.estado}` : (p.cidade ?? p.estado)].filter(Boolean).join(' — ');
 
-  const fichasHtml = fichas.length > 0
+  const fichasHtml = administrativo ? '' : fichas.length > 0
     ? fichas.map(renderFichaCard).join('')
     : '<p class="empty">Nenhuma ficha clínica registrada.</p>';
 
@@ -486,7 +488,7 @@ export function buildProntuarioHTML(
       </table>`
     : '<p class="empty">Nenhuma consulta registrada.</p>';
 
-  const atendimentosHtml = atendimentos.length > 0
+  const atendimentosHtml = administrativo ? '' : atendimentos.length > 0
     ? atendimentos.map((atendimento) => `<div class="card">
         <div class="card-head">
           <div><span class="card-date">${esc(fmtDateOnly(atendimento.data))}</span> · ${esc(atendimento.profissionalNome)}</div>
@@ -517,6 +519,7 @@ export function buildProntuarioHTML(
   <div class="ph">
     <div class="ph-tag">Prontuário Médico</div>
     <div class="ph-name">${esc(p.nome)}</div>
+    ${administrativo ? '<p>Versão administrativa: sem dados clínicos.</p>' : ''}
     <div class="ph-grid">
       ${p.data_nascimento ? `<div><div class="ph-lbl">Nascimento</div><div class="ph-val">${fmtDate(p.data_nascimento)}${idade !== null ? ` (${idade} anos)` : ''}</div></div>` : ''}
       ${p.cpf ? `<div><div class="ph-lbl">CPF</div><div class="ph-val">${esc(p.cpf)}</div></div>` : ''}
@@ -527,7 +530,7 @@ export function buildProntuarioHTML(
     </div>
   </div>
 
-  <div class="section">
+  ${administrativo ? '' : `<div class="section">
     <div class="section-title">Atendimentos <span class="section-count">${atendimentos.length}</span></div>
     ${atendimentosHtml}
   </div>
@@ -535,7 +538,7 @@ export function buildProntuarioHTML(
   <div class="section">
     <div class="section-title">Fichas Clínicas <span class="section-count">${fichas.length}</span></div>
     ${fichasHtml}
-  </div>
+  </div>`}
 
   <div class="section">
     <div class="section-title">Orçamentos <span class="section-count">${orcamentos.length}</span></div>

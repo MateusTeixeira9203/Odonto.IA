@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { getDentistaCached } from '@/lib/get-dentista';
+import { acessoPdfPorPapel } from '@/lib/prontuario/acesso-pdf';
 import { buildFichaHTML, type FichaComPaciente, type EventoFichaPdf, type EvolucaoFichaExport } from '@/lib/prontuario-html';
 
 export async function GET(
@@ -10,6 +11,10 @@ export async function GET(
 
   const dentista = await getDentistaCached();
   if (!dentista) return new Response('Não autorizado', { status: 401 });
+
+  const acesso = acessoPdfPorPapel(dentista.role);
+  if (acesso === 'negado') return new Response('Ficha não encontrada', { status: 404 });
+  if (acesso === 'administrativo') return new Response('Sem permissão', { status: 403 });
 
   const supabase = await createClient();
 
