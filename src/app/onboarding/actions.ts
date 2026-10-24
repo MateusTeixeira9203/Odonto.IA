@@ -6,9 +6,9 @@ import { enviarEmailD0 } from "@/server/services/onboarding-emails";
 import type { FocoPrincipal } from "@/lib/persona";
 import type { Especialidade } from "@/lib/especialidades";
 import { limiteDentistasParaPlano } from "@/lib/planos";
-import { papelPodeAlterarPlano, MSG_SEM_PERMISSAO_PLANO } from "@/lib/billing/permissao-plano";
+import { ehPlanoClinica, papelPodeAlterarPlano, MSG_SEM_PERMISSAO_PLANO, type PlanoClinica } from "@/lib/billing/permissao-plano";
 
-export type PlanoClinica = "SOLO" | "CLINICA";
+export type { PlanoClinica } from "@/lib/billing/permissao-plano";
 
 export interface IniciarOnboardingInput {
   nome: string;
@@ -89,6 +89,7 @@ export async function definirPlano(
 ): Promise<{ error?: string }> {
   const { supabase, clinicId, role } = await requireClinicContext();
   if (!papelPodeAlterarPlano(role)) return { error: MSG_SEM_PERMISSAO_PLANO };
+  if (!ehPlanoClinica(plano)) return { error: "Plano inválido." };
   const { data: gravadas, error } = await supabase
     .from("clinicas")
     .update({ plano, limite_dentistas: limiteDentistasParaPlano(plano) })
@@ -132,14 +133,18 @@ export async function marcarOnboardingCompleto(): Promise<{ error?: string }> {
 export async function definirProcedimentosPendente(
   pendente: boolean,
 ): Promise<{ error?: string }> {
-  const { supabase, clinicId } = await requireClinicContext();
-  const { error } = await supabase
+  const { supabase, clinicId, role } = await requireClinicContext();
+  const semPermissao = "Só o administrador da clínica pode mudar esta configuração.";
+  if (!papelPodeAlterarPlano(role)) return { error: semPermissao };
+  const { data: gravadas, error } = await supabase
     .from("clinicas")
     .update({ procedimentos_pendente: pendente })
-    .eq("id", clinicId);
+    .eq("id", clinicId)
+    .select("id");
   if (error) {
     console.error("[definirProcedimentosPendente]", error.message);
-    return { error: error.message };
+    return { error: "Não foi possível salvar a configuração. Tente novamente." };
   }
+  if (!gravadas?.length) return { error: semPermissao };
   return {};
 }

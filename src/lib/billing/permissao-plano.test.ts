@@ -1,6 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { papelPodeAlterarPlano } from './permissao-plano';
+import { ehPlanoClinica, papelPodeAlterarPlano } from './permissao-plano';
+
+for (const plano of ['SOLO', 'CLINICA']) {
+  test(`${plano} é um plano de clínica válido`, () => {
+    assert.equal(ehPlanoClinica(plano), true);
+  });
+}
+
+for (const valor of ['XYZ', '', null, undefined, 1]) {
+  test(`${JSON.stringify(valor)} não é um plano de clínica válido`, () => {
+    assert.equal(ehPlanoClinica(valor), false);
+  });
+}
 
 test('admin pode alterar o plano da clínica ativa', () => {
   assert.equal(papelPodeAlterarPlano('admin'), true);

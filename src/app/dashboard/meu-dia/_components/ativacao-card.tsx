@@ -6,15 +6,15 @@
 //
 // Duas coisas acontecem aqui, e a separação entre elas é contrato:
 //
-//   1. O RELÓGIO já partiu sozinho antes deste card montar (`activateTrial`, chamado em
-//      `meu-dia-client.tsx`). Este componente só INFORMA a data. Não existe botão "começar
+//   1. O RELÓGIO do trial é da Stripe (`STRIPE_BILLING_ENABLED`). Este componente
+//      só INFORMA a data. Não existe botão "começar
 //      meus 7 dias" de propósito: quem clicasse em "agora não" voltaria ao trial infinito de
 //      hoje (`trial_ends_at` NULL) e o bug que este item conserta sobreviveria com outra roupa.
 //
 //   2. O PLANO é a única pergunta, e ela é operacional ("atendo sozinho" / "somos vários"),
 //      não comercial ("escolha um plano"). É a única informação que o sistema não deduz, e o
 //      dentista responde sem pensar. Grava por `definirPlano`, que já existe e já cuida do
-//      `limite_dentistas` — `activateTrial` não escreve plano nenhum (invariante I8).
+//      `limite_dentistas`; o relógio do trial é da Stripe (`STRIPE_BILLING_ENABLED`).
 //
 // Só o admin monta este card (I4): quem entrou por convite não vê preço.
 
@@ -25,7 +25,7 @@ import { definirPlano, type PlanoClinica } from '@/app/onboarding/actions';
 import { PLANOS } from '@/lib/planos';
 
 interface AtivacaoCardProps {
-  /** ISO devolvido por `activateTrial`. É a data REAL gravada em `clinicas.trial_ends_at` —
+  /** ISO do trial da Stripe (`STRIPE_BILLING_ENABLED`), gravado em `clinicas.trial_ends_at` —
    *  nunca recalculada aqui, senão o card e o banco podem divergir. */
   trialEndsAt: string;
   /** Plano provisório que `iniciarOnboarding` gravou (SOLO). Pré-marca a opção. */
