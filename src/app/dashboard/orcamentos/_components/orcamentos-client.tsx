@@ -935,7 +935,9 @@ export function OrcamentosClient({
     if (!confirmDeleteId) return;
     setDeleteSaving(true);
     const result = await excluirOrcamento(confirmDeleteId);
-    if (!result.error) {
+    if (result.error) {
+      toast.error(result.error);
+    } else {
       setOrcamentos((prev) => prev.filter((o) => o.id !== confirmDeleteId));
       if (selected?.id === confirmDeleteId) setSelected(null);
       setConfirmDeleteId(null);

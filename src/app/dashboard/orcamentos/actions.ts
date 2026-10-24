@@ -12,6 +12,7 @@ import { ERRO_ORCAMENTO_SEM_APROVACAO } from "@/server/orcamentos/pagamento-guar
 import { criarDocumentoAceiteOrcamento } from '@/server/legal/documentos-aceite';
 import { normalizarNomeProcedimento } from '@/lib/arcadas';
 import { erroCriacaoOrcamento } from '@/lib/orcamentos/erros-criacao';
+import { motivoBloqueioExclusao, mensagemErroExclusao, MSG_ERRO_EXCLUSAO } from '@/lib/orcamentos/exclusao';
 
 export type FormaPagamento =
   | "dinheiro"
@@ -1605,11 +1606,24 @@ export async function excluirOrcamento(
     return { error: 'Você não tem permissão para excluir este orçamento — só o dentista responsável pode.' };
   }
 
-  // Decisão de 14/08: nem pagamento recebido nem aceite assinado bloqueiam mais a exclusão.
-  // Quem decide é o dentista — o sistema avisa o que vai junto (pagamento sai do financeiro,
-  // assinatura de aceite é apagada) no diálogo de confirmação e para por aí. Antes disso o
-  // orçamento errado ficava preso na lista pra sempre, sem caminho de saída.
-  // A assinatura sai por cascade da FK (migration 143, que reverte o RESTRICT da 113).
+  // Aceite assinado preserva a prova do acordo, inclusive no formato antigo (só assinatura).
+  // A migration 147 também protege o documento por FK RESTRICT; recebimento sem aceite
+  // continua seguindo a exclusão com aviso no diálogo.
+  const [assinaturas, documentos] = await Promise.all([
+    supabase.from('assinaturas').select('id', { count: 'exact', head: true })
+      .eq('orcamento_id', orcamentoId).eq('clinica_id', clinicId),
+    supabase.from('documentos_aceite').select('id', { count: 'exact', head: true })
+      .eq('orcamento_id', orcamentoId).eq('clinica_id', clinicId),
+  ]);
+  if (assinaturas.error || documentos.error) {
+    console.error('[excluirOrcamento:aceite]', assinaturas.error ?? documentos.error);
+    return { error: MSG_ERRO_EXCLUSAO };
+  }
+  const bloqueio = motivoBloqueioExclusao({
+    assinaturas: assinaturas.count ?? 0,
+    documentosAceite: documentos.count ?? 0,
+  });
+  if (bloqueio) return { error: bloqueio };
 
   // Um único DELETE: as três filhas (orcamento_itens, pagamentos, assinaturas) são todas
   // ON DELETE CASCADE, então o Postgres as leva junto — atômico. Antes, os filhos eram
@@ -1626,7 +1640,10 @@ export async function excluirOrcamento(
     .eq("clinica_id", clinicId)
     .select("id");
 
-  if (error) return { error: error.message };
+  if (error) {
+    console.error('[excluirOrcamento]', error);
+    return { error: mensagemErroExclusao(error) ?? MSG_ERRO_EXCLUSAO };
+  }
   if (!deletado || deletado.length === 0) {
     return { error: "Você não tem permissão para excluir este orçamento — só o dentista responsável pode." };
   }
