@@ -91,7 +91,7 @@ export function AceiteOrcamentoModal({
           15-16", o conteúdo — 6 procedimentos + nome + assinatura + botões — passava da
           tela e não tinha rolagem; o botão "Confirmar aceite" ficava inalcançável). */}
       <DialogContent
-        className="flex flex-col max-w-lg rounded-3xl p-0 overflow-hidden border-border"
+        className="flex flex-col w-[calc(100vw-2rem)] max-w-lg rounded-[16px] bg-surface p-0 overflow-hidden border-border"
         style={{ maxHeight: '90vh' }}
         showCloseButton={false}
       >
@@ -105,15 +105,15 @@ export function AceiteOrcamentoModal({
                     <PenLine className="w-4 h-4 text-teal-ink" />
                   </div>
                   <div>
-                    <DialogTitle className="font-heading font-semibold text-xl text-text-primary leading-tight">
+                    <DialogTitle className="font-heading font-normal text-[24px] text-text-primary leading-tight">
                       Aceite do orçamento
                     </DialogTitle>
-                    <DialogDescription className="text-text-muted text-xs">
+                    <DialogDescription className="mt-1 text-text-secondary text-xs">
                       O paciente confirma que aceita pagar nestes termos.
                     </DialogDescription>
                   </div>
                 </div>
-                <button onClick={resetAndClose} aria-label="Fechar" className="p-1.5 rounded-lg hover:bg-surface-alt text-text-secondary transition-colors">
+                <button onClick={resetAndClose} aria-label="Fechar" className="h-10 w-10 shrink-0 flex items-center justify-center rounded-[8px] hover:bg-surface-alt text-text-secondary transition-colors">
                   <X className="w-4 h-4" />
                 </button>
               </div>
@@ -124,7 +124,7 @@ export function AceiteOrcamentoModal({
                 <div className="rounded-2xl border border-border overflow-hidden">
                   {itens.map((item) => (
                     <div key={item.id} className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-border/60 last:border-b-0 text-sm">
-                      <span className="text-text-primary truncate">
+                      <span className="min-w-0 break-words text-text-primary">
                         {item.quantidade > 1 ? `${item.quantidade}× ` : ''}{item.descricao ?? '—'}
                       </span>
                       <span className="font-mono text-text-secondary shrink-0">R$ {fmt(item.preco_total ?? 0)}</span>
@@ -132,12 +132,12 @@ export function AceiteOrcamentoModal({
                   ))}
                   <div className="flex items-center justify-between px-4 py-2.5 bg-surface-alt">
                     <span className="text-sm font-bold text-text-primary">Total</span>
-                    <span className="font-mono text-sm font-bold text-teal-ink">R$ {fmt(total ?? 0)}</span>
+                    <span className="font-mono text-[21px] font-medium text-teal-ink">R$ {fmt(total ?? 0)}</span>
                   </div>
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="aceite-assinado-por" className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">
+                  <Label htmlFor="aceite-assinado-por" className="text-xs text-text-secondary">
                     Nome de quem assina
                   </Label>
                   <Input
@@ -145,7 +145,7 @@ export function AceiteOrcamentoModal({
                     value={assinadoPor}
                     onChange={(e) => { setAssinadoPor(e.target.value); setErro(null); }}
                     placeholder="Nome completo do paciente ou responsável"
-                    className="rounded-xl bg-surface-alt border-border text-text-primary"
+                    className="rounded-none border-0 border-b border-border bg-transparent px-0 text-text-primary shadow-none"
                   />
                 </div>
 
@@ -156,17 +156,17 @@ export function AceiteOrcamentoModal({
                 )}
               </div>
 
-              <div className="shrink-0 px-6 py-5 flex gap-3 border-t border-border">
+              <div className="shrink-0 px-6 py-4 flex flex-col gap-2 sm:flex-row border-t border-border">
                 <Button
                   variant="outline"
                   onClick={resetAndClose}
-                  className="flex-1 h-auto py-3 rounded-xl border-border text-text-primary hover:bg-surface-alt"
+                  className="h-10 min-h-10 flex-none sm:flex-1 rounded-[8px] border-border text-text-primary hover:bg-surface-alt"
                 >
                   Cancelar
                 </Button>
                 <Button
                   onClick={() => void handleConfirmar()}
-                  className="flex-1 h-auto py-3 rounded-xl bg-teal text-white hover:bg-teal-lt font-semibold gap-2"
+                  className="h-10 min-h-10 flex-none sm:flex-1 rounded-[8px] border border-teal/20 bg-teal-pale text-teal-ink hover:bg-teal/15 font-semibold gap-2"
                 >
                   <CheckCircle2 className="w-4 h-4" />
                   Confirmar aceite
@@ -197,7 +197,7 @@ export function AceiteOrcamentoModal({
                   href={documentoUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center justify-center gap-1.5 h-auto px-5 py-2.5 rounded-xl bg-teal text-white hover:bg-teal-lt font-semibold text-sm transition-colors"
+                  className="inline-flex items-center justify-center gap-1.5 h-10 px-5 rounded-[8px] border border-teal/20 bg-teal-pale text-teal-ink hover:bg-teal/15 font-semibold text-sm transition-colors"
                 >
                   <ExternalLink className="w-4 h-4" />
                   Abrir PDF assinado
@@ -205,7 +205,7 @@ export function AceiteOrcamentoModal({
               ) : (
                 <p className="text-xs text-text-secondary">O aceite ficou registrado. O PDF final será disponibilizado em Documentos.</p>
               )}
-              <Button variant="outline" onClick={resetAndClose} className="h-auto px-5 py-2.5 rounded-xl border-border text-text-primary hover:bg-surface-alt">
+              <Button variant="outline" onClick={resetAndClose} className="h-10 px-5 rounded-[8px] border-border text-text-primary hover:bg-surface-alt">
                 Fechar
               </Button>
             </motion.div>
@@ -222,7 +222,7 @@ export function AceiteOrcamentoModal({
               </div>
               <Button
                 onClick={() => setStep('assinar')}
-                className="h-auto px-6 py-2.5 rounded-xl bg-teal text-white hover:bg-teal-lt font-semibold gap-1.5"
+                className="h-10 px-6 rounded-[8px] border border-teal/20 bg-teal-pale text-teal-ink hover:bg-teal/15 font-semibold gap-1.5"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 Tentar novamente

@@ -481,9 +481,9 @@ function CobrancasPorEtapa({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 [&_label]:text-xs [&_input:not([type=checkbox])]:rounded-none [&_input:not([type=checkbox])]:border-0 [&_input:not([type=checkbox])]:border-b [&_input:not([type=checkbox])]:border-border [&_input:not([type=checkbox])]:bg-transparent [&_input:not([type=checkbox])]:px-0 [&_input:not([type=checkbox])]:text-xs [&_input:not([type=checkbox])]:shadow-none [&_[data-slot=select-trigger]]:rounded-none [&_[data-slot=select-trigger]]:border-0 [&_[data-slot=select-trigger]]:border-b [&_[data-slot=select-trigger]]:border-border [&_[data-slot=select-trigger]]:bg-transparent [&_[data-slot=select-trigger]]:px-0 [&_[data-slot=select-trigger]]:text-xs [&_[data-slot=select-trigger]]:shadow-none">
       <div>
-        <p className="text-xs font-bold uppercase tracking-widest text-teal-ink">Cobranças por etapa</p>
+        <h2 className="text-[17px] font-bold text-text-primary">Cobranças por etapa</h2>
         <p className="mt-1 text-xs text-text-secondary">Cobrar só o que o paciente decidiu fazer agora. O restante continua como proposta.</p>
       </div>
 
@@ -511,20 +511,20 @@ function CobrancasPorEtapa({
           .map((item) => itemPorId.get(item.orcamento_item_id)?.descricao ?? 'Procedimento')
           .join(', ');
         const classeEstado: Record<typeof estado.estado, string> = {
-          pendente: 'bg-warning/15 text-warning-ink border-warning/25',
-          parcial: 'bg-teal/10 text-teal-ink border-teal/30',
-          paga: 'bg-teal/15 text-teal-ink border-teal/30',
+          pendente: 'text-text-secondary border-transparent',
+          parcial: 'text-teal-ink border-transparent',
+          paga: 'text-teal-ink border-transparent',
           cancelada: 'bg-surface-alt text-text-secondary border-border',
         };
         const rotuloEstado: Record<typeof estado.estado, string> = {
           pendente: 'Pendente', parcial: 'Parcial', paga: 'Paga', cancelada: 'Cancelada',
         };
         return (
-          <div key={cobranca.id} className="rounded-2xl border border-border bg-surface-alt/40 p-3 space-y-3">
-            <div className="flex items-start justify-between gap-2">
+          <div key={cobranca.id} className="border-t border-border pt-4 space-y-3">
+            <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-text-primary leading-snug">{descricao}</p>
-                <p className="mt-1 text-[11px] text-text-secondary font-mono">
+                <p className="text-[13px] font-medium text-text-primary leading-snug">{descricao}</p>
+                <p className="mt-1 text-[12.5px] text-text-secondary">
                   Subtotal R$ {fmt(cobranca.subtotal)}{cobranca.desconto > 0 && ` − desconto R$ ${fmt(cobranca.desconto)}`}
                 </p>
                 <p className="mt-1 text-[11px] text-text-secondary">
@@ -537,9 +537,9 @@ function CobrancasPorEtapa({
               </div>
               <span className={`shrink-0 rounded-full border px-2 py-1 text-[10px] font-bold ${classeEstado[estado.estado]}`}>{rotuloEstado[estado.estado]}</span>
             </div>
-            {cobranca.observacoes && <div className="rounded-lg border border-border bg-card p-3"><p className="text-xs font-semibold text-foreground">Observação do acordo</p><p className="mt-1 whitespace-pre-wrap break-words text-sm text-muted-foreground">{cobranca.observacoes}</p></div>}
-            <div className="grid grid-cols-3 gap-2 text-xs">
-              <div><p className="text-text-secondary">Final</p><p className="font-mono font-semibold text-text-primary">R$ {fmt(cobranca.valor_final)}</p></div>
+            {cobranca.observacoes && <div className="border-l-2 border-border pl-3"><p className="text-xs font-semibold text-foreground">Observação do acordo</p><p className="mt-1 whitespace-pre-wrap break-words text-xs text-muted-foreground">{cobranca.observacoes}</p></div>}
+            <div className="grid grid-cols-2 gap-3 text-xs [&>div:first-child]:col-span-2">
+              <div><p className="text-text-secondary">Final</p><p className="font-mono text-[21px] font-medium text-teal-ink">R$ {fmt(cobranca.valor_final)}</p></div>
               <div><p className="text-text-secondary">Recebido</p><p className="font-mono font-semibold text-teal-ink">R$ {fmt(estado.valorPago)}</p></div>
               <div><p className="text-text-secondary">Saldo</p><p className="font-mono font-semibold text-text-primary">R$ {fmt(estado.saldo)}</p></div>
             </div>
@@ -586,7 +586,7 @@ function CobrancasPorEtapa({
                 {erro && <p className="text-xs text-coral-ink">{erro}</p>}
                 <div className="flex gap-2">
                   <Button size="sm" variant="outline" onClick={() => { setCobrancaEditandoId(null); setErro(null); }} disabled={saving} className="flex-1">Cancelar</Button>
-                  <Button size="sm" onClick={() => void salvarEtapaEditada(cobranca, estado.valorPago)} disabled={saving || itensEtapaEditados.length === 0} className="flex-1 bg-teal text-white hover:bg-teal-lt">{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Salvar etapa'}</Button>
+                  <Button size="sm" onClick={() => void salvarEtapaEditada(cobranca, estado.valorPago)} disabled={saving || itensEtapaEditados.length === 0} className="h-10 flex-1 rounded-[8px] border border-teal/20 bg-teal-pale text-teal-ink hover:bg-teal/15">{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Salvar etapa'}</Button>
                 </div>
               </div>
             )}
@@ -618,13 +618,13 @@ function CobrancasPorEtapa({
                   <Input type="date" value={recebimento.data} onChange={(event) => setRecebimento((current) => ({ ...current, data: event.target.value }))} className="h-9" />
                   <Select value={recebimento.forma} onValueChange={(value) => setRecebimento((current) => ({ ...current, forma: value as FormaPagamento }))}><SelectTrigger className="h-9"><SelectValue /></SelectTrigger><SelectContent>{Object.entries(FORMA_LABEL).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select>
                 </div>
-                <div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => setCobrancaRecebendoId(null)} disabled={saving} className="flex-1">Cancelar</Button><Button size="sm" onClick={() => void registrar(cobranca.id)} disabled={saving || resultadoDesconhecido} className="flex-1 bg-teal text-white hover:bg-teal-lt">{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : resultadoDesconhecido ? 'Recarregue para confirmar' : 'Registrar'}</Button></div>
+                <div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => setCobrancaRecebendoId(null)} disabled={saving} className="flex-1">Cancelar</Button><Button size="sm" onClick={() => void registrar(cobranca.id)} disabled={saving || resultadoDesconhecido} className="h-10 flex-1 rounded-[8px] border border-teal/20 bg-teal-pale text-teal-ink hover:bg-teal/15">{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : resultadoDesconhecido ? 'Recarregue para confirmar' : 'Registrar'}</Button></div>
               </div>
             ) : !editandoEtapa && cancelandoId === cobranca.id ? (
               <div className="space-y-2 border-t border-border pt-3"><Input value={motivoCancelamento} onChange={(event) => setMotivoCancelamento(event.target.value)} placeholder="Motivo do cancelamento" maxLength={500} className="h-9" /><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => setCancelandoId(null)} disabled={saving} className="flex-1">Voltar</Button><Button size="sm" onClick={() => void cancelar(cobranca.id)} disabled={saving} className="flex-1 bg-coral-pale text-coral-ink hover:bg-coral/20">Cancelar etapa</Button></div></div>
             ) : !editandoEtapa && cobranca.situacao === 'aberta' ? (
-              <div className="flex gap-2 border-t border-border pt-3">
-                {estado.estado !== 'paga' && <Button size="sm" onClick={() => setCobrancaRecebendoId(cobranca.id)} disabled={resultadoDesconhecido} className="flex-1 bg-teal text-white hover:bg-teal-lt">{resultadoDesconhecido ? 'Recarregue para confirmar' : 'Registrar recebimento'}</Button>}
+              <div className="flex flex-wrap gap-2 border-t border-border pt-3">
+                {estado.estado !== 'paga' && <Button size="sm" onClick={() => setCobrancaRecebendoId(cobranca.id)} disabled={resultadoDesconhecido} className={`h-10 w-full rounded-[8px] ${orcamento.aceite ? 'border border-teal/20 bg-teal-pale font-semibold text-teal-ink hover:bg-teal/15' : 'border border-border bg-transparent text-text-secondary hover:bg-surface-alt'}`}>{resultadoDesconhecido ? 'Recarregue para confirmar' : 'Registrar recebimento'}</Button>}
                 <Button size="sm" variant="outline" onClick={() => iniciarEdicaoEtapa(cobranca)} disabled={saving} className={estado.estado === 'paga' ? 'flex-1' : ''}><Edit2 className="mr-1 h-3.5 w-3.5" />Editar etapa</Button>
                 {podeCancelar && <Button size="sm" variant="outline" onClick={() => setCancelandoId(cobranca.id)} className="text-coral-ink">Cancelar</Button>}
               </div>
@@ -645,7 +645,7 @@ function CobrancasPorEtapa({
               </div>
               <div className="shrink-0 text-right">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Total da etapa</p>
-                <p className="mt-1 font-mono text-xl font-semibold text-text-primary">R$ {fmt(valorFinal)}</p>
+                <p className="mt-1 font-mono text-[21px] font-medium text-teal-ink">R$ {fmt(valorFinal)}</p>
               </div>
             </div>
 
@@ -703,7 +703,7 @@ function CobrancasPorEtapa({
 
             <div><button type="button" onClick={() => setObservacoesAbertas((atual) => !atual)} className="text-sm font-semibold text-text-primary">{observacoesAbertas ? 'Ocultar observação' : '+ Adicionar observação do acordo'}</button>{observacoesAbertas && <label className="mt-2 block space-y-1 text-sm text-foreground"><Textarea value={observacoes} onChange={(event) => setObservacoes(event.target.value)} maxLength={2000} disabled={saving} placeholder="Ex.: entrada hoje; restante no cartão a partir do próximo mês." /><span className="block text-xs text-muted-foreground">Interna para a equipe; não entra automaticamente no documento do paciente.</span></label>}</div>
             {erro && <p role="alert" className="text-xs text-coral-ink">{erro}</p>}
-            <div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => { setFormAberto(false); setErro(null); }} disabled={saving} className="min-h-11 flex-1">Cancelar</Button><Button size="sm" onClick={() => void criarEtapa()} disabled={saving || itemIds.length === 0} className="min-h-11 flex-1 bg-teal text-white hover:bg-teal-lt">{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Criar cobrança'}</Button></div>
+            <div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => { setFormAberto(false); setErro(null); }} disabled={saving} className="min-h-11 flex-1">Cancelar</Button><Button size="sm" onClick={() => void criarEtapa()} disabled={saving || itemIds.length === 0} className="min-h-10 flex-1 rounded-[8px] border border-teal/20 bg-teal-pale text-teal-ink hover:bg-teal/15">{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Criar cobrança'}</Button></div>
           </section>
         ) : <Button variant="outline" onClick={() => { setItemIds(itensElegiveis.map((item) => item.id)); setAlterandoSelecao(false); setFormAberto(true); }} className="w-full border-teal/35 text-teal-ink hover:bg-teal/10"><Plus className="mr-1.5 h-4 w-4" />Cobrar nesta etapa</Button>
       )}
@@ -888,13 +888,8 @@ export function DetalheOrcamentoModal({
                   {estado === 'quitado' && <CheckCircle2 className="w-3 h-3" />}
                   {rotuloEstado({ estado, valorDevido, valorPago: totalPago, valorAprovado })}
                   </span>
-                {quitado ? (
-                  <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-teal-ink text-surface">
-                    <CheckCircle2 className="w-3 h-3" />
-                    Quitado
-                  </span>
-                ) : valorAprovado > 0 ? (
-                  <span className="font-mono text-[13px] font-medium text-text-primary hidden sm:inline">
+                {valorAprovado > 0 ? (
+                  <span className="font-mono text-[13px] font-medium text-text-primary">
                     <span className="text-teal-ink">R$ {fmt(totalPago)}</span>
                     <span className="font-sans text-xs text-text-secondary"> de </span>
                     R$ {fmt(valorDevido)}
@@ -911,7 +906,7 @@ export function DetalheOrcamentoModal({
             {/* ── Corpo: procedimentos à esquerda, dinheiro à direita (R-39a) ──────
                 Empilha com o dinheiro ACIMA no celular: é a
                 pergunta que se responde primeiro num gesto de balcão. */}
-            <div className="flex-1 min-w-0 min-h-0 grid grid-cols-1 auto-rows-max overflow-y-auto [&>div:first-child]:order-2 [&>div:last-child]:order-1 sm:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] sm:auto-rows-[minmax(0,1fr)] sm:[&>div:first-child]:order-1 sm:[&>div:last-child]:order-2 sm:overflow-hidden [@media(max-height:570px)]:overflow-y-auto">
+            <div className="flex-1 min-w-0 min-h-0 grid grid-cols-1 auto-rows-max overflow-y-auto [&>div:first-child]:order-2 [&>div:last-child]:order-1 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:auto-rows-[minmax(0,1fr)] lg:[&>div:first-child]:order-1 lg:[&>div:last-child]:order-2 lg:overflow-hidden [@media(max-height:570px)]:overflow-y-auto">
 
               {/* ── Coluna clínica ─────────────────────────────────────── */}
               <div className="flex min-w-0 min-h-0 flex-col">
@@ -931,18 +926,18 @@ export function DetalheOrcamentoModal({
                       />
                     )}
                     <div className="overflow-x-auto">
-                      <div role="table" aria-label="Procedimentos do orçamento" className="min-w-[550px]">
-                        <div role="row" className={`grid items-center gap-2 border-b border-border px-[6px] py-2 text-xs text-text-secondary ${orcEditMode ? 'grid-cols-[24px_minmax(180px,1fr)_64px_110px_28px]' : 'grid-cols-[24px_minmax(180px,1fr)_100px_110px]'}`}>
-                          <span role="columnheader" aria-label="Incluir">✓</span>
+                      <div role="table" aria-label="Procedimentos do orçamento" className="min-w-0">
+                        <div role="row" className={`${!orcEditMode && detalheOrc.itens.length === 0 ? 'hidden' : 'grid'} items-center gap-2 border-b border-border px-[6px] py-2 text-xs text-text-secondary ${orcEditMode ? 'grid-cols-[24px_minmax(0,1fr)_64px_90px_28px] max-lg:[&>*:nth-child(2)]:col-span-4 max-lg:[&>*:nth-child(3)]:col-start-3 lg:grid-cols-[24px_minmax(0,1fr)_64px_110px_28px]' : 'grid-cols-[24px_minmax(0,1fr)_90px] lg:grid-cols-[24px_minmax(0,1fr)_125px_110px]'}`}>
+                          <span role="columnheader" aria-label={orcEditMode ? "Item" : "Incluir"}>{orcEditMode ? "#" : "✓"}</span>
                           <span role="columnheader">Procedimento</span>
-                          <span role="columnheader">{orcEditMode ? 'Qtd' : 'Qtd × unitário'}</span>
+                          <span role="columnheader" className={orcEditMode ? "" : "hidden lg:block"}>{orcEditMode ? 'Qtd' : 'Qtd × unitário'}</span>
                           <span role="columnheader">{orcEditMode ? 'Unitário' : 'Valor'}</span>
                           {orcEditMode && <span role="columnheader" aria-label="Ações" />}
                         </div>
                       {orcEditMode ? (
-                        <div className="space-y-2">
+                        <div role="rowgroup" className="space-y-2">
                           {orcEditItens.map((item, idx) => (
-                            <div key={idx} role="row" className="grid min-h-[59px] grid-cols-[24px_minmax(180px,1fr)_64px_110px_28px] items-center gap-2 border-b border-border px-[6px] py-[9px]">
+                            <div key={idx} role="row" className="grid min-h-[59px] grid-cols-[24px_minmax(0,1fr)_64px_90px_28px] max-lg:[&>*:nth-child(2)]:col-span-4 max-lg:[&>*:nth-child(3)]:col-start-3 lg:grid-cols-[24px_minmax(0,1fr)_64px_110px_28px] items-center gap-2 border-b border-border px-[6px] py-[9px]">
                               <span role="cell" className="w-6 h-6 rounded-lg bg-teal/10 text-teal text-xs font-bold flex items-center justify-center shrink-0">
                                 {idx + 1}
                               </span>
@@ -988,7 +983,7 @@ export function DetalheOrcamentoModal({
                           </button>
                         </div>
                       ) : (
-                        <div className="min-w-0">
+                        <div role="rowgroup" className="min-w-0">
                           {detalheOrc.itens.length === 0 ? (
                             <div className="p-6 text-center text-sm text-text-secondary">Nenhum procedimento registrado.</div>
                           ) : (
@@ -997,7 +992,7 @@ export function DetalheOrcamentoModal({
                                 <div
                                   key={item.id}
                                   role="row"
-                                  className={`grid min-h-[59px] grid-cols-[24px_minmax(180px,1fr)_100px_110px] items-center gap-2 px-[6px] py-[9px] border-b border-border transition-colors ${
+                                  className={`grid min-h-[59px] grid-cols-[24px_minmax(0,1fr)_90px] lg:grid-cols-[24px_minmax(0,1fr)_125px_110px] items-center gap-2 px-[6px] py-[9px] border-b border-border transition-colors ${
                                     item.aprovado ? 'hover:bg-surface-alt/40' : 'bg-surface-alt/30'
                                   }`}
                                 >
@@ -1029,10 +1024,13 @@ export function DetalheOrcamentoModal({
                                         </span>
                                       )}
                                     </p>
+                                    <p className="mt-1 font-mono text-[11px] text-text-secondary lg:hidden">
+                                      {item.quantidade} × R$ {fmt((item.preco_total ?? 0) / item.quantidade)}
+                                    </p>
                                       {item.composicao?.length ? <ul className="mt-1 space-y-1 text-xs text-muted-foreground">{item.composicao.map((membro, index) => <li key={index}>{membro.quantidade} × {membro.descricao}</li>)}</ul> : null}
 
                                   </div>
-                                  <div role="cell">
+                                  <div role="cell" className="hidden lg:block whitespace-nowrap">
                                     {item.quantidade > 1 ? (
                                       <p className="text-[11px] text-text-secondary font-mono">
                                         {item.quantidade} unidades × R$ {fmt((item.preco_total ?? 0) / item.quantidade)}
@@ -1053,7 +1051,7 @@ export function DetalheOrcamentoModal({
                                     </span>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-3 shrink-0">
+                                <div className="flex flex-wrap items-center gap-3">
                                   {/* Atalho de 1 clique (pedido dele, 16/08): some sozinho
                                       quando tudo já está aprovado — sem "desmarcar tudo",
                                       é direção única (bate na I9 assim que há pagamento). */}
@@ -1087,17 +1085,39 @@ export function DetalheOrcamentoModal({
                   é gesto de balcão, não cabe atrás de um segundo clique. */}
               <div
                 id="ajustes-financeiros-orcamento"
-                className="w-full min-w-0 border-t border-border sm:basis-[64%] sm:border-l sm:border-t-0 sm:flex-none flex flex-col min-h-0 bg-teal/[0.04]"
+                className="w-full min-w-0 border-t border-border lg:border-l lg:border-t-0 flex flex-col min-h-0 bg-surface"
               >
-                <div className="flex-1 min-h-0 overflow-y-auto p-5">
+                {!orcEditMode && (
+                  <div className="shrink-0 space-y-2 border-b border-border p-5">
+                    {!detalheOrc.aceite && <Button
+                      onClick={() => setShowAceiteModal(true)}
+                      className="h-10 w-full rounded-[8px] border border-teal/20 bg-teal-pale font-semibold text-teal-ink hover:bg-teal/15"
+                    >
+                      <PenLine className="mr-2 h-4 w-4" />
+                      Coletar aceite do paciente
+                    </Button>}
+                    {detalheOrc.aceite && (
+                      <p className="text-xs text-text-secondary">Aceite assinado por {detalheOrc.aceite.assinadoPor}.</p>
+                    )}
+                    {revisaoObrigatoria && (
+                      <Button variant="outline" onClick={onOpenEditOrc} className="h-10 w-full rounded-[8px] border-border text-text-secondary hover:bg-surface-alt">
+                        Revisar orçamento
+                      </Button>
+                    )}
+                  </div>
+                )}
+                {!orcEditMode && !revisaoObrigatoria && detalheOrc.itens.some((item) => item.composicao?.length) && (
+                  <p className="px-5 pb-3 text-xs text-text-secondary">A composição dos grupos é preservada após salvar.</p>
+                )}
+                <div className="flex-1 min-h-0 overflow-y-auto p-5 [&_label]:text-xs [&_input:not([type=checkbox])]:rounded-none [&_input:not([type=checkbox])]:border-0 [&_input:not([type=checkbox])]:border-b [&_input:not([type=checkbox])]:border-border [&_input:not([type=checkbox])]:bg-transparent [&_input:not([type=checkbox])]:px-0 [&_input:not([type=checkbox])]:text-xs [&_input:not([type=checkbox])]:shadow-none [&_[data-slot=select-trigger]]:rounded-none [&_[data-slot=select-trigger]]:border-0 [&_[data-slot=select-trigger]]:border-b [&_[data-slot=select-trigger]]:border-border [&_[data-slot=select-trigger]]:bg-transparent [&_[data-slot=select-trigger]]:shadow-none">
                   {!orcEditMode && usarCobrancasPorEtapa ? (
                     <CobrancasPorEtapa orcamento={detalheOrc} pacienteId={pacienteId} permitirNovaEtapa={!temAcordoGlobal} cobrancasComResultadoIncerto={cobrancasComResultadoIncerto} onCobrancaResultadoIncerto={onCobrancaResultadoIncerto} onPagamentosOrcamentoConfirmados={onPagamentosOrcamentoConfirmados} />
                   ) : (
                     <>
                   {orcEditMode ? (
-                    <div className="rounded-2xl border border-teal/25 p-5 text-center">
-                      <p className="text-xs font-bold uppercase tracking-widest text-teal-ink">{revisaoObrigatoria ? 'Revisão do orçamento' : 'Novo total'}</p>
-                      <p className="font-mono text-3xl font-semibold text-teal-ink mt-1">
+                    <div className="border-b border-border pb-4">
+                      <p className="text-[17px] font-bold text-text-primary">{revisaoObrigatoria ? 'Revisão do orçamento' : 'Novo total'}</p>
+                      <p className="font-mono text-[21px] font-medium text-teal-ink mt-1">
                         R$ {fmt(totalEmEdicao)}
                       </p>
                       {revisaoObrigatoria ? (
@@ -1142,27 +1162,27 @@ export function DetalheOrcamentoModal({
                   ) : (
                     <div className="space-y-4">
                       <div>
-                        <p className="text-xs font-bold uppercase tracking-widest text-teal-ink">Resumo financeiro</p>
+                        <h2 className="text-[17px] font-bold text-text-primary">Resumo financeiro</h2>
                         <p className="mt-1 text-xs text-text-secondary">O que foi aceito, recebido e ainda falta receber.</p>
                       </div>
 
                       {temItensAprovados ? (
                         <div className="grid grid-cols-3 gap-2" aria-label="Resumo do orçamento">
-                          <div className="rounded-xl border border-border bg-surface-alt/40 p-3">
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Aprovado</p>
+                          <div className="border-b border-border pb-3">
+                            <p className="text-xs text-text-secondary">Aprovado</p>
                             <p className="mt-1 font-mono text-sm font-semibold text-text-primary">R$ {fmt(valorAprovado)}</p>
                           </div>
-                          <div className="rounded-xl border border-border bg-surface-alt/40 p-3">
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Recebido</p>
+                          <div className="border-b border-border pb-3">
+                            <p className="text-xs text-text-secondary">Recebido</p>
                             <p className="mt-1 font-mono text-sm font-semibold text-teal-ink">R$ {fmt(totalPago)}</p>
                           </div>
-                          <div className="rounded-xl border border-border bg-surface-alt/40 p-3">
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Saldo</p>
+                          <div className="border-b border-border pb-3">
+                            <p className="text-xs text-text-secondary">Saldo</p>
                             <p className="mt-1 font-mono text-sm font-semibold text-text-primary">R$ {fmt(restante)}</p>
                           </div>
                         </div>
                       ) : (
-                        <div className="rounded-2xl border border-border bg-surface-alt/40 p-4">
+                        <div className="border-l-2 border-border pl-3 py-1">
                           <p className="text-sm font-semibold text-text-primary">Aguardando aprovação do paciente</p>
                           <p className="mt-1 text-xs leading-relaxed text-text-secondary">
                             Selecione os procedimentos aceitos à esquerda. O recebimento só é liberado depois disso.
@@ -1171,7 +1191,7 @@ export function DetalheOrcamentoModal({
                       )}
 
                       {quitado && (
-                        <div className="rounded-2xl border border-teal/30 bg-teal/5 p-4">
+                        <div className="border-l-2 border-teal/30 pl-3 py-1">
                           <p className="text-sm font-semibold text-teal-ink">Orçamento quitado</p>
                           <p className="mt-1 text-xs text-text-secondary">
                             {pagosCount} {pagosCount === 1 ? 'pagamento registrado' : 'pagamentos registrados'}
@@ -1210,17 +1230,17 @@ export function DetalheOrcamentoModal({
                             <Button size="sm" variant="outline" onClick={onCancelarEdicaoValorAcordado} disabled={valorAcordadoSaving} className="flex-1 rounded-lg">
                               Cancelar
                             </Button>
-                            <Button size="sm" onClick={onSalvarValorAcordado} disabled={valorAcordadoSaving} className="flex-1 rounded-lg bg-teal text-white hover:bg-teal/90">
+                            <Button size="sm" onClick={onSalvarValorAcordado} disabled={valorAcordadoSaving} className="flex-1 rounded-lg bg-teal text-surface hover:bg-teal/90">
                               {valorAcordadoSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Salvar valor'}
                             </Button>
                           </div>
                         </div>
                       ) : (
-                        <div className="rounded-xl border border-border bg-surface-alt/40 p-3">
+                        <div className="border-b border-border pb-3">
                           <div className="flex items-start justify-between gap-3">
                             <div>
-                              <p className="text-xs font-bold uppercase tracking-widest text-text-secondary">Valor final negociado</p>
-                              <p className="font-mono text-lg font-semibold text-text-primary mt-1">R$ {fmt(valorNegociado)}</p>
+                              <p className="text-xs font-normal text-text-secondary">Valor final negociado</p>
+                              <p className="font-mono text-[21px] font-medium text-teal-ink mt-1">R$ {fmt(valorNegociado)}</p>
                             </div>
                             <Button
                               size="sm"
@@ -1245,7 +1265,7 @@ export function DetalheOrcamentoModal({
                     <>
                       <div className="h-px bg-border my-4" />
                       <div className="mb-2 flex items-center justify-between gap-3">
-                        <h4 className="text-xs font-bold uppercase tracking-widest text-text-secondary">
+                        <h4 className="text-xs font-normal text-text-secondary">
                           {temPlanoParcelado ? 'Previsão e recebimentos' : 'Recebimentos'}
                         </h4>
                         <span className="text-[11px] text-text-secondary">Recebido é histórico; previsão pode ser reorganizada</span>
@@ -1304,7 +1324,7 @@ export function DetalheOrcamentoModal({
                                   </Button>
                                   <Button
                                     size="sm" onClick={onSalvarEdicaoPagamento} disabled={editPagSaving}
-                                    className="flex-1 rounded-lg h-8 text-xs bg-teal hover:bg-teal/90 text-white"
+                                    className="flex-1 rounded-lg h-8 text-xs bg-teal hover:bg-teal/90 text-surface"
                                   >
                                     {editPagSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Salvar'}
                                   </Button>
@@ -1343,7 +1363,7 @@ export function DetalheOrcamentoModal({
                                     size="sm"
                                     onClick={() => onExcluirPagamento(pg.id, motivoEstorno)}
                                     disabled={pagDeleteSaving || (isPago && !motivoEstorno.trim())}
-                                    /* `text-white` sobre `bg-coral` reprova no escuro: coral vira
+                                    /* `text-surface` sobre `bg-coral` reprova no escuro: coral vira
                                        #ef9a9a (rosa claro) e branco em cima dá ~1,9:1. Par
                                        coral-ink/coral-pale funciona nos dois temas. */
                                     className="rounded-lg h-7 text-xs px-2 bg-coral-pale border border-coral text-coral-ink hover:bg-coral/20"
@@ -1465,7 +1485,7 @@ export function DetalheOrcamentoModal({
                       )}
 
                       <div className="mb-3">
-                        <p className="text-xs font-bold uppercase tracking-widest text-teal-ink">
+                        <p className="text-[17px] font-bold text-text-primary">
                           {closingPagamentoId ? 'Confirmar previsão como recebida' : parcelasMode ? 'Organizar cobrança' : 'Registrar recebimento'}
                         </p>
                         {!closingPagamentoId && podeEscolherRecebimento && (
@@ -1607,7 +1627,7 @@ export function DetalheOrcamentoModal({
                       <Button
                         onClick={onGerarParcelas}
                         disabled={parcelasSaving || !parcelasForm.primeiroVencimento}
-                        className="w-full bg-teal text-white hover:bg-teal-lt rounded-xl disabled:opacity-50 font-semibold"
+                        className={`h-10 w-full rounded-[8px] disabled:opacity-50 ${detalheOrc.aceite ? 'border border-teal/20 bg-teal-pale font-semibold text-teal-ink hover:bg-teal/15' : 'border border-border bg-transparent text-text-secondary hover:bg-surface-alt'}`}
                       >
                         {parcelasSaving
                           ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Salvando...</>
@@ -1618,7 +1638,7 @@ export function DetalheOrcamentoModal({
                       <Button
                         onClick={onRegistrarPagamento}
                         disabled={pagSaving || !pagForm.valor}
-                        className="w-full bg-teal text-white hover:bg-teal-lt rounded-xl disabled:opacity-50 font-semibold"
+                        className={`h-10 w-full rounded-[8px] disabled:opacity-50 ${detalheOrc.aceite ? 'border border-teal/20 bg-teal-pale font-semibold text-teal-ink hover:bg-teal/15' : 'border border-border bg-transparent text-text-secondary hover:bg-surface-alt'}`}
                       >
                         {pagSaving
                           ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Salvando...</>
@@ -1638,7 +1658,7 @@ export function DetalheOrcamentoModal({
             {/* ── Rodapé único (R-27a) — fora das colunas ─────────────────
                 "Registrar pagamento" saiu daqui — a coluna do dinheiro já é
                 permanente, não precisa de atalho pra abrir nada. */}
-            <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 px-6 py-4 border-t border-border [&_button]:h-10 [&_button]:rounded-[8px]">
+            <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 px-6 py-4 border-t border-border [&_button:not([role=switch])]:h-10 [&_button:not([role=switch])]:rounded-[8px]">
               {orcEditMode ? (
                 <>
                   {orcEditError && (
@@ -1688,7 +1708,7 @@ export function DetalheOrcamentoModal({
                     </Button>
                     <Dialog key={detalheOrc.id}>
                       <DialogTrigger className="h-10 rounded-[8px] px-2 text-xs text-text-secondary hover:text-teal-ink">Atividade</DialogTrigger>
-                      <DialogContent className="max-w-[650px] rounded-[16px] border-border bg-surface p-[25px]">
+                      <DialogContent className="w-[calc(100vw-2rem)] max-w-[650px] max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-[16px] border-border bg-surface p-[25px]">
                         <DialogTitle className="font-heading text-xl text-text-primary">Atividade</DialogTitle>
                         <DialogDescription className="text-xs text-text-secondary">Registros deste orçamento.</DialogDescription>
                         <div className="space-y-4">
@@ -1697,7 +1717,7 @@ export function DetalheOrcamentoModal({
                         (distinta da aprovação de status acima, que não afirma nada em 4 dos 5
                         caminhos que a disparam). */}
                     {detalheOrc.aceite ? (
-                      <div className="flex items-start gap-2 bg-teal/5 border border-teal/15 rounded-xl px-3 py-2.5">
+                      <div className="flex flex-wrap items-start gap-2 bg-teal/5 border border-teal/15 rounded-xl px-3 py-2.5 [&>p]:min-w-0 [&>p]:basis-[calc(100%-24px)]">
                         <PenLine className="w-3.5 h-3.5 text-teal-ink shrink-0 mt-0.5" />
                         <p className="text-xs text-text-secondary">
                           Aceite assinado por <span className="font-semibold text-text-primary">{detalheOrc.aceite.assinadoPor}</span>
