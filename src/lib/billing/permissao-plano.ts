@@ -1,3 +1,9 @@
+export type PlanoClinica = 'SOLO' | 'CLINICA';
+
+export function ehPlanoClinica(valor: unknown): valor is PlanoClinica {
+  return valor === 'SOLO' || valor === 'CLINICA';
+}
+
 /** Somente o proprietário da clínica ativa pode alterar sua configuração de cobrança. */
 export function papelPodeAlterarPlano(role: string | null | undefined): boolean {
   return role === 'admin';
