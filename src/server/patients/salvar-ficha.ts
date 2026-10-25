@@ -144,6 +144,26 @@ export async function salvarFicha(input: SalvarFichaInput): Promise<SalvarFichaR
   const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
   if (role === 'secretaria') return { ok: false, error: 'Sem permissão.' };
 
+  // Esta action também é chamada diretamente pela Ficha rápida e pela importação do Word.
+  const [paciente, agendamento] = await Promise.all([
+    supabase.from('pacientes').select('id')
+      .eq('id', data.pacienteId)
+      .eq('clinica_id', clinicId)
+      .maybeSingle<{ id: string }>(),
+    data.agendamentoId
+      ? supabase.from('agendamentos').select('id')
+        .eq('id', data.agendamentoId)
+        .eq('clinica_id', clinicId)
+        .eq('paciente_id', data.pacienteId)
+        .eq('dentista_id', dentistaId)
+        .maybeSingle<{ id: string }>()
+      : Promise.resolve(null),
+  ]);
+  if (paciente.error || !paciente.data
+    || (data.agendamentoId && (agendamento?.error || !agendamento?.data))) {
+    return { ok: false, error: 'Registro nao encontrado.' };
+  }
+
   const isUpdate = data.fichaId != null;
 
   if (isUpdate) {
@@ -152,9 +172,10 @@ export async function salvarFicha(input: SalvarFichaInput): Promise<SalvarFichaR
       .select('id, dentista_id, assinado_em, dentes_afetados, procedimentos')
       .eq('id', data.fichaId as string)
       .eq('clinica_id', clinicId)
+      .eq('paciente_id', data.pacienteId)
       .maybeSingle();
 
-    if (!fichaAtual) return { ok: false, error: 'Ficha não encontrada.' };
+    if (!fichaAtual) return { ok: false, error: 'Registro nao encontrado.' };
     if (fichaAtual.assinado_em != null) {
       return { ok: false, error: 'Esta ficha já foi assinada e não pode mais ser alterada.' };
     }

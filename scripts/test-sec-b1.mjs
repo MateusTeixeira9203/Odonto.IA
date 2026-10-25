@@ -7,7 +7,8 @@ import { createClient } from '@supabase/supabase-js';
 import { contexto, exigirHostQa, cli } from './qa/_lib.mjs';
 
 await cli(async () => {
-  if (process.env.RUN_SEC_B1_QA !== '1') { console.log('SKIP SEC-B1: use RUN_SEC_B1_QA=1'); return; }
+  const a2 = process.env.RUN_SEC_B1_A2_QA === '1';
+  if (process.env.RUN_SEC_B1_QA !== '1' && !a2) { console.log('SKIP SEC-B1: use RUN_SEC_B1_QA=1 ou RUN_SEC_B1_A2_QA=1'); return; }
   const ctx = await contexto();
   const base = 'http://localhost:3000';
   const host = exigirHostQa(ctx.env.NEXT_PUBLIC_SUPABASE_URL).hostname;
@@ -52,7 +53,7 @@ await cli(async () => {
   const browser = await chromium.launch({ channel: 'msedge', headless: true });
   const evidence = { host, base, patientId, slotId, cases: [], created: {} };
   const stamp = Date.now();
-  const evidenceFile = `.qa/sec-b1-${stamp}.json`;
+  const evidenceFile = `.qa/sec-b1-${a2 ? 'a2-' : ''}${stamp}.json`;
   function save() { writeFileSync(evidenceFile, JSON.stringify(evidence, null, 2)); }
   try {
     async function login(index) {
@@ -99,6 +100,46 @@ await cli(async () => {
       const line = text.split('\n').find(l => /^\d+:\{"ok":/.test(l));
       assert(line, 'Retorno da action ausente');
       return JSON.parse(line.slice(line.indexOf(':') + 1));
+    }
+    if (a2) {
+      const data = '2026-10-24';
+      const payloads = {
+        salvarFicha: { pacienteId: patientId, origem: 'manual', dataAtendimento: data,
+          queixaPrincipal: '', anotacoes: 'QA SEC-B1 A2 ficha sintética', dentesAfetados: [],
+          dentesObservacoes: {}, procedimentos: [], conduta: '' },
+        importarHistoricoDoWord: { pacienteId: patientId, dataAtendimento: data, texto: 'QA SEC-B1 A2 histórico sintético' },
+      };
+      const bruno = await login(4);
+      for (const [action, payload] of Object.entries(payloads)) {
+        const before = await snapshot();
+        const result = await call(bruno, action, payload);
+        const after = await snapshot();
+        evidence.cases.push({ label: 'A2 Bruno', action, result, before, after }); save();
+        assert.equal(result.ok, false);
+        assert.equal(result.error, 'Registro nao encontrado.');
+        assert.deepEqual(after, before);
+        console.log(`PASS A2 Bruno / ${action}: recusa e quatro tabelas iguais`);
+      }
+      await bruno.context().close();
+      for (const [action, payload] of Object.entries(payloads)) {
+        const before = await snapshot();
+        const result = await call(ana, action, payload);
+        const after = await snapshot();
+        evidence.cases.push({ label: 'A2 Ana', action, result, before, after }); save();
+        assert.equal(result.ok, true);
+        const ficha = await observer.from('fichas').select('clinica_id,paciente_id,origem,anotacoes')
+          .eq('id', result.fichaId).single();
+        assert(!ficha.error);
+        assert.equal(ficha.data.clinica_id, clinicA);
+        assert.equal(ficha.data.paciente_id, patientId);
+        assert.equal(ficha.data.origem, action === 'salvarFicha' ? 'manual' : 'importado');
+        assert.equal(ficha.data.anotacoes, payload.anotacoes ?? payload.texto);
+        assert.equal(after.fichas.count, before.fichas.count + 1);
+        for (const table of ['atendimentos_clinicos', 'ficha_evolucoes', 'odontograma_eventos']) assert.deepEqual(after[table], before[table]);
+        console.log(`PASS A2 Ana / ${action}: ficha persistida na A; demais tabelas iguais`);
+      }
+      console.log(`EVIDÊNCIA ${evidenceFile}; dados sintéticos preservados, sem DELETE`);
+      return;
     }
     for (const [label, index, expected] of [
       ['Bruno', 4, 'Registro nao encontrado.'], ['secretaria', 3, 'Sem permissão.'], ['protetico', 5, 'Sem permissão.'],
