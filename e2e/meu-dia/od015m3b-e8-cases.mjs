@@ -1,0 +1,31 @@
+﻿export async function run(stage,h){
+ const {assert,expect,e,save,rows,db,state,login,openFicha,openDelete,fillDialog,capture,base,qaPatient,qaName,qid,fs,path,dir}=h;
+ const get=(t,id,col='id')=>rows(db.from(t).select('*').eq(col,id));
+ async function openBudget(p,label){
+  await p.goto(base+'/dashboard/pacientes/'+qaPatient);await p.getByRole('tab',{name:'Orçamentos',exact:true}).click();const cards=p.getByRole('button',{name:/^Abrir orçamento de/});await expect(cards).toHaveCount(1);e[label]={card:await cards.first().innerText()};await cards.first().click();const d=p.getByRole('dialog',{name:'Orçamento',exact:true});await d.waitFor();const text=await d.innerText();e[label].text=text;e[label].buttons=await d.getByRole('button').allTextContents();save();assert(text.includes('Aceite assinado por '+qaName));assert(!text.includes('Coletar aceite'));assert.match(text,/100/);assert.match(text,/Pix|pix|PIX/);await capture(p,label);return d;
+ }
+ async function blockDelete(p,d,label){
+  await d.getByRole('button',{name:'Excluir',exact:true}).click();const blocked=p.getByRole('dialog',{name:'Excluir orçamento',exact:true});await blocked.waitFor();const text=await blocked.innerText();e[label]={text,buttons:await blocked.getByRole('button').allTextContents()};save();assert.match(text,/aceite assinado pelo paciente e não pode ser excluído/);assert.deepEqual(e[label].buttons.map(x=>x.trim()),['Fechar']);await capture(p,label);await blocked.getByRole('button',{name:'Fechar',exact:true}).click();
+ }
+ function preserved(before,after){
+  for(const t of ['assinaturas','orcamento_cobrancas','orcamento_cobranca_itens','pagamentos','orcamento_itens','paciente_documentos'])assert.equal(before.tables[t].hash,after.tables[t].hash,t+' alterado');
+  const old=before.tables.orcamentos.rows.find(x=>x.id===qid(603)),now=after.tables.orcamentos.rows.find(x=>x.id===qid(603));assert(now);assert.equal(now.ficha_id,null);for(const k of Object.keys(old).filter(x=>!['ficha_id','updated_at'].includes(x)))assert.deepEqual(now[k],old[k],k);
+  const od=before.tables.documentos_aceite.rows.find(x=>x.id===qid(1002)),nd=after.tables.documentos_aceite.rows.find(x=>x.id===qid(1002));assert.equal(nd.ficha_id,null);assert.deepEqual({...nd,ficha_id:od.ficha_id},od);
+  assert.equal(after.permanent,before.permanent);assert(!after.tables.fichas.rows.some(x=>x.id===qid(108)));assert(!after.tables.odontograma_eventos.rows.some(x=>x.id===qid(304)));assert(!after.tables.ficha_evolucoes.rows.some(x=>x.id===qid(403)));assert(!after.tables.orcamento_eventos.rows.some(x=>x.orcamento_id===qid(603)));
+ }
+ if(stage==='prepare'){
+  const a=await login('ANA'),p=a.page;e.before=await state();assert.equal((await get('pacientes',qaPatient))[0].nome,qaName);assert.equal((await get('fichas',qid(108))).length,1);const signature=(await get('assinaturas',qid(802)))[0];assert.equal(signature.termos_snapshot.versao,2);assert.equal(signature.termos_snapshot.total,100);assert.equal((await get('pagamentos',qid(1202)))[0].status,'pago');assert.equal((await get('pagamentos',qid(1202)))[0].forma_pagamento,'pix');save();
+  const d=await openBudget(p,'E8-00-antes-aceite');await blockDelete(p,d,'E8-01-antes-OD010');await d.getByRole('button',{name:'Fechar',exact:true}).last().click();assert.deepEqual(await state(),e.before);e.prepared=true;save();console.log('PASSOU preflight E8 V2, aceite legivel e OD010 antes; nenhuma escrita');console.log(JSON.stringify(e['E8-00-antes-aceite'].buttons));
+ }
+ if(stage==='delete-once'){
+  assert(e.prepared);assert(!e.writeSent);const a=await login('ANA'),p=a.page;assert.deepEqual(await state(),e.before);await openFicha(p,qid(108),qaPatient);const d=await openDelete(p);await d.waitFor();await fillDialog(d,{name:qaName});await expect(d.getByRole('checkbox')).not.toBeChecked();await expect(d.getByRole('button',{name:'Apagar ficha',exact:true})).toBeDisabled();e.warning=await d.innerText();await capture(p,'E8-02-sem-caixa');await d.getByRole('checkbox').check();await expect(d.getByRole('button',{name:'Apagar ficha',exact:true})).toBeEnabled();await capture(p,'E8-03-com-caixa');e.writeSent={at:new Date().toISOString(),ficha:qid(108),patient:qaPatient};save();await d.getByRole('button',{name:'Apagar ficha',exact:true}).click();await expect.poll(()=>get('fichas',qid(108)),{timeout:25000}).toHaveLength(0);e.afterDelete=await state();save();preserved(e.before,e.afterDelete);e.copy=await get('prontuario_exclusoes_copias',qid(108),'ficha_id');e.audit=await get('prontuario_exclusoes',qid(108),'ficha_id');assert.equal(e.copy.length,1);assert.equal(e.audit.length,1);assert(e.audit[0].resumo.confirmou_orcamento_aceito);assert.equal(e.copy[0].conteudo.orcamentos_apagados.length,0);e.deleted=true;save();console.log('PASSOU unica exclusao E8; hashes e objetos preservados');
+ }
+ if(stage==='after-ui'){
+  assert(e.deleted);const a=await login('ANA'),p=a.page;const d=await openBudget(p,'E8-04-depois-aceite');await blockDelete(p,d,'E8-05-depois-OD010');await d.getByRole('button',{name:'Fechar',exact:true}).last().click();await p.reload();const d2=await openBudget(p,'E8-06-segunda-leitura-aceite');await blockDelete(p,d2,'E8-07-segunda-leitura-OD010');await d2.getByRole('button',{name:'Fechar',exact:true}).last().click();e.afterUI=await state();preserved(e.before,e.afterUI);assert.deepEqual(e.afterUI,e.afterDelete);e.uiPassed=true;save();console.log('PASSOU aba e segunda leitura independente apos recarga; aceite/PIX/OD010');
+  await p.goto(base+'/dashboard/orcamentos');await p.waitForURL(url=>url.pathname==='/dashboard/pacientes',{timeout:15000});e.globalRoute={requested:'/dashboard/orcamentos',actual:p.url(),status:'NAO TESTADO',reason:'Rota geral nao renderiza; redireciona para Pacientes.'};await capture(p,'E8-08-rota-geral-redireciona');save();
+ }
+ if(stage==='final'){
+  e.final=await state();preserved(e.before,e.final);assert.deepEqual(e.final,e.afterDelete);e.finished=new Date().toISOString();e.ids={patient:qaPatient,ficha:qid(108),budget:qid(603),signature:qid(802),document:qid(1002),charge:qid(1101),payment:qid(1202),copy:e.copy.map(x=>x.exclusao_id)};fs.writeFileSync(path.join(dir,'fixtures-para-limpeza.json'),JSON.stringify({ids:e.ids,state:e.final,noCleanup:true},null,2));save();console.log('PASSOU final E8 sem efeitos extras; fixture retida para limpeza autorizada');
+ }
+}
+
