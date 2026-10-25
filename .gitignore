@@ -53,3 +53,7 @@ plans/auditorias/screens/
 
 # Eval clínico: resultados locais podem referenciar uma sessão autenticada e são regeneráveis.
 evals/extracao-clinica/results/
+
+/.qa/
+
+/test-results/

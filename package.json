@@ -9,7 +9,15 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test",
-    "test:watch": "tsx --test --watch src/**/*.test.ts"
+    "test:watch": "tsx --test --watch src/**/*.test.ts",
+    "qa:snapshot-up": "node scripts/qa/snapshot-up.mjs",
+    "qa:snapshot-down": "node scripts/qa/snapshot-down.mjs",
+    "qa:snapshot-list": "node scripts/qa/snapshot-list.mjs",
+    "qa:suite": "node scripts/qa/suite.mjs",
+    "qa:e2e": "node scripts/qa/e2e.mjs",
+    "qa:fixture-apply": "node scripts/qa/fixture-apply.mjs",
+    "qa:fixture-clean": "node scripts/qa/fixture-clean.mjs",
+    "qa:checar-vazamento": "node scripts/qa/checar-vazamento.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.2.0",
@@ -57,6 +65,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.3",
+    "pg": "^8.23.1",
     "shadcn": "^4.0.3",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
