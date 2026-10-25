@@ -25,6 +25,7 @@ import {
   Lock,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
+import { dentistaDoEscopoDaAgenda } from '@/lib/agenda/escopo-dentista';
 const AssinaturaRecepcaoModal = dynamic(
   () => import('@/components/fichas/AssinaturaRecepcaoModal').then(m => m.AssinaturaRecepcaoModal),
   { ssr: false }
@@ -319,22 +320,28 @@ export function AgendamentosClient({
     // é como o defeito nasceu. Agora há um só, e ele mora em `janelaDaVisao`.
     const janela = janelaDaVisao(visao, ancora);
     const supabase = createClient();
+    const escopo = dentistaDoEscopoDaAgenda(role, dentistaAtualId);
+    const query = supabase
+      .from('agendamentos')
+      .select('id, clinica_id, paciente_id, dentista_id, data_hora, duracao_minutos, status, origem, observacoes, created_at, paciente:pacientes(id, nome, observacoes), dentista:dentistas!agendamentos_dentista_id_fkey(id, nome), criador:dentistas!agendamentos_created_by_fkey(id, nome)')
+      .eq('clinica_id', _clinicaId)
+      .gte('data_hora', janela.de)
+      .lt('data_hora', janela.ate)
+      .order('data_hora');
+    if (escopo) query.eq('dentista_id', escopo);
+
+    const bloqueiosQuery = supabase
+      .from('agenda_bloqueios')
+      .select('id, clinica_id, dentista_id, data_hora, duracao_minutos, titulo, criado_por, dentista:dentistas!agenda_bloqueios_dentista_id_fkey(id, nome)')
+      .eq('clinica_id', _clinicaId)
+      .gte('data_hora', janela.de)
+      .lt('data_hora', janela.ate)
+      .order('data_hora');
+    if (escopo) bloqueiosQuery.eq('dentista_id', escopo);
+
     const [{ data, error }, { data: bloqueiosData, error: bloqueiosErr }] = await Promise.all([
-      supabase
-        .from('agendamentos')
-        .select('id, clinica_id, paciente_id, dentista_id, data_hora, duracao_minutos, status, origem, observacoes, created_at, paciente:pacientes(id, nome, observacoes), dentista:dentistas!agendamentos_dentista_id_fkey(id, nome), criador:dentistas!agendamentos_created_by_fkey(id, nome)')
-        .eq('clinica_id', _clinicaId)
-        .gte('data_hora', janela.de)
-        .lt('data_hora', janela.ate)
-        .order('data_hora'),
-      // R-102 — mesma janela, RLS já restringe ao próprio dentista (ou aos dois, se secretária).
-      supabase
-        .from('agenda_bloqueios')
-        .select('id, clinica_id, dentista_id, data_hora, duracao_minutos, titulo, criado_por, dentista:dentistas!agenda_bloqueios_dentista_id_fkey(id, nome)')
-        .eq('clinica_id', _clinicaId)
-        .gte('data_hora', janela.de)
-        .lt('data_hora', janela.ate)
-        .order('data_hora'),
+      query,
+      bloqueiosQuery,
     ]);
     // Antes o erro era engolido (`if (data)`) e a lista ficava velha em silêncio —
     // e é dela que sai o aviso de conflito. Falhar calado aqui é mentir na tela.
@@ -350,7 +357,7 @@ export function AgendamentosClient({
     }
     if (data) setAgendamentos(data as unknown as AgendamentoRow[]);
     if (bloqueiosData) setBloqueios(bloqueiosData as unknown as BloqueioRow[]);
-  }, [_clinicaId, visao, ancora]);
+  }, [_clinicaId, visao, ancora, role, dentistaAtualId]);
 
   useEffect(() => {
     const handler = () => { void recarregarAgendamentos(); };

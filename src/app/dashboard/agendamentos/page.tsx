@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { dentistaDoEscopoDaAgenda } from '@/lib/agenda/escopo-dentista';
 import { getDentistaCached } from '@/lib/get-dentista';
 import { hojeBRT } from '@/lib/hora-brt';
 import { createClient } from '@/lib/supabase/server';
@@ -84,6 +85,7 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
 
   const supabase = await createClient();
   const isSecretaria = dentista.role === 'secretaria';
+  const escopo = dentistaDoEscopoDaAgenda(dentista.role, dentista.id);
 
   // Secretária: vê todos os agendamentos da clínica
   // Dentista/admin: vê apenas seus próprios
@@ -98,8 +100,8 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
     .lt('data_hora', janela.ate)
     .order('data_hora', { ascending: true });
 
-  if (!isSecretaria) {
-    query.eq('dentista_id', dentista.id);
+  if (escopo) {
+    query.eq('dentista_id', escopo);
   }
 
   // Agendamentos ativos DEPOIS do mês da âncora.
@@ -119,8 +121,8 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
     .gte('data_hora', fimDoMes)
     .order('data_hora', { ascending: true });
 
-  if (!isSecretaria) {
-    proximosQuery.eq('dentista_id', dentista.id);
+  if (escopo) {
+    proximosQuery.eq('dentista_id', escopo);
   }
 
   // R-102 — compromissos pessoais na mesma janela visível, mesmo filtro de dentista que
@@ -133,8 +135,8 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
     .lt('data_hora', janela.ate)
     .order('data_hora', { ascending: true });
 
-  if (!isSecretaria) {
-    bloqueiosQuery.eq('dentista_id', dentista.id);
+  if (escopo) {
+    bloqueiosQuery.eq('dentista_id', escopo);
   }
 
   // Dados em paralelo: agendamentos + contagem de secretárias + o que está fora da janela
