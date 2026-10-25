@@ -1,5 +1,4 @@
 import { planejarRoteamentoVisita } from '@/lib/prontuario/planejar-roteamento-visita';
-import { fichaAssinadaRecusa } from '@/lib/prontuario/ficha-assinada-recusa';
 import { requireClinicContext } from '@/server/auth/clinic';
 import { hojeBRT } from '@/lib/hora-brt';
 import { derivarV2DosEventos } from '@/lib/odontograma/derivar-campos-legado';
@@ -56,7 +55,7 @@ export interface RotearVisitaInput {
 const ERRO_FICHA_SUMIU =
   'A ficha deste tratamento não foi encontrada. Atualize a página e tente de novo.';
 const ERRO_FICHA_ASSINADA =
-  'Esta ficha foi assinada pelo modo antigo e ainda não recebe procedimentos novos. A evolução pode ser salva sem eles.';
+  'Os procedimentos anteriores à assinatura desta ficha não podem ser alterados.';
 const ERRO_FICHA_DE_OUTRO =
   'Não foi possível gravar: esta ficha é de outro dentista.';
 
@@ -98,9 +97,6 @@ export async function acrescentarEventosNaFicha(input: {
     .maybeSingle<{ id: string; assinado_em: string | null }>();
 
   if (!ficha) return { ok: false, error: ERRO_FICHA_SUMIU };
-  if (fichaAssinadaRecusa(ficha.assinado_em, input.eventos.length)) {
-    return { ok: false, error: ERRO_FICHA_ASSINADA };
-  }
 
   // Sonda de escrita ANTES de tocar em evento. A leitura de ficha é compartilhada na clínica
   // (migration 099) mas a escrita continua siloada por dentista — sem isto, concluir pendência

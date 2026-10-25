@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { editarEvolucaoClinica } from '@/server/patients/editar-evolucao-clinica';
 import type { ProntuarioAtendimento, ProntuarioEvolucao } from '@/server/patients/get-prontuario-longitudinal';
+import { travadoPelaAssinaturaDaFicha } from '@/lib/prontuario/travado-pela-ficha';
 
 type EditorAberto = { fechar: () => void; podeFechar: () => boolean };
 const GrupoEditoresContext = createContext<((editor: EditorAberto) => boolean) | null>(null);
@@ -49,8 +50,13 @@ export function EvolucaoClinicaFicha({ atendimento, pacienteId, dentistaId, canW
     }));
   const podeEditar = (registro: ProntuarioEvolucao): boolean => {
     const ficha = atendimento.fichas.find((item) => item.id === registro.fichaId);
+    const nova = registro.id.startsWith('nova:');
+    const legado = registro.id.startsWith('texto-legado:') || (nova && atendimento.atendimentoId == null);
+    const travada = legado
+      ? Boolean(ficha?.assinadoEm || ficha?.assinaturaUrl)
+      : !nova && travadoPelaAssinaturaDaFicha(ficha?.assinadoEm ?? null, registro.criadoEm ?? null);
     return canWrite && !registro.automatica && registro.profissional.id === dentistaId
-      && !!ficha && !ficha.assinadoEm && !ficha.assinaturaUrl;
+      && !!ficha && !travada;
   };
   const unico = registros.length === 1 ? registros[0] : null;
   const botaoEditar = (registro: ProntuarioEvolucao) => (

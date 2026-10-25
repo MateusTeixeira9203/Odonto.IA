@@ -23,11 +23,13 @@ export type ProntuarioEvolucao = {
   texto: string | null;
   automatica: boolean;
   data: string;
+  criadoEm?: string | null;
   profissional: ProntuarioProfissional;
 };
 
 export type ProntuarioEvento = OdontogramaEventoDraft & {
   fichaId: string | null;
+  criadoEm?: string | null;
   /** Captura que acrescentou o evento depois da visita original, quando houver. */
   capturaId?: string | null;
   /** Retirada preserva o histórico; a ficha ativa a exclui. */
@@ -131,6 +133,7 @@ type EvolucaoRaw = {
   data: string;
   texto: string | null;
   automatica: boolean;
+  created_at: string | null;
 };
 
 type EventoRaw = {
@@ -247,6 +250,7 @@ function paraEvento(
     realizado_em: raw.realizado_em,
     registrado_em: raw.registrado_em,
     created_at: raw.created_at,
+    criadoEm: raw.created_at,
     assinaturaId: raw.assinatura_id,
     encaminhadoParaId: raw.encaminhado_para,
     atualizadoEm: raw.registrado_em,
@@ -329,7 +333,7 @@ export async function getProntuarioLongitudinal({
   const evolucoesResult = fichaIdsDoPaciente.length > 0
     ? await supabase
         .from('ficha_evolucoes')
-        .select('id, ficha_id, atendimento_id, dentista_id, data, texto, automatica')
+        .select('id, ficha_id, atendimento_id, dentista_id, data, texto, automatica, created_at')
         .eq('clinica_id', clinicId)
         .in('ficha_id', fichaIdsDoPaciente)
         .order('data', { ascending: false })
@@ -515,6 +519,7 @@ export async function getProntuarioLongitudinal({
         fichaId: evolucao.ficha_id,
         texto: evolucao.texto,
         automatica: evolucao.automatica,
+        criadoEm: evolucao.created_at,
         data: evolucao.data,
         profissional: profissionais.get(evolucao.dentista_id) ?? profissionalDesconhecido,
       })),
@@ -565,11 +570,13 @@ export async function getProntuarioLongitudinal({
           data: ficha.data_atendimento,
           texto: ficha.anotacoes,
           automatica: false,
+          created_at: null,
         } satisfies EvolucaoRaw]).map((evolucao) => ({
           id: evolucao.id,
           fichaId: evolucao.ficha_id,
           texto: evolucao.texto,
           automatica: evolucao.automatica,
+          criadoEm: evolucao.created_at,
           data: evolucao.data,
           profissional: profissionais.get(evolucao.dentista_id) ?? profissionalDesconhecido,
         })),

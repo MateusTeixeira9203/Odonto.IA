@@ -12,6 +12,7 @@ import { endoDetalheSchema } from '@/lib/especialidades/endo';
 import { implanteDetalheSchema } from '@/lib/especialidades/implante';
 import { criarDocumentoConclusaoAssinatura } from '@/server/legal/documentos-aceite';
 import { hojeBRT } from '@/lib/hora-brt';
+import { travadoPelaAssinaturaDaFicha } from '@/lib/prontuario/travado-pela-ficha';
 
 import { editarDetalhesEventoSchema, type EditarDetalhesEventoInput, type EditarDetalhesEventoResult } from '@/lib/odontograma/edicao-procedimento';
 
@@ -172,7 +173,7 @@ export async function iniciarAtendimentoConsulta(agendamentoId: string): Promise
  * Alterna planejado ⇄ realizado de UM registro (grupo de eventos) na ficha salva.
  * Bug 21/07: a ficha salva não tinha caminho pra marcar o que foi feito — tudo
  * ficava "Planejado". Regras herdadas do núcleo clínico: só o AUTOR escreve, e
- * ficha assinada é imutável (invariante #14). `realizado_em` registra o dia em que
+ * item anterior à assinatura da ficha é imutável. `realizado_em` registra o dia em que
  * o dentista marcou o procedimento como realizado e volta a null ao reabrir o registro.
  */
 export async function alternarStatusRegistro(params: {
@@ -192,10 +193,10 @@ export async function alternarStatusRegistro(params: {
 
   if (!dentistaPerfil) return { ok: false, error: 'Perfil de dentista não encontrado.' };
 
-  // A ficha dona precisa ser DESTE dentista e não estar assinada.
+  // Preserva autor/responsável; a assinatura da ficha trava somente os itens anteriores.
   const { data: eventos } = await supabase
     .from('odontograma_eventos')
-    .select('id, ficha_id, origem')
+    .select('id, ficha_id, origem, created_at')
     .in('id', params.eventoIds)
     .eq('clinica_id', clinicId)
     .is('retirado_em', null)
@@ -212,8 +213,9 @@ export async function alternarStatusRegistro(params: {
     .in('id', fichaIds)
     .eq('clinica_id', clinicId);
 
-  if (fichas?.some((f) => f.assinado_em != null)) {
-    return { ok: false, error: 'Esta ficha já foi assinada e não pode mais ser alterada.' };
+  const assinaturaPorFicha = new Map((fichas ?? []).map((f) => [f.id, f.assinado_em]));
+  if (eventos.some((e) => travadoPelaAssinaturaDaFicha(assinaturaPorFicha.get(e.ficha_id ?? '') ?? null, e.created_at))) {
+    return { ok: false, error: 'Este registro é anterior à assinatura da ficha e não pode mais ser alterado.' };
   }
 
   const realizado = params.novoStatus === 'realizado';
@@ -251,7 +253,7 @@ export async function alternarStatusRegistro(params: {
 
 /**
  * R-101 — liga/desliga "próxima seção" de UM registro (grupo de eventos) na ficha salva.
- * Mesmo padrão de guarda que alternarStatusRegistro (autor, ficha não assinada). Só faz
+ * Mesmo padrão de guarda que alternarStatusRegistro (autor, trava por item). Só faz
  * sentido em status='indicado' — a constraint do banco recusa em realizado; o caller
  * (RegistroCard) já esconde o controle nesse caso, mas a action não confia só na UI.
  */
@@ -274,7 +276,7 @@ export async function alternarMomentoRegistro(params: {
 
   const { data: eventos } = await supabase
     .from('odontograma_eventos')
-    .select('id, ficha_id')
+    .select('id, ficha_id, created_at')
     .in('id', params.eventoIds)
     .eq('clinica_id', clinicId)
     .is('retirado_em', null)
@@ -292,8 +294,9 @@ export async function alternarMomentoRegistro(params: {
     .in('id', fichaIds)
     .eq('clinica_id', clinicId);
 
-  if (fichas?.some((f) => f.assinado_em != null)) {
-    return { ok: false, error: 'Esta ficha já foi assinada e não pode mais ser alterada.' };
+  const assinaturaPorFicha = new Map((fichas ?? []).map((f) => [f.id, f.assinado_em]));
+  if (eventos.some((e) => travadoPelaAssinaturaDaFicha(assinaturaPorFicha.get(e.ficha_id ?? '') ?? null, e.created_at))) {
+    return { ok: false, error: 'Este registro é anterior à assinatura da ficha e não pode mais ser alterado.' };
   }
 
   const { error } = await supabase
@@ -353,7 +356,7 @@ export async function encaminharProcedimento(params: {
   // A query já filtra por autor (`dentista_id = eu`) — o que não voltar aqui já é "ignorado".
   const { data: eventos } = await supabase
     .from('odontograma_eventos')
-    .select('id, ficha_id, status, paciente_id')
+    .select('id, ficha_id, status, paciente_id, created_at')
     .in('id', params.eventoIds)
     .eq('clinica_id', clinicId)
     .is('retirado_em', null)
@@ -372,12 +375,11 @@ export async function encaminharProcedimento(params: {
     .select('id, assinado_em')
     .in('id', fichaIdsCandidatos)
     .eq('clinica_id', clinicId);
-  const fichasAssinadas = new Set(
-    (fichas ?? []).filter((f) => f.assinado_em != null).map((f) => f.id),
-  );
+  const assinaturaPorFicha = new Map((fichas ?? []).map((f) => [f.id, f.assinado_em]));
 
   const eventosElegiveis = (eventos ?? []).filter(
-    (e) => idsIndicados.has(e.id) && (e.ficha_id == null || !fichasAssinadas.has(e.ficha_id)),
+    (e) => idsIndicados.has(e.id)
+      && !travadoPelaAssinaturaDaFicha(assinaturaPorFicha.get(e.ficha_id ?? '') ?? null, e.created_at),
   );
   const idsElegiveis = eventosElegiveis.map((e) => e.id);
   const ignorados = params.eventoIds.filter((id) => !idsElegiveis.includes(id));
@@ -401,7 +403,7 @@ export async function encaminharProcedimento(params: {
   if (!destino) return { ok: false, error: 'Destino inválido.' };
 
   // R-140c: alteração e trilha de auditoria precisam ser uma operação só. A RPC
-  // reafirma autor, clínica, status, ficha não assinada e destino antes de gravar
+  // reafirma autor, clínica, status, trava do item e destino antes de gravar
   // o evento e o `activity_logs`; se o log falhar, nada é encaminhado.
   const { error } = await supabase.rpc('encaminhar_eventos_odontograma', {
     p_evento_ids: idsElegiveis,
@@ -781,6 +783,9 @@ export async function assinarProcedimentos(
     // num único raise (status_invalido) — não há como o wrapper distinguir os 3 casos.
     if (error.message.includes('status_invalido')) {
       return { ok: false, error: 'Só é possível assinar procedimentos já realizados e ainda não assinados, todos da mesma ficha.' };
+    }
+    if (error.message.includes('autores_diferentes')) {
+      return { ok: false, error: 'Selecione procedimentos de um único profissional para cada assinatura.' };
     }
     console.error('[assinarProcedimentos]', error.message);
     return { ok: false, error: 'Não foi possível registrar a assinatura.' };

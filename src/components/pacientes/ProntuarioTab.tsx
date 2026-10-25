@@ -32,6 +32,7 @@ import type { MeuDiaCatalogoProcedimento } from '@/server/dashboard/get-meu-dia'
 import type { ProntuarioAtendimento, ProntuarioEvento, ProntuarioLongitudinalData } from '@/server/patients/get-prontuario-longitudinal';
 import type { OdontogramaEventoDraft } from '@/types/odontograma';
 import { rotuloProcedimento as nomeClinicoProcedimento } from '@/types/odontograma';
+import { travadoPelaAssinaturaDaFicha } from '@/lib/prontuario/travado-pela-ficha';
 import {
   alternarMomentoRegistro,
   alternarStatusRegistro,
@@ -642,15 +643,22 @@ export function ProntuarioTab({
     const progressoDaFicha = fichaAberta && fichaAberta.totalProcedimentos > 0
       ? Math.round((fichaAberta.procedimentosRealizados / fichaAberta.totalProcedimentos) * 100)
       : 0;
+    const travadoPelaFicha = (evento: ProntuarioEvento): boolean => {
+      const ficha = evento.fichaId === fichaAtual?.id
+        ? fichaAtual
+        : atendimentoAberto.fichas.find((item) => item.id === evento.fichaId);
+      return travadoPelaAssinaturaDaFicha(ficha?.assinadoEm ?? null, evento.criadoEm ?? evento.created_at ?? null);
+    };
     const elegiveisParaAssinatura = eventosDaFicha.filter((evento) => (
       evento.status === 'realizado'
       && evento.assinaturaId == null
       && evento.retiradoEm == null
       && evento.fichaId != null
+      && !travadoPelaFicha(evento)
       && (evento.encaminhadoParaId ?? evento.dentistaId) === dentistaId
     ));
     const podeEscreverFicha = podeEditarProcedimentosDaSuperficie(superficie, canWrite);
-    const podeAdicionarNaFicha = podeEscreverFicha && fichaAtual != null && !fichaAtual.assinadoEm && (
+    const podeAdicionarNaFicha = podeEscreverFicha && fichaAtual != null && (
       fichaAtual.responsavel.id === dentistaId
       || eventosDaFicha.some((evento) => evento.encaminhadoParaId === dentistaId && evento.retiradoEm == null)
     );
@@ -731,7 +739,7 @@ export function ProntuarioTab({
                   onAbrir={(resumo) => Promise.resolve(onGerarOrcamento(fichaAtual.id, resumo))}
                 />
             )}
-            {podeEscreverFicha && fichaAtual && !fichaAtual.assinadoEm && (
+            {podeEscreverFicha && fichaAtual && (!fichaAtual.assinadoEm || elegiveisParaAssinatura.length > 0) && (
                     <Button
                       variant="outline"
                       className={atalhoFicha}
@@ -762,7 +770,7 @@ export function ProntuarioTab({
             <article data-ficha-procedimentos className="min-w-0">
               <div className="flex flex-wrap items-center gap-3">
                 <h2 className="font-sans text-[17px] font-bold text-text-primary">Procedimentos</h2>
-                {podeEscreverFicha && fichaAtual && !fichaAtual.assinadoEm && (
+                {podeEscreverFicha && fichaAtual && (
                   <div className="flex flex-wrap gap-2">
                     {podeAdicionarNaFicha && <Button
                       variant="ghost"
@@ -814,15 +822,16 @@ export function ProntuarioTab({
                           ? fichaAtual
                           : evento.fichaId ? atendimentoAberto.fichas.find((item) => item.id === evento.fichaId) : null;
                         const fichaAssinada = ficha?.assinadoEm != null;
-                        const podeAlterarStatus = podeEscreverFicha && !retirado && !assinado && !fichaAssinada
+                        const travadoPelaAssinatura = grupo.eventos.some(travadoPelaFicha);
+                        const podeAlterarStatus = podeEscreverFicha && !retirado && !assinado && !travadoPelaAssinatura
                           && (temEncaminhamento ? encaminhadoAoAtual : autorAtual);
                         const realizados = grupo.eventos.filter((item) => item.status === 'realizado').length;
                         const todosRealizados = realizados === grupo.eventos.length;
                         const todosAFazer = realizados === 0;
                         const podeOrganizar = podeAlterarStatus && !temEncaminhamento && autorAtual && todosAFazer;
                         const emProximaSessao = todosAFazer && grupo.eventos.every((item) => item.momento_planejado === 'proxima_sessao');
-                        const integrantesEditaveis = podeEscreverFicha && !fichaAssinada
-                          ? grupo.eventos.filter((item) => !item.retiradoEm && !item.assinaturaId && (
+                        const integrantesEditaveis = podeEscreverFicha
+                          ? grupo.eventos.filter((item) => !travadoPelaFicha(item) && !item.retiradoEm && !item.assinaturaId && (
                             item.encaminhadoParaId == null
                               ? item.dentistaId === dentistaId
                               : item.encaminhadoParaId === dentistaId && (item.tipo === 'endodontia' || item.tipo === 'implante')
@@ -845,7 +854,7 @@ export function ProntuarioTab({
                             <span className="text-xs text-text-secondary" aria-label="Faces">{evento.ancora.faces?.join('') || '—'}</span>
                             <button type="button" disabled={!podeAlterarStatus || carregando}
                               onClick={() => void atualizarStatusGrupo(grupo, todosRealizados ? 'indicado' : 'realizado')}
-                              title={podeAlterarStatus ? 'Alternar entre A fazer e Realizado' : assinado || fichaAssinada ? 'Assinado · registro bloqueado' : 'Status sem permissão de alteração'}
+                              title={podeAlterarStatus ? 'Alternar entre A fazer e Realizado' : assinado || travadoPelaAssinatura ? 'Assinado · registro bloqueado' : 'Status sem permissão de alteração'}
                               aria-label={`Status de ${nomeClinicoProcedimento(evento)} no ${dente == null ? 'âmbito Boca / região' : `dente ${dente}`}: ${retirado ? 'Retirado da ficha' : todosRealizados ? 'Realizado' : emProximaSessao ? 'A fazer · próxima sessão' : 'A fazer'}`}
                               className={`h-7 min-w-0 truncate rounded-[4px] bg-surface px-1 text-xs disabled:cursor-default ${retirado ? 'text-text-secondary' : 'text-teal-ink'}`}>
                               {retirado ? 'Retirado da ficha' : todosRealizados ? 'Realizado' : !todosAFazer ? `Parcial · ${realizados} de ${grupo.eventos.length}` : emProximaSessao ? 'Próxima sessão' : 'A fazer'}
@@ -921,7 +930,7 @@ export function ProntuarioTab({
                                 {emProximaSessao ? 'Planejado para a próxima sessão' : 'Levar para próxima sessão'}
                               </button>
                             )}
-                            {podeEscreverFicha && autorAtual && !temEncaminhamento && !retirado && !assinado && !fichaAssinada && todosAFazer && (
+                            {podeEscreverFicha && autorAtual && !temEncaminhamento && !retirado && !assinado && !travadoPelaAssinatura && todosAFazer && (
                               <button
                                 type="button"
                                 onClick={() => {
@@ -1234,7 +1243,8 @@ export function ProntuarioTab({
                       && evento.assinaturaId == null
                       && evento.retiradoEm == null
                       && evento.fichaId != null
-                      && evento.dentistaId === dentistaId
+                      && !travadoPelaFicha(evento)
+                      && (evento.encaminhadoParaId ?? evento.dentistaId) === dentistaId
                     ));
                     const habilitado = elegiveis.length > 0;
                     const marcado = habilitado && elegiveis.every((evento) => assinaturaSelecionados.includes(evento.id));
