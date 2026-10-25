@@ -75,6 +75,7 @@ export type SalvarFichaResult =
 
 export interface DeletarFichaResult {
   ok: boolean;
+  codigo?: 'confirmar_orcamento_aceito';
   error?: string;
 }
 
@@ -83,6 +84,7 @@ export interface ResumoExclusaoFicha {
   evolucoes: number;
   orcamentosEditaveis: number;
   orcamentosMantidos: number;
+  avisoOrcamentoPreservado?: boolean;
   orcamentosApagados: number;
   nomePaciente: string;
   arquivos: number;
@@ -610,7 +612,7 @@ export async function deletarFicha(
   });
   if (error) {
     console.error('[deletarFicha]', error.message);
-    return { ok: false, error: mensagemErroExclusao(error.message) };
+    return { ok: false, error: mensagemErroExclusao(error.message), codigo: error.message === 'confirmar_orcamento_aceito' ? 'confirmar_orcamento_aceito' : undefined };
   }
   revalidatePath(`/dashboard/pacientes/${ficha.paciente_id}`);
   return { ok: true };

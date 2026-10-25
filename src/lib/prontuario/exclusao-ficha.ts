@@ -1,3 +1,5 @@
+import type { ResumoExclusaoFicha } from '@/server/patients/salvar-ficha';
+
 export const MOTIVOS_EXCLUSAO = [
   { valor: 'paciente_errado', rotulo: 'Paciente errado' },
   { valor: 'ficha_duplicada', rotulo: 'Ficha duplicada' },
@@ -46,4 +48,13 @@ export function mensagemErroExclusao(codigo: string): string {
     ficha_com_encaminhamento: 'Esta ficha tem procedimento encaminhado a outro dentista e não pode ser apagada.',
   };
   return mensagens[codigo] ?? 'Não foi possível apagar a ficha. Tente novamente.';
+}
+
+/** A RPC pode enxergar movimento financeiro que a prévia não consegue ler por RLS. */
+export function recuperarConfirmacaoOrcamento(
+  resumo: ResumoExclusaoFicha,
+  codigo?: string,
+): ResumoExclusaoFicha {
+  if (codigo !== 'confirmar_orcamento_aceito' || resumo.orcamentosMantidos > 0) return resumo;
+  return { ...resumo, orcamentosMantidos: 1, avisoOrcamentoPreservado: true };
 }

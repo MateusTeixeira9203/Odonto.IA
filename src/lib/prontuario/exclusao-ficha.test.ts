@@ -4,7 +4,7 @@ import test from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import { z } from 'zod';
-import { MOTIVOS_EXCLUSAO, mensagemErroExclusao, nomeConfere, podeApagar, type ConfirmacaoExclusaoFicha } from './exclusao-ficha';
+import { MOTIVOS_EXCLUSAO, mensagemErroExclusao, nomeConfere, podeApagar, recuperarConfirmacaoOrcamento, type ConfirmacaoExclusaoFicha } from './exclusao-ficha';
 import type { DeletarFichaResult, PrepararExclusaoFichaResult } from '../../server/patients/salvar-ficha';
 import type { RegistrarAtendimentoClinicoInput, RegistrarAtendimentoClinicoResult } from '../../server/patients/registrar-atendimento-clinico';
 
@@ -236,4 +236,29 @@ test('visita: descarta só a âncora criada nesta tentativa e preserva erro orig
     assert.equal(chamadas, criada ? 1 : 0);
     assert.equal(logs, criada && falha !== 'nenhuma' ? 1 : 0);
   }
+});
+
+
+test('regressão: movimento oculto pela RLS exige caixa após recusa da RPC, sem autorizar automaticamente', async () => {
+  const service = servico({ rpcErro: 'confirmar_orcamento_aceito' });
+  const previa = await service.prepararExclusaoFicha('ficha');
+  assert.equal(previa.ok, true);
+  if (!previa.ok) return;
+  assert.equal(previa.resumo.orcamentosMantidos, 0);
+  const recusada = await service.deletarFicha('ficha', confirmacao);
+  assert.equal(recusada.ok, false);
+  assert.equal(recusada.codigo, 'confirmar_orcamento_aceito');
+  const resumo = recuperarConfirmacaoOrcamento(previa.resumo, recusada.codigo);
+  assert.equal(resumo.orcamentosMantidos, 1);
+  assert.equal(resumo.avisoOrcamentoPreservado, true);
+  assert.equal(previa.resumo.orcamentosMantidos, 0);
+  assert.equal(podeApagar({ ...confirmacao, nomeConfere: true, orcamentosMantidos: resumo.orcamentosMantidos, caixaMarcada: false }), false);
+  assert.equal(podeApagar({ ...confirmacao, nomeConfere: true, orcamentosMantidos: resumo.orcamentosMantidos, caixaMarcada: true }), true);
+  assert.equal(service.chamadas.length, 1);
+  assert.equal(service.revalidacoes.length, 0);
+  assert.equal(recuperarConfirmacaoOrcamento(resumo, recusada.codigo), resumo);
+  assert.equal(recuperarConfirmacaoOrcamento(previa.resumo, 'sem_permissao'), previa.resumo);
+  const sucesso = servico();
+  assert.equal((await sucesso.deletarFicha('ficha', { ...confirmacao, confirmaOrcamentoAceito: true })).ok, true);
+  assert.equal(sucesso.chamadas[0].args.p_confirma_orcamento_aceito, true);
 });

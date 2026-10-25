@@ -30,13 +30,13 @@ export function ConfirmarExclusaoFicha({ resumo, apagando, onCancelar, onConfirm
           <DialogTitle>Apagar esta ficha?</DialogTitle>
           <DialogDescription>
             A ficha de {data} será apagada com {resumo.evolucoes} evolução(ões), {resumo.eventos} procedimento(s) e {resumo.arquivos} arquivo(s). <strong>Isso não pode ser desfeito.</strong> Fica registrado quem apagou, quando e o motivo.
-            {resumo.orcamentosApagados > 0 && <> {resumo.orcamentosApagados} orçamento(s) desta ficha que o paciente ainda não aceitou também será(ão) apagado(s).</>}
+            {!resumo.avisoOrcamentoPreservado && resumo.orcamentosApagados > 0 && <> {resumo.orcamentosApagados} orçamento(s) desta ficha que o paciente ainda não aceitou também será(ão) apagado(s).</>}
           </DialogDescription>
         </DialogHeader>
         {resumo.orcamentosMantidos > 0 && (
           <div className="rounded-lg border border-warning/40 bg-warning-pale p-3 text-sm text-warning-ink">
-            <p className="font-semibold">{plural ? `Esta ficha tem ${resumo.orcamentosMantidos} orçamentos aceitos pelo paciente` : 'Esta ficha tem orçamento aceito pelo paciente'}</p>
-            <p className="mt-1">{plural ? <>Os orçamentos aceitos <strong>não serão apagados</strong>. Eles continuam na aba Orçamentos do paciente, com o aceite, os valores, as cobranças e os pagamentos. Eles só deixam de estar ligados a esta ficha.</> : <>O orçamento aceito <strong>não será apagado</strong>. Ele continua na aba Orçamentos do paciente, com o aceite, os valores, as cobranças e os pagamentos. Ele só deixa de estar ligado a esta ficha.</>}</p>
+            <p className="font-semibold">{resumo.avisoOrcamentoPreservado ? 'Esta ficha tem orçamento ou pagamento que será mantido' : plural ? `Esta ficha tem ${resumo.orcamentosMantidos} orçamentos aceitos pelo paciente` : 'Esta ficha tem orçamento aceito pelo paciente'}</p>
+            <p className="mt-1">{resumo.avisoOrcamentoPreservado ? <>Existe orçamento ou pagamento ligado a esta ficha que <strong>não será apagado</strong>. O orçamento continua na aba Orçamentos do paciente, com o aceite, os valores, as cobranças e os pagamentos. Ele só deixa de estar ligado a esta ficha.</> : plural ? <>Os orçamentos aceitos <strong>não serão apagados</strong>. Eles continuam na aba Orçamentos do paciente, com o aceite, os valores, as cobranças e os pagamentos. Eles só deixam de estar ligados a esta ficha.</> : <>O orçamento aceito <strong>não será apagado</strong>. Ele continua na aba Orçamentos do paciente, com o aceite, os valores, as cobranças e os pagamentos. Ele só deixa de estar ligado a esta ficha.</>}</p>
           </div>
         )}
         <form className="grid gap-4" onSubmit={(event) => {

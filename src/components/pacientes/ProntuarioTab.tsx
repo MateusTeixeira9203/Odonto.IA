@@ -10,7 +10,7 @@ import { useRouter } from 'next/navigation';
 import type SignaturePadLib from 'signature_pad';
 import { Button } from '@/components/ui/button';
 import { ConfirmarExclusaoFicha } from '@/components/pacientes/confirmar-exclusao-ficha';
-import type { ConfirmacaoExclusaoFicha } from '@/lib/prontuario/exclusao-ficha';
+import { recuperarConfirmacaoOrcamento, type ConfirmacaoExclusaoFicha } from '@/lib/prontuario/exclusao-ficha';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ToothDetailPanel } from '@/components/odontograma/ToothDetailPanel';
@@ -478,6 +478,7 @@ export function ProntuarioTab({
     const resultado = await deletarFicha(exclusaoFichaId, confirmacao);
     setApagandoFicha(false);
     if (!resultado.ok) {
+      setResumoExclusao((resumo) => resumo ? recuperarConfirmacaoOrcamento(resumo, resultado.codigo) : resumo);
       toast.error(resultado.error ?? 'Não foi possível apagar a ficha.');
       return;
     }
