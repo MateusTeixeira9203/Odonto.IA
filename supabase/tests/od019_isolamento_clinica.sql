@@ -14,6 +14,8 @@
 -- L5 Bruno x B: fluxo legitimo da clinica B; recarga e persistencia.
 -- Evidencia futura: status/codigo, antes/depois/recarga; nunca cookie/token.
 begin;
+-- Fixa pg_get_constraintdef: referencias public iguais ao snapshot efetivo.
+set local search_path = pg_catalog, public, pg_temp;
 
 create temp table od019_resultados(caso text, passou boolean, detalhe text);
 create temp table od019_modo(depois boolean);
@@ -86,6 +88,26 @@ select pg_temp.cruzado('Q4a evento B paciente A sem ficha isola FK paciente', $q
 select pg_temp.cruzado('Q4b evento B outro paciente da ficha B', $q$insert into public.odontograma_eventos(id,clinica_id,paciente_id,dentista_id,ficha_id,tipo,status,origem,nivel,faces,momento_planejado) values('d0190000-0000-4000-8000-000000000512','b0000000-0000-4000-8000-000000000002','d0190000-0000-4000-8000-000000000103','b0000000-0000-4000-8000-0000000000b1','d0190000-0000-4000-8000-000000000203','profilaxia','indicado','clinica','boca','{}','sessao_atual');$q$, 'odontograma_eventos_ficha_mesmo_paciente_fk');
 select pg_temp.cruzado('Q5 agendamento B paciente A', $q$insert into public.agendamentos(id,clinica_id,paciente_id,dentista_id,data_hora,created_by) values('d0190000-0000-4000-8000-000000000311','b0000000-0000-4000-8000-000000000002','d0190000-0000-4000-8000-000000000101','b0000000-0000-4000-8000-0000000000b1','2026-10-25T12:00:00Z','b0000000-0000-4000-8000-0000000000b1');$q$, 'agendamentos_paciente_mesma_clinica_fk');
 select pg_temp.caso('Q6 RPC real recusa dominio antes do INSERT', $q$select public.adicionar_procedimentos_ficha('d0190000-0000-4000-8000-000000000202','d0190000-0000-4000-8000-000000000103','d0190000-0000-4000-8000-000000000700','[{"id": "d0190000-0000-4000-8000-000000000513", "clinica_id": "b0000000-0000-4000-8000-000000000002", "paciente_id": "d0190000-0000-4000-8000-000000000101", "dentista_id": "b0000000-0000-4000-8000-0000000000b1", "ficha_id": "d0190000-0000-4000-8000-000000000202", "tipo": "profilaxia", "status": "indicado", "origem": "clinica", "momento_planejado": "sessao_atual", "nivel": "boca", "faces": [], "observacao": null, "realizado_em": null}]'::jsonb);$q$, 'P0001', null, '^(evento_invalido|ficha_nao_encontrada)$');
+
+-- Q6 complementar: dono da tabela, sem depender da RLS ou do guard da RPC.
+-- O executor administrativo precisa poder SET ROLE para o dono efetivo.
+reset role;
+do $dono$
+declare v_dono name;
+begin
+  select pg_get_userbyid(relowner) into v_dono
+  from pg_class where oid='public.odontograma_eventos'::regclass;
+  execute format('set local role %I', v_dono);
+end;
+$dono$;
+set local row_security = off;
+select pg_temp.cruzado('Q6 FK direta como dono da tabela', $q$
+  insert into public.odontograma_eventos(id,clinica_id,paciente_id,dentista_id,ficha_id,tipo,status,origem,nivel,faces,momento_planejado)
+  values('d0190000-0000-4000-8000-000000000515','b0000000-0000-4000-8000-000000000002',
+    'd0190000-0000-4000-8000-000000000101','b0000000-0000-4000-8000-0000000000b1',
+    null,'profilaxia','indicado','clinica','boca','{}','sessao_atual');
+$q$, 'odontograma_eventos_paciente_mesma_clinica_fk');
+set local row_security = on;
 
 reset role;
 set local request.jwt.claims = '{"sub":"b0000000-0000-4000-8000-00000000000a","role":"authenticated"}';
@@ -203,7 +225,8 @@ select 'C19' as verificacao, count(*) as cruzados from public.agendamentos orige
 union all
 select 'C20' as verificacao, count(*) as cruzados from public.agendamentos origem join public.atendimentos_clinicos alvo on alvo.id = origem.atendimento_origem_id where origem.clinica_id is distinct from alvo.clinica_id
 ) c order by verificacao;
-insert into od019_resultados select 'Q11 cruzados zero depois M0',
+-- C03 e informativo: C2 permite pacientes diferentes na mesma clinica.
+insert into od019_resultados select 'Q11 cruzados zero depois M0 (exceto C03)',
  not (select depois from od019_modo) or not exists(select 1 from (select 'C01' as verificacao, count(*) as cruzados from public.atendimentos_clinicos origem join public.pacientes alvo on alvo.id = origem.paciente_id where origem.clinica_id is distinct from alvo.clinica_id
 union all
 select 'C02' as verificacao, count(*) as cruzados from public.atendimentos_clinicos origem join public.agendamentos alvo on alvo.id = origem.agendamento_id where origem.clinica_id is distinct from alvo.clinica_id
@@ -243,15 +266,18 @@ union all
 select 'C19' as verificacao, count(*) as cruzados from public.agendamentos origem join public.dentistas alvo on alvo.id = origem.created_by where origem.clinica_id is distinct from alvo.clinica_id
 union all
 select 'C20' as verificacao, count(*) as cruzados from public.agendamentos origem join public.atendimentos_clinicos alvo on alvo.id = origem.atendimento_origem_id where origem.clinica_id is distinct from alvo.clinica_id
-) c where cruzados<>0),null;
+) c where verificacao <> 'C03' and cruzados<>0),null;
 -- Q6 zero efeito e todos os probes negativos/positivos descartados por subtransacao.
-insert into od019_resultados select 'Q6 zero efeito',not exists(select 1 from public.odontograma_eventos where id='d0190000-0000-4000-8000-000000000513'),null;
+insert into od019_resultados select 'Q6 zero efeito',not exists(select 1 from public.odontograma_eventos where id in ('d0190000-0000-4000-8000-000000000513','d0190000-0000-4000-8000-000000000515')),null;
 select case when depois then 'DEPOIS M0' else 'ANTES M0: probes comprovam FURO, nao seguranca' end as modo from od019_modo;
 select caso,passou,detalhe from od019_resultados order by caso;
 do $fim$
+declare v_reprovados text;
 begin
- if exists(select 1 from od019_resultados where not passou) then
-   raise exception 'OD019 NAO PASSA: transacao abortada; ROLLBACK se conexao continuar aberta';
+ select string_agg(caso || ' [' || coalesce(detalhe, 'sem detalhe') || ']', '; ' order by caso)
+ into v_reprovados from od019_resultados where passou is not true;
+ if v_reprovados is not null then
+   raise exception 'OD019 NAO PASSA: %; transacao abortada; ROLLBACK se conexao continuar aberta', v_reprovados;
  end if;
 end;
 $fim$;
