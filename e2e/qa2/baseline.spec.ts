@@ -138,7 +138,7 @@ for (const port of [3012, 3013]) {
   test(`@visual ficha e orçamento temas e larguras ${port}`, async ({ page }, info) => {
     await login(page, port, 'ana');
     const records: unknown[] = [];
-    const evidence = 'C:/Users/mateu/Desktop/Nex Lab/Projetos/Odonto-IA/log/prints';
+    const evidence = process.env.QA2_EVIDENCE_DIR ?? 'C:/Users/mateu/Desktop/Nex Lab/Projetos/Odonto-IA/log/prints';
     for (const width of [390, 768, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       for (const dark of [false, true]) {
@@ -175,7 +175,8 @@ for (const port of [3012, 3013]) {
         await page.screenshot({ path: `${evidence}/QA2-003-${width}-${dark ? 'escuro' : 'claro'}-${port === 3012 ? 'antes' : 'depois'}.png`, fullPage: false });
       }
     }
-    writeFileSync(join(evidence, '..', 'QA2-medidas-' + port + '.json'), JSON.stringify(records, null, 2));
+    const measurementsDir = process.env.QA2_EVIDENCE_DIR ? evidence : join(evidence, '..');
+    writeFileSync(join(measurementsDir, 'QA2-medidas-' + port + '.json'), JSON.stringify(records, null, 2));
     await info.attach('medidas', { body: JSON.stringify(records, null, 2), contentType: 'application/json' });
   });
 }
