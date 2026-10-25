@@ -21,6 +21,7 @@ import type { MeuDiaVisita, MeuDiaEventoVisita, MeuDiaPendencia } from '@/server
 import { rotuloProcedimento } from '@/types/odontograma';
 import { fmtData } from './meu-dia-format';
 import { ColarDoWordDialog } from '@/components/pacientes/colar-do-word-dialog';
+import { concluidoPor } from '@/lib/meu-dia/concluido-por';
 
 export interface HistoricoBlocoProps {
   visitas: MeuDiaVisita[];
@@ -207,11 +208,17 @@ function VisitaEntry({
           </p>
           {cardsFeito.map((card) => {
             const indicadoEm = card.ids.map((id) => indicadoEmPorId.get(id)).find(Boolean);
+            const executor = concluidoPor(
+              [...v.eventos, ...v.feitosAqui].filter(e => card.ids.includes(e.id)), v.dentistaNome,
+            );
             return (
               <div key={card.key} className="flex flex-col gap-0.5">
                 <RegistroCard data={card.data}>
                   {corpoEspecialidade(card.data.tipo, card.data.detalhe)}
                 </RegistroCard>
+                {executor && (
+                  <p className="px-1 text-[11px] text-text-secondary">concluído por {executor}</p>
+                )}
                 {indicadoEm && (
                   <p className="px-1 text-[11px] text-text-secondary">indicada em {fmtData(indicadoEm)}</p>
                 )}

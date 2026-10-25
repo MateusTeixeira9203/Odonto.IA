@@ -61,6 +61,27 @@ export const PSR_VAZIO: PsrDetalhe = {
   },
 };
 
+/** vazio → 0 → 1 → 2 → 3 → 4 → X → vazio; o asterisco é independente. */
+export function cicloSextante(detalhe: PsrDetalhe | null, id: SextanteId): PsrDetalhe {
+  const v = detalhe ?? PSR_VAZIO;
+  const s = v.psr[id];
+  const resto = s.asterisco ? { asterisco: true } : {};
+  const next: SextantePSR = s.ausente
+    ? { codigo: null, ...resto }
+    : s.codigo === null
+      ? { codigo: 0, ...resto }
+      : s.codigo === 4
+        ? { codigo: null, ausente: true, ...resto }
+        : { codigo: (s.codigo + 1) as CodigoPSR, ...resto };
+  return { psr: { ...v.psr, [id]: next } };
+}
+
+export function alternarAsterisco(detalhe: PsrDetalhe | null, id: SextanteId): PsrDetalhe {
+  const v = detalhe ?? PSR_VAZIO;
+  const s = v.psr[id];
+  return { psr: { ...v.psr, [id]: { ...s, asterisco: s.asterisco ? undefined : true } } };
+}
+
 // ── Conclusão determinística ────────────────────────────────────────────────
 
 export type ConclusaoPSR =

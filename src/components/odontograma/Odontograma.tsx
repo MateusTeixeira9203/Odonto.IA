@@ -885,6 +885,11 @@ export function Odontograma({
 
       return (
         <Fragment key={num}>
+          {colunas && (num === teeth[0] || isMidlineStart) && (
+            <span className="col-span-full hidden text-[11px] text-text-secondary max-[600px]:block">
+              {isMidlineStart ? 'Esquerdo' : 'Direito'}
+            </span>
+          )}
           {!colunas && isMidlineStart && (
             <div
               className="self-stretch w-px mx-0.5 shrink-0"
@@ -1151,15 +1156,15 @@ export function Odontograma({
 
           {/* Upper arch — raízes pra cima, coroas pro plano oclusal */}
           {viewFilter !== 'lower' && (
-            <div className={colunas ? "grid w-full items-end gap-[3px]" : "flex items-end gap-[3px]"}
-              style={colunas ? { gridTemplateColumns: `repeat(${upperTeeth.length}, minmax(0, 1fr))` } : undefined}>
+            <div className={colunas ? "grid w-full grid-cols-[repeat(var(--cols),minmax(0,1fr))] items-end gap-[3px] max-[600px]:grid-cols-[repeat(var(--cols-sm),minmax(0,1fr))]" : "flex items-end gap-[3px]"}
+              style={colunas ? { '--cols': upperTeeth.length, '--cols-sm': upperTeeth.length / 2 } as React.CSSProperties : undefined}>
               {renderArch(upperTeeth, true)}
             </div>
           )}
 
           {/* Midline separator — o plano oclusal */}
           {viewFilter === 'all' && (colunas ? (
-            <div className="my-2 flex justify-between text-[12px] leading-[19.2px] text-text-secondary">
+            <div className="my-2 flex justify-between text-[12px] leading-[19.2px] text-text-secondary max-[600px]:hidden">
               <span>Direito</span><span>Esquerdo</span>
             </div>
           ) : (
@@ -1174,8 +1179,8 @@ export function Odontograma({
 
           {/* Lower arch — coroas pra cima, raízes pra baixo */}
           {viewFilter !== 'upper' && (
-            <div className={colunas ? "grid w-full items-start gap-[3px]" : "flex items-start gap-[3px]"}
-              style={colunas ? { gridTemplateColumns: `repeat(${lowerTeeth.length}, minmax(0, 1fr))` } : undefined}>
+            <div className={colunas ? "grid w-full grid-cols-[repeat(var(--cols),minmax(0,1fr))] items-start gap-[3px] max-[600px]:grid-cols-[repeat(var(--cols-sm),minmax(0,1fr))]" : "flex items-start gap-[3px]"}
+              style={colunas ? { '--cols': lowerTeeth.length, '--cols-sm': lowerTeeth.length / 2 } as React.CSSProperties : undefined}>
               {renderArch(lowerTeeth, false)}
             </div>
           )}

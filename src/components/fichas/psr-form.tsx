@@ -10,22 +10,13 @@
 
 import type { PluginFormProps } from '@/lib/especialidades/plugin';
 import {
-  SEXTANTES, PSR_VAZIO, concluirPSR, textoConclusao, corDoCodigo,
-  type PsrDetalhe, type SextanteId, type SextantePSR, type CodigoPSR,
+  SEXTANTES, PSR_VAZIO, concluirPSR, textoConclusao, corDoCodigo, cicloSextante, alternarAsterisco,
+  type PsrDetalhe, type SextanteId, type SextantePSR,
 } from '@/lib/especialidades/perio';
 
 /** Ordem de TELA (não a de leitura da boca): superior esq→dir, depois inferior. */
 const LINHA_SUPERIOR: SextanteId[] = ['s1', 's2', 's3'];
 const LINHA_INFERIOR: SextanteId[] = ['s6', 's5', 's4'];
-
-/** vazio → 0 → 1 → 2 → 3 → 4 → X → vazio */
-function proximoEstado(s: SextantePSR): SextantePSR {
-  const resto = s.asterisco ? { asterisco: true } : {};
-  if (s.ausente) return { codigo: null, ...resto };            // X → vazio
-  if (s.codigo === null) return { codigo: 0, ...resto };
-  if (s.codigo === 4) return { codigo: null, ausente: true, ...resto }; // 4 → X
-  return { codigo: (s.codigo + 1) as CodigoPSR, ...resto };
-}
 
 function rotulo(s: SextantePSR): string {
   if (s.ausente) return 'X';
@@ -42,57 +33,59 @@ function descricaoAcessivel(label: string, descricao: string, s: SextantePSR): s
   return `${label} — ${descricao}: ${estado}${s.asterisco ? ', com achado adicional' : ''}`;
 }
 
+function CelulaSextante({ id, s, readOnly, onCiclo, onAsterisco }: {
+  id: SextanteId;
+  s: SextantePSR;
+  readOnly?: boolean;
+  onCiclo: () => void;
+  onAsterisco: () => void;
+}) {
+  const meta = SEXTANTES.find((s) => s.id === id)!;
+  const cor = s.codigo !== null && !s.ausente ? corDoCodigo(s.codigo) : null;
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        disabled={readOnly}
+        onClick={onCiclo}
+        aria-label={descricaoAcessivel(meta.label, meta.descricao, s)}
+        title={`${meta.descricao} (${meta.dentes})`}
+        className="w-full flex flex-col items-center justify-center gap-0.5 rounded-xl border py-2.5 transition-all active:scale-95 outline-none focus-visible:ring-1 focus-visible:ring-teal disabled:opacity-60 disabled:cursor-not-allowed"
+        style={{
+          background: cor
+            ? `color-mix(in srgb, var(--color-${cor}) 16%, var(--color-surface-alt))`
+            : 'var(--color-surface-alt)',
+          color: cor ? `var(--color-${cor}-ink)` : 'var(--color-text-secondary)',
+          borderColor: cor
+            ? `color-mix(in srgb, var(--color-${cor}) 45%, var(--color-border))`
+            : 'var(--color-border)',
+        }}
+      >
+        <span className="text-[9px] font-bold uppercase tracking-wider opacity-70">{meta.label}</span>
+        <span className="font-mono tabular-nums text-lg font-bold leading-none">{rotulo(s)}</span>
+      </button>
+      <button
+        type="button"
+        disabled={readOnly}
+        onClick={onAsterisco}
+        aria-label={`${meta.label}: achado adicional (furca, mobilidade, mucogengival ou recessão ≥3,5mm)`}
+        title="Achado adicional: furca, mobilidade, mucogengival ou recessão ≥3,5mm"
+        className={`absolute top-1 right-1 w-5 h-5 rounded-md text-xs font-bold leading-none transition-colors outline-none focus-visible:ring-1 focus-visible:ring-teal disabled:opacity-60 ${
+          s.asterisco
+            ? 'bg-coral/20 text-coral-ink'
+            : 'text-text-muted hover:text-text-secondary hover:bg-surface'
+        }`}
+      >
+        *
+      </button>
+    </div>
+  );
+}
+
 export function PsrForm({ valor, onChange, readOnly }: PluginFormProps<PsrDetalhe>) {
   const v = valor ?? PSR_VAZIO;
   const conclusao = concluirPSR(v);
-
-  const set = (id: SextanteId, next: SextantePSR) =>
-    onChange({ psr: { ...v.psr, [id]: next } });
-
-  const Celula = ({ id }: { id: SextanteId }) => {
-    const meta = SEXTANTES.find((s) => s.id === id)!;
-    const s = v.psr[id];
-    const cor = s.codigo !== null && !s.ausente ? corDoCodigo(s.codigo) : null;
-
-    return (
-      <div className="relative">
-        <button
-          type="button"
-          disabled={readOnly}
-          onClick={() => set(id, proximoEstado(s))}
-          aria-label={descricaoAcessivel(meta.label, meta.descricao, s)}
-          title={`${meta.descricao} (${meta.dentes})`}
-          className="w-full flex flex-col items-center justify-center gap-0.5 rounded-xl border py-2.5 transition-all active:scale-95 outline-none focus-visible:ring-1 focus-visible:ring-teal disabled:opacity-60 disabled:cursor-not-allowed"
-          style={{
-            background: cor
-              ? `color-mix(in srgb, var(--color-${cor}) 16%, var(--color-surface-alt))`
-              : 'var(--color-surface-alt)',
-            color: cor ? `var(--color-${cor}-ink)` : 'var(--color-text-secondary)',
-            borderColor: cor
-              ? `color-mix(in srgb, var(--color-${cor}) 45%, var(--color-border))`
-              : 'var(--color-border)',
-          }}
-        >
-          <span className="text-[9px] font-bold uppercase tracking-wider opacity-70">{meta.label}</span>
-          <span className="font-mono tabular-nums text-lg font-bold leading-none">{rotulo(s)}</span>
-        </button>
-        <button
-          type="button"
-          disabled={readOnly}
-          onClick={() => set(id, { ...s, asterisco: s.asterisco ? undefined : true })}
-          aria-label={`${meta.label}: achado adicional (furca, mobilidade, mucogengival ou recessão ≥3,5mm)`}
-          title="Achado adicional: furca, mobilidade, mucogengival ou recessão ≥3,5mm"
-          className={`absolute top-1 right-1 w-5 h-5 rounded-md text-xs font-bold leading-none transition-colors outline-none focus-visible:ring-1 focus-visible:ring-teal disabled:opacity-60 ${
-            s.asterisco
-              ? 'bg-coral/20 text-coral-ink'
-              : 'text-text-muted hover:text-text-secondary hover:bg-surface'
-          }`}
-        >
-          *
-        </button>
-      </div>
-    );
-  };
 
   return (
     <div className="flex flex-col gap-3">
@@ -101,11 +94,15 @@ export function PsrForm({ valor, onChange, readOnly }: PluginFormProps<PsrDetalh
           Rastreio periodontal (PSR)
         </p>
         <div className="grid grid-cols-3 gap-1.5">
-          {LINHA_SUPERIOR.map((id) => <Celula key={id} id={id} />)}
+          {LINHA_SUPERIOR.map((id) => <CelulaSextante key={id} id={id} s={v.psr[id]} readOnly={readOnly}
+            onCiclo={() => onChange(cicloSextante(valor, id))}
+            onAsterisco={() => onChange(alternarAsterisco(valor, id))} />)}
         </div>
         <div className="h-px bg-border my-1.5" />
         <div className="grid grid-cols-3 gap-1.5">
-          {LINHA_INFERIOR.map((id) => <Celula key={id} id={id} />)}
+          {LINHA_INFERIOR.map((id) => <CelulaSextante key={id} id={id} s={v.psr[id]} readOnly={readOnly}
+            onCiclo={() => onChange(cicloSextante(valor, id))}
+            onAsterisco={() => onChange(alternarAsterisco(valor, id))} />)}
         </div>
       </div>
 

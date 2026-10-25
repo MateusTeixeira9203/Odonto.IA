@@ -87,6 +87,7 @@ export interface MeuDiaPendencia {
 
 export interface MeuDiaEventoVisita {
   id: string;
+  encaminhadoParaNome: string | null;
   tipo: TipoRegistroOdontograma;
   procedimentoId: string | null;
   procedimentoNome: string | null;
@@ -273,6 +274,7 @@ function eventoParaVisita(e: EventoRow, fichaDataPorId: Map<string, string>): Me
     origem: e.origem, momento_planejado: e.momento_planejado, grupoId: e.grupo_id, realizadoEm: e.realizado_em,
     indicadoEm: (e.ficha_id ? fichaDataPorId.get(e.ficha_id) : undefined) ?? e.registrado_em,
     registradoEm: e.registrado_em, detalhe: e.detalhe,
+    encaminhadoParaNome: e.encaminhado_dentista?.nome ?? null,
   };
 }
 
