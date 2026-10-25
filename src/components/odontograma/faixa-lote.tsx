@@ -10,6 +10,7 @@ import {
   eventosDoLote, eventosDoLoteAusente, eventosDoLoteAvulso, eventosDoLoteRestauracao,
 } from '@/lib/odontograma/lote-multidente';
 import { TEETH_UPPER, TEETH_LOWER } from './Odontograma';
+import { restauracaoPodeAplicar } from './restauracao-pode-aplicar';
 import type { ContextoLancamento } from '@/lib/odontograma/criar-eventos-contextuais';
 import type { MeuDiaCatalogoProcedimento } from '@/server/dashboard/get-meu-dia';
 import { ehDenteAnteriorFDI, faceAbreviacao, faceLabel, TIPO_LABEL, type FaceDental, type ModoLancamento, type OdontogramaEventoDraft, type TipoRegistroOdontograma } from '@/types/odontograma';
@@ -70,6 +71,7 @@ export function FaixaLote({
     ? 'rounded-[20px] border border-border bg-surface px-[13px] py-[7px] text-[13px] leading-[20.8px] text-text-primary hover:border-teal-ink hover:bg-teal-pale'
     : 'rounded-full border border-teal/30 bg-surface px-2.5 py-1 text-[11px] font-semibold text-teal-ink hover:bg-teal/10';
   const [facePendente, setFacePendente] = useState(false);
+  const [avisoRestauracao, setAvisoRestauracao] = useState(false);
   const [facesSelecionadas, setFacesSelecionadas] = useState<FaceDental[]>([]);
   const [busca, setBusca] = useState('');
   const [catalogoPendente, setCatalogoPendente] = useState<MeuDiaCatalogoProcedimento | null>(null);
@@ -128,6 +130,7 @@ export function FaixaLote({
   }
 
   function alternarFaceRestauracao(face: FaceDental) {
+    if (meuDia) setAvisoRestauracao(false);
     setFacesSelecionadas((atuais) => (
       atuais.includes(face) ? atuais.filter((item) => item !== face) : [...atuais, face]
     ));
@@ -268,7 +271,7 @@ export function FaixaLote({
       {(facePendente || meuDia) && (
         <div className={meuDia ? "mt-[10px] flex flex-wrap items-center gap-[5px]" : "flex flex-wrap items-center gap-1.5"}>
           <span className={meuDia ? "mb-px w-full text-[12.5px] leading-5 text-text-secondary" : "text-[10px] font-bold uppercase tracking-wider text-text-secondary"}>
-            {meuDia ? 'Faces (opcional)' : 'Restauração — selecione uma ou mais faces'}
+            {meuDia ? 'Faces' : 'Restauração — selecione uma ou mais faces'}
           </span>
           {(meuDia ? [...FACES_LOTE].sort((a, b) => 'MODVL'.indexOf(a) - 'MODVL'.indexOf(b)) : FACES_LOTE).map((face) => (
             <button
@@ -288,6 +291,11 @@ export function FaixaLote({
               {faceLabelLote(face)}
             </button>
           ))}
+          {meuDia && avisoRestauracao && facesSelecionadas.length === 0 && (
+            <p role="status" className="w-full text-[12.5px] leading-5 text-text-secondary">
+              Escolha ao menos uma face para a Restauração
+            </p>
+          )}
           {!meuDia && <><button
             type="button"
             disabled={facesSelecionadas.length === 0}
@@ -323,8 +331,11 @@ export function FaixaLote({
             type="button"
             onClick={() => {
               if (meuDia) {
-                if (facesSelecionadas.length) aplicarRestauracao();
-                else aplicar('carie_restauracao');
+                if (!restauracaoPodeAplicar(facesSelecionadas, variante)) {
+                  setAvisoRestauracao(true);
+                  return;
+                }
+                aplicarRestauracao();
               } else setFacePendente(true);
             }}
             className={meuDia ? `order-first ${chipClass}` : chipClass}
