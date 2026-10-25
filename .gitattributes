@@ -1,3 +1,14 @@
 supabase/rollbacks/20261025112735_od015b1_4_copia_protegida.sql -text
 supabase/tests/od015b1_4_copia.sql -text
 supabase/migrations_recuperadas/** -text
+supabase/migrations/20261025022000_od019_isolamento_clinica_fk.sql -text
+supabase/rollbacks/20261025022000_od019_isolamento_clinica_fk.sql -text
+supabase/migrations/20261025022100_od015b1_1_regra_unica.sql -text
+supabase/rollbacks/20261025022100_od015b1_1_regra_unica.sql -text
+supabase/migrations/20261025022141_od015b1_3_assinar_por_autor.sql -text
+supabase/rollbacks/20261025022141_od015b1_3_assinar_por_autor.sql -text
+supabase/migrations/20261025023703_od008_pedidos_protetico_permissao.sql -text
+supabase/rollbacks/20261025023703_od008_pedidos_protetico_permissao.sql -text
+supabase/migrations/20261025103502_od015b1_2_apagar_ficha_auditoria.sql -text
+supabase/rollbacks/20261025103502_od015b1_2_apagar_ficha_auditoria.sql -text
+supabase/migrations/20261025112735_od015b1_4_copia_protegida.sql -text
