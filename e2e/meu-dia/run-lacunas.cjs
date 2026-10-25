@@ -1,0 +1,16 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const { spawnSync } = require('node:child_process');
+const repo = path.resolve(__dirname, '../..');
+const raw = fs.readFileSync(path.join(repo, '.env.qa-contas'), 'utf8');
+const password = raw.match(/^#\s*Senha de todas:\s*(.+)\r?$/m)?.[1]?.trim();
+if (!password) throw Error('Senha QA ausente; conteúdo omitido.');
+const env = { ...process.env, QA_EMAIL: 'dentista.a.r140@example.invalid', QA_PASSWORD: password, MD_RETEST_READY: 'OD-001r+OD-002g', MD_SCOPE: 'final' };
+const port = new URL(env.QA_BASE_URL).port;
+if (!['3010', '3011'].includes(port)) throw Error('Porta QA inválida.');
+const snapshot = path.resolve(repo, port === '3010' ? '../Odonto.IA-antes' : '../Odonto.IA-depois4');
+const config = fs.readFileSync(path.join(snapshot, '.env.development.local'), 'utf8');
+const host = config.match(/^NEXT_PUBLIC_SUPABASE_URL\s*=\s*["']?https:\/\/([^/\s"']+)/m)?.[1];
+if (host !== 'uhuxteswtvgdnlixwrdu.supabase.co') throw Error('Snapshot fora de odonto-qa.');
+const result = spawnSync(process.execPath, [require.resolve('@playwright/test/cli'), 'test', ...process.argv.slice(2)], { cwd: repo, env, stdio: 'inherit' });
+process.exit(result.status ?? 1);
