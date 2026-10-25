@@ -8,7 +8,11 @@ test('R01 R02 R04 R05 R10 R11 R13 R14 consulta própria, status, Ctrl+S e recarg
   const visit = await newVisit(page, info, 'Salvar');
   await expect(page.getByRole('button', { name: 'Salvar atendimento', exact: true })).toBeDisabled();
   for (const status of ['checked_in', 'in_progress', 'scheduled']) {
+    const response = process.env.MD_FINAL_REUSE === '2c6eeff'
+      ? page.waitForResponse(item => item.request().method() === 'POST' && new URL(item.url()).pathname === '/dashboard/meu-dia')
+      : null;
     await page.getByRole('combobox', { name: 'Mudar status do atendimento', exact: true }).selectOption(status);
+    if (response) await response;
     await openDay(page, visit);
     await expect(page.getByRole('combobox', { name: 'Mudar status do atendimento', exact: true })).toHaveValue(status);
   }

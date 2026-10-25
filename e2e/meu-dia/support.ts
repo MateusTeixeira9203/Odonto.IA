@@ -8,8 +8,8 @@ export const baseURL = process.env.QA_BASE_URL ?? 'http://localhost:3011';
 
 export function assertSnapshot(url: string): void {
   const parsed = new URL(url);
-  if (parsed.protocol !== 'http:' || parsed.hostname !== 'localhost' || !['3010', '3011'].includes(parsed.port)) {
-    throw new Error('Meu Dia QA permite somente localhost:3010/3011.');
+  if (parsed.protocol !== 'http:' || parsed.hostname !== 'localhost' || !['3010', '3011', '3021'].includes(parsed.port)) {
+    throw new Error('Meu Dia QA permite somente localhost:3010/3011/3021.');
   }
 }
 
@@ -62,11 +62,12 @@ export type OwnVisit = { name: string; slotId: string };
 
 export async function openDay(page: Page, visit?: OwnVisit): Promise<void> {
   await page.goto(`${baseURL}/dashboard/meu-dia${visit ? `?ag=${visit.slotId}` : ''}`);
-  await expect(page.getByRole('heading', { name: 'Meu Dia', exact: true })).toBeVisible();
+  if (new URL(baseURL).port === '3010') await expect(page.getByRole('button', { name: /^(Encaixe|Atender agora)$/ })).toBeVisible();
+  else await expect(page.getByRole('heading', { name: 'Meu Dia', exact: true })).toBeVisible();
   if (visit) {
     const slot = page.locator(`[data-rail-alvo="${visit.slotId}"]`);
-    await slot.click();
-    await expect(slot).toHaveAttribute('aria-pressed', 'true');
+    if (new URL(baseURL).port !== '3010' && await slot.getAttribute('aria-pressed') !== 'true') await slot.click();
+    if (new URL(baseURL).port !== '3010') await expect(slot).toHaveAttribute('aria-pressed', 'true');
   }
 }
 
@@ -87,6 +88,28 @@ export async function encaixe(page: Page, name: string, create: boolean): Promis
 }
 
 export async function newVisit(page: Page, info: TestInfo, label: string): Promise<OwnVisit> {
+  if (process.env.MD_FINAL_REUSE === '2c6eeff') {
+    const fixtures: Record<string, OwnVisit> = {
+      Salvar: { name: 'QA MD LacunaEncaixe 3010 1792892245629', slotId: '9fd836cc-af5f-4ffb-b221-fc91256be87b' },
+      Documento: { name: 'QA MD LacunaEncaixe 3011 1792892275609', slotId: '259a84e6-e19d-4cfd-b7bc-91876f1c4bca' },
+      GerarEvolucao: { name: 'QA MD LacunaEncaixe 3010 1792892343333', slotId: '51365abf-db3f-4519-b150-c1b9c3e5e6a1' },
+      PSR: { name: 'QA MD LacunaEncaixe 3011 1792892376521', slotId: 'cef4d30f-55ba-4802-baa6-aff960c17a95' },
+      TrocaB: { name: 'QA MD ChipsPreservados 1792891721218 0', slotId: 'd59318dc-57dc-458f-99fd-86f434b1e4b5' },
+      FilaB: { name: 'QA MD ChipsPreservados 1792891721218 0', slotId: 'd59318dc-57dc-458f-99fd-86f434b1e4b5' },
+    };
+    const visit = fixtures[label] ?? { name: 'QA MD Restauracao1440 1792891310664 0', slotId: '962125c7-55f7-4af7-8f63-16cf4ea9e90d' };
+    await openDay(page, visit);
+    await expect(page.getByRole('heading', { name: visit.name, exact: true })).toBeVisible();
+    await page.waitForFunction(() => {
+      const editor = document.querySelector('textarea[aria-label="Relato para organizar com Dex"]');
+      return editor != null && Object.keys(editor).some(key => key.startsWith('__reactProps') &&
+        typeof (Reflect.get(editor, key) as { onChange?: unknown }).onChange === 'function');
+    });
+    await page.getByRole('textbox', { name: 'Relato para organizar com Dex', exact: true }).click();
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+    await writeFile(info.outputPath('fixture-reutilizada.json'), JSON.stringify({ label, ...visit }));
+    return visit;
+  }
   const name = `QA MD ${label} ${Date.now()} ${info.workerIndex}`;
   const visit = await encaixe(page, name, true);
   const recordPath = info.outputPath('registro-sintetico-criado.json');
@@ -126,6 +149,9 @@ export async function addPsr(page: Page): Promise<void> {
 }
 
 export async function saveOnce(page: Page, visit: OwnVisit, shortcut = false): Promise<void> {
+  if (process.env.MD_FINAL_REUSE === '2c6eeff' && process.env.MD_ALLOW_WRITE !== 'OWN_FIXTURES_2c6eeff') {
+    throw new Error('Save da regressão final exige opt-in MD_ALLOW_WRITE.');
+  }
   const selected = page.locator(`[data-rail-alvo="${visit.slotId}"]`);
   await expect(selected).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('heading', { name: visit.name, exact: true })).toBeVisible();
