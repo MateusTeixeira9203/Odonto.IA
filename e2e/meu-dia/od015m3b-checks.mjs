@@ -1,0 +1,4 @@
+﻿import path from 'node:path';import {contexto,executar} from '../../scripts/qa/_lib.mjs';
+const root=path.resolve('../Odonto.IA-m3bqa'),ctx=await contexto(root),dir='C:/Users/mateu/Desktop/Nex Lab/Projetos/Odonto-IA/log/QA-OD015M3b-live-1cec17f-2026-10-25';
+const checks=[['typecheck','typescript/bin/tsc',['--noEmit','--incremental','false']],['lint','eslint/bin/eslint.js',['src/components/pacientes/confirmar-exclusao-ficha.tsx','src/lib/prontuario/exclusao-ficha.test.ts','src/server/orcamentos/od021-nome-dentista.test.ts']],['unit','tsx/dist/cli.mjs',['--test']]];
+for(const [name,bin,args]of checks){const r=await executar(process.execPath,[path.join(root,'node_modules',bin),...args],{cwd:root,env:{...ctx.env,NODE_OPTIONS:'--max-old-space-size=6144'},log:path.join(dir,'checks-'+name+'.log'),segredos:ctx.segredos});console.log(name+' '+(r.code?'FALHOU':'PASSOU')+' exit '+r.code);}
