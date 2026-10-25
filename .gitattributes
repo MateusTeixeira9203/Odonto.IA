@@ -1,2 +1,3 @@
 supabase/rollbacks/20261025112735_od015b1_4_copia_protegida.sql -text
 supabase/tests/od015b1_4_copia.sql -text
+supabase/migrations_recuperadas/** -text
