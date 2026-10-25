@@ -12,7 +12,7 @@ import { endoDetalheSchema } from '@/lib/especialidades/endo';
 import { implanteDetalheSchema } from '@/lib/especialidades/implante';
 import { criarDocumentoConclusaoAssinatura } from '@/server/legal/documentos-aceite';
 import { hojeBRT } from '@/lib/hora-brt';
-import { filtrarEventosParaAssinar, agruparPorAutor } from '@/lib/prontuario/assinatura-recepcao';
+import { filtrarEventosParaAssinar, agruparPorAutor, NADA_A_ASSINAR } from '@/lib/prontuario/assinatura-recepcao';
 import { travadoPelaAssinaturaDaFicha } from '@/lib/prontuario/travado-pela-ficha';
 
 import { editarDetalhesEventoSchema, type EditarDetalhesEventoInput, type EditarDetalhesEventoResult } from '@/lib/odontograma/edicao-procedimento';
@@ -827,17 +827,23 @@ export async function assinarTodosRealizadosDaFicha(params: {
     .eq('clinica_id', clinicId)
     .is('retirado_em', null)
     .eq('status', 'realizado')
-    .is('assinatura_id', null);
+    .is('assinatura_id', null)
+    .order('id', { ascending: true });
 
   if (error) {
     console.error('[assinarTodosRealizadosDaFicha]', error.message);
     return { ok: false, error: 'Não foi possível consultar os procedimentos para assinatura.' };
   }
-  const grupos = agruparPorAutor(filtrarEventosParaAssinar(eventos ?? [], { role, dentistaId }));
-  if (grupos.length === 0) return { ok: false, error: 'Nada a assinar nesta ficha.' };
+  const elegiveis = filtrarEventosParaAssinar(eventos ?? [], { role, dentistaId });
+  if (elegiveis.length === 0) return { ok: false, error: NADA_A_ASSINAR };
 
+  // REC-4: o trigger recusa a secretaria nos encaminhados. Mantem esses itens
+  // pendentes sem enviar um lote sabidamente recusado nem bloquear os demais.
+  const pendentes = role === 'secretaria' ? elegiveis.filter((evento) => evento.encaminhado_para != null) : [];
+  const assinaveis = role === 'secretaria' ? elegiveis.filter((evento) => evento.encaminhado_para == null) : elegiveis;
+  const grupos = agruparPorAutor(assinaveis);
   let resultado: AssinarProcedimentosResult = { ok: true };
-  let gruposAssinados = 0;
+  let procedimentosAssinados = 0;
   for (const grupo of grupos) {
     resultado = await assinarProcedimentos({
       eventoIds: grupo.map((evento) => evento.id),
@@ -846,13 +852,22 @@ export async function assinarTodosRealizadosDaFicha(params: {
       conclusao: params.conclusao,
     });
     if (!resultado.ok) {
-      if (role === 'secretaria' && grupo.some((evento) => evento.encaminhado_para != null)) {
-        const preservados = gruposAssinados > 0 ? ' Os lotes já assinados foram preservados.' : '';
-        return { ok: false, error: `Não foi possível assinar os procedimentos encaminhados a outro profissional. Eles continuam pendentes; peça ao profissional responsável para assiná-los.${preservados}` };
-      }
-      return resultado;
+      return { ok: false, error: `${procedimentosAssinados} procedimento(s) assinado(s). ${elegiveis.length - procedimentosAssinados} procedimento(s) permanece(m) pendente(s). ${resultado.error}` };
     }
-    gruposAssinados++;
+    procedimentosAssinados += grupo.length;
+  }
+  if (pendentes.length > 0) {
+    const autores = [...new Set(pendentes.map((evento) => evento.encaminhado_para).filter((id): id is string => id != null))];
+    const { data: profissionais, error: autoresError } = await supabase
+      .from('dentistas')
+      .select('id, nome')
+      .eq('clinica_id', clinicId)
+      .in('id', autores)
+      .order('id', { ascending: true });
+    const responsaveis = !autoresError && profissionais?.length
+      ? profissionais.map((profissional) => profissional.nome).join(', ')
+      : 'o profissional responsável pelo encaminhamento';
+    return { ok: false, error: `${procedimentosAssinados} procedimento(s) assinado(s). ${pendentes.length} procedimento(s) encaminhado(s) continua(m) pendente(s); peça a ${responsaveis} para assiná-los. As assinaturas já registradas foram preservadas.` };
   }
   return resultado;
 }

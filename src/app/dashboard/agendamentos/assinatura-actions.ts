@@ -1,6 +1,6 @@
 'use server';
 
-import { usarCaminhoLegado } from '@/lib/prontuario/assinatura-recepcao';
+import { usarCaminhoLegado, NADA_A_ASSINAR } from '@/lib/prontuario/assinatura-recepcao';
 import { requireClinicContext } from '@/server/auth/clinic';
 import { createServiceClient } from '@/lib/supabase/service';
 import { assinarTodosRealizadosDaFicha } from '@/server/patients/registro-actions';
@@ -61,7 +61,7 @@ export async function salvarAssinaturaRecepcao(
   if (role !== 'secretaria') return { ok: false, error: 'Sem permissão' };
 
   const granular = await assinarTodosRealizadosDaFicha({ fichaId, pacienteId, assinadoPor, assinaturaDataUrl });
-  if (granular.ok || granular.error !== 'Nada a assinar nesta ficha.') return granular;
+  if (granular.ok || granular.error !== NADA_A_ASSINAR) return granular;
 
   // Caminho legado (ficha sem evento) — inalterado, spec R-03b Decisão #B3.
   const db = createServiceClient();

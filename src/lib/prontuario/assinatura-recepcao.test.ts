@@ -25,7 +25,7 @@ function carregar(eventos: helpers.EventoParaAssinar[], options: { role?: string
     from(table: string) {
       const filtros: Array<(e: helpers.EventoParaAssinar) => boolean> = [];
       const q = {
-        select() { return q; },
+        select() { return q; }, order() { return q; }, in() { return q; },
         eq(chave: string, valor: string) {
           if (chave === 'status') filtros.push(e => e.status === valor);
           return q;
@@ -39,7 +39,7 @@ function carregar(eventos: helpers.EventoParaAssinar[], options: { role?: string
         update() { carimbos++; return q; },
         async maybeSingle() { return { data: { id: table === 'dentistas' ? (role === 'secretaria' ? 'sara' : 'ana') : params.fichaId, ficha_id: params.fichaId, paciente_id: params.pacienteId }, error: null }; },
         then(resolve: (value: unknown) => unknown) {
-          const data = table === 'odontograma_eventos' ? eventos.filter(e => filtros.every(f => f(e))) : [];
+          const data = table === 'odontograma_eventos' ? eventos.filter(e => filtros.every(f => f(e))) : table === 'dentistas' ? [{ id: 'carlos', nome: 'Carlos QA' }] : [];
           return Promise.resolve(resolve({ data, count: data.length, error: options.erroLeitura ? { message: 'QA leitura recusada' } : null }));
         },
       };
@@ -87,10 +87,10 @@ test('legado exige exatamente zero procedimentos', () => {
   assert.equal(helpers.usarCaminhoLegado({ totalProcedimentos: 0 }), true);
   assert.equal(helpers.usarCaminhoLegado({ totalProcedimentos: 1 }), false);
 });
-test('action real: Sara assina eventos de Ana e Carlos em lotes separados sem carimbar ficha', async () => {
+test('action real: Sara assina Ana e mantem Carlos pendente sem carimbar ficha', async () => {
   const c = carregar([evento(1), evento(2, { encaminhado_para: 'carlos' }), evento(3)]);
-  assert.equal((await salvar(c)).ok, true);
-  assert.deepEqual(c.lotes, [[id(1), id(3)], [id(2)]]);
+  assert.equal((await salvar(c)).ok, false);
+  assert.deepEqual(c.lotes, [[id(1), id(3)]]);
   assert.equal(c.carimbos(), 0);
 });
 test('action real: dentista assina so autor efetivo, incluindo encaminhado para ele', async () => {
@@ -139,11 +139,25 @@ test('encaminhado recusado preserva primeiro lote e informa pendencia e responsa
   });
   const result = await salvar(c);
   assert.equal(result.ok, false);
-  assert.match(result.error ?? '', /continuam pendentes/);
-  assert.match(result.error ?? '', /responsável/);
-  assert.match(result.error ?? '', /lotes já assinados foram preservados/);
+  assert.match(result.error ?? '', /continua\(m\) pendente/);
+  assert.match(result.error ?? '', /Carlos QA/);
+  assert.match(result.error ?? '', /assinaturas já registradas foram preservadas/);
   assert.equal(result.error?.includes('responsavel_do_encaminhamento'), false);
-  assert.deepEqual(c.lotes, [[id(1)], [id(2)]]);
-  assert.equal(c.removidos(), 1);
+  assert.deepEqual(c.lotes, [[id(1)]]);
+  assert.equal(c.removidos(), 0);
   assert.equal(c.carimbos(), 0);
+});
+
+
+test('recepcao: encaminhado primeiro nao impede proprio; ambas as ordens preservam pendencia nominal', async () => {
+  for (const eventos of [[evento(2, { encaminhado_para: 'carlos' }), evento(1)], [evento(1), evento(2, { encaminhado_para: 'carlos' })]]) {
+    const c = carregar(eventos, { erroRpc: 'responsavel_do_encaminhamento', erroRpcNoLote: 2 });
+    const result = await salvar(c);
+    assert.equal(result.ok, false);
+    assert.deepEqual(c.lotes, [[id(1)]]);
+    assert.match(result.error ?? '', /1 procedimento.*assinado/);
+    assert.match(result.error ?? '', /1 procedimento.*pendente/);
+    assert.match(result.error ?? '', /Carlos QA/);
+    assert.equal(c.carimbos(), 0);
+  }
 });

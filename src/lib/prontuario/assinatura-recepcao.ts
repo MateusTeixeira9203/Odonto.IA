@@ -1,3 +1,5 @@
+export const NADA_A_ASSINAR = 'Nada a assinar nesta ficha.';
+
 export type EventoParaAssinar = {
   id: string;
   dentista_id: string;
