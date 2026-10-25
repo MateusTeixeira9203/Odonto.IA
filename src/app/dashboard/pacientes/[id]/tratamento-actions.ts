@@ -229,6 +229,7 @@ export async function buscarFichasSemTratamento(
   // Exclude fichas with no tooth observations — they have no clinical data to link
   const fichas = ((data ?? []) as Array<FichaSemTratamento & { dentes_observacoes: Record<string, unknown> | null }>)
     .filter(f => f.dentes_observacoes && Object.keys(f.dentes_observacoes).length > 0)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- OD016-L15: binding intencionalmente descarta dentes_observacoes do resultado publico; manter formato da resposta; dono ALFA - Dev 2 (lista unica no vault)
     .map(({ dentes_observacoes: _obs, ...rest }) => rest as FichaSemTratamento);
 
   return { fichas };

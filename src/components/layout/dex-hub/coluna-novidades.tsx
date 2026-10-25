@@ -27,6 +27,7 @@ export function ColunaNovidades() {
     for (const n of NOVIDADES) {
       if (localStorage.getItem(chaveVisto(n.id))) set.add(n.id);
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- OD016-L26: leitura unica do localStorage depois da montagem preserva estado inicial dos indicadores; dono ALFA - Dev 2 (lista unica no vault)
     setVistos(set);
   }, []);
 

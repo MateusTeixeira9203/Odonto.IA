@@ -65,6 +65,7 @@ export function InviteAuthClient({ token, inviteEmail }: Props) {
         return;
       }
       if (!data.session) {
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- OD016-L02: navegacao completa apos aceitar convite preserva sessao e clinica ativa; alterar exige teste de auth; dono ALFA - Dev 2 (lista unica no vault)
         window.location.href = `/verifique-email?email=${encodeURIComponent(email)}&next=${encodeURIComponent(`/convite/${token}`)}`;
         return;
       }

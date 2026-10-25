@@ -136,7 +136,7 @@ export async function listarDespesas(mesISO: string): Promise<Despesa[]> {
 export async function calcularSaldoMes(mesISO: string): Promise<SaldoMes> {
   const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
 
-  const { inicio, fim, inicioDate, fimDate } = mesWindow(mesISO);
+  const { inicioDate, fimDate } = mesWindow(mesISO);
   const scopado = role !== 'secretaria';
 
   let despesasQuery = supabase

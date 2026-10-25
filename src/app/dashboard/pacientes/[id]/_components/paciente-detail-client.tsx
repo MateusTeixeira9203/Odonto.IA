@@ -2,50 +2,16 @@
 
 import { useState, useTransition, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  Phone,
-  Mail,
-  MapPin,
-  Clock,
-  CreditCard,
-  Plus,
-  Edit2,
-  FileDown,
-  ChevronRight,
-  Calendar,
-  CheckCircle2,
-  AlertCircle,
-  FileText,
-  FilePlus,
-  FileSignature,
-  Loader2,
-  Activity,
-  Bell,
-  Paperclip,
-  Trash2,
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { Phone, Mail, MapPin, Clock, CreditCard, Plus, Edit2, FileDown, ChevronRight, Calendar, CheckCircle2, AlertCircle, FileText, FilePlus, FileSignature, Paperclip, Trash2 } from 'lucide-react';
+import { motion } from 'motion/react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+
 import { PageContainer } from '@/components/layout/page-container';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+
+
 import dynamic from 'next/dynamic';
 
 const TabSkeleton = () => (
@@ -90,7 +56,7 @@ import {
 import { exigeRevisaoComercial } from '@/lib/orcamentos/exige-revisao-comercial';
 import type { Paciente } from '@/types/database';
 import type { TimelineEvent } from '@/server/patients/get-visible-timeline-events';
-import { addMonths, format, parseISO, differenceInCalendarDays } from 'date-fns';
+import { addMonths, format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { formatarDataFicha } from '@/lib/format-data-ficha';
 import { toast } from 'sonner';
@@ -129,7 +95,6 @@ type PendenciaItem = {
   globalKey: string;
 };
 
-const ARCH_LABEL_SHORT: Record<number, string> = { 97: 'Sup.', 98: 'Inf.', 99: 'Boca' };
 
 type AgendamentoTabItem = {
   id: string;
@@ -175,13 +140,11 @@ interface PacienteDetailClientProps {
 
 export function PacienteDetailClient({
   paciente,
-  agendamentoProximo,
   orcamentos,
   orcamentosAviso = null,
   clinicaId,
   dentistaId,
   role,
-  plano,
   fichasRecentesSSR,
   timeline = [],
   prontuario,
@@ -360,9 +323,12 @@ export function PacienteDetailClient({
   }, [fichasRecentesSSR]);
 
   // Follow-up
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- OD016-L05: mantem bloco legado de followup/pendencias; retirada conjunta e efeitos de leitura clinica exigem recorte proprio; dono ALFA - Dev 2 (lista unica no vault)
   const [followupPendente, setFollowupPendente] = useState<boolean>(paciente.followup_pendente ?? false);
   const [followupNota, setFollowupNota] = useState<string>(paciente.followup_nota ?? '');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- OD016-L06: mantem bloco legado de followup/pendencias; retirada conjunta e efeitos de leitura clinica exigem recorte proprio; dono ALFA - Dev 2 (lista unica no vault)
   const [showFollowupInput, setShowFollowupInput] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- OD016-L07: mantem bloco legado de followup/pendencias; retirada conjunta e efeitos de leitura clinica exigem recorte proprio; dono ALFA - Dev 2 (lista unica no vault)
   const [followupSaving, setFollowupSaving] = useState(false);
 
   // Pendências — widget persistente acima das abas
@@ -482,12 +448,14 @@ export function PacienteDetailClient({
     () => orcamentosState.filter(o => estadoPorOrc.get(o.id)?.estado !== 'proposto'),
     [orcamentosState, estadoPorOrc]
   );
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- OD016-L08: mantem bloco legado de followup/pendencias; retirada conjunta e efeitos de leitura clinica exigem recorte proprio; dono ALFA - Dev 2 (lista unica no vault)
   const pendenciasAtivas = useMemo(
     () => pendencias.filter(p => !pendenciasConcluidas.has(p.globalKey)),
     [pendencias, pendenciasConcluidas]
   );
 
   // Procedimentos clínicos dos orçamentos aprovados — headline da Col 2
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- OD016-L09: mantem bloco legado de followup/pendencias; retirada conjunta e efeitos de leitura clinica exigem recorte proprio; dono ALFA - Dev 2 (lista unica no vault)
   const procedimentosPrincipais = useMemo(() => {
     // R-114 (I2) — só o que o paciente de fato aceitou. Item ainda não aprovado é proposta,
     // não pertence ao "que ele já fechou".
@@ -495,6 +463,7 @@ export function PacienteDetailClient({
     return itens.sort((a, b) => (b.preco_total ?? 0) - (a.preco_total ?? 0));
   }, [orcamentosAprovados]);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- OD016-L10: mantem bloco legado de followup/pendencias; retirada conjunta e efeitos de leitura clinica exigem recorte proprio; dono ALFA - Dev 2 (lista unica no vault)
   const handleMarcarFollowUp = async () => {
     setFollowupSaving(true);
     const res = await marcarFollowUp(paciente.id, followupNota || undefined);
@@ -508,6 +477,7 @@ export function PacienteDetailClient({
     setFollowupSaving(false);
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- OD016-L11: mantem bloco legado de followup/pendencias; retirada conjunta e efeitos de leitura clinica exigem recorte proprio; dono ALFA - Dev 2 (lista unica no vault)
   const handleLimparFollowUp = async () => {
     const notaAnterior = followupNota;
     setFollowupSaving(true);
@@ -535,6 +505,7 @@ export function PacienteDetailClient({
     setFollowupSaving(false);
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- OD016-L12: mantem bloco legado de followup/pendencias; retirada conjunta e efeitos de leitura clinica exigem recorte proprio; dono ALFA - Dev 2 (lista unica no vault)
   const handleSnooze = async (days: number) => {
     setFollowupSaving(true);
     const res = await snoozeFollowUp(paciente.id, days);
@@ -736,8 +707,10 @@ export function PacienteDetailClient({
         setPendencias(items);
         setPendenciasConcluidas(concluidos);
       });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- OD016-L13: dependencias canViewClinical/fichasRecentesSSR mudam disparos de leituras clinicas; nao alterar escopo/timing sem teste proprio; dono ALFA - Dev 2 (lista unica no vault)
   }, [clinicaId, paciente.id, dentistaId]);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- OD016-L14: mantem bloco legado de followup/pendencias; retirada conjunta e efeitos de leitura clinica exigem recorte proprio; dono ALFA - Dev 2 (lista unica no vault)
   const togglePendencia = async (item: PendenciaItem) => {
     if (togglingPendencia === item.globalKey) return;
     setTogglingPendencia(item.globalKey);
@@ -758,7 +731,8 @@ export function PacienteDetailClient({
         .eq('clinica_id', clinicaId);
       setPendenciasConcluidas((prev) => {
         const s = new Set(prev);
-        isDone ? s.delete(item.globalKey) : s.add(item.globalKey);
+        if (isDone) s.delete(item.globalKey);
+        else s.add(item.globalKey);
         return s;
       });
     } finally {

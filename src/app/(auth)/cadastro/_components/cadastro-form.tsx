@@ -98,6 +98,7 @@ export function CadastroForm() {
       }
 
       if (!authData.session) {
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- OD016-L01: navegacao completa apos cadastro preserva reinicializacao da sessao; SPA exige teste de auth proprio; dono ALFA - Dev 2 (lista unica no vault)
         window.location.href = `/verifique-email?email=${encodeURIComponent(data.email)}&next=${encodeURIComponent(postSignupPath)}`;
         return;
       }

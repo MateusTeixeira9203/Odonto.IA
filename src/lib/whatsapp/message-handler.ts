@@ -14,15 +14,7 @@
 import { createServiceClient } from '@/lib/supabase/service';
 import { STATES, type BotState } from './states';
 import { sendText } from './provider';
-import {
-  sendDentistList,
-  sendDateList,
-  sendHoraList,
-  ROW_HUMANO,
-  type DentistListItem,
-  type SlotInfo,
-  type HoraListResult,
-} from '@/services/whatsapp.service';
+import { sendDentistList, sendDateList, sendHoraList, ROW_HUMANO, type HoraListResult } from '@/services/whatsapp.service';
 import { inserirNotificacao } from '@/lib/notificacoes';
 import { getBotMensagens, parseTemplate, type BotMensagens } from './template';
 

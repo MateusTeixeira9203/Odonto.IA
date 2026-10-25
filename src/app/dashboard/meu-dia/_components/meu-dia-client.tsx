@@ -523,6 +523,21 @@ export function MeuDiaClient({
   // espelho / rodapé). Chamado incondicionalmente (regra dos hooks) — os fallbacks
   // ''/[]/null/false espelham o mesmo padrão que `useOrcamentoModal` acima já usa; a saída só
   // é RENDERIZADA dentro do `{slotSelecionado && contexto ? ... }` abaixo, nunca aparece vazia.
+  const handleDenteAbertoChange = useCallback((dente: number | null) => {
+    if (dente != null) setJaTocouDente(true); // R-105a §4.2.1 — dispensa a dica do odontograma
+    setDenteAberto(dente);
+    setIniciarPonteDente(null);
+    // R-63 — nova seleção (ou fechar via ✕) nunca herda a tabela aberta do dente anterior;
+    // o próprio ToothDetailPanel também reseta o índice local pro mesmo efeito (§4.2/I3).
+    setDetalheEspecialidadeAberto(false);
+    // R-78 F2 — trocar de dente (ou fechar) sempre volta pro histórico; nunca herda o
+    // editor aberto do dente anterior.
+    setRegistrandoDenteAberto(false);
+    setDetalheAlvoId(null);
+    // R-78 F4 — tocar um dente sai do modo "ler visita" (1 ocupante só, §3.2).
+    setLeituraGrande(null);
+  }, []);
+
   const registrarPainel = useRegistrarPainel({
     variante: 'meu-dia',
     onVerSessao: contexto?.visitas[0] ? () => abrirLeituraGrande(contexto.visitas[0]) : undefined,
@@ -784,20 +799,7 @@ export function MeuDiaClient({
     router.refresh();
   }
 
-  function handleDenteAbertoChange(dente: number | null) {
-    if (dente != null) setJaTocouDente(true); // R-105a §4.2.1 — dispensa a dica do odontograma
-    setDenteAberto(dente);
-    setIniciarPonteDente(null);
-    // R-63 — nova seleção (ou fechar via ✕) nunca herda a tabela aberta do dente anterior;
-    // o próprio ToothDetailPanel também reseta o índice local pro mesmo efeito (§4.2/I3).
-    setDetalheEspecialidadeAberto(false);
-    // R-78 F2 — trocar de dente (ou fechar) sempre volta pro histórico; nunca herda o
-    // editor aberto do dente anterior.
-    setRegistrandoDenteAberto(false);
-    setDetalheAlvoId(null);
-    // R-78 F4 — tocar um dente sai do modo "ler visita" (1 ocupante só, §3.2).
-    setLeituraGrande(null);
-  }
+
 
   /** R-78 F4 — "ler tudo ⤢" de uma visita no Histórico. Fecha o dente se algum estava
    *  aberto (mesma regra do ocupante único, §3.2) — a gaveta continua aberta, só o slot

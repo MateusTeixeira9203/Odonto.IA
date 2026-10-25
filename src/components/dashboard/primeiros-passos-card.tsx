@@ -27,6 +27,7 @@ export function PrimeirosPassosCard({ progresso, dentistaId }: Props) {
   const [dismissed, setDismissed] = useState(true);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- OD016-L24: hidrata dispensa persistida por dentista sem exibir card antes da leitura; preservar transicao SSR; dono ALFA - Dev 2 (lista unica no vault)
     setDismissed(!!localStorage.getItem(DISMISS_KEY(dentistaId)));
   }, [dentistaId]);
 

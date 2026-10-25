@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -39,6 +39,8 @@ import {
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+
+const subscribeMounted = () => () => {};
 
 // ─── Types (mirrored from PlanejamentoTab) ──────────────────────────────────
 
@@ -348,7 +350,7 @@ export function ApresentarPanel({
   const [currentSlide, setCurrentSlide] = useState(0);
   const [slideDirection, setSlideDirection] = useState(1);
   const [overviewMode, setOverviewMode] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
+  const isMounted = useSyncExternalStore(subscribeMounted, () => true, () => false);
   // R-98a — confirmação destrutiva usa AlertDialog, nunca window.confirm (o paciente está
   // vendo a tela). O hook só executa; decidir SE confirma é do editor.
   const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
@@ -364,11 +366,10 @@ export function ApresentarPanel({
   const currentSection = currentSlide >= 1 && currentSlide <= sections.length ? sections[currentSlide - 1] : null;
   const isImagemSlide = currentSection?.tipo === 'imagem';
 
-  useEffect(() => setIsMounted(true), []);
-
   // Reset state when panel opens
   useEffect(() => {
     if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- OD016-L33: reset coordena slides, marcacao e fullscreen; preservar ate QA proprio; dono ALFA - Dev 2 (lista unica no vault)
       setPanelTab('editar');
       setCurrentSlide(0);
       setOverviewMode(false);

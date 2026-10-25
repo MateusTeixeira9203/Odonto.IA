@@ -186,6 +186,7 @@ export function OnboardingClient({ initialStep, focoInicial, nomeInicial, billin
       // combinar uma transição App Router com refresh podia manter a apresentação do
       // Dex renderizada, mesmo com onboarding_completo=true. Navegação de documento
       // garante que o dashboard lê o estado novo antes de montar a tela.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- OD016-L18: reload completo conclui onboarding e atualiza gates da sessao; trocar por SPA exige teste de auth proprio; dono ALFA - Dev 2 (lista unica no vault)
       window.location.assign('/dashboard/meu-dia');
     } finally {
       setIsLoading(false);

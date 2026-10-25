@@ -24,6 +24,7 @@ import type {
   InteractiveListOptions,
 } from '../provider';
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- OD016-L31: contrato e endpoint do adaptador Meta ainda stub; manter parametro MIME e URL para recorte de implementacao proprio; dono ALFA - Dev 2 (lista unica no vault)
 const GRAPH_URL = 'https://graph.facebook.com/v25.0';
 
 // ─── Tipos internos do payload Meta ───────────────────────────────────────────
@@ -142,6 +143,7 @@ export class MetaProvider implements WhatsAppProvider {
     base64: string,
     filename: string,
     caption?: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- OD016-L32: contrato e endpoint do adaptador Meta ainda stub; manter parametro MIME e URL para recorte de implementacao proprio; dono ALFA - Dev 2 (lista unica no vault)
     mimeType = 'application/pdf',
   ): Promise<void> {
     // TODO: stub — Meta requer upload de mídia em 2 etapas:

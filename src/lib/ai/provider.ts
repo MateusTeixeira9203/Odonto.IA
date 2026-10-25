@@ -18,7 +18,7 @@ export interface GenerateTextOptions {
   feature: string;
 }
 
-export interface GenerateStructuredOptions<T = unknown> {
+export interface GenerateStructuredOptions {
   prompt: string;
   model?: string;
   timeoutMs?: number;
@@ -109,7 +109,7 @@ export async function generateText(options: GenerateTextOptions): Promise<AIResu
   };
 }
 
-export async function generateStructured<T>(options: GenerateStructuredOptions<T>): Promise<AIResult<T>> {
+export async function generateStructured<T>(options: GenerateStructuredOptions): Promise<AIResult<T>> {
   const model   = options.model ?? DEFAULT_MODEL;
   const timeout = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const client  = getClient();

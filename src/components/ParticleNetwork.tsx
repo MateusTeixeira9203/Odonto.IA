@@ -31,6 +31,7 @@ export default function ParticleNetwork() {
     let lastTs: number | null = null;
     let frozen = false;
 
+    // eslint-disable-next-line react-hooks/unsupported-syntax -- OD016-L27: classe captura canvas e mouse locais; compiler pula apenas esta otimizacao; mover a classe exige validar animacao; dono ALFA - Dev 2 (lista unica no vault)
     class Particle {
       x: number; y: number; vx: number; vy: number;
       radius: number; baseRadius: number;

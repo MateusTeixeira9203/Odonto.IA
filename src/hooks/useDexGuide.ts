@@ -26,6 +26,7 @@ export function useDexGuide(dentistaId: string) {
   useEffect(() => {
     const stored = localStorage.getItem(KEY(dentistaId)) as DexGuidePhase | null;
     if (stored) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- OD016-L30: hidrata fase legada por dentista e registra CustomEvent na mesma montagem; preservar migracao e timing; dono ALFA - Dev 2 (lista unica no vault)
       setPhaseState(stored);
     } else {
       const jaConcluiuAntigo =

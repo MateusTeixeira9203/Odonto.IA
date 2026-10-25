@@ -22,6 +22,7 @@ export function DateInputDMY({ value, onChange, id }: DateInputDMYProps) {
   useEffect(() => {
     if (value && value.length === 10) {
       const [y, m, d] = value.split('-');
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- OD016-L28: sincroniza prop ISO com digitacao parcial DMY; derivar no render pode apagar entrada incompleta; dono ALFA - Dev 2 (lista unica no vault)
       setDia(d ?? '');
       setMes(m ?? '');
       setAno(y ?? '');

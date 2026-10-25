@@ -35,6 +35,7 @@ export function useLogout() {
     const supabase = createClient();
     await supabase.auth.signOut();
     limparDadosMeuDiaDaAba();
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- OD016-L29: navegacao completa apos limpar sessao descarta caches e estado privado; preservar saida segura; dono ALFA - Dev 2 (lista unica no vault)
     window.location.href = '/login';
   }, [isLoggingOut]);
 

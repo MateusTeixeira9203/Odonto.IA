@@ -123,7 +123,6 @@ export function OrcamentosClient({
   clinicaId,
   dentistaId,
   role,
-  temSecretaria = false,
   canEdit = false,
   dentistas = [],
 }: {
@@ -378,10 +377,11 @@ export function OrcamentosClient({
 
       return matchesSearch && matchesStatus && matchesDentista;
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- OD016-L04: incluir hoje altera quando o filtro pagos_hoje recalcula na virada do dia; comportamento vai a recorte proprio; dono ALFA - Dev 2 (lista unica no vault)
   }, [orcamentos, searchTerm, filterStatus, filterDentista]);
 
   // Métricas do mês atual
-  const { totalAprovados, totalAguardando, totalValidos, totalAprovadosCount, taxaConversao } = useMemo(() => {
+  const { totalAprovados, totalAguardando, taxaConversao } = useMemo(() => {
     const agora = new Date();
     const inicioMes = new Date(agora.getFullYear(), agora.getMonth(), 1);
     const validos = orcamentos.filter((o) => o.status !== 'rascunho').length;

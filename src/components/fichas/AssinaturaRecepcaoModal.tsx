@@ -31,6 +31,7 @@ export function AssinaturaRecepcaoModal({ open, onOpenChange, pacienteId, pacien
   // Busca a ficha ao abrir
   useEffect(() => {
     if (!open) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- OD016-L25: reset de assinatura e loading por abertura/paciente; mover reset pode afetar canvas e salvar; recorte proprio; dono ALFA - Dev 2 (lista unica no vault)
     setStep('loading');
     setErro(null);
     setVazio(true);

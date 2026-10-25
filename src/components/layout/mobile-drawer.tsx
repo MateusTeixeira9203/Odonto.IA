@@ -7,7 +7,7 @@ import {
   X, LogOut, Sun, Moon, Lock, Loader2,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { useState, useEffect } from 'react';
+import { useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { temFeature } from '@/lib/planos';
@@ -15,6 +15,8 @@ import type { DentistaRole } from '@/types/database';
 import type { PlanoId } from '@/lib/planos';
 import { OdontoIALogo } from '@/components/ui/dent-ia-logo';
 import { useLogout } from '@/hooks/use-logout';
+
+const subscribeMounted = () => () => {};
 
 interface MobileDrawerProps {
   open: boolean;
@@ -40,10 +42,8 @@ const NAV_ITEMS = [
 export function MobileDrawer({ open, onClose, nome, clinicaNome, role, avatarUrl, plano }: MobileDrawerProps) {
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(subscribeMounted, () => true, () => false);
   const { logout, isLoggingOut } = useLogout();
-
-  useEffect(() => { setMounted(true); }, []);
 
   const avatarInitials = nome.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
   const financeiroLocked = !temFeature(plano ?? 'SOLO', 'financeiro');

@@ -25,6 +25,7 @@ export function FinanceiroHub({
 
   useEffect(() => {
     try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- OD016-L03: hidrata preferencia de privacidade do localStorage mantendo HTML inicial; mudar timing exige recorte visual; dono ALFA - Dev 2 (lista unica no vault)
       if (localStorage.getItem('dentia:financeiro-privado') === 'true') setPrivado(true);
     } catch { /* SSR */ }
   }, []);

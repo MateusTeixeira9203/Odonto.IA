@@ -270,9 +270,7 @@ export function FinanceiroClient({
   const [removendoReceita, setRemovendoReceita] = useState<string | null>(null);
 
   const mesDate = parseISO(`${mesAtual}-01`);
-  const mesLabel = format(mesDate, "MMMM 'de' yyyy", { locale: ptBR });
 
-  const priv = (v: number) => isPrivacy ? '••••••' : fmt(v);
 
   type LancamentoUnif =
     | { kind: 'saida';     id: string; data: string; item: Despesa }

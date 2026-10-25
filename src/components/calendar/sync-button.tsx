@@ -14,6 +14,7 @@ export function GoogleCalendarSyncButton({ connected }: Props) {
     setIsDisconnecting(true);
     await fetch('/api/calendar/disconnect', { method: 'POST' });
     // O endpoint faz redirect — recarregar para refletir o novo estado
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- OD016-L19: redirect completo inicia callback OAuth externo; preservar fluxo de sincronizacao; dono ALFA - Dev 2 (lista unica no vault)
     window.location.href = '/dashboard/agendamentos?calendar=disconnected';
   }
 

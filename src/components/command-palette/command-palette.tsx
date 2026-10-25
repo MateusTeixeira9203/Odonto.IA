@@ -72,6 +72,7 @@ export function CommandPalette({ open, onClose, clinicaId }: Props) {
 
   useEffect(() => {
     if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- OD016-L20: preservar reset de abertura ate QA de teclado; dono ALFA - Dev 2 (lista unica no vault)
       setQuery('');
       setSelectedIdx(0);
       setPatients([]);
@@ -88,6 +89,7 @@ export function CommandPalette({ open, onClose, clinicaId }: Props) {
     abortRef.current?.abort();
 
     if (query.length < 2) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- OD016-L21: preservar reset da busca curta ate QA proprio; dono ALFA - Dev 2 (lista unica no vault)
       setPatients([]);
       setSearching(false);
       return;
@@ -189,6 +191,7 @@ export function CommandPalette({ open, onClose, clinicaId }: Props) {
   }));
 
   // Flat list for keyboard navigation
+  // OD016-L22: dependencia instavel mantida para preservar o listener atual; dono ALFA - Dev 2.
   const allItems = query.length >= 2
     ? [...patientItems, ...filteredStatic]
     : [...recentItems, ...filteredStatic];
@@ -215,6 +218,7 @@ export function CommandPalette({ open, onClose, clinicaId }: Props) {
   }, [open, selectedIdx, allItems, total]);
 
   // Reset selection on results change
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- OD016-L23: preservar indice ao mudar resultados; dono ALFA - Dev 2 (lista unica no vault)
   useEffect(() => { setSelectedIdx(0); }, [query, patients.length]);
 
   // Group static items for display

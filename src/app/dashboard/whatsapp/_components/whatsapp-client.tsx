@@ -50,6 +50,7 @@ function tempoRelativo(iso: string): string {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- OD016-L16: helper/acao legados de etapas e finalizacao sem controle ativo; revisao do fluxo WhatsApp fica em recorte proprio; dono ALFA - Dev 2 (lista unica no vault)
 function etapaLabel(etapa: string): string {
   const mapa: Record<string, string> = {
     inicio:                 'Menu',
@@ -176,7 +177,7 @@ interface Props {
   clinicaId: string;
 }
 
-export function WhatsAppClient({ initialConversas, clinicaId }: Props) {
+export function WhatsAppClient({ initialConversas }: Props) {
   const [conversas, setConversas]             = useState<ConversaItem[]>(initialConversas);
   const [tab, setTab]                         = useState<Tab>('todas');
   const [conversaSelecionada, setSelecionada] = useState<ConversaItem | null>(null);
@@ -251,6 +252,7 @@ export function WhatsAppClient({ initialConversas, clinicaId }: Props) {
   };
 
   // ── Finalizar conversa (humano → bot) ─────────────────────────────────────
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- OD016-L17: helper/acao legados de etapas e finalizacao sem controle ativo; revisao do fluxo WhatsApp fica em recorte proprio; dono ALFA - Dev 2 (lista unica no vault)
   const handleFinalizar = () => {
     if (!conversaSelecionada) return;
     startTransition(async () => {
