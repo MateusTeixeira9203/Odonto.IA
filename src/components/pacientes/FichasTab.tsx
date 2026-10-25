@@ -950,7 +950,7 @@ export function FichasTab({
       const supabase = createClient();
       const { data, error } = await supabase
         .from("fichas")
-        .select("id, created_at, data_atendimento, queixa_principal, anotacoes, dentes_afetados, dentes_observacoes, status, procedimentos_concluidos, procedimentos_status, procedimentos, conduta, assinatura_url, assinado_em, tratamento_id, orto_manutencao, nome, dentista_id, dentista:dentistas(nome, cro)")
+        .select("id, created_at, data_atendimento, queixa_principal, anotacoes, dentes_afetados, dentes_observacoes, status, procedimentos_concluidos, procedimentos_status, procedimentos, conduta, assinatura_url, assinado_em, tratamento_id, orto_manutencao, nome, dentista_id, dentista:dentistas!fichas_dentista_id_fkey(nome, cro)")
         .eq("paciente_id", patientId)
         .eq("clinica_id", clinicaId)
         .order("data_atendimento", { ascending: false })
@@ -1007,7 +1007,7 @@ export function FichasTab({
       // degrada pra timeline vazia, mesmo padrão de "erro engolido só quando é seguro".
       const { data: evoData, error: evoError } = await supabase
         .from("ficha_evolucoes")
-        .select("id, ficha_id, dentista_id, data, texto, automatica, dentista:dentistas(nome)")
+        .select("id, ficha_id, dentista_id, data, texto, automatica, dentista:dentistas!ficha_evolucoes_dentista_id_fkey(nome)")
         .eq("clinica_id", clinicaId)
         .in("ficha_id", (data as unknown as FichaDB[]).map((f) => f.id));
 

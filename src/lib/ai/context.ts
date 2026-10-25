@@ -162,7 +162,7 @@ export async function buildConsultationContext(
 ): Promise<ConsultationContext | null> {
   const { data: ag } = await supabase
     .from('agendamentos')
-    .select('data_hora, observacoes, paciente:pacientes(id, nome, data_nascimento, observacoes)')
+    .select('data_hora, observacoes, paciente:pacientes!agendamentos_paciente_id_fkey(id, nome, data_nascimento, observacoes)')
     .eq('id', agendamentoId)
     .eq('clinica_id', clinicId)
     .maybeSingle();
@@ -209,7 +209,7 @@ export async function buildClinicOperationalContext(
     await Promise.all([
       supabase
         .from('agendamentos')
-        .select('data_hora, status, paciente:pacientes(nome)')
+        .select('data_hora, status, paciente:pacientes!agendamentos_paciente_id_fkey(nome)')
         .eq('clinica_id', clinicId)
         .gte('data_hora', hojeInicio.toISOString())
         .lte('data_hora', hojeFim.toISOString())

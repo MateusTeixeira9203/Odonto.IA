@@ -93,7 +93,7 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
   const query = supabase
     .from('agendamentos')
     .select(
-      'id, clinica_id, paciente_id, dentista_id, data_hora, duracao_minutos, status, origem, observacoes, created_at, paciente:pacientes(id, nome, observacoes), dentista:dentistas!agendamentos_dentista_id_fkey(id, nome), criador:dentistas!agendamentos_created_by_fkey(id, nome)'
+      'id, clinica_id, paciente_id, dentista_id, data_hora, duracao_minutos, status, origem, observacoes, created_at, paciente:pacientes!agendamentos_paciente_id_fkey(id, nome, observacoes), dentista:dentistas!agendamentos_dentista_id_fkey(id, nome), criador:dentistas!agendamentos_created_by_fkey(id, nome)'
     )
     .eq('clinica_id', dentista.clinica_id)
     .gte('data_hora', janela.de)

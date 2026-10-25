@@ -392,7 +392,7 @@ export async function getMeuDiaData({
   ] = await Promise.all([
     supabase
       .from('agendamentos')
-      .select('id, data_hora, status, paciente:pacientes(id, nome, observacoes, data_nascimento)')
+      .select('id, data_hora, status, paciente:pacientes!agendamentos_paciente_id_fkey(id, nome, observacoes, data_nascimento)')
       .eq('clinica_id', clinicId)
       .eq('dentista_id', dentistaId)
       .gte('data_hora', inicioDoDiaBRT(now).toISOString())
@@ -464,7 +464,7 @@ export async function getMeuDiaData({
       .from('fichas')
       // R-108b — `status` e `nome` entram nesta MESMA query (nenhuma solta, spec §4): são o
       // que o seletor "o novo vai para" precisa pra listar os tratamentos abertos.
-      .select('id, paciente_id, data_atendimento, queixa_principal, procedimentos, anotacoes, orto_manutencao, origem, status, nome, dentista_id, dentista:dentistas(nome)')
+      .select('id, paciente_id, data_atendimento, queixa_principal, procedimentos, anotacoes, orto_manutencao, origem, status, nome, dentista_id, dentista:dentistas!fichas_dentista_id_fkey(nome)')
       .eq('clinica_id', clinicId)
       .in('paciente_id', pacienteIds)
       .order('data_atendimento', { ascending: false })

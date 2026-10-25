@@ -100,7 +100,7 @@ export async function DentistaDashboard({ dentista, children }: { dentista: Dent
     // Lista completa de atendimentos hoje com dados do paciente
     supabase
       .from('agendamentos')
-      .select('id, data_hora, status, observacoes, paciente:pacientes(id, nome, observacoes)')
+      .select('id, data_hora, status, observacoes, paciente:pacientes!agendamentos_paciente_id_fkey(id, nome, observacoes)')
       .eq('clinica_id', dentista.clinica_id)
       .eq('dentista_id', dentista.id)
       .gte('data_hora', todayStart)
@@ -113,7 +113,7 @@ export async function DentistaDashboard({ dentista, children }: { dentista: Dent
     // (dashboard/page.tsx), então nunca precisa filtrar isso aqui.
     supabase
       .from('odontograma_eventos')
-      .select('id, tipo, dente, paciente_id, paciente:pacientes(nome)')
+      .select('id, tipo, dente, paciente_id, paciente:pacientes!odontograma_eventos_paciente_id_fkey(nome)')
       .eq('clinica_id', dentista.clinica_id)
     .is('retirado_em', null)
       .eq('encaminhado_para', dentista.id)

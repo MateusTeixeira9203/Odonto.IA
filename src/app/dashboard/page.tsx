@@ -40,7 +40,7 @@ async function SecretaryDashboardServer({
     supabase
       .from('agendamentos')
       .select(
-        'id, data_hora, status, observacoes, paciente:pacientes(id, nome), dentista:dentistas!agendamentos_dentista_id_fkey(id, nome)',
+        'id, data_hora, status, observacoes, paciente:pacientes!agendamentos_paciente_id_fkey(id, nome), dentista:dentistas!agendamentos_dentista_id_fkey(id, nome)',
       )
       .eq('clinica_id', clinicaId)
       .gte('data_hora', startOfDay.toISOString())

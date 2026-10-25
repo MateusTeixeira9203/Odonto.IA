@@ -105,8 +105,8 @@ export async function sendReminders(): Promise<ReminderResult> {
       .from('agendamentos')
       .select(`
         id, data_hora, duracao_minutos,
-        paciente:pacientes (nome, whatsapp, telefone),
-        dentista:dentistas (nome)
+        paciente:pacientes!agendamentos_paciente_id_fkey (nome, whatsapp, telefone),
+        dentista:dentistas!agendamentos_dentista_id_fkey (nome)
       `)
       .eq('clinica_id', config.clinica_id)
       .gte('data_hora', now.toISOString())

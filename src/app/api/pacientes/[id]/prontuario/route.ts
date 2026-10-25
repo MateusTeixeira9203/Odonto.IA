@@ -41,7 +41,7 @@ export async function GET(
       .maybeSingle(),
     acesso === 'completo' ? supabase
       .from('fichas')
-      .select('id, created_at, data_atendimento, queixa_principal, anotacoes, dentes_afetados, dentes_observacoes, procedimentos_concluidos, assinatura_url, assinado_em, origem, dentista:dentistas(nome)')
+      .select('id, created_at, data_atendimento, queixa_principal, anotacoes, dentes_afetados, dentes_observacoes, procedimentos_concluidos, assinatura_url, assinado_em, origem, dentista:dentistas!fichas_dentista_id_fkey(nome)')
       .eq('paciente_id', id)
       .eq('clinica_id', dentista.clinica_id)
       .order('data_atendimento', { ascending: false }) : Promise.resolve({ data: [] }),

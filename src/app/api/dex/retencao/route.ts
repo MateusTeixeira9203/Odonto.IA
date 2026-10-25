@@ -44,13 +44,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
     let agendamentosQuery = supabase
       .from('agendamentos')
-      .select('paciente_id, status, data_hora, paciente:pacientes(nome)')
+      .select('paciente_id, status, data_hora, paciente:pacientes!agendamentos_paciente_id_fkey(nome)')
       .eq('clinica_id', dentista.clinica_id)
       .gte('data_hora', ha180Dias.toISOString());
 
     let fichasQuery = supabase
       .from('fichas')
-      .select('paciente_id, data_atendimento, paciente:pacientes(nome)')
+      .select('paciente_id, data_atendimento, paciente:pacientes!fichas_paciente_id_fkey(nome)')
       .eq('clinica_id', dentista.clinica_id);
 
     if (scopado) {

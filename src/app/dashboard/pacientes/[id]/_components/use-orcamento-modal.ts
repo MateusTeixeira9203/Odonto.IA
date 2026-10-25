@@ -112,14 +112,14 @@ type ResumoOrigemOrcamento = {
 
 const CAMPOS_FICHA_ORC =
   'id, created_at, data_atendimento, queixa_principal, dentes_afetados, dentes_observacoes, ' +
-  'dentista_id, dentista:dentistas(nome)';
+  'dentista_id, dentista:dentistas!fichas_dentista_id_fkey(nome)';
 const CAMPOS_EVENTO_ORC =
   'id, dentista_id, tipo, procedimento_id, procedimento_nome, status, origem, nivel, arcada, quadrante, dente, faces, papel_no_grupo, grupo_id, assinatura_id, observacao, ' +
   'encaminhado_para, encaminhado_dentista:dentistas!odontograma_eventos_encaminhado_para_fkey(nome)';
-const SELECT_FICHA_PARA_ORC = `${CAMPOS_FICHA_ORC}, odontograma_eventos(${CAMPOS_EVENTO_ORC})`;
+const SELECT_FICHA_PARA_ORC = `${CAMPOS_FICHA_ORC}, odontograma_eventos!odontograma_eventos_ficha_id_fkey(${CAMPOS_EVENTO_ORC})`;
 // R-130 — !inner mantém o agregado enxuto, mas a elegibilidade financeira não depende mais
 // de status/assinatura: qualquer evento clínico da ficha pode virar item de orçamento.
-const SELECT_FICHA_PARA_ORC_AGREGADO = `${CAMPOS_FICHA_ORC}, odontograma_eventos!inner(${CAMPOS_EVENTO_ORC})`;
+const SELECT_FICHA_PARA_ORC_AGREGADO = `${CAMPOS_FICHA_ORC}, odontograma_eventos!odontograma_eventos_ficha_id_fkey!inner(${CAMPOS_EVENTO_ORC})`;
 
 export function useOrcamentoModal({
   pacienteId, clinicaId, meuDentistaId, procedimentosClinica, erroCatalogo = null, isSecretaria, dentistasClinica,

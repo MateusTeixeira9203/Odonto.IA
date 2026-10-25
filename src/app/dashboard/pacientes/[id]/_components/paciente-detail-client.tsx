@@ -372,7 +372,7 @@ export function PacienteDetailClient({
       .from('agendamentos')
       // dentista:dentistas!dentista_id — agendamentos tem 2 FKs pra dentistas (dentista_id e
       // created_by); sem desambiguar, o embed dá erro (PGRST201) e a aba fica sempre vazia.
-      .select('id, data_hora, status, observacoes, duracao_minutos, dentista:dentistas!dentista_id(nome)')
+      .select('id, data_hora, status, observacoes, duracao_minutos, dentista:dentistas!agendamentos_dentista_id_fkey(nome)')
       .eq('paciente_id', paciente.id)
       .eq('clinica_id', clinicaId)
       .order('data_hora', { ascending: false })
@@ -669,7 +669,7 @@ export function PacienteDetailClient({
     if (fichasRecentesSSR === undefined) {
       void supabase
         .from('fichas')
-        .select('id, created_at, data_atendimento, queixa_principal, anotacoes, dentista:dentistas(nome)')
+        .select('id, created_at, data_atendimento, queixa_principal, anotacoes, dentista:dentistas!fichas_dentista_id_fkey(nome)')
         .eq('paciente_id', paciente.id)
         .eq('clinica_id', clinicaId)
         .order('data_atendimento', { ascending: false })
