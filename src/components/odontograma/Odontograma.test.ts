@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { OdontogramaEventoDraft, TipoRegistroOdontograma } from '@/types/odontograma';
-import { buildResumos } from './Odontograma';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { Odontograma, rotuloDenticao, buildResumos } from './Odontograma';
 
 function evento(
   id: string,
@@ -39,4 +41,15 @@ test('implante realizado volta a desenhar o dente antes ausente', () => {
   ]);
 
   assert.equal(resumos.get(23)?.ausente, false);
+});
+
+test('MD-06: cabecalho e dentes seguem a mesma denticao controlada, inclusive ao voltar', () => {
+  for (const denticao of ['permanent', 'deciduous', 'permanent'] as const) {
+    const markup = renderToStaticMarkup(createElement(Odontograma, {
+      denticao, selectedTeeth: [], onToothToggle: () => {}, layout: 'colunas',
+    }));
+    assert.equal(rotuloDenticao(denticao), denticao === 'deciduous' ? 'Dentição decídua' : 'Dentição permanente');
+    assert.equal(markup.includes('Dente 55'), denticao === 'deciduous');
+    assert.equal(markup.includes('Dente 18'), denticao === 'permanent');
+  }
 });

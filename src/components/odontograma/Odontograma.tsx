@@ -764,7 +764,15 @@ const FILTER_BUTTONS: { id: string; label: string; filter: ViewFilter }[] = [
 ];
 
 // ─── Main component ───────────────────────────────────────────────────────────
+export type Denticao = 'permanent' | 'deciduous';
+
+export function rotuloDenticao(denticao: Denticao): string {
+  return denticao === 'deciduous' ? 'Dentição decídua' : 'Dentição permanente';
+}
+
 export interface OdontogramaProps {
+  denticao?: Denticao;
+  onDenticaoChange?: (denticao: Denticao) => void;
   selectedTeeth: number[];
   sharedTeeth?: number[];
   historicalTeeth?: Set<number>;
@@ -805,6 +813,8 @@ export interface OdontogramaProps {
 
 export function Odontograma({
   selectedTeeth,
+  denticao,
+  onDenticaoChange,
   sharedTeeth = [],
   historicalTeeth = new Set(),
   onToothToggle,
@@ -819,7 +829,8 @@ export function Odontograma({
   presentationMode = false,
 }: OdontogramaProps) {
   const [hoveredTooth, setHoveredTooth]   = useState<number | null>(null);
-  const [tab, setTab]                     = useState<'permanent' | 'deciduous'>('permanent');
+  const [tabInterna, setTab] = useState<Denticao>('permanent');
+  const tab = denticao ?? tabInterna;
   const [viewFilter, setViewFilter]       = useState<ViewFilter>('all');
   const [activeFilterId, setActiveFilterId] = useState<string>('arcadas');
   const [legendOpen, setLegendOpen]       = useState(false);
@@ -1063,7 +1074,7 @@ export function Odontograma({
           <button
             key={id}
             type="button"
-            onClick={() => setTab(id)}
+            onClick={() => { setTab(id); onDenticaoChange?.(id); }}
             // R-63 F3 (G17) — piso de 36px. Só o modo `compact` (cockpit do Meu dia) tem o
             // wrapper `zoom: 0.85` (linha ~996), e getBoundingClientRect() mede o valor JÁ
             // escalado: h-9 (36px de CSS) vira 30.6px de verdade na tela. h-11 (44px) vira

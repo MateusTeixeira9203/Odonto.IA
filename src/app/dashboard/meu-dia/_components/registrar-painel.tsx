@@ -57,7 +57,7 @@ import { toast } from 'sonner';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { Check, AlertTriangle, CalendarPlus, FileText, Loader2, ScanLine, X } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Odontograma } from '@/components/odontograma/Odontograma';
+import { Odontograma, rotuloDenticao, type Denticao } from '@/components/odontograma/Odontograma';
 import { salvarEventosOdontograma } from '@/server/patients/registro-actions';
 import { CampoMagicoMeuDia } from './campo-magico-meu-dia';
 import type { DocumentoControlado } from './documento-atendimento';
@@ -242,6 +242,7 @@ export interface RegistrarPainelSlots {
    *  `ToothDetailPanel` no lugar deste slot inteiro (mesma prioridade de sempre: orto
    *  vence — ver `slot` abaixo). */
   slotCentral: ReactNode;
+  denticaoLabel: string;
   /** Rodapé com um único CTA primário + aviso de eventos pendentes. */
   rodape: ReactNode;
   /** Manutenção é estado estruturado da visita, mas precisa ser revisável antes do save. */
@@ -337,6 +338,7 @@ export function useRegistrarPainel({
   const [erroSalvamento, setErroSalvamento] = useState<string | null>(null);
   useEffect(() => () => { salvamentoAtual.current?.abort(); }, [contextoId]);
   const [savedFichaId, setSavedFichaId] = useState<string | null>(null);
+  const [denticao, setDenticao] = useState<Denticao>('permanent');
   const [eventosPendentes, setEventosPendentes] = useState<OdontogramaEventoDraft[] | null>(null);
   const [isRegravando, setIsRegravando] = useState(false);
 
@@ -958,6 +960,8 @@ export function useRegistrarPainel({
                 </button>
               </div>
               <Odontograma
+                denticao={denticao}
+                onDenticaoChange={setDenticao}
                 eventos={eventosDraft}
                 eventosPersistidos={boca}
                 selectedTeeth={onde?.dentes ?? []}
@@ -1164,6 +1168,7 @@ export function useRegistrarPainel({
     controlesOdontograma,
     acoesSecundarias,
     slotCentral,
+    denticaoLabel: rotuloDenticao(denticao),
     rodape,
     ortoManutencao: ortoParaSalvar,
     rascunhoAtual: { orto: ortoValor, alerta: alertaNovo },

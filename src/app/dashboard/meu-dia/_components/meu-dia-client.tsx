@@ -1210,7 +1210,7 @@ export function MeuDiaClient({
             >
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-[17px] font-bold text-text-primary">Odontograma</h2>
-                <span className="text-[12.5px] text-text-secondary">Dentição permanente</span>
+                <span className="text-[12.5px] text-text-secondary">{registrarPainel.denticaoLabel}</span>
               </div>
               <AnimatePresence mode="wait" initial={false}>
                 {anexosAbertos ? (
