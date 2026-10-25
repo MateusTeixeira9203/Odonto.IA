@@ -1692,11 +1692,11 @@ export function PacienteDetailClient({
                           }`}
                         >
                           <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
-                            <div className="flex min-w-0 items-center gap-3">
+                            <div className="flex min-w-0 max-w-full items-center gap-3">
                               <div className="w-8 h-8 shrink-0 flex items-center justify-center">
                                 <StatusIcon className="w-5 h-5 text-teal" />
                               </div>
-                              <div>
+                              <div className="min-w-0">
                                 <div className="flex items-center gap-2">
                                   <span
                                     className={`text-[15px] font-medium ${estadoCls}`}
@@ -1713,6 +1713,9 @@ export function PacienteDetailClient({
                                     <> • Validade: {orc.validade_dias} dias</>
                                   )}
                                 </div>
+                                <p className="mt-1 break-words text-[12.5px] text-muted-foreground">
+                                  Dentista responsável: {orc.dentista?.nome ?? '—'}
+                                </p>
                               </div>
                             </div>
                             <div className="ml-auto flex shrink-0 items-center gap-3">

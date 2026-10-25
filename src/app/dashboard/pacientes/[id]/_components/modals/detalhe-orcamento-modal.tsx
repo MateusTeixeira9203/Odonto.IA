@@ -877,11 +877,14 @@ export function DetalheOrcamentoModal({
                 tabela de procedimentos não responde ("está sendo pago?") vive aqui. */}
             <div className="grid grid-cols-[minmax(0,1fr)_40px] items-start gap-3 border-b border-border px-6 py-5 shrink-0">
               <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
-                <div>
+                <div className="min-w-0 max-w-full">
                   <DialogTitle className="font-heading text-[28px] font-normal leading-tight text-text-primary">Orçamento</DialogTitle>
                   <DialogDescription className="mt-1 text-[13px] text-text-secondary">
                     {format(parseISO(detalheOrc.created_at), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
                   </DialogDescription>
+                  <p className="mt-1 break-words text-[13px] text-muted-foreground">
+                    Dentista responsável: {detalheOrc.dentista?.nome ?? '—'}
+                  </p>
                 </div>
                 <div className="flex flex-col items-start gap-1 sm:items-end">
                   <span className={`inline-flex items-center gap-1.5 text-[15px] ${estado === 'proposto' ? 'text-text-secondary' : 'text-teal-ink'}`}>

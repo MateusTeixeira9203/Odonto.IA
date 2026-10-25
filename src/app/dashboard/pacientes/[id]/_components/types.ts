@@ -70,6 +70,7 @@ export type OrcamentoComItens = {
   /** R-38 — false esconde preço por item e Subtotal no PDF. Default true. */
   mostrar_valor_por_item: boolean;
   dentista_id: string | null;
+  dentista?: { nome: string } | null;
   itens: OrcamentoItem[];
   pagamentos: Pagamento[];
   cobrancas: CobrancaEtapa[];
