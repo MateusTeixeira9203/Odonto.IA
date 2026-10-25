@@ -9,6 +9,8 @@ import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import type SignaturePadLib from 'signature_pad';
 import { Button } from '@/components/ui/button';
+import { ConfirmarExclusaoFicha } from '@/components/pacientes/confirmar-exclusao-ficha';
+import type { ConfirmacaoExclusaoFicha } from '@/lib/prontuario/exclusao-ficha';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ToothDetailPanel } from '@/components/odontograma/ToothDetailPanel';
@@ -470,10 +472,10 @@ export function ProntuarioTab({
     setExclusaoFichaId(fichaId);
   }
 
-  async function confirmarExclusaoFicha(): Promise<void> {
+  async function confirmarExclusaoFicha(confirmacao: ConfirmacaoExclusaoFicha): Promise<void> {
     if (!exclusaoFichaId) return;
     setApagandoFicha(true);
-    const resultado = await deletarFicha(exclusaoFichaId);
+    const resultado = await deletarFicha(exclusaoFichaId, confirmacao);
     setApagandoFicha(false);
     if (!resultado.ok) {
       toast.error(resultado.error ?? 'Não foi possível apagar a ficha.');
@@ -1095,36 +1097,16 @@ export function ProntuarioTab({
         onTentarEnviarPedido={() => void retorno.tentarEnviarPedido(dentistaId)}
       />
 
-        <Dialog open={exclusaoFichaId != null} onOpenChange={(open) => {
-          if (!open && !apagandoFicha) {
+        {exclusaoFichaId && resumoExclusao && <ConfirmarExclusaoFicha
+          key={exclusaoFichaId}
+          resumo={resumoExclusao}
+          apagando={apagandoFicha}
+          onCancelar={() => {
             setExclusaoFichaId(null);
             setResumoExclusao(null);
-          }
-        }}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Apagar esta Ficha?</DialogTitle>
-              <DialogDescription>
-                Esta ação é permanente. A ficha só pode ser apagada porque não há assinatura, documento clínico, orçamento aceito ou pagamento vinculados.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="rounded-xl border border-border bg-surface-alt p-3 text-sm text-text-secondary">
-              Serão removidos {resumoExclusao?.eventos ?? 0} procedimento{(resumoExclusao?.eventos ?? 0) === 1 ? '' : 's'}, {resumoExclusao?.evolucoes ?? 0} {(resumoExclusao?.evolucoes ?? 0) === 1 ? 'evolução' : 'evoluções'} e {resumoExclusao?.orcamentosEditaveis ?? 0} orçamento{(resumoExclusao?.orcamentosEditaveis ?? 0) === 1 ? ' editável' : 's editáveis'}.
-            </div>
-            <DialogFooter>
-              <Button variant="ghost" disabled={apagandoFicha} onClick={() => {
-                setExclusaoFichaId(null);
-                setResumoExclusao(null);
-              }}>
-                Cancelar
-              </Button>
-              <Button variant="destructive" disabled={apagandoFicha} onClick={() => void confirmarExclusaoFicha()}>
-                {apagandoFicha && <Loader2 className="h-4 w-4 animate-spin" />}
-                Apagar permanentemente
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          }}
+          onConfirmar={confirmarExclusaoFicha}
+        />}
 
         <Dialog open={odontogramaCompletoAberto} onOpenChange={setOdontogramaCompletoAberto}>
           <DialogContent className="w-[calc(100vw-1rem)] max-w-[1180px] overflow-hidden p-3 sm:w-[calc(100vw-2rem)] sm:max-w-[1180px] sm:p-6">

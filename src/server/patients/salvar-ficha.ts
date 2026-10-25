@@ -1,6 +1,7 @@
 'use server';
 
 import { z } from 'zod';
+import { mensagemErroExclusao, type ConfirmacaoExclusaoFicha } from '@/lib/prontuario/exclusao-ficha';
 import { requireClinicContext } from '@/server/auth/clinic';
 import { revalidatePath } from 'next/cache';
 import { registrarLog } from '@/lib/activity-log';
@@ -81,6 +82,11 @@ export interface ResumoExclusaoFicha {
   eventos: number;
   evolucoes: number;
   orcamentosEditaveis: number;
+  orcamentosMantidos: number;
+  orcamentosApagados: number;
+  nomePaciente: string;
+  arquivos: number;
+  dataAtendimento: string;
 }
 
 export type PrepararExclusaoFichaResult =
@@ -464,131 +470,111 @@ type AvaliacaoExclusaoFicha =
 
 async function avaliarExclusaoFicha(fichaId: string): Promise<AvaliacaoExclusaoFicha> {
   const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
-  if (role === 'secretaria') return { ok: false, error: 'Sem permissão para apagar fichas clínicas.' };
-
-  const { data: ficha } = await supabase
-    .from('fichas')
-    .select('id, paciente_id, dentista_id, assinado_em, dentes_afetados, procedimentos')
-    .eq('id', fichaId)
-    .eq('clinica_id', clinicId)
-    .maybeSingle();
-
-  if (!ficha) return { ok: false, error: 'Ficha não encontrada.' };
-  if (role === 'dentista' && ficha.dentista_id !== dentistaId) {
-    return { ok: false, error: 'Sem permissão para apagar fichas de outro dentista.' };
+  if (role !== 'admin' && role !== 'dentista') {
+    return { ok: false, error: mensagemErroExclusao('sem_permissao') };
   }
-  const { count: eventos, error: eventosError } = await supabase
-    .from('odontograma_eventos')
-    .select('id', { count: 'exact', head: true })
-    .eq('ficha_id', fichaId)
-    .eq('clinica_id', clinicId);
-  const { count: eventosAssinados, error: eventosAssinadosError } = await supabase
-    .from('odontograma_eventos')
-    .select('id', { count: 'exact', head: true })
-    .eq('ficha_id', fichaId)
-    .eq('clinica_id', clinicId)
-    .not('assinatura_id', 'is', null);
-  const { count: evolucoes, error: evolucoesError } = await supabase
-    .from('ficha_evolucoes')
-    .select('id', { count: 'exact', head: true })
-    .eq('ficha_id', fichaId)
-    .eq('clinica_id', clinicId);
-  const { count: documentos, error: documentosError } = await supabase
-    .from('documentos_aceite')
-    .select('id', { count: 'exact', head: true })
-    .eq('ficha_id', fichaId)
-    .eq('clinica_id', clinicId);
-  const { data: orcamentos, error: orcamentosError } = await supabase
-    .from('orcamentos')
-    .select('id, status')
-    .eq('ficha_id', fichaId)
-    .eq('clinica_id', clinicId);
+  const { data: ficha, error: fichaError } = await supabase.from('fichas')
+    .select('id, paciente_id, dentista_id, assinado_em, assinatura_url, dentes_afetados, procedimentos, data_atendimento')
+    .eq('id', fichaId).eq('clinica_id', clinicId).maybeSingle();
+  if (fichaError) {
+    console.error('[avaliarExclusaoFicha:ficha]', fichaError.message);
+    return { ok: false, error: mensagemErroExclusao('erro') };
+  }
+  if (!ficha) return { ok: false, error: mensagemErroExclusao('ficha_nao_encontrada') };
+  if (ficha.dentista_id !== dentistaId) return { ok: false, error: mensagemErroExclusao('sem_permissao') };
 
-  if (eventosError || eventosAssinadosError || evolucoesError || documentosError || orcamentosError) {
-    console.error('[avaliarExclusaoFicha] falha ao validar vínculos', {
-      eventos: eventosError?.message,
-      eventosAssinados: eventosAssinadosError?.message,
-      evolucoes: evolucoesError?.message,
-      documentos: documentosError?.message,
-      orcamentos: orcamentosError?.message,
-    });
-    return { ok: false, error: 'Não foi possível verificar se esta ficha pode ser apagada.' };
+  const [eventos, evolucoes, documentos, assinaturas, arquivos, paciente, orcamentosDiretos] = await Promise.all([
+    supabase.from('odontograma_eventos').select('id, assinatura_id, retirado_em, encaminhado_para')
+      .eq('ficha_id', fichaId).eq('clinica_id', clinicId),
+    supabase.from('ficha_evolucoes').select('id', { count: 'exact', head: true })
+      .eq('ficha_id', fichaId).eq('clinica_id', clinicId),
+    supabase.from('documentos_aceite').select('id', { count: 'exact', head: true })
+      .eq('ficha_id', fichaId).eq('clinica_id', clinicId).neq('tipo', 'orcamento'),
+    supabase.from('assinaturas').select('id', { count: 'exact', head: true })
+      .eq('ficha_id', fichaId).eq('clinica_id', clinicId).neq('tipo', 'orcamento'),
+    supabase.from('ficha_arquivos').select('id', { count: 'exact', head: true })
+      .eq('ficha_id', fichaId).eq('clinica_id', clinicId),
+    supabase.from('pacientes').select('nome').eq('id', ficha.paciente_id).eq('clinica_id', clinicId).maybeSingle(),
+    supabase.from('orcamentos').select('id, ficha_id, paciente_id, status, aprovado_em')
+      .eq('ficha_id', fichaId).eq('clinica_id', clinicId),
+  ]);
+  const falhas = [eventos, evolucoes, documentos, assinaturas, arquivos, paciente, orcamentosDiretos]
+    .flatMap((resultado) => resultado.error ? [resultado.error.message] : []);
+  if (falhas.length > 0 || !paciente.data) {
+    console.error('[avaliarExclusaoFicha:vinculos]', falhas);
+    return { ok: false, error: mensagemErroExclusao('erro') };
+  }
+  const procedimentos = eventos.data ?? [];
+  if (ficha.assinado_em != null || ficha.assinatura_url != null
+    || procedimentos.some((evento) => evento.assinatura_id != null)
+    || (documentos.count ?? 0) > 0 || (assinaturas.count ?? 0) > 0) {
+    return { ok: false, error: mensagemErroExclusao('ficha_assinada') };
+  }
+  if (procedimentos.some((evento) => evento.retirado_em != null)) {
+    return { ok: false, error: mensagemErroExclusao('ficha_com_retirado') };
+  }
+  if (procedimentos.some((evento) => evento.encaminhado_para != null && evento.encaminhado_para !== dentistaId)) {
+    return { ok: false, error: mensagemErroExclusao('ficha_com_encaminhamento') };
   }
 
-  // R-03b (#B5) — a prova clínica assinada é imutável, mesmo quando a assinatura está no
-  // cabeçalho da ficha antiga em vez de em um evento moderno.
-  if (ficha.assinado_em != null || (eventosAssinados ?? 0) > 0) {
-    return { ok: false, error: 'Esta ficha tem procedimentos assinados e não pode ser apagada.' };
-  }
-
-  if ((documentos ?? 0) > 0) {
-    return { ok: false, error: 'Esta ficha possui documento clínico assinado e não pode ser apagada.' };
-  }
-
-  const orcamentoIds = (orcamentos ?? []).map((orcamento) => orcamento.id);
-  let pagamentos = 0;
-  let itensAprovados = 0;
-  let assinaturasDeOrcamento = 0;
-  if (orcamentoIds.length > 0) {
-    const [pagamentosResult, itensResult, assinaturasResult] = await Promise.all([
-      supabase
-        .from('pagamentos')
-        .select('id', { count: 'exact', head: true })
-        .in('orcamento_id', orcamentoIds)
-        .eq('clinica_id', clinicId),
-      supabase
-        .from('orcamento_itens')
-        .select('id', { count: 'exact', head: true })
-        .in('orcamento_id', orcamentoIds)
-        .eq('clinica_id', clinicId)
-        .eq('aprovado', true),
-      supabase
-        .from('assinaturas')
-        .select('id', { count: 'exact', head: true })
-        .in('orcamento_id', orcamentoIds)
-        .eq('clinica_id', clinicId)
-        .eq('tipo', 'orcamento'),
-    ]);
-    if (pagamentosResult.error || itensResult.error || assinaturasResult.error) {
-      console.error('[avaliarExclusaoFicha] falha ao validar prova financeira', {
-        pagamentos: pagamentosResult.error?.message,
-        itensAprovados: itensResult.error?.message,
-        assinaturas: assinaturasResult.error?.message,
-      });
-      return { ok: false, error: 'Não foi possível verificar os vínculos financeiros desta ficha.' };
+  const orcamentos = new Map((orcamentosDiretos.data ?? []).map((orcamento) => [orcamento.id, orcamento]));
+  if (procedimentos.length > 0) {
+    const pontes = await supabase.from('orcamento_eventos').select('orcamento_id')
+      .in('evento_id', procedimentos.map((evento) => evento.id)).eq('clinica_id', clinicId);
+    if (pontes.error) {
+      console.error('[avaliarExclusaoFicha:pontes]', pontes.error.message);
+      return { ok: false, error: mensagemErroExclusao('erro') };
     }
-    pagamentos = pagamentosResult.count ?? 0;
-    itensAprovados = itensResult.count ?? 0;
-    assinaturasDeOrcamento = assinaturasResult.count ?? 0;
+    const ids = [...new Set((pontes.data ?? []).map((ponte) => ponte.orcamento_id))];
+    if (ids.length > 0) {
+      const ligados = await supabase.from('orcamentos').select('id, ficha_id, paciente_id, status, aprovado_em')
+        .in('id', ids).eq('clinica_id', clinicId);
+      if (ligados.error) {
+        console.error('[avaliarExclusaoFicha:orcamentos]', ligados.error.message);
+        return { ok: false, error: mensagemErroExclusao('erro') };
+      }
+      for (const orcamento of ligados.data ?? []) orcamentos.set(orcamento.id, orcamento);
+    }
   }
-
-  if (pagamentos > 0) {
-    return { ok: false, error: 'Esta ficha possui pagamento registrado e não pode ser apagada.' };
+  if ([...orcamentos.values()].some((orcamento) => orcamento.paciente_id !== ficha.paciente_id)) {
+    console.error('[avaliarExclusaoFicha] ficha_contexto_invalido');
+    return { ok: false, error: mensagemErroExclusao('ficha_contexto_invalido') };
   }
-  if (
-    (orcamentos ?? []).some((orcamento) => orcamento.status === 'aprovado')
-    || itensAprovados > 0
-    || assinaturasDeOrcamento > 0
-  ) {
-    return { ok: false, error: 'Esta ficha possui orçamento aceito e não pode ser apagada.' };
+  const mantidos = new Set<string>();
+  const ids = [...orcamentos.keys()];
+  if (ids.length > 0) {
+    const provas = await Promise.all([
+      supabase.from('orcamento_itens').select('orcamento_id').in('orcamento_id', ids).eq('clinica_id', clinicId).eq('aprovado', true),
+      supabase.from('assinaturas').select('orcamento_id').in('orcamento_id', ids).eq('clinica_id', clinicId),
+      supabase.from('documentos_aceite').select('orcamento_id').in('orcamento_id', ids).eq('clinica_id', clinicId),
+      supabase.from('pagamentos').select('orcamento_id').in('orcamento_id', ids).eq('clinica_id', clinicId),
+      supabase.from('orcamento_cobrancas').select('orcamento_id').in('orcamento_id', ids).eq('clinica_id', clinicId),
+    ]);
+    if (provas.some((prova) => prova.error)) {
+      console.error('[avaliarExclusaoFicha:financeiro]', provas.flatMap((prova) => prova.error ? [prova.error.message] : []));
+      return { ok: false, error: mensagemErroExclusao('erro') };
+    }
+    for (const prova of provas) {
+      for (const linha of prova.data ?? []) if (linha.orcamento_id) mantidos.add(linha.orcamento_id);
+    }
+    for (const orcamento of orcamentos.values()) {
+      if (orcamento.status === 'aprovado' || orcamento.aprovado_em != null) mantidos.add(orcamento.id);
+    }
   }
-
+  const apagados = [...orcamentos.values()].filter((orcamento) => orcamento.ficha_id === fichaId && !mantidos.has(orcamento.id)).length;
   return {
     ok: true,
     contexto: {
-      supabase,
-      clinicId,
-      dentistaId,
-      ficha: {
-        id: ficha.id,
-        paciente_id: ficha.paciente_id,
-        dentes_afetados: ficha.dentes_afetados,
-        procedimentos: ficha.procedimentos,
-      },
+      supabase, clinicId, dentistaId, ficha,
       resumo: {
-        eventos: eventos ?? 0,
-        evolucoes: evolucoes ?? 0,
-        orcamentosEditaveis: orcamentoIds.length,
+        eventos: procedimentos.length,
+        evolucoes: evolucoes.count ?? 0,
+        arquivos: arquivos.count ?? 0,
+        dataAtendimento: ficha.data_atendimento,
+        nomePaciente: paciente.data.nome,
+        orcamentosEditaveis: apagados,
+        orcamentosApagados: apagados,
+        orcamentosMantidos: mantidos.size,
       },
     },
   };
@@ -601,69 +587,31 @@ export async function prepararExclusaoFicha(fichaId: string): Promise<PrepararEx
   return { ok: true, resumo: avaliacao.contexto.resumo };
 }
 
-/**
- * Exclusão física só para Ficha própria não assinada e sem prova clínica/financeira. O
- * paciente é sempre obtido da Ficha no servidor; nenhum identificador vindo da interface é
- * usado para definir o escopo da remoção nem o log de auditoria.
- */
-export async function deletarFicha(fichaId: string): Promise<DeletarFichaResult> {
-  const avaliacao = await avaliarExclusaoFicha(fichaId);
-  if (!avaliacao.ok) return avaliacao;
-  const { supabase, clinicId, dentistaId, ficha, resumo } = avaliacao.contexto;
-
-  const { data: apagada, error } = await supabase
-    .from('fichas')
-    .delete()
-    .eq('id', fichaId)
-    .eq('clinica_id', clinicId)
-    .select('id');
-
-  if (error) {
-    // R-03a: ficha com algum evento assinado é imutável até no DELETE — o cascade tenta
-    // desamarrar odontograma_eventos.assinatura_id e o trigger trg_odontograma_evento_imutavel
-    // barra (raise 'evento_assinado_imutavel'). Comportamento correto (protege prova clínica
-    // assinada — CFO), só precisa de mensagem clara em vez do erro cru do Postgres.
-    if (error.message.includes('evento_assinado_imutavel')) {
-      return { ok: false, error: 'Esta ficha tem procedimentos assinados e não pode ser apagada.' };
-    }
-    // R-35 item 2 — assinaturas.orcamento_id é ON DELETE RESTRICT: o cascade da ficha tenta
-    // apagar o orçamento, o orçamento tenta apagar a assinatura de aceite, e o Postgres barra
-    // (23503, foreign_key_violation) em vez de deixar a prova de aceite sumir em silêncio.
-    if (error.code === '23503') {
-      return {
-        ok: false,
-        error: 'Esta ficha tem um orçamento já aceito e assinado pelo paciente — não pode ser apagada.',
-      };
-    }
-    console.error('[deletarFicha]', error.message);
-    return { ok: false, error: 'Erro ao apagar ficha.' };
+/** A RPC revalida autoria, prova clínica, confirmação e preservação financeira atomicamente. */
+export async function deletarFicha(
+  fichaId: string,
+  confirmacao?: ConfirmacaoExclusaoFicha,
+): Promise<DeletarFichaResult> {
+  if (!confirmacao) return { ok: false, error: 'Confirme a exclusão.' };
+  const { supabase, clinicId } = await requireClinicContext();
+  const { data: ficha, error: fichaError } = await supabase.from('fichas').select('paciente_id')
+    .eq('id', fichaId).eq('clinica_id', clinicId).maybeSingle();
+  if (fichaError) {
+    console.error('[deletarFicha:contexto]', fichaError.message);
+    return { ok: false, error: mensagemErroExclusao('erro') };
   }
-
-  // RLS pode barrar o DELETE sem devolver erro (0 linhas afetadas) — sem o .select() acima
-  // isso vira falso "ok: true" com a ficha intacta no banco. Achado ao vivo 28/07: a policy de
-  // DELETE do admin tinha sumido do banco (fichas_write_own sozinha só libera o dono).
-  if (!apagada || apagada.length === 0) {
-    console.error('[deletarFicha] DELETE bloqueado silenciosamente (RLS?) — 0 linhas para', fichaId);
-    return { ok: false, error: 'Erro ao apagar ficha.' };
-  }
-
-  registrarLog(supabase, {
-    clinicaId:  clinicId,
-    actorId:    dentistaId,
-    pacienteId: ficha.paciente_id,
-    entityType: ENTITY_TYPES.FICHA,
-    entityId:   fichaId,
-    action:     EVENTS.FICHA_EXCLUIDA,
-    metadata: {
-      dentes_adicionados: [],
-      dentes_removidos:   ficha.dentes_afetados ?? [],
-      eventos_antes:      resumo.eventos,
-      eventos_depois:     0,
-      procedimentos_antes:  ficha.procedimentos ?? [],
-      procedimentos_depois: [],
-    },
+  if (!ficha) return { ok: false, error: mensagemErroExclusao('ficha_nao_encontrada') };
+  const { error } = await supabase.rpc('excluir_ficha_clinica', {
+    p_ficha_id: fichaId,
+    p_motivo: confirmacao.motivo,
+    p_motivo_detalhe: confirmacao.detalhe ?? null,
+    p_nome_paciente: confirmacao.nomePaciente,
+    p_confirma_orcamento_aceito: confirmacao.confirmaOrcamentoAceito === true,
   });
-
+  if (error) {
+    console.error('[deletarFicha]', error.message);
+    return { ok: false, error: mensagemErroExclusao(error.message) };
+  }
   revalidatePath(`/dashboard/pacientes/${ficha.paciente_id}`);
   return { ok: true };
 }

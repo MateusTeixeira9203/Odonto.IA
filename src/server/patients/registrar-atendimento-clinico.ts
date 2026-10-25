@@ -107,7 +107,17 @@ export async function registrarAtendimentoClinico(
     // O fechamento de agenda é feito apenas depois que as relações da visita estiverem íntegras.
     finalizarAtendimento: false,
   });
-  if (!resultado.ok) return resultado;
+  if (!resultado.ok) {
+    if (atendimento.criadaAgora) {
+      try {
+        const { error } = await supabase.rpc('descartar_atendimento_vazio', { p_atendimento_id: atendimento.row.id });
+        if (error) console.error('[registrarAtendimentoClinico:descarte]', error.message);
+      } catch (error) {
+        console.error('[registrarAtendimentoClinico:descarte]', error instanceof Error ? error.message : 'Falha no descarte.');
+      }
+    }
+    return resultado;
+  }
   if (resultado.eventosFalharam) {
     return { ...resultado, atendimentoId: atendimento.row.id };
   }
@@ -162,7 +172,7 @@ async function obterOuCriarAtendimento(ctx: {
   pacienteId: string;
   agendamentoId?: string;
   origem: 'meu_dia' | 'ficha';
-}): Promise<{ ok: true; row: AtendimentoRow } | { ok: false; error: string }> {
+}): Promise<{ ok: true; row: AtendimentoRow; criadaAgora: boolean } | { ok: false; error: string }> {
   const porChave = await buscarAtendimento(ctx.supabase, ctx.clinicId, 'chave_idempotencia', ctx.visitaKey);
   if (porChave) return validarContextoAtendimento(porChave, ctx);
 
@@ -189,7 +199,7 @@ async function obterOuCriarAtendimento(ctx: {
     .select('id, paciente_id, dentista_id, agendamento_id, estado')
     .maybeSingle<AtendimentoRow>();
 
-  if (criado) return { ok: true, row: criado };
+  if (criado) return { ok: true, row: criado, criadaAgora: true };
   if (error?.code !== '23505') {
     console.error('[registrarAtendimentoClinico:criar]', error?.message);
     return { ok: false, error: 'Não foi possível iniciar esta visita. Tente novamente.' };
@@ -224,7 +234,7 @@ async function buscarAtendimento(
 function validarContextoAtendimento(
   row: AtendimentoRow,
   ctx: { pacienteId: string; dentistaId: string; agendamentoId?: string },
-): { ok: true; row: AtendimentoRow } | { ok: false; error: string } {
+): { ok: true; row: AtendimentoRow; criadaAgora: boolean } | { ok: false; error: string } {
   if (
     row.paciente_id !== ctx.pacienteId
     || row.dentista_id !== ctx.dentistaId
@@ -232,7 +242,7 @@ function validarContextoAtendimento(
   ) {
     return { ok: false, error: 'Esta visita já pertence a outro contexto. Atualize a página antes de salvar.' };
   }
-  return { ok: true, row };
+  return { ok: true, row, criadaAgora: false };
 }
 
 async function vincularEventosAoAtendimento(ctx: {
