@@ -29,10 +29,11 @@ export function ConfirmarExclusaoFicha({ resumo, apagando, onCancelar, onConfirm
         <DialogHeader>
           <DialogTitle>Apagar esta ficha?</DialogTitle>
           <DialogDescription>
-            A ficha de {data} será apagada com {resumo.evolucoes} evolução(ões), {resumo.eventos} procedimento(s) e {resumo.arquivos} arquivo(s). <strong>Isso não pode ser desfeito.</strong> Fica registrado quem apagou, quando e o motivo.
+            A ficha de {data} será apagada do prontuário, com {resumo.evolucoes} evolução(ões), {resumo.eventos} procedimento(s) e {resumo.arquivos} arquivo(s). <strong>Isso não pode ser desfeito pela tela.</strong> Uma <strong>cópia protegida</strong> do conteúdo fica guardada, e só o administrador da clínica pode consultá-la. Fica registrado quem apagou, quando e o motivo.
             {!resumo.avisoOrcamentoPreservado && resumo.orcamentosApagados > 0 && <> {resumo.orcamentosApagados} orçamento(s) desta ficha que o paciente ainda não aceitou também será(ão) apagado(s).</>}
           </DialogDescription>
         </DialogHeader>
+        {resumo.arquivos > 0 && <p className="text-xs text-muted-foreground">As fotos e os documentos anexados continuam guardados no arquivo da clínica.</p>}
         {resumo.orcamentosMantidos > 0 && (
           <div className="rounded-lg border border-warning/40 bg-warning-pale p-3 text-sm text-warning-ink">
             <p className="font-semibold">{resumo.avisoOrcamentoPreservado ? 'Esta ficha tem orçamento ou pagamento que será mantido' : plural ? `Esta ficha tem ${resumo.orcamentosMantidos} orçamentos aceitos pelo paciente` : 'Esta ficha tem orçamento aceito pelo paciente'}</p>
