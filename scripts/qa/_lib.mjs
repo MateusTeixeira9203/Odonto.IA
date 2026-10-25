@@ -121,6 +121,17 @@ export function guardaSqlFixture(sql) {
   if (/\b(create|alter|drop|grant|revoke|truncate|copy|execute|pg_read_file|pg_read_binary_file|pg_ls_dir|lo_import|lo_export|dblink_connect)\b/i.test(visible)) {
     throw new QaError('SQL', 'fixture aceita apenas dados; DDL, privilégios, execução dinâmica e acesso a arquivos são proibidos');
   }
+  for (const match of visible.matchAll(/\b(?:delete|update)\b/gi)) {
+    let depth = 0;
+    let where = false;
+    for (const token of visible.slice(match.index + match[0].length).matchAll(/\bwhere\b|[();]/gi)) {
+      if (token[0] === '(') depth++;
+      else if (token[0] === ')') { if (!depth) break; depth--; }
+      else if (token[0] === ';') break;
+      else if (!depth) { where = true; break; }
+    }
+    if (!where) throw new QaError('SQL', 'DELETE e UPDATE exigem WHERE na propria operacao');
+  }
   return sql;
 }
 export function temTransacao(sql) {
@@ -265,12 +276,31 @@ export function gravarRegistros(data) {
   fs.writeFileSync(file + '.tmp', JSON.stringify(data, null, 2) + '\n');
   fs.renameSync(file + '.tmp', file);
 }
-export async function comTrava(fn) {
-  fs.mkdirSync(QA_DIR, { recursive: true });
-  const file = path.join(QA_DIR, 'snapshots.lock');
+export async function comTrava(fn, dir = QA_DIR) {
+  fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, 'snapshots.lock');
   let fd;
-  try { fd = fs.openSync(file, 'wx'); }
-  catch { throw new QaError('OCUPADO', 'há outra operação de snapshot em andamento'); }
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      fd = fs.openSync(file, 'wx');
+      fs.writeFileSync(fd, String(process.pid));
+      break;
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error;
+      const owner = fs.readFileSync(file, 'utf8');
+      const pid = Number(owner);
+      if (!Number.isSafeInteger(pid) || pid <= 0) throw new QaError('OCUPADO', 'trava sem PID valido; confira manualmente');
+      try { process.kill(pid, 0); }
+      catch (error) {
+        if (error.code === 'ESRCH' && fs.readFileSync(file, 'utf8') === owner) {
+          fs.unlinkSync(file);
+          continue;
+        }
+      }
+      throw new QaError('OCUPADO', 'ha outra operacao de snapshot em andamento');
+    }
+  }
+  if (fd === undefined) throw new QaError('OCUPADO', 'nao foi possivel adquirir a trava');
   try { return await fn(); } finally { fs.closeSync(fd); fs.unlinkSync(file); }
 }
 export async function pidDaPorta(porta) {
@@ -354,4 +384,16 @@ export async function aplicarFixture(arquivo, { limpeza = false, ensaio = false 
     fs.mkdirSync(QA_DIR, { recursive: true });
     fs.appendFileSync(path.join(QA_DIR, 'fixtures.log'), `${new Date().toISOString()} ${arquivo} ${hash} ${ensaio ? 'ensaio' : 'aplicada'} ${outcome}\n`);
   }
+}
+
+export function detectarVazamentos(output) {
+  const patterns = [
+    ['REF_PRODUCAO', new RegExp(REF_PROD, 'i')],
+    ['URL_BANCO', /postgres(?:ql)?(?::|%3a)(?:\/\/|%2f%2f)[^\s"']+/i],
+    ['JWT', /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/],
+    ['CHAVE_API', /\b(?:sb_secret_|sb_publishable_|sk_(?:live_|test_|proj-)?|re_)[A-Za-z0-9_-]{16,}\b/],
+    ['CHAVE_PRIVADA', /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/],
+    ['CREDENCIAL', /\b(?:password|senha|secret|token|api[_-]?key|service[_-]?role[_-]?key|authorization|cookie)\b["']?\s*[:=]\s*["']?[^\s"']{8,}/i],
+  ];
+  return patterns.filter(([, pattern]) => pattern.test(output)).map(([name]) => name);
 }

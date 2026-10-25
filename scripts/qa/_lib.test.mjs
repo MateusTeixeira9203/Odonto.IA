@@ -1,15 +1,17 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { spawnSync } from 'node:child_process';
 import { X509Certificate } from 'node:crypto';
-import { REF_QA, REF_PROD, ROOT, exigirHostQa, configPgQa, validarPorta, validarNome, validarCommit, flags, resolverFixture, guardaSqlFixture, temTransacao, trocarMarcadoresSenha, mascarar, lerVariavel, contasQa, verificarEnvSnapshot, childEnv, planoE2e, processoSnapshot, desfazerJuncao } from './_lib.mjs';
+import { REF_QA, REF_PROD, ROOT, comTrava, detectarVazamentos, exigirHostQa, configPgQa, validarPorta, validarNome, validarCommit, flags, resolverFixture, guardaSqlFixture, temTransacao, trocarMarcadoresSenha, mascarar, lerVariavel, contasQa, verificarEnvSnapshot, childEnv, planoE2e, processoSnapshot, desfazerJuncao } from './_lib.mjs';
 
-function temporary() { return fs.mkdtempSync(path.join(os.tmpdir(), 'od017-unit-')); }
+function temporary() {
+  fs.mkdirSync(path.join(ROOT, '.qa'), { recursive: true });
+  return fs.mkdtempSync(path.join(ROOT, '.qa', 'od017-unit-'));
+}
 function removeTemporary(dir) {
-  assert(path.resolve(dir).startsWith(path.join(os.tmpdir(), 'od017-unit-')));
+  assert(path.resolve(dir).startsWith(path.join(ROOT, '.qa', 'od017-unit-')));
   fs.rmSync(dir, { recursive: true });
 }
 test('host: somente a API e as conexões PostgreSQL do QA', () => {
@@ -152,4 +154,71 @@ test('CLI recusa flags inválidas antes de carregar ambiente ou criar worktree',
     assert.equal(result.status, 2, args[0]);
     assert.match(result.stderr, /RECUSA/);
   }
+});
+
+test('SQL: DELETE/UPDATE sem WHERE recusados, mesmo com WHERE em comentario, literal ou subconsulta', () => {
+  for (const sql of [
+    'delete from t;', 'update t set x=1;',
+    "delete from t; select 1 where true;", "update t set x='where';",
+    'delete from t /* where id=1 */;',
+    'update t set x=(select x from other where id=1);',
+    'with gone as (delete from t returning *) select * from gone where id=1;',
+    'delete from t where id=1; update t set x=2;',
+    'do $$ begin delete from t; end $$;',
+  ]) assert.throws(() => guardaSqlFixture(sql), /WHERE/);
+  for (const sql of ['delete from t where id=1;', 'update t set x=1 where id=2;',
+    'do $$ begin update t set x=1 where id=2; end $$;']) assert.doesNotThrow(() => guardaSqlFixture(sql));
+});
+
+test('lock: recupera PID encerrado, preserva PID vivo e libera em erro', async () => {
+  const dir = temporary();
+  const file = path.join(dir, 'snapshots.lock');
+  try {
+    const dead = spawnSync(process.execPath, ['-e', ''], { windowsHide: true });
+    assert.equal(dead.status, 0);
+    fs.writeFileSync(file, String(dead.pid));
+    await comTrava(async () => assert.equal(fs.readFileSync(file, 'utf8'), String(process.pid)), dir);
+    assert(!fs.existsSync(file));
+    fs.writeFileSync(file, String(process.pid));
+    await assert.rejects(comTrava(async () => assert.fail('nao deve executar'), dir), /andamento/);
+    assert.equal(fs.readFileSync(file, 'utf8'), String(process.pid));
+    fs.unlinkSync(file);
+    await assert.rejects(comTrava(async () => { throw new Error('synthetic'); }, dir), /synthetic/);
+    assert(!fs.existsSync(file));
+  } finally { removeTemporary(dir); }
+});
+
+test('detector usa ref publico e padroes genericos, sem carregar arquivos de ambiente', () => {
+  assert.deepEqual(detectarVazamentos('PASSOU sem credenciais'), []);
+  for (const sample of [REF_PROD, 'postgres://fake:fake@host/db', 'eyJfake.eyJfake.signature',
+    'sb_secret_synthetic1234567890', 'senha=synthetic-password', '-----BEGIN PRIVATE KEY-----']) {
+    assert(detectarVazamentos(sample).length > 0);
+  }
+  const dir = temporary();
+  try {
+    const output = path.join(dir, 'output.log');
+    const harness = `
+      import fs from 'node:fs';
+      import path from 'node:path';
+      for (const method of ['readFileSync', 'createReadStream']) {
+        const original = fs[method];
+        fs[method] = function(file, ...args) {
+          const name = path.basename(String(file));
+          if (name.startsWith('.env') || name === 'env.local') throw new Error('ENV_READ_FORBIDDEN');
+          return original.call(this, file, ...args);
+        };
+      }
+      process.argv = ['node', 'detector', '--saida', ${JSON.stringify(output)}];
+      await import(${JSON.stringify(new URL('./checar-vazamento.mjs', import.meta.url).href)});
+    `;
+    for (const [content, code, expected] of [
+      ['saida segura', 0, '0 vazamentos'], [REF_PROD, 1, '1 vazamentos: REF_PRODUCAO'],
+    ]) {
+      fs.writeFileSync(output, content);
+      const result = spawnSync(process.execPath, ['--input-type=module', '-e', harness], { encoding: 'utf8', windowsHide: true });
+      assert.equal(result.status, code, result.stderr);
+      assert.equal(result.stdout.trim(), expected);
+      assert(!result.stdout.includes(REF_PROD));
+    }
+  } finally { removeTemporary(dir); }
 });
