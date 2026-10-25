@@ -25,6 +25,10 @@ where id = 'e0000000-0000-4000-8000-000000009b01'
   and user_id = 'c0000000-0000-4000-8000-00000000000d'
   and clinica_id = 'b0000000-0000-4000-8000-000000000002';
 
+delete from public.clinica_acessos
+where clinica_id = 'b0000000-0000-4000-8000-000000000002'
+  and membro_id = 'e0000000-0000-4000-8000-000000009b02';
+
 delete from public.clinica_usuarios
 where id = 'e0000000-0000-4000-8000-000000009b02'
   and usuario_id = 'c0000000-0000-4000-8000-00000000000d'
