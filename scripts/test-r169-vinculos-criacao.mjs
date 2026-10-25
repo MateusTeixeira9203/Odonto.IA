@@ -1,7 +1,12 @@
 /** Executa as três RPCs reais em Postgres/WASM isolado; sem acesso ao banco principal. */
 import assert from 'node:assert/strict';
+import test from 'node:test';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
+
+test('test-r169-vinculos-criacao: PostgreSQL/WASM isolado', {
+  skip: !process.env.R169_PGLITE ? 'OD016-T4: R169_PGLITE ausente (runtime PGlite externo); dono: ALFA - Orquestrador' : false,
+}, async () => {
 const { PGlite } = await import(pathToFileURL(process.env.R169_PGLITE).href);
 const db = new PGlite();
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
@@ -71,3 +76,5 @@ await check('criação recusa lote vazio ou nulo',async()=>{
  for(const items of [[],null]) await assert.rejects(db.query('select criar_orcamento_com_eventos($1,$2,$3,0,$4)',[patient,actor,ficha,items]),/itens_invalidos/);
 });
 console.log(`${passed}/${passed} verificações passaram`);await db.close();
+
+});

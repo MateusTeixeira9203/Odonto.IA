@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
-const source = readFileSync(fileURLToPath(new URL('./get-dentista.ts', import.meta.url)), 'utf8');
+// Source checks must delimit the same function on Windows (CRLF) and Unix (LF).
+const source = readFileSync(fileURLToPath(new URL('./get-dentista.ts', import.meta.url)), 'utf8').replace(/\r\n/g, '\n');
 const actorSource = source.slice(
   source.indexOf('export const getDexActorCached'),
   source.indexOf('/**\n * Busca o perfil clínico'),

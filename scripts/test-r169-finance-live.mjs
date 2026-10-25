@@ -2,10 +2,14 @@
  * R169_PGLITE=/caminho/pglite/dist/index.js node scripts/test-r169b-ficha-orcamento.mjs
  */
 import assert from 'node:assert/strict';
+import test from 'node:test';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
-if (!process.env.R169_PGLITE) throw new Error('Informe R169_PGLITE (runtime temporário, fora das dependências do app).');
+
+test('test-r169-finance-live: PostgreSQL/WASM isolado', {
+  skip: !process.env.R169_PGLITE ? 'OD016-T3: R169_PGLITE ausente (runtime PGlite externo); dono: ALFA - Orquestrador' : !process.env.R169_FINANCE_FIXTURE ? 'OD016-T3: R169_FINANCE_FIXTURE ausente (fixture historico); dono: ALFA - Orquestrador' : false,
+}, async () => {
 const { PGlite } = await import(pathToFileURL(process.env.R169_PGLITE).href);
 const db = new PGlite();
 const id = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -65,7 +69,7 @@ await db.exec(`
 `);
 
 await db.exec('drop function criar_cobranca_orcamento(uuid,uuid[],numeric,smallint,date,text); drop function editar_cobranca_orcamento(uuid,uuid[],numeric); drop function reorganizar_parcelas_orcamento(uuid,numeric,jsonb);');
-const fixture=JSON.parse(await readFile(process.env.R169_FINANCE_FIXTURE ?? '/tmp/r169-finance-before.json','utf8'));
+const fixture=JSON.parse(await readFile(process.env.R169_FINANCE_FIXTURE,'utf8'));
 for (const row of fixture) await db.exec(row.definition+';');
 try {
   await db.exec(await readFile(new URL('../supabase/migrations/20260914210240_r169b_ficha_orcamento_incremental.sql',import.meta.url),'utf8'));
@@ -81,3 +85,5 @@ for (const f of fns) {
  }
 }
 console.log('PASS migration compilada sobre definições vigentes do principal');await db.close();
+
+});

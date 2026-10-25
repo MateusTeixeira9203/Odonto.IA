@@ -1,9 +1,13 @@
 /** Isolated PostgreSQL/WASM gate for the financial migration candidates. */
 import assert from 'node:assert/strict';
+import test from 'node:test';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
-if (!process.env.ODONTO_PGLITE) throw new Error('Set ODONTO_PGLITE to a local PGlite dist/index.js');
+
+test('test-r184-r189-r194-db: PostgreSQL/WASM isolado', {
+  skip: !process.env.ODONTO_PGLITE ? 'OD016-T7: ODONTO_PGLITE ausente (runtime PGlite externo); dono: ALFA - Orquestrador' : false,
+}, async () => {
 const { PGlite } = await import(pathToFileURL(process.env.ODONTO_PGLITE).href);
 const db = new PGlite();
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -250,3 +254,5 @@ await check('R194 log failure rolls back prediction conversion', async () => {
 });
 console.log(`${checks} isolated database checks passed`);
 await db.close();
+
+});

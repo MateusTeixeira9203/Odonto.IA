@@ -2,10 +2,14 @@
  * R169_PGLITE=/caminho/pglite/dist/index.js node scripts/test-r169-editar-nome.mjs
  */
 import assert from 'node:assert/strict';
+import test from 'node:test';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
-if (!process.env.R169_PGLITE) throw new Error('Informe R169_PGLITE (runtime temporário, fora das dependências do app).');
+
+test('test-r169-editar-nome: PostgreSQL/WASM isolado', {
+  skip: !process.env.R169_PGLITE ? 'OD016-T2: R169_PGLITE ausente (runtime PGlite externo); dono: ALFA - Orquestrador' : false,
+}, async () => {
 const { PGlite } = await import(pathToFileURL(process.env.R169_PGLITE).href);
 const db = new PGlite();
 const id = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -173,3 +177,5 @@ await check('assinatura de evento ativo continua funcionando e bloqueia edição
 });
 console.log(`${passed} checks passaram. Modelo isolado; não substitui teste manual autenticado no preview.`);
 await db.close();
+
+});

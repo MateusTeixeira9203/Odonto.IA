@@ -14,12 +14,12 @@ test('a rota paraleliza só os gates independentes e conserva a cota por identid
 });
 
 test('a trilha segura não altera a configuração clínica da geração estruturada', () => {
-  assert.match(route, /const DEX_PROMPT_VERSION = 'r142-2026-08-31';/);
-  assert.match(route, /generateStructuredGemini<EvolucaoWire>\(\{\s*prompt,\s*responseSchema: EVOLUCAO_SCHEMA,\s*feature: 'formatar-evolucao',\s*\}\)/s);
+  assert.match(route, /const DEX_PROMPT_VERSION = 'r169-curativo-2026-09-14';/);
+  assert.match(route, /generateStructuredGemini<EvolucaoWire>\(\{\s*prompt,\s*responseSchema: EVOLUCAO_SCHEMA,\s*feature: 'formatar-evolucao',\s*thinkingBudget: 1024,\s*\}\)/s);
   assert.match(provider, /const GEMINI_STRUCT_MODEL = 'gemini-2\.5-flash';/);
   assert.match(provider, /temperature: 0\.2,/);
   assert.match(provider, /maxOutputTokens: options\.maxOutputTokens \?\? 16_384,/);
-  assert.match(provider, /thinkingConfig: \{ thinkingBudget: 0 \}/);
+  assert.match(provider, /thinkingConfig: \{ thinkingBudget: options\.thinkingBudget \?\? 0 \}/);
   assert.match(provider, /const MAX_RETRIES\s+= 3;/);
   assert.match(provider, /const DEFAULT_TIMEOUT_MS = 30_000;/);
 });
