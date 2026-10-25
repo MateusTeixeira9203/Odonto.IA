@@ -59,7 +59,28 @@ export async function registrarAtendimentoClinico(
 
   const origemAtendimento = input.origemAtendimento ?? 'meu_dia';
   if (origemAtendimento === 'meu_dia' && !input.agendamentoId) {
-    return { ok: false, error: 'A consulta do Meu Dia precisa de um agendamento válido.' };
+    return { ok: false, error: 'Registro nao encontrado.' };
+  }
+
+  // As FKs por id não garantem que as referências pertençam à clínica da nova visita.
+  // Validar antes de buscar/reutilizar a âncora também protege o caminho do Prontuário.
+  const [paciente, agendamento] = await Promise.all([
+    supabase.from('pacientes').select('id')
+      .eq('id', input.pacienteId)
+      .eq('clinica_id', clinicId)
+      .maybeSingle<{ id: string }>(),
+    input.agendamentoId
+      ? supabase.from('agendamentos').select('id')
+        .eq('id', input.agendamentoId)
+        .eq('clinica_id', clinicId)
+        .eq('paciente_id', input.pacienteId)
+        .eq('dentista_id', dentistaId)
+        .maybeSingle<{ id: string }>()
+      : Promise.resolve(null),
+  ]);
+  if (paciente.error || !paciente.data
+    || (input.agendamentoId && (agendamento?.error || !agendamento?.data))) {
+    return { ok: false, error: 'Registro nao encontrado.' };
   }
 
   const atendimento = await obterOuCriarAtendimento({
