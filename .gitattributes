@@ -12,3 +12,4 @@ supabase/rollbacks/20261025023703_od008_pedidos_protetico_permissao.sql -text
 supabase/migrations/20261025103502_od015b1_2_apagar_ficha_auditoria.sql -text
 supabase/rollbacks/20261025103502_od015b1_2_apagar_ficha_auditoria.sql -text
 supabase/migrations/20261025112735_od015b1_4_copia_protegida.sql -text
+supabase/tests/od019_contagem_cruzados.sql -text
