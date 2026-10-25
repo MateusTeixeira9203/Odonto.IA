@@ -26,6 +26,7 @@ export default async function MeuDiaPage({ searchParams }: MeuDiaPageProps) {
   // Meu dia é o dia do dentista em atendimento (D2 da spec) — agendamentos são silo por
   // dentista_id (RLS, migration 099); pra secretaria isso seria sempre vazio.
   if (dentista.role === 'secretaria') redirect('/dashboard');
+  if (dentista.role === 'protetico') redirect('/dashboard/protetico');
 
   const { ag } = await searchParams;
   const now = new Date();

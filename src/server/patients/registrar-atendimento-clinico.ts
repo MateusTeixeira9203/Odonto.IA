@@ -4,6 +4,13 @@ import { finalizarAtendimentoSeAplicavel } from '@/server/patients/finalizar-ate
 import { rotearVisitaMeuDia, type RotearVisitaInput } from '@/server/patients/rotear-visita';
 import type { OdontogramaEventoDraft } from '@/types/odontograma';
 
+export function papelPodeRegistrarClinico(role: string): boolean {
+  return role === 'admin' || role === 'dentista';
+}
+
+export const MENSAGEM_VISITA_FINALIZADA =
+  'Esta visita já foi finalizada e está salva na Ficha. Se você acrescentou algo depois, isso não foi gravado: use Novo atendimento na Ficha do paciente.';
+
 export type RegistrarAtendimentoClinicoResult =
   | {
       ok: true;
@@ -48,7 +55,7 @@ export async function registrarAtendimentoClinico(
   input: RegistrarAtendimentoClinicoInput,
 ): Promise<RegistrarAtendimentoClinicoResult> {
   const { supabase, clinicId, dentistaId, role, user } = await requireClinicContext();
-  if (role === 'secretaria') return { ok: false, error: 'Sem permissão.' };
+  if (!papelPodeRegistrarClinico(role)) return { ok: false, error: 'Sem permissão.' };
 
   const origemAtendimento = input.origemAtendimento ?? 'meu_dia';
   if (origemAtendimento === 'meu_dia' && !input.agendamentoId) {
@@ -69,11 +76,7 @@ export async function registrarAtendimentoClinico(
   if (!atendimento.ok) return atendimento;
 
   if (atendimento.row.estado === 'finalizado') {
-    const fichaId = await fichaDoAtendimento(supabase, clinicId, atendimento.row.id);
-    if (!fichaId) {
-      return { ok: false, error: 'Esta visita já foi finalizada, mas não foi possível recuperar a ficha. Atualize a página.' };
-    }
-    return { ok: true, fichaId, atendimentoId: atendimento.row.id };
+    return { ok: false, error: MENSAGEM_VISITA_FINALIZADA };
   }
 
   const resultado = await rotearVisitaMeuDia({
@@ -209,23 +212,6 @@ function validarContextoAtendimento(
     return { ok: false, error: 'Esta visita já pertence a outro contexto. Atualize a página antes de salvar.' };
   }
   return { ok: true, row };
-}
-
-async function fichaDoAtendimento(
-  supabase: Awaited<ReturnType<typeof requireClinicContext>>['supabase'],
-  clinicId: string,
-  atendimentoId: string,
-): Promise<string | null> {
-  const { data, error } = await supabase
-    .from('ficha_evolucoes')
-    .select('ficha_id')
-    .eq('clinica_id', clinicId)
-    .eq('atendimento_id', atendimentoId)
-    .limit(1)
-    .maybeSingle<{ ficha_id: string }>();
-
-  if (error) console.error('[registrarAtendimentoClinico:ficha]', error.message);
-  return data?.ficha_id ?? null;
 }
 
 async function vincularEventosAoAtendimento(ctx: {
