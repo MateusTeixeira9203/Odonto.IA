@@ -13,8 +13,9 @@ export default async function PerfilPage() {
   const { data: dados } = await supabase
     .from('dentistas')
     .select('nome, cro, especialidade, telefone, cpf, chave_pix')
+    .eq('id', dentista.id)
     .eq('user_id', user.id)
-    .single();
+    .maybeSingle();
 
   return (
     <PageTransition>

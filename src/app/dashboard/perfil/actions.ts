@@ -4,15 +4,19 @@ import { requireUser } from '@/server/auth/user';
 import { requireClinicContext } from '@/server/auth/clinic';
 import { revalidatePath } from 'next/cache';
 import type { Especialidade } from '@/lib/especialidades';
+import { getDexActorCached } from '@/lib/get-dentista';
 
 // avatar_url guarda o caminho no storage (bucket privado desde a migration 117), não
 // mais a URL pública — a leitura gera URL assinada em getDentistaCached().
 export async function salvarAvatarUrl(avatarPath: string): Promise<{ error?: string }> {
   const { supabase, user } = await requireUser();
+  const ator = await getDexActorCached();
+  if (!ator) return { error: 'Sessão sem clínica ativa. Entre novamente.' };
 
   const { error } = await supabase
     .from('dentistas')
     .update({ avatar_url: avatarPath })
+    .eq('id', ator.dentistaId)
     .eq('user_id', user.id);
 
   if (error) return { error: 'Erro ao salvar avatar.' };
@@ -23,10 +27,13 @@ export async function salvarAvatarUrl(avatarPath: string): Promise<{ error?: str
 
 export async function removerAvatar(): Promise<{ error?: string }> {
   const { supabase, user } = await requireUser();
+  const ator = await getDexActorCached();
+  if (!ator) return { error: 'Sessão sem clínica ativa. Entre novamente.' };
 
   const { error } = await supabase
     .from('dentistas')
     .update({ avatar_url: null })
+    .eq('id', ator.dentistaId)
     .eq('user_id', user.id);
 
   if (error) return { error: 'Erro ao remover avatar.' };
@@ -46,6 +53,8 @@ export interface PerfilData {
 
 export async function salvarPerfil(data: PerfilData): Promise<{ error?: string }> {
   const { supabase, user } = await requireUser();
+  const ator = await getDexActorCached();
+  if (!ator) return { error: 'Sessão sem clínica ativa. Entre novamente.' };
 
   if (data.especialidade.length === 0) {
     return { error: 'Selecione ao menos uma especialidade.' };
@@ -61,6 +70,7 @@ export async function salvarPerfil(data: PerfilData): Promise<{ error?: string }
       cpf:           data.cpf           || null,
       chave_pix:     data.chavePix      || null,
     })
+    .eq('id', ator.dentistaId)
     .eq('user_id', user.id);
 
   if (error) {

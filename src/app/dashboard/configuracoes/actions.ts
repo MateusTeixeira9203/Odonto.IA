@@ -8,22 +8,29 @@ import { redirect } from "next/navigation";
 import { sairDaClinica } from "@/server/services/team";
 import { z } from "zod";
 import { normalizarNomeProcedimento } from "@/lib/arcadas";
+import { canAccess } from "@/server/authorization/permissions";
+
+const MSG_SEM_PERMISSAO_CONFIG = 'Só dentistas e o administrador podem alterar as configurações.';
 
 export async function salvarPerfil(data: {
   nome: string;
   cro: string;
 }): Promise<{ error?: string }> {
-  const { supabase, user } = await requireClinicContext();
+  const { supabase, user, dentistaId, role } = await requireClinicContext();
+  if (!canAccess(role, 'configuracoes')) return { error: MSG_SEM_PERMISSAO_CONFIG };
 
-  const { error } = await supabase
+  const { data: atualizados, error } = await supabase
     .from('dentistas')
     .update({ nome: data.nome.trim(), cro: data.cro.trim() || null })
-    .eq('user_id', user.id);
+    .eq('id', dentistaId)
+    .eq('user_id', user.id)
+    .select('id');
 
   if (error) {
     console.error('Erro ao salvar perfil:', error);
-    return { error: error.message };
+    return { error: 'Não foi possível salvar o perfil. Tente novamente.' };
   }
+  if (!atualizados?.length) return { error: 'Não foi possível salvar o perfil. Tente novamente.' };
 
   return {};
 }
@@ -78,32 +85,24 @@ export interface HorarioDia {
 export async function salvarHorarios(
   horarios: HorarioDia[]
 ): Promise<{ error?: string }> {
-  const { supabase, user, clinicId } = await requireClinicContext();
-
-  const { data: dentistaPerfil } = await supabase
-    .from("dentistas")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("clinica_id", clinicId)
-    .maybeSingle();
-
-  if (!dentistaPerfil) return { error: 'Dentista não encontrado.' };
+  const { supabase, clinicId, dentistaId, role } = await requireClinicContext();
+  if (!canAccess(role, 'configuracoes')) return { error: MSG_SEM_PERMISSAO_CONFIG };
 
   const { error: deleteError } = await supabase
     .from("horarios_disponiveis")
     .delete()
-    .eq("dentista_id", dentistaPerfil.id);
+    .eq("dentista_id", dentistaId);
 
   if (deleteError) {
     console.error("Erro ao limpar horários:", deleteError);
-    return { error: deleteError.message };
+    return { error: 'Não foi possível salvar os horários. Tente novamente.' };
   }
 
   const linhas = horarios
     .filter((h) => h.ativo)
     .map((h) => ({
       clinica_id:        clinicId,
-      dentista_id:       dentistaPerfil.id,
+      dentista_id:       dentistaId,
       dia_semana:        h.dia_semana,
       hora_inicio:       h.hora_inicio,
       hora_fim:          h.hora_fim,
@@ -121,7 +120,7 @@ export async function salvarHorarios(
 
   if (insertError) {
     console.error("Erro ao inserir horários:", insertError);
-    return { error: insertError.message };
+    return { error: 'Não foi possível salvar os horários. Tente novamente.' };
   }
 
   return {};
