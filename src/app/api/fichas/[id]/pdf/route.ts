@@ -37,7 +37,7 @@ export async function GET(
       .order('registrado_em', { ascending: true }),
     supabase
       .from('ficha_evolucoes')
-      .select('data, texto, automatica')
+      .select('data, texto, automatica, created_at')
       .eq('ficha_id', id)
       .eq('clinica_id', dentista.clinica_id)
       .order('data', { ascending: true })
@@ -50,7 +50,9 @@ export async function GET(
   const html = buildFichaHTML(
     {
       ...(fichaRaw as unknown as FichaComPaciente),
-      ...(evolucoesError ? {} : { evolucoes: (evolucoesRaw ?? []) as EvolucaoFichaExport[] }),
+      ...(evolucoesError ? {} : { evolucoes: (evolucoesRaw ?? []).map((evolucao): EvolucaoFichaExport => ({
+        data: evolucao.data, texto: evolucao.texto, automatica: evolucao.automatica, criadoEm: evolucao.created_at,
+      })) }),
     },
     (eventosRaw ?? []) as EventoFichaPdf[],
   );

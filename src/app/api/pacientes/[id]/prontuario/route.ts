@@ -70,7 +70,7 @@ export async function GET(
   if (acesso === 'completo' && fichasExport.length > 0) {
     const { data: evolucoesRaw, error: evolucoesError } = await supabase
       .from('ficha_evolucoes')
-      .select('ficha_id, data, texto, automatica')
+      .select('ficha_id, data, texto, automatica, created_at')
       .eq('clinica_id', dentista.clinica_id)
       .in('ficha_id', fichasExport.map((ficha) => ficha.id))
       .order('data', { ascending: true })
@@ -80,9 +80,9 @@ export async function GET(
       console.error('[prontuario] Erro ao ler evoluções para impressão:', evolucoesError);
     } else {
       const porFicha = new Map<string, EvolucaoFichaExport[]>();
-      for (const evolucao of (evolucoesRaw ?? []) as (EvolucaoFichaExport & { ficha_id: string })[]) {
+      for (const evolucao of evolucoesRaw ?? []) {
         const itens = porFicha.get(evolucao.ficha_id) ?? [];
-        itens.push({ data: evolucao.data, texto: evolucao.texto, automatica: evolucao.automatica });
+        itens.push({ data: evolucao.data, texto: evolucao.texto, automatica: evolucao.automatica, criadoEm: evolucao.created_at });
         porFicha.set(evolucao.ficha_id, itens);
       }
       fichasExport = fichasExport.map((ficha) => ({ ...ficha, evolucoes: porFicha.get(ficha.id) ?? [] }));

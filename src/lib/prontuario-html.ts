@@ -2,6 +2,7 @@ import type { ComponenteGrupoOrcamento } from '@/lib/orcamentos/grupos';
 // Shared helpers e builders para export de prontuário e PDF de ficha
 
 import { formatarDataFicha } from './format-data-ficha';
+import { partesDataHoraBRT } from './hora-brt';
 import { deriveEstadoOrcamento, rotuloEstado } from './orcamentos/estado';
 import { faceAbreviacao, type FaceDental } from '@/types/odontograma';
 
@@ -21,6 +22,7 @@ export type EvolucaoFichaExport = {
   data: string | null;
   texto: string | null;
   automatica: boolean;
+  criadoEm?: string | null;
 };
 
 export type FichaExport = {
@@ -222,6 +224,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,san
 .tooth-num{font-size:10px;font-weight:700;color:#2f9c85;min-width:30px;font-family:ui-monospace,Menlo,monospace}
 .tooth-note{font-size:12px;color:#444}
 .signed{font-size:11px;color:#10b981;margin-top:8px;padding-top:8px;border-top:1px solid #f0fdf4}
+.apos-assinatura{color:#8a5a00;font-size:11px;font-weight:600}
 .items-list{display:flex;flex-direction:column;gap:2px}
 .item-row{display:flex;align-items:center;gap:10px;padding:3px 0;border-bottom:1px solid #fafafa;font-size:12px}
 .item-row .item-desc{flex:1;color:#444}
@@ -243,13 +246,23 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,san
 
 // ── Partials ───────────────────────────────────────────────────────────────────
 
+export function registradaAposAssinatura(
+  criadoEm: string | null | undefined,
+  assinadoEm: string | null | undefined,
+): boolean {
+  return Boolean(criadoEm && assinadoEm && Date.parse(criadoEm) > Date.parse(assinadoEm));
+}
+
 export function evolucoesParaImpressao(f: FichaExport): {
   titulo: string;
-  itens: { data: string | null; texto: string; automatica: boolean }[];
+  itens: { data: string | null; texto: string; automatica: boolean; aposAssinatura?: true }[];
 } | null {
   const itens = (f.evolucoes ?? []).flatMap((evolucao) => {
     const texto = evolucao.texto;
-    return texto?.trim() ? [{ data: evolucao.data, texto, automatica: evolucao.automatica }] : [];
+    return texto?.trim() ? [{
+      data: evolucao.data, texto, automatica: evolucao.automatica,
+      ...(registradaAposAssinatura(evolucao.criadoEm, f.assinado_em) ? { aposAssinatura: true as const } : {}),
+    }] : [];
   }).sort((a, b) => (a.data ?? '').localeCompare(b.data ?? ''));
 
   if (itens.length > 0) return { titulo: 'Evolução clínica', itens };
@@ -295,7 +308,7 @@ function renderFichaCard(f: FichaExport): string {
         <span class="badge badge-teal">${esc(badge)}</span>
         <span class="card-prof">Dr(a). ${esc(f.dentista?.nome ?? 'Profissional')}${f.dentista?.cro ? ` · CRO ${esc(f.dentista.cro)}` : ''}</span>
       </div>
-      ${evolucao ? `<div class="field"><div class="field-lbl">${esc(evolucao.titulo)}</div>${evolucao.itens.map((item) => `<div class="field-val">${item.data ? `${esc(fmtDateOnly(item.data))} — ` : ''}${esc(item.texto)}${item.automatica ? ' (registro automático)' : ''}</div>`).join('')}</div>` : ''}
+      ${evolucao ? `<div class="field"><div class="field-lbl">${esc(evolucao.titulo)}</div>${evolucao.itens.map((item) => `<div class="field-val">${item.data ? `${esc(fmtDateOnly(item.data))} — ` : ''}${esc(item.texto)}${item.automatica ? ' (registro automático)' : ''}${item.aposAssinatura && f.assinado_em ? ` <span class="apos-assinatura">(registrado após a assinatura de ${fmtDateOnly(partesDataHoraBRT(f.assinado_em).data)})</span>` : ''}</div>`).join('')}</div>` : ''}
       ${dentesHtml}
       ${concluidosHtml}
       ${f.assinado_em ? `<div class="signed">✓ Assinado digitalmente em ${esc(fmtDateTime(f.assinado_em))}</div>` : ''}
