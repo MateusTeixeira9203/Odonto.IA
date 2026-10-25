@@ -12,6 +12,7 @@ import { endoDetalheSchema } from '@/lib/especialidades/endo';
 import { implanteDetalheSchema } from '@/lib/especialidades/implante';
 import { criarDocumentoConclusaoAssinatura } from '@/server/legal/documentos-aceite';
 import { hojeBRT } from '@/lib/hora-brt';
+import { filtrarEventosParaAssinar, agruparPorAutor } from '@/lib/prontuario/assinatura-recepcao';
 import { travadoPelaAssinaturaDaFicha } from '@/lib/prontuario/travado-pela-ficha';
 
 import { editarDetalhesEventoSchema, type EditarDetalhesEventoInput, type EditarDetalhesEventoResult } from '@/lib/odontograma/edicao-procedimento';
@@ -816,36 +817,42 @@ export async function assinarTodosRealizadosDaFicha(params: {
   assinaturaDataUrl: string;
   conclusao?: z.infer<typeof conclusaoAssinadaSchema>;
 }): Promise<AssinarProcedimentosResult> {
-  const { supabase, clinicId, user } = await requireClinicContext();
+  const { supabase, clinicId, role, dentistaId } = await requireClinicContext();
 
-  const { data: dentista } = await supabase
-    .from('dentistas')
-    .select('id')
-    .eq('clinica_id', clinicId)
-    .eq('user_id', user.id)
-    .maybeSingle<{ id: string }>();
-  if (!dentista) return { ok: false, error: 'Perfil de dentista não encontrado.' };
-
-  const { data: eventos } = await supabase
+  const { data: eventos, error } = await supabase
     .from('odontograma_eventos')
-    .select('id')
+    .select('id, dentista_id, encaminhado_para, status, assinatura_id, retirado_em')
     .eq('ficha_id', params.fichaId)
     .eq('paciente_id', params.pacienteId)
     .eq('clinica_id', clinicId)
     .is('retirado_em', null)
     .eq('status', 'realizado')
-    .is('assinatura_id', null)
-    .or(`and(dentista_id.eq.${dentista.id},encaminhado_para.is.null),encaminhado_para.eq.${dentista.id}`);
+    .is('assinatura_id', null);
 
-  const eventoIds = (eventos ?? []).map((e) => e.id as string);
-  if (eventoIds.length === 0) {
-    return { ok: false, error: 'Nada a assinar nesta ficha.' };
+  if (error) {
+    console.error('[assinarTodosRealizadosDaFicha]', error.message);
+    return { ok: false, error: 'Não foi possível consultar os procedimentos para assinatura.' };
   }
+  const grupos = agruparPorAutor(filtrarEventosParaAssinar(eventos ?? [], { role, dentistaId }));
+  if (grupos.length === 0) return { ok: false, error: 'Nada a assinar nesta ficha.' };
 
-  return assinarProcedimentos({
-    eventoIds,
-    assinadoPor: params.assinadoPor,
-    assinaturaDataUrl: params.assinaturaDataUrl,
-    conclusao: params.conclusao,
-  });
+  let resultado: AssinarProcedimentosResult = { ok: true };
+  let gruposAssinados = 0;
+  for (const grupo of grupos) {
+    resultado = await assinarProcedimentos({
+      eventoIds: grupo.map((evento) => evento.id),
+      assinadoPor: params.assinadoPor,
+      assinaturaDataUrl: params.assinaturaDataUrl,
+      conclusao: params.conclusao,
+    });
+    if (!resultado.ok) {
+      if (role === 'secretaria' && grupo.some((evento) => evento.encaminhado_para != null)) {
+        const preservados = gruposAssinados > 0 ? ' Os lotes já assinados foram preservados.' : '';
+        return { ok: false, error: `Não foi possível assinar os procedimentos encaminhados a outro profissional. Eles continuam pendentes; peça ao profissional responsável para assiná-los.${preservados}` };
+      }
+      return resultado;
+    }
+    gruposAssinados++;
+  }
+  return resultado;
 }

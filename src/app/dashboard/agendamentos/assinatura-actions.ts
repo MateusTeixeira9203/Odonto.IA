@@ -1,5 +1,6 @@
 'use server';
 
+import { usarCaminhoLegado } from '@/lib/prontuario/assinatura-recepcao';
 import { requireClinicContext } from '@/server/auth/clinic';
 import { createServiceClient } from '@/lib/supabase/service';
 import { assinarTodosRealizadosDaFicha } from '@/server/patients/registro-actions';
@@ -74,6 +75,21 @@ export async function salvarAssinaturaRecepcao(
     .maybeSingle();
 
   if (!ficha) return { ok: false, error: 'Ficha não encontrada' };
+
+  const { count, error: eventosError } = await db
+    .from('odontograma_eventos')
+    .select('id', { count: 'exact', head: true })
+    .eq('ficha_id', fichaId)
+    .eq('paciente_id', pacienteId)
+    .eq('clinica_id', clinicId)
+    .is('retirado_em', null);
+
+  if (eventosError || count == null) {
+    return { ok: false, error: 'Não foi possível consultar os procedimentos para assinatura.' };
+  }
+  if (!usarCaminhoLegado({ totalProcedimentos: count })) {
+    return { ok: false, error: 'Não há procedimento realizado para assinar nesta ficha.' };
+  }
 
   const base64 = assinaturaDataUrl.split(',')[1];
   if (!base64) return { ok: false, error: 'Assinatura inválida' };
