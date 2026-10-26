@@ -1,46 +1,82 @@
 ﻿# Campanha do dentista · QA
 
-Somente odonto-qa `uhuxteswtvgdnlixwrdu`. Responsável: ALFA - QA. Não executa servidor, migration, cleanup, publicação, IA paga ou envio externo automaticamente. Código de produto não é corrigido por estes roteiros.
+ALFA - QA. Somente odonto-qa `uhuxteswtvgdnlixwrdu`; contas existentes Ana, Sara, Bruno, admin e protético. Sem produção, 3000, migration, cleanup automático, push, merge, deploy, IA paga ou envio externo. QA não corrige produto.
 
-## Ambientes autorizados
+## Configuração por ambiente
 
-| DENTISTA_QA_SNAPSHOT | Snapshot | Porta | Código |
-|---|---|---|---|
-| baseline (padrão) | Odonto.IA-dentistaqa |3012|3d14edb|
-| embeds69 | Odonto.IA-dentistareteste |3014|69b5dde, só leitura|
-| rec3a | Odonto.IA-dentistarec |3016|3a45088|
-| final | Odonto.IA-dentistafinal |3012|DENTISTA_QA_FINAL_COMMIT explícito, fornecido pelo Orquestrador após revisão|
+Não há porta, commit, snapshot ou destino do vault fixados nos roteiros. Configure todos antes de descoberta/execução:
 
-Guard: `DENTISTA_QA_READY=3d14edb-QA`. Escrita inicial/reteste: `DENTISTA_QA_WRITE=OWN-e026da00`; final: `OWN-e026da01`. Sem opt-in, a execução aborta antes de Auth/escrita. Cada cenário confere HEAD e `git diff --exit-code -- src` antes/depois; o ambiente é carregado SOMENTE do snapshot e validado por exigirHostQa. Credenciais QA ficam em memória; sem trace, vídeo, storageState, HAR ou log do login.
+| Variável | Contrato |
+|---|---|
+| `DENTISTA_QA_SNAPSHOT` | Nome do snapshot criado por qa:snapshot-up, iniciado por dentista; sem caminho/.. |
+| `DENTISTA_QA_COMMIT` | SHA completo (40 hex) revisado e aprovado para esta rodada |
+| `DENTISTA_QA_PORT` | Porta do snapshot registrado, dentro da faixa do runner; nunca3000 |
+| `DENTISTA_QA_EVIDENCE_DIR` | Caminho absoluto do diretório de evidências escolhido pelo operador no vault |
+| `DENTISTA_QA_READY` | Sete primeiros caracteres do SHA + `-odonto-qa` |
+| `DENTISTA_QA_WRITE` | `OWN-e026da01`, somente quando houver escrita autorizada |
 
-Subir snapshot é ação explícita pelo runner `npm run qa:snapshot-up -- --nome ... --commit ... --porta ...`, nunca3000. Não atualizar fonte/snapshot no meio da rodada. Não aplicar mudança de banco durante uma rodada.
+Exemplo PowerShell para o opt-in, depois de definir SHA/snapshot/porta/evidências:
 
-## Execução
+```powershell
+$env:DENTISTA_QA_READY=$env:DENTISTA_QA_COMMIT.Substring(0,7)+'-odonto-qa'
+$env:DENTISTA_QA_WRITE='OWN-e026da01'
+```
 
-Configuração própria, sem alterar o playwright.config.ts global:
+`guard()` verifica opt-in por versão, HEAD, registro da porta/snapshot/SHA e `git status --porcelain --untracked-files=all -- src` antes/depois. Arquivos novos em src também bloqueiam. O ambiente vem somente do snapshot e passa por exigirHostQa. Credenciais ficam em memória; sem trace, vídeo, HAR, storageState ou captura de login.
+
+O browser usa allowlist no CONTEXTO (inclusive novas abas/popups): somente origem local configurada e HTTPS do host QA; `data:`, `blob:` e `about:` são locais. Todos os outros hosts são abortados, incluindo fontes/telemetria externas. É o padrão de bloqueio geral do Dev2. O observador Supabase aceita apenas GET/HEAD no host QA.
+
+## Execução explícita
+
+Subir um snapshot revisado é comando separado: `npm run qa:snapshot-up -- --nome <nome> --commit <sha> --porta <porta>`. Nunca atualizar código no meio da rodada. Os roteiros não iniciam servidor.
+
+Descobrir sem rodar testes/banco:
+
+`node node_modules/@playwright/test/cli.js test --config e2e/dentista-qa/playwright.config.mjs --list`
+
+Criar a fixture NOVA somente com autorização de escrita e opt-in:
+
+`node e2e/dentista-qa/fixture-setup.mjs`
+
+Aborta se qualquer paciente da faixa existir. Não reaplicar após escrita parcial. A preparação cria as variações, os slots de Dia/recepção/toque e o caso misto Ana/admin com encaminhado. `fixture-rec3a.mjs` e `fixture-touch.mjs` são entradas históricas desativadas antes de Auth/banco; não usar para completar uma rodada parcial.
+
+Executar a rodada aprovada:
 
 `node node_modules/@playwright/test/cli.js test --config e2e/dentista-qa/playwright.config.mjs --workers=1 --retries=0`
 
-`--list` só descobre; não certifica comportamento. Usar `--grep` ou arquivo por lote somente para retestes autorizados. Todos os testes na regressão final, sem silenciar a falha conhecida DQ-EMBED-02. O único pulo planejado é orçamento sem responsável PERSISTIDO: coluna NOT NULL, catálogo QA registrado; não alterar schema. Null/undefined são cobertos nos JSX reais da lista/detalhe e builder real do PDF com dados sintéticos, explicitamente em estado isolado. Paciente sem dentista existe de verdade e é exercitado.
-
-Fixtures iniciais: `node e2e/dentista-qa/fixture-setup.mjs`, só com escrita opt-in. Aborta se houver qualquer paciente da faixa: não reaplicar após save parcial. `fixture-rec3a.mjs` foi usado uma vez para o reteste em3016 (paciente9, ficha109,eventos309–311,slots601–607); `fixture-touch.mjs` acrescentou paciente10/ficha110/evento312/slot608. Não repetir esses dois scripts. A fixture da rodada final cria tudo necessário, inclusive casos mistos e toque, em faixa nova `e026da01`, com nomes FINAL01. Não há cleanup automático.
+Faixa desta versão: **e026da01**, nomes FINAL01. Faixas e026da00 anteriores e e015e800/e015b300, ES, Paciente Exclusao QA e fixtures de outros agentes permanecem intocadas. Repetição de escrita persistida não é retry seguro; verificar evidência/estado primeiro.
 
 ## Casos
 
-- 01: Meu Dia, seleção de paciente exato, quatro variações de Encaixe, relato manual/evolução, restauração com faces, persistência, assinatura e PDF. IA real não chamada; não confundir cenário manual com validação da IA.
-- 02: criar/editar evolução, novo/antigo/sem responsável/várias fichas, permanentes/decíduos, restauração sem faces bloqueada, Word colado e DOCX real, histórico/data antiga preservados.
-- 03: assinatura real pela tela, novo atendimento com evolução/procedimento após assinatura, hash do antigo intacto, negativas Auth Ana/Sara/Bruno.
-- 04: orçamento da ficha, item/preço, aprovação, aceite real com canvas, cobrança, PIX, recarga, responsável na lista/detalhe/PDF e OD-010; estados de rede da navegação e export com atraso/erro e recuperação. O nome não tem fetch separado: atraso/erro são do carregamento da página, sem inventar um estado de erro individual do rótulo.
-- PDFs: Ficha e Prontuário de sete variações, Orçamento; HTTP, conteúdo, nome de Ana, abertura em navegador e PNG. Endpoints retornam HTML imprimível: não chamar isso de inspeção de todas as páginas de um arquivo PDF binário.
-- 10: AST extrai selects reais do snapshot;71consultas x5Auth reais =355. Todos devem retornar200. A listagem usa embeds-clinica.test.ts como referência de relações e amplia para todos os selects com embeds. Uma falha não interrompe o registro das demais. Telas: Início/Meu Dia/Agenda/Pacientes/Financeiro/Configurações e abas de quatro pacientes.
-- Recepção: Sara, métricas/links/filtros/dentistas, todos os status/ações oferecidos (cancelado oculto, faltou sem ação), transições persistidas, menu Faltou, cancelar/reabrir assinatura, limpar/redesenhar, erro de rede sem gravação e recuperação, assinatura real com CRO por autor e sem carimbo na ficha. Misto Ana/admin com CRO próprio; encaminhado permanece pendente (REC-4). Toque nativo via CDP além de mouse, sem gravar no teste de toque.
+- 01: Meu Dia, seleção exata/Encaixe em4variações, relato/evolução manual, restauração com faces, persistência, assinatura e export. IA real não chamada.
+- 02: criar/editar, novo/antigo/sem dentista/várias fichas, permanentes/decíduos, bloquear restauração sem face, Word colado e DOCX real, data/histórico preservados.
+- 03: assinatura real pela tela, novo atendimento com evolução/procedimento, hash do antigo intacto, negativas Auth Ana/Sara/Bruno.
+- 04: orçamento/item/preço/aprovação/aceite real/cobrança/PIX/recarga; nome na lista/detalhe/export, OD010; atraso/erro de navegação e export com recuperação. O nome não possui fetch individual: testes de rede operam o carregamento da página.
+- Exports: Ficha/Prontuário em7variações e Orçamento, HTTP/conteúdo/nome e abertura no browser. Endpoints entregam HTML imprimível; essa prova não equivale a inspecionar todas as páginas de um PDF binário.
+- 10: AST de selects do snapshot; referência de relações em embeds-clinica.test.ts, expandida para todos os embeds.71selects x5Auth =355 no lote já executado. Seis telas e três abas em4pacientes. Continua exigindo200 em TODAS as consultas.
+- Sara: métricas/atalhos/filtros/dentistas, todos estados/ações oferecidos, transições e Faltou persistidos; assinatura/cancelar/reabrir/limpar/redesenhar, rede/volta, CRO por autor/sem carimbo; misto e REC-4 preservado; toque nativo CDP e mouse.
 
-## Evidência, falhas e gravação única
+## Falhas esperadas e limites
 
-Vault: `Projetos/Odonto-IA/log/QA-DENTISTA-3d14edb-2026-10-25/`; retestes em subpastas por commit. `resultados.jsonl` inclui PASSOU/FALHOU/PULOU, mensagem e artefato. PNG/DOM de tentativa têm timestamp. `inventario-ids-exatos.json` lista objetos próprios após cada teste. `C10-REST-resultados.json` registra fonte/linha/select/HTTP por perfil, sem respostas clínicas de terceiros.
+**DQ-EMBED-02 (`conversas_bot.estado`) é achado antigo decidido pelo usuário, FORA do envio atual. Não é pulado nem silenciado.** O C10 mantém5falhas HTTP400/42703, uma por conta, e continua vermelho. O relatório da rodada deve confirmar que estas são as únicas falhas desse lote: send-pdf200nos5 e nenhuma nova falha. Não declarar C10 integral verde, nem reabrir schema/regra por esse achado.
 
-Não reexecutar cenário com escrita já persistida. Na primeira rodada houve seletores antigos, título de ficha derivado e asserção de pagamento anterior ao fim do save; são falhas do harness preservadas. Continuação foi somente no ponto faltante ou releitura, sem recriar atendimento/orçamento/pagamento/assinatura. Scripts de investigação/continuação foram para `log/.../harness-historico/`; não entram na regressão final. A pasta e2e contém o roteiro final corrigido.
+O único pulo planejado é orçamento sem responsável PERSISTIDO: coluna NOT NULL no catálogo QA. Não alterar schema/migração. Os JSX reais de lista/detalhe e builder real de export recebem null/undefined em testes de estado isolado; são prova distinta de Auth/UI persistida. Paciente sem dentista é permitido e exercitado de verdade.
 
-Falha de produto: evidência -> Orquestrador/Dev -> revisão/commit local -> snapshot NOVO -> reteste. Banco, regra, risco alto ou decisão antiga vão ao usuário. Sem correção de produto pelo QA. Não pular DQ-EMBED-02 (42703 em conversas_bot.estado); manter teste exigindo200 até decisão/correção autorizada.
+DQ-REC-02 rede ainda depende de correção/revisão/novo snapshot. Regra REC-4 permanece: recepção não assina encaminhado. Casos antigos decididos não viram correção autônoma.
 
-IDs protegidos ES/Paciente Exclusao QA, faixas e015e800/e015b300 e fixtures de outros agentes não são editados. Contas somente Ana, Sara, Bruno, admin e protético existentes. A limpeza futura exige lista explícita dos IDs do inventário, incluindo objetos de assinatura/documentos; nenhum DELETE por prefixo ou paciente fora da lista. Gatilhos permanecem ativos.
+## Evidência e manifesto de limpeza
+
+Destino vem de DENTISTA_QA_EVIDENCE_DIR. resultados.jsonl contém PASSOU/FALHOU/PULOU, motivo, artefato e horário; PNG/DOM por tentativa com timestamp. Nunca imprimir env, senha, cookie, JWT, sessão ou trace.
+
+`inventory.mjs` faz somente SELECT em transação READ ONLY no QA:
+
+- começa na lista exata de pacientes e nas auditorias/cópias desses pacientes;
+- expande filhas pelas FKs EFETIVAS, incluindo compostas, até fechar os vínculos;
+- enumera PKs/IDs/chaves compostas de ficha_arquivos, ficha_evolucoes, atendimento_eventos, orcamento_eventos, orcamento_cobranca_itens, documentos e demais filhas;
+- enumera notificações por referências a entidades próprias ou nome completo FINAL01; guarda os IDs exatos, nunca autoriza DELETE por texto;
+- enumera referências de assinatura/PDF/anexos e objetos Storage por id/bucket/path, incluindo órfãos nos diretórios exatos de pacientes próprios, sem baixar binários;
+- escreve inventario-ids-exatos.json com dados e `_cleanup`: chaves por tabela, objetos e referências; avisa/bloqueia limpeza sem PK. Nenhum DELETE, TRUNCATE ou storage remove é executado.
+
+A coleta lê QA_DB_URL via lerVariavel, sem carregar outras variáveis do arquivo compartilhado. Conexão validada por exigirHostQa. O manifesto NÃO autoriza cleanup: limpeza futura só com IDs/chaves/paths enumerados e respeito a retenção/gatilhos. Nunca prefixo, nome ou clínica como critério de exclusão.
+
+Fluxo por bug: evidência -> Dev -> revisão/commit LOCAL -> snapshot NOVO -> reteste. Rodada final de TODOS os roteiros no commit final fornecido pelo Orquestrador. Falhas anteriores do harness ficam no log da campanha, sem reproduzir gravação persistida nem esconder tentativa inválida.

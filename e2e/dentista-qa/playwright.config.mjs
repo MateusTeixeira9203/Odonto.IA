@@ -1,2 +1,5 @@
-﻿import {defineConfig} from '@playwright/test';
-export default defineConfig({testDir:'.',testIgnore:'**/historico/**',fullyParallel:false,workers:1,retries:0,reporter:'list',outputDir:'C:/Users/mateu/Desktop/Nex Lab/Projetos/Odonto-IA/log/QA-DENTISTA-3d14edb-2026-10-25/playwright-output',use:{browserName:'chromium',channel:'msedge',viewport:{width:1440,height:1000},trace:'off',video:'off',screenshot:'off'}});
+﻿import assert from 'node:assert/strict';
+import path from 'node:path';
+import {defineConfig} from '@playwright/test';
+assert(path.isAbsolute(process.env.DENTISTA_QA_EVIDENCE_DIR??''),'Defina DENTISTA_QA_EVIDENCE_DIR absoluto');
+export default defineConfig({testDir:'.',fullyParallel:false,workers:1,retries:0,reporter:'list',outputDir:path.join(process.env.DENTISTA_QA_EVIDENCE_DIR,'playwright-output'),use:{browserName:'chromium',channel:'msedge',viewport:{width:1440,height:1000},trace:'off',video:'off',screenshot:'off'}});
