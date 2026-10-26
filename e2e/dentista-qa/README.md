@@ -1,10 +1,10 @@
-﻿# Campanha do dentista · QA
+# Campanha do dentista · QA
 
 ALFA - QA. Somente odonto-qa `uhuxteswtvgdnlixwrdu`; contas existentes Ana, Sara, Bruno, admin e protético. Sem produção, 3000, migration, cleanup automático, push, merge, deploy, IA paga ou envio externo. QA não corrige produto.
 
 ## Configuração por ambiente
 
-Não há porta, commit, snapshot ou destino do vault fixados nos roteiros. Configure todos antes de descoberta/execução:
+Não há porta, commit, snapshot ou destino do vault fixados nos roteiros. Configure todos antes da EXECUÇÃO. A descoberta --list não exige variáveis, snapshot existente, registro, ambiente QA nem acesso ao banco:
 
 | Variável | Contrato |
 |---|---|
@@ -22,7 +22,7 @@ $env:DENTISTA_QA_READY=$env:DENTISTA_QA_COMMIT.Substring(0,7)+'-odonto-qa'
 $env:DENTISTA_QA_WRITE='OWN-e026da01'
 ```
 
-`guard()` verifica opt-in por versão, HEAD, registro da porta/snapshot/SHA e `git status --porcelain --untracked-files=all -- src` antes/depois. Arquivos novos em src também bloqueiam. O ambiente vem somente do snapshot e passa por exigirHostQa. Credenciais ficam em memória; sem trace, vídeo, HAR, storageState ou captura de login.
+`initialize()` roda no beforeAll (ou explicitamente nos preparadores); só então o guard verifica opt-in por versão, HEAD, registro da porta/snapshot/SHA e `git status --porcelain --untracked-files=all -- src`. As verificações continuam antes/depois dos testes. Importar support não lê ambiente/registro, não roda Git, não cria cliente/diretório nem conecta ao banco. Arquivos novos em src também bloqueiam. O ambiente vem somente do snapshot e passa por exigirHostQa. Credenciais ficam em memória; sem trace, vídeo, HAR, storageState ou captura de login.
 
 O browser usa allowlist no CONTEXTO (inclusive novas abas/popups): somente origem local configurada e HTTPS do host QA; `data:`, `blob:` e `about:` são locais. Todos os outros hosts são abortados, incluindo fontes/telemetria externas. É o padrão de bloqueio geral do Dev2. O observador Supabase aceita apenas GET/HEAD no host QA.
 
@@ -30,7 +30,7 @@ O browser usa allowlist no CONTEXTO (inclusive novas abas/popups): somente orige
 
 Subir um snapshot revisado é comando separado: `npm run qa:snapshot-up -- --nome <nome> --commit <sha> --porta <porta>`. Nunca atualizar código no meio da rodada. Os roteiros não iniciam servidor.
 
-Descobrir sem rodar testes/banco:
+Descobrir sem ENV e sem inicializar o harness (também funciona pelo config global do qa:suite):
 
 `node node_modules/@playwright/test/cli.js test --config e2e/dentista-qa/playwright.config.mjs --list`
 

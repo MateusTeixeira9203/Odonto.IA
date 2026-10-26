@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {createClient} from '@supabase/supabase-js';
-import {guard,ctx,fetchQa,id,clinic,ana,names,rows,db,dir,auth} from './support.mjs';
-guard(true);const existing=await rows(db.from('pacientes').select('id').in('id',Object.keys(names).map(Number).map(id)));assert.equal(existing.length,0,'Fixtures ja existem: nao reaplicar nem limpar automaticamente');
+import {guard,ctx,fetchQa,id,clinic,ana,names,rows,db,dir,auth,initialize} from './support.mjs';
+await initialize(true);guard(true);const existing=await rows(db.from('pacientes').select('id').in('id',Object.keys(names).map(Number).map(id)));assert.equal(existing.length,0,'Fixtures ja existem: nao reaplicar nem limpar automaticamente');
 const writer=createClient(ctx.env.NEXT_PUBLIC_SUPABASE_URL,ctx.env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false,autoRefreshToken:false},global:{fetch:fetchQa()}});
 async function insert(table,data){const r=await writer.from(table).insert(data);if(r.error)throw Error('Fixture '+table+': '+r.error.code+' '+r.error.message);}
 const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
