@@ -24,6 +24,7 @@ function carregar(eventos: helpers.EventoParaAssinar[], options: { role?: string
   const db = {
     from(table: string) {
       const filtros: Array<(e: helpers.EventoParaAssinar) => boolean> = [];
+      let atualizando = false;
       const q = {
         select() { return q; }, order() { return q; }, in() { return q; },
         eq(chave: string, valor: string) {
@@ -36,10 +37,10 @@ function carregar(eventos: helpers.EventoParaAssinar[], options: { role?: string
           return q;
         },
         or() { filtros.push(e => (e.encaminhado_para ?? e.dentista_id) === (role === 'secretaria' ? 'sara' : 'ana')); return q; },
-        update() { carimbos++; return q; },
+        update() { atualizando = true; carimbos++; return q; },
         async maybeSingle() { return { data: { id: table === 'dentistas' ? (role === 'secretaria' ? 'sara' : 'ana') : params.fichaId, ficha_id: params.fichaId, paciente_id: params.pacienteId }, error: null }; },
         then(resolve: (value: unknown) => unknown) {
-          const data = table === 'odontograma_eventos' ? eventos.filter(e => filtros.every(f => f(e))) : table === 'dentistas' ? [{ id: 'carlos', nome: 'Carlos QA' }] : [];
+          const data = table === 'odontograma_eventos' ? eventos.filter(e => filtros.every(f => f(e))) : table === 'dentistas' ? [{ id: 'carlos', nome: 'Carlos QA' }] : table === 'fichas' && atualizando ? [{ id: params.fichaId }] : [];
           return Promise.resolve(resolve({ data, count: data.length, error: options.erroLeitura ? { message: 'QA leitura recusada' } : null }));
         },
       };
@@ -60,6 +61,7 @@ function carregar(eventos: helpers.EventoParaAssinar[], options: { role?: string
     }).outputText + '\nexports;', {
       exports: {}, Buffer, console: { error() {} },
       require(name: string) {
+        if (name === 'node:crypto') return { randomUUID: () => id(96) };
         if (name === 'zod') return { z };
         if (name === '@/lib/prontuario/assinatura-recepcao') return helpers;
         if (name === '@/server/patients/registro-actions') return registro;

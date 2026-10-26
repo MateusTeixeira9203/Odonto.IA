@@ -1,5 +1,6 @@
 'use server';
 
+import { randomUUID } from 'node:crypto';
 import { usarCaminhoLegado, NADA_A_ASSINAR } from '@/lib/prontuario/assinatura-recepcao';
 import { requireClinicContext } from '@/server/auth/clinic';
 import { createServiceClient } from '@/lib/supabase/service';
@@ -47,7 +48,7 @@ export async function buscarFichaParaAssinar(
 
 /**
  * R-03b — tenta primeiro o caminho granular (assinarTodosRealizadosDaFicha, que já valida
- * autoria/status via a RPC do R-03a); só cai pro caminho legado (service role, inalterado)
+ * autoria/status via a RPC do R-03a); só cai pro caminho legado (service role)
  * quando a ficha genuinamente não tem evento nenhum pra assinar granularmente.
  */
 export async function salvarAssinaturaRecepcao(
@@ -63,18 +64,22 @@ export async function salvarAssinaturaRecepcao(
   const granular = await assinarTodosRealizadosDaFicha({ fichaId, pacienteId, assinadoPor, assinaturaDataUrl });
   if (granular.ok || granular.error !== NADA_A_ASSINAR) return granular;
 
-  // Caminho legado (ficha sem evento) — inalterado, spec R-03b Decisão #B3.
+  // Caminho legado (ficha sem evento): nunca substituir uma assinatura já registrada.
   const db = createServiceClient();
 
-  const { data: ficha } = await db
+  const { data: ficha, error: fichaError } = await db
     .from('fichas')
-    .select('id')
+    .select('id, assinado_em, assinatura_url')
     .eq('id', fichaId)
     .eq('clinica_id', clinicId)
     .eq('paciente_id', pacienteId)
     .maybeSingle();
 
+  if (fichaError) return { ok: false, error: 'Não foi possível consultar a ficha para assinatura.' };
   if (!ficha) return { ok: false, error: 'Ficha não encontrada' };
+  if (ficha.assinado_em != null || ficha.assinatura_url != null) {
+    return { ok: false, error: 'Esta ficha já está assinada e não pode ser assinada novamente.' };
+  }
 
   const { count, error: eventosError } = await db
     .from('odontograma_eventos')
@@ -95,21 +100,54 @@ export async function salvarAssinaturaRecepcao(
   if (!base64) return { ok: false, error: 'Assinatura inválida' };
   const buffer = Buffer.from(base64, 'base64');
 
-  const storagePath = `${clinicId}/${pacienteId}/assinatura_${fichaId}.png`;
+  const storagePath = `${clinicId}/${pacienteId}/assinatura_${fichaId}_${randomUUID()}.png`;
+  const storage = db.storage.from('fichas');
+  const erroArquivoPendente = 'Não foi possível concluir a assinatura nem remover o arquivo desta tentativa. Atualize a página e peça à equipe para verificar.';
+  const erroGravacaoIncerta = 'Não foi possível confirmar a gravação da assinatura. Atualize a página antes de tentar novamente.';
 
-  const { error: storageErr } = await db.storage
-    .from('fichas')
-    .upload(storagePath, buffer, { contentType: 'image/png', upsert: true });
+  const removerArquivoDaTentativa = async (): Promise<boolean> => {
+    try {
+      const { error } = await storage.remove([storagePath]);
+      return !error;
+    } catch {
+      return false;
+    }
+  };
 
-  if (storageErr) return { ok: false, error: storageErr.message };
+  try {
+    const { error: storageErr } = await storage.upload(storagePath, buffer, { contentType: 'image/png', upsert: false });
+    // O SDK pode devolver a falha de transporte em vez de rejeitar a promessa.
+    if (storageErr?.name === 'StorageUnknownError') throw storageErr;
+    if (storageErr) return { ok: false, error: storageErr.message };
+  } catch {
+    const removido = await removerArquivoDaTentativa();
+    return { ok: false, error: removido ? 'Não foi possível enviar a assinatura. Verifique a conexão e tente novamente.' : erroArquivoPendente };
+  }
 
-  const { error: dbErr } = await db
-    .from('fichas')
-    .update({ assinatura_url: storagePath, assinado_em: new Date().toISOString() })
-    .eq('id', fichaId)
-    .eq('clinica_id', clinicId);
+  let atualizadas: Array<{ id: string }> | null;
+  let dbErr: { code: string; message: string } | null;
+  try {
+    const resultado = await db
+      .from('fichas')
+      .update({ assinatura_url: storagePath, assinado_em: new Date().toISOString() })
+      .eq('id', fichaId)
+      .eq('clinica_id', clinicId)
+      .eq('paciente_id', pacienteId)
+      .is('assinado_em', null)
+      .is('assinatura_url', null)
+      .select('id');
+    atualizadas = resultado.data;
+    dbErr = resultado.error;
+  } catch {
+    // A resposta pode ter se perdido após o commit. Não apagar uma prova possivelmente vinculada.
+    return { ok: false, error: erroGravacaoIncerta };
+  }
 
-  if (dbErr) return { ok: false, error: dbErr.message };
+  if (dbErr && !/^[0-9A-Z]{5}$/.test(dbErr.code)) return { ok: false, error: erroGravacaoIncerta };
+  if (dbErr || !atualizadas?.length) {
+    if (!await removerArquivoDaTentativa()) return { ok: false, error: erroArquivoPendente };
+    return { ok: false, error: dbErr?.message ?? 'Registro nao encontrado.' };
+  }
 
   return { ok: true };
 }
