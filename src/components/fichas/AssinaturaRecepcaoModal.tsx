@@ -21,6 +21,8 @@ type Step = 'loading' | 'sem-ficha' | 'assinar' | 'salvando' | 'sucesso' | 'erro
 
 export function AssinaturaRecepcaoModal({ open, onOpenChange, pacienteId, pacienteNome, onSigned }: Props) {
   const padRef     = useRef<SignaturePadLib | null>(null);
+  const confirmacaoEmCurso = useRef(false);
+  const resultadoIncerto = useRef(false);
 
   const [step,    setStep]    = useState<Step>('loading');
   const [fichaId, setFichaId] = useState<string | null>(null);
@@ -34,6 +36,7 @@ export function AssinaturaRecepcaoModal({ open, onOpenChange, pacienteId, pacien
     setStep('loading');
     setErro(null);
     setVazio(true);
+    resultadoIncerto.current = false;
 
     void buscarFichaParaAssinar(pacienteId).then(({ fichaId: id, error }) => {
       if (error || !id) {
@@ -62,6 +65,7 @@ export function AssinaturaRecepcaoModal({ open, onOpenChange, pacienteId, pacien
     });
 
     padRef.current = pad;
+    confirmacaoEmCurso.current = false;
     setVazio(true);
     const aoTerminarTraco = () => setVazio(pad.isEmpty());
     pad.addEventListener('endStroke', aoTerminarTraco);
@@ -79,11 +83,20 @@ export function AssinaturaRecepcaoModal({ open, onOpenChange, pacienteId, pacien
   };
 
   const handleConfirmar = async () => {
-    if (!fichaId || !padRef.current || padRef.current.isEmpty()) return;
+    if (confirmacaoEmCurso.current || !fichaId || !padRef.current || padRef.current.isEmpty()) return;
+    confirmacaoEmCurso.current = true;
     setStep('salvando');
 
-    const dataUrl = padRef.current.toDataURL('image/png');
-    const result  = await salvarAssinaturaRecepcao(fichaId, pacienteId, pacienteNome, dataUrl);
+    let result: Awaited<ReturnType<typeof salvarAssinaturaRecepcao>>;
+    try {
+      const dataUrl = padRef.current.toDataURL('image/png');
+      result = await salvarAssinaturaRecepcao(fichaId, pacienteId, pacienteNome, dataUrl);
+    } catch {
+      resultadoIncerto.current = true;
+      setErro('Não foi possível confirmar se a assinatura foi salva. Verifique a conexão e tente novamente.');
+      setStep('erro');
+      return;
+    }
 
     if (!result.ok) {
       setErro(result.error ?? 'Erro ao salvar assinatura.');
@@ -94,6 +107,26 @@ export function AssinaturaRecepcaoModal({ open, onOpenChange, pacienteId, pacien
     setStep('sucesso');
     onSigned?.();
     setTimeout(() => onOpenChange(false), 2000);
+  };
+
+  const handleTentarNovamente = async () => {
+    if (resultadoIncerto.current) {
+      setStep('loading');
+      try {
+        const pendencia = await buscarFichaParaAssinar(pacienteId);
+        if (pendencia.error || pendencia.fichaId !== fichaId) {
+          setErro(pendencia.error ?? 'Não foi possível confirmar esta assinatura. Feche e atualize a página para conferir o registro antes de tentar novamente.');
+          setStep('erro');
+          return;
+        }
+      } catch {
+        setErro('Não foi possível verificar a assinatura. Verifique a conexão e tente novamente.');
+        setStep('erro');
+        return;
+      }
+      resultadoIncerto.current = false;
+    }
+    setStep('assinar');
   };
 
   const hoje = format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
@@ -278,7 +311,7 @@ export function AssinaturaRecepcaoModal({ open, onOpenChange, pacienteId, pacien
                 <p className="text-sm text-text-secondary">{erro}</p>
               </div>
               <button
-                onClick={() => setStep('assinar')}
+                onClick={() => void handleTentarNovamente()}
                 className="px-6 py-2.5 bg-teal-ink text-surface rounded-xl text-sm font-semibold hover:opacity-90 transition-colors"
               >
                 Tentar novamente
