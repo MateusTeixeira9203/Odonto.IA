@@ -1,31 +1,33 @@
-import { start, id, base, assert, expect, rows } from './harness.mjs';
+import { start, id, base, patientName, assert, expect, rows } from './harness.mjs';
 const h = await start('08-agenda');
+const day = process.env.DENTISTA_D2_AGENDA_DAY ?? '2026-11-17';
+assert.match(day, /^2026-11-\d{2}$/);
 try {
   const a = await h.login('ANA'), p = a.page;
-  await p.goto(base + '/dashboard/agendamentos?d=2026-11-17&v=dia');
+  await p.goto(base + `/dashboard/agendamentos?d=${day}&v=dia`);
   let created;
   await h.check('Agenda UI abre novo agendamento com paciente sintético e permite cancelar sem gravar', async () => {
     const before = await h.ownState();
     await p.getByRole('button', { name: /Novo agendamento/i }).first().click();
-    const input = p.getByPlaceholder('Buscar paciente pelo nome...', { exact: true }); await input.fill('QA D2 Sintético 3');
-    await expect(p.getByText('QA D2 Sintético 3', { exact: true }).first()).toBeVisible();
-    await p.getByText('QA D2 Sintético 3', { exact: true }).first().click();
+    const input = p.getByPlaceholder('Buscar paciente pelo nome...', { exact: true }); await input.fill(patientName(3));
+    await expect(p.getByText(patientName(3), { exact: true }).first()).toBeVisible();
+    await p.getByText(patientName(3), { exact: true }).first().click();
     await h.capture(p, '08-ui-novo-paciente');
     await p.keyboard.press('Escape'); assert.deepEqual(await h.ownState(), before);
     return { aberturaUI: true, busca: id(3), cancelamentoSemEfeito: true };
   }, p);
   await h.check('Agenda criar, persistir ID, recarregar e mostrar na agenda da Ana', async () => {
-    const r = await h.action('ANA', 'criarAgendamento', [{ pacienteId: id(3), dataHora: '2026-11-17T13:00:00-03:00', duracaoMinutos: 30, observacoes: 'QA D2 agenda criar', forcarForaDoExpediente: true }], '/dashboard/agendamentos');
+    const r = await h.action('ANA', 'criarAgendamento', [{ pacienteId: id(3), dataHora: `${day}T13:00:00-03:00`, duracaoMinutos: 30, observacoes: 'QA D2 agenda criar', forcarForaDoExpediente: true }], '/dashboard/agendamentos');
     assert.ok(r.id, JSON.stringify(r)); created = r.id; h.report.ids.agendamentoCriado = created; h.save();
     const row = (await h.get('agendamentos', created))[0]; assert.equal(row.paciente_id, id(3)); assert.equal(row.dentista_id, a.id); assert.equal(row.status, 'scheduled');
-    await p.reload(); await expect(p.getByText('QA D2 Sintético 3', { exact: true }).filter({ visible: true }).first()).toBeVisible();
+    await p.reload(); await expect(p.getByText(patientName(3), { exact: true }).filter({ visible: true }).first()).toBeVisible();
     return { id: created, paciente: id(3), status: row.status };
   }, p);
   await h.check('Agenda editar horário/duração/observação e trocar paciente, com recarga', async () => {
     assert.ok(created, 'criação anterior deve passar');
-    const r = await h.action('ANA', 'atualizarAgendamento', [created, { pacienteId: id(4), dataHora: '2026-11-17T14:00:00-03:00', duracaoMinutos: 45, observacoes: 'QA D2 agenda editada', forcarForaDoExpediente: true }], '/dashboard/agendamentos'); assert.ok(!r.error, r.error);
-    const row = (await h.get('agendamentos', created))[0]; assert.equal(row.paciente_id, id(4)); assert.equal(row.duracao_minutos, 45); assert.equal(row.observacoes, 'QA D2 agenda editada'); assert.equal(new Date(row.data_hora).toISOString(), '2026-11-17T17:00:00.000Z');
-    await p.reload(); await expect(p.getByText('QA D2 Sintético 4', { exact: true }).filter({ visible: true }).first()).toBeVisible();
+    const r = await h.action('ANA', 'atualizarAgendamento', [created, { pacienteId: id(4), dataHora: `${day}T14:00:00-03:00`, duracaoMinutos: 45, observacoes: 'QA D2 agenda editada', forcarForaDoExpediente: true }], '/dashboard/agendamentos'); assert.ok(!r.error, r.error);
+    const row = (await h.get('agendamentos', created))[0]; assert.equal(row.paciente_id, id(4)); assert.equal(row.duracao_minutos, 45); assert.equal(row.observacoes, 'QA D2 agenda editada'); assert.equal(new Date(row.data_hora).toISOString(), `${day}T17:00:00.000Z`);
+    await p.reload(); await expect(p.getByText(patientName(4), { exact: true }).filter({ visible: true }).first()).toBeVisible();
     return { id: created, paciente: id(4), duracao: row.duracao_minutos };
   }, p);
   await h.check('Agenda check-in e repetição não regravam o estado', async () => {
@@ -41,7 +43,7 @@ try {
     await p.reload(); assert.equal((await h.get('agendamentos', created))[0].status, 'cancelled'); return { id: created, status: row.status, motivoPreservado: true };
   }, p);
   await h.check('Agenda encaixe sem colisão, colisão do paciente intransponível mesmo com override', async () => {
-    const data = { pacienteId: id(3), dataHora: '2026-11-17T15:30:00-03:00', duracaoMinutos: 30, observacoes: 'QA D2 encaixe' };
+    const data = { pacienteId: id(3), dataHora: `${day}T15:30:00-03:00`, duracaoMinutos: 30, observacoes: 'QA D2 encaixe' };
     const r = await h.action('ANA', 'criarEncaixe', [data], '/dashboard/agendamentos'); assert.ok(r.id, JSON.stringify(r));
     h.report.ids.encaixe = r.id; h.save(); assert.equal((await h.get('agendamentos', r.id))[0].paciente_id, id(3));
     const before = await rows(h.db.from('agendamentos').select('id').eq('paciente_id', id(3)));
@@ -54,7 +56,7 @@ try {
     for (const session of [a, b]) {
       await session.page.goto(base + '/dashboard/agendamentos?d=2026-11-16&v=dia'); await session.page.reload();
       const body = await session.page.locator('body').innerText(); const mine = session === a ? 3 : 2, other = session === a ? 2 : 3;
-      assert.ok(body.includes(`QA D2 Sintético ${mine}`)); assert.ok(!body.includes(`QA D2 Sintético ${other}`));
+      assert.ok(body.includes(patientName(mine))); assert.ok(!body.includes(patientName(other)));
       await h.capture(session.page, `08-reload-${session === a ? 'Ana' : 'Bruno'}`);
     }
     return { ana: id(201), bruno: id(202), isoladosAposRecarga: true };

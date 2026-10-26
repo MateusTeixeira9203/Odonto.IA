@@ -1,4 +1,4 @@
-import { start, id, name, base, assert, expect } from './harness.mjs';
+import { start, id, name, base, patientName, assert, expect } from './harness.mjs';
 const h = await start('07-isolamento');
 try {
   const b = await h.login('BRUNO'), a = await h.login('ANA');
@@ -10,7 +10,7 @@ try {
       const r = await b.page.goto(base + route); await b.page.waitForLoadState('domcontentloaded');
       if (route.endsWith(id(1))) await expect(b.page.getByText('Página não encontrada', { exact: true })).toBeVisible();
       const text = await b.page.locator('body').innerText();
-      for (const marker of [name, 'QA-D2-CLINICO-PRIVADO', 'QA D2 Ficha', 'QA D2 Procedimento', 'QA D2 Sintético 3']) assert.ok(!text.includes(marker), 'Vazamento: ' + marker);
+      for (const marker of [name, 'QA-D2-CLINICO-PRIVADO', 'QA D2 Ficha', 'QA D2 Procedimento', patientName(3)]) assert.ok(!text.includes(marker), 'Vazamento: ' + marker);
       if (route.endsWith(id(1))) assert.match(text, /404|não encontrad|não existe/i);
       return { route, http: r?.status(), urlFinal: new URL(b.page.url()).pathname, semMarcadoresA: true };
     }, b.page);
@@ -56,6 +56,7 @@ try {
     const before = await h.ownState(); const r = await h.action('BRUNO', action, args);
     assert.deepEqual(await h.ownState(), before, 'Efeito indevido');
     assert.ok(r.error || r.ok === false, 'Sucesso aparente não é recusa explícita: ' + JSON.stringify(r));
+    if (['marcarNoShow', 'cancelarComMotivo', 'deletarAgendamento', 'atualizarPaciente'].includes(action)) assert.equal(r.error, 'Registro nao encontrado.');
     if (['editarDetalhesEvento', 'excluirProcedimento'].includes(action)) assert.equal(r.error, 'Registro não encontrado.');
     return { action, resultado: r, semEfeito: true };
   });

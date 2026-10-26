@@ -6,25 +6,39 @@ import { createHash } from 'node:crypto';
 import { chromium, expect } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 import { Client } from 'pg';
-import { contexto, exigirHostQa, configPgQa, lerVariavel, mascarar } from '../../scripts/qa/_lib.mjs';
+import { contexto, exigirHostQa, configPgQa, lerVariavel, mascarar, registros } from '../../scripts/qa/_lib.mjs';
 
 export { assert, expect };
 export const root = path.resolve(import.meta.dirname, '../..');
-export const runtime = path.resolve(root, '../Odonto.IA-dentistadev2');
-export const commit = '3d14edb231c318c4f005f57818a41233e8bab6ad';
-export const base = 'http://localhost:3013';
-export const dir = 'C:/Users/mateu/Desktop/Nex Lab/Projetos/Odonto-IA/log/dentista-dev2-3d14edb';
-export const id = n => `d025d200-0000-4000-8000-${String(n).padStart(12, '0')}`;
-export const name = 'QA D2 Campanha Dentista';
+const snapshotName = process.env.DENTISTA_D2_SNAPSHOT ?? 'dentistadev2';
+assert.match(snapshotName, /^dentistadev2(?:-[a-z0-9-]+)?$/);
+export const runtime = path.resolve(root, `../Odonto.IA-${snapshotName}`);
+export const commit = process.env.DENTISTA_D2_COMMIT ?? '3d14edb231c318c4f005f57818a41233e8bab6ad';
+assert.match(commit, /^[0-9a-f]{40}$/);
+export const prefix = process.env.DENTISTA_D2_PREFIX ?? 'd025d200';
+assert.match(prefix, /^d025d2[0-9a-f]{2}$/);
+const port = process.env.DENTISTA_D2_PORT ?? '3013';
+assert.ok(['3013', '3015'].includes(port));
+assert.ok(port !== '3015' || snapshotName === 'dentistadev2-iso', '3015 reservada ao reteste autorizado');
+export const base = `http://localhost:${port}`;
+export const dir = `C:/Users/mateu/Desktop/Nex Lab/Projetos/Odonto-IA/log/dentista-dev2-${commit.slice(0, 7)}${prefix === 'd025d200' ? '' : '-' + prefix}`;
+export const id = n => `${prefix}-0000-4000-8000-${String(n).padStart(12, '0')}`;
+const suffix = prefix === 'd025d200' ? '' : ' ' + prefix;
+export const name = 'QA D2 Campanha Dentista' + suffix;
+export const patientName = n => `QA D2 Sintético ${n}${suffix}`;
+export const positiveName = role => `QA D2 Positivo ${role} ${commit.slice(0, 7)}${suffix}`;
 export const emails = { ANA: 'dentista.a.r140@example.invalid', SARA: 'secretaria.a.auditoria@example.invalid', BRUNO: 'dentista.b.r140@example.invalid', ADMIN: 'admin.a.auditoria@example.invalid', PROTETICO: 'protetico.a.qa@example.invalid' };
 export const rows = async query => { const r = await query; assert.ok(!r.error, r.error?.message); return r.data; };
 const sha = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
 export async function start(lote) {
-  assert.equal(process.env.DENTISTA_D2_READY, '3d14edb-odonto-qa', 'opt-in obrigatório');
+  assert.equal(process.env.DENTISTA_D2_READY, `${commit.slice(0, 7)}-odonto-qa`, 'opt-in obrigatório por versão');
   const head = () => execFileSync('git', ['rev-parse', 'HEAD'], { cwd: runtime, encoding: 'utf8' }).trim();
   assert.equal(head(), commit);
-  execFileSync('git', ['diff', '--exit-code', '--', 'src'], { cwd: runtime });
+  const sourceClean = () => assert.equal(execFileSync('git', ['status', '--porcelain', '--untracked-files=all', '--', 'src'], { cwd: runtime, encoding: 'utf8' }).trim(), '', 'src do snapshot deve estar limpa');
+  sourceClean();
+  const record = registros().find(r => r.porta === Number(port));
+  assert.equal(record?.nome, snapshotName); assert.equal(record?.commit, commit);
   const ctx = await contexto(runtime);
   const host = exigirHostQa(ctx.env.NEXT_PUBLIC_SUPABASE_URL).hostname;
   assert.equal(host, 'uhuxteswtvgdnlixwrdu.supabase.co');
@@ -112,7 +126,7 @@ export async function start(lote) {
     finally { await pg.end(); }
   }
   async function finish() {
-    try { assert.equal(head(), commit); execFileSync('git', ['diff', '--exit-code', '--', 'src'], { cwd: runtime }); report.headDepois = head(); }
+    try { assert.equal(head(), commit); sourceClean(); report.headDepois = head(); }
     finally { await browser.close(); }
     report.fim = new Date().toISOString(); save();
     const table = report.casos.map((c, i) => `| ${c.cenario.replaceAll('|', '/')} | ${c.resultado} | ${lote}.json #${i + 1}${c.erro ? ': ' + c.erro.replaceAll('|', '/').replaceAll('\n', ' ').slice(0, 500) : ''} |`).join('\n');

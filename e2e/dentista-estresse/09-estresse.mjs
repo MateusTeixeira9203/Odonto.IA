@@ -1,5 +1,5 @@
 import { setTimeout as delay } from 'node:timers/promises';
-import { start, id, base, assert, expect, rows } from './harness.mjs';
+import { start, id, base, patientName, assert, expect, rows } from './harness.mjs';
 import { openFicha } from './telas.mjs';
 const h = await start('09-estresse');
 const placeholder = 'Curativo, sutura, orientação ou evolução da consulta';
@@ -59,8 +59,8 @@ try {
   await h.check('Lista grande: busca própria e voltar/avançar conservam paciente e dados persistidos', async () => {
     await p.setViewportSize({ width: 1440, height: 1000 });
     await p.goto(base + '/dashboard/pacientes');
-    const input = p.getByPlaceholder(/Buscar.*nome|Buscar paciente|Buscar por/i).first(); await input.fill('QA D2 Sintético 5035');
-    await expect(p.getByText('QA D2 Sintético 5035', { exact: true }).first()).toBeVisible();
+    const input = p.getByPlaceholder(/Buscar.*nome|Buscar paciente|Buscar por/i).first(); await input.fill(patientName(5035));
+    await expect(p.getByText(patientName(5035), { exact: true }).first()).toBeVisible();
     const before = await h.ownState(); await p.goto(base + '/dashboard/pacientes/' + id(1)); await p.goBack(); await p.goForward();
     await expect(p.getByRole('tab', { name: 'Orçamentos', exact: true })).toBeVisible(); assert.deepEqual(await h.ownState(), before);
     return { pacientesProprios: 40, buscaId: id(5035), semEfeito: true };
