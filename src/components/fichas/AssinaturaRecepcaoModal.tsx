@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import SignaturePadLib from 'signature_pad';
 import { motion, AnimatePresence } from 'motion/react';
 import { PenLine, RotateCcw, CheckCircle2, Loader2, AlertCircle, X } from 'lucide-react';
@@ -20,7 +20,6 @@ interface Props {
 type Step = 'loading' | 'sem-ficha' | 'assinar' | 'salvando' | 'sucesso' | 'erro';
 
 export function AssinaturaRecepcaoModal({ open, onOpenChange, pacienteId, pacienteNome, onSigned }: Props) {
-  const canvasRef  = useRef<HTMLCanvasElement>(null);
   const padRef     = useRef<SignaturePadLib | null>(null);
 
   const [step,    setStep]    = useState<Step>('loading');
@@ -46,30 +45,33 @@ export function AssinaturaRecepcaoModal({ open, onOpenChange, pacienteId, pacien
     });
   }, [open, pacienteId]);
 
-  // Inicializa o signature pad quando o canvas montar
-  useEffect(() => {
-    if (step !== 'assinar' || !canvasRef.current) return;
-
-    const canvas = canvasRef.current;
+  // AnimatePresence pode montar o canvas depois do efeito de step. O ref acompanha o DOM real.
+  const canvasRef = useCallback((canvas: HTMLCanvasElement | null) => {
+    if (!canvas) return;
     const ratio  = window.devicePixelRatio || 1;
     canvas.width  = canvas.offsetWidth  * ratio;
     canvas.height = canvas.offsetHeight * ratio;
     const ctx = canvas.getContext('2d');
     if (ctx) ctx.scale(ratio, ratio);
 
-    padRef.current = new SignaturePadLib(canvas, {
+    const pad = new SignaturePadLib(canvas, {
       backgroundColor: 'rgb(255,255,255)',
       penColor: '#0d0d0d',
       minWidth: 1.5,
       maxWidth: 3,
     });
 
-    padRef.current.addEventListener('endStroke', () => {
-      setVazio(padRef.current?.isEmpty() ?? true);
-    });
+    padRef.current = pad;
+    setVazio(true);
+    const aoTerminarTraco = () => setVazio(pad.isEmpty());
+    pad.addEventListener('endStroke', aoTerminarTraco);
 
-    return () => { padRef.current?.off(); };
-  }, [step]);
+    return () => {
+      pad.removeEventListener('endStroke', aoTerminarTraco);
+      pad.off();
+      if (padRef.current === pad) padRef.current = null;
+    };
+  }, []);
 
   const handleLimpar = () => {
     padRef.current?.clear();
