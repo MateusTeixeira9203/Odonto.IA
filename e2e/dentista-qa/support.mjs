@@ -11,7 +11,7 @@ export {test,expect};
 export const root=path.resolve(import.meta.dirname,'../..');
 export let runtime,commit,base,dir,ctx,host,db;
 let lockedConfig;
-export const namespace='e026da01';
+export const namespace='e026da02';
 export const id=n=>namespace+'-0000-4000-8000-'+String(n).padStart(12,'0');
 export const reception={patient:6,prefix:'QA DENTISTA Recepcao',slot:501,event:306,ficha:106};
 function configuration(){
@@ -26,7 +26,7 @@ function configuration(){
 export function guard(write=false){
  const config=configuration();
  assert.equal(process.env.DENTISTA_QA_READY,config.commit.slice(0,7)+'-odonto-qa','opt-in obrigatorio por versao');
- if(write)assert.equal(process.env.DENTISTA_QA_WRITE,'OWN-e026da01','Escrita so na faixa nova e026da01');
+ if(write)assert.equal(process.env.DENTISTA_QA_WRITE,'OWN-e026da02','Escrita so na faixa nova e026da02');
  if(lockedConfig)assert.deepEqual(config,lockedConfig,'Configuracao do snapshot mudou durante a rodada');
  assert.equal(execFileSync('git',['rev-parse','HEAD'],{cwd:config.runtime,encoding:'utf8'}).trim(),config.commit);
  assert.equal(execFileSync('git',['status','--porcelain','--untracked-files=all','--','src'],{cwd:config.runtime,encoding:'utf8'}).trim(),'','src do snapshot deve estar limpa, inclusive arquivos novos');
@@ -49,7 +49,7 @@ export async function initialize(write=false){
 }
 export const clinic='b0000000-0000-4000-8000-000000000001',ana='b0000000-0000-4000-8000-0000000000a1';
 export const names={1:'QA DENTISTA Novo',2:'QA DENTISTA Antigo',3:'QA DENTISTA Sem responsavel',4:'QA DENTISTA Varias fichas',5:'QA DENTISTA Dia',6:'QA DENTISTA Recepcao',7:'QA DENTISTA Assinada',8:'QA DENTISTA Orcamento',9:'QA DENTISTA Recepcao RT3a',10:'QA DENTISTA Toque'};
-for(const n of Object.keys(names))names[n]+=' FINAL01';
+for(const n of Object.keys(names))names[n]+=' FINAL02';
 export const fetchQa=(readOnly=false)=>(input,init)=>{assert.equal(new URL(input instanceof Request?input.url:String(input)).hostname,host);if(readOnly)assert(['GET','HEAD'].includes((init?.method??'GET').toUpperCase()));return fetch(input,init);};
 export const rows=async q=>{const r=await q;if(r.error)throw Error(r.error.code+' '+r.error.message);return r.data;};
 export const hash=x=>createHash('sha256').update(JSON.stringify(x)).digest('hex');
@@ -83,5 +83,5 @@ export async function openFicha(page,n,ficha){
  await expect(buttons).toHaveCount(1);await buttons.click();await page.getByRole('region',{name:'Ficha aberta no prontuário',exact:true}).waitFor();
 }
 export async function inventory(){await initialize();return collectInventory({root,dir,patients:Object.keys(names).map(Number).map(id),clinicId:clinic,patientNames:Object.values(names),secrets:ctx.segredos});}
-export function suite(){test.describe.configure({timeout:120000,retries:0});test.beforeAll(async()=>{await initialize();});test.beforeEach(async({page})=>{guard();await blockBrowser(page.context());page.setDefaultTimeout(15000);page.setDefaultNavigationTimeout(60000);page.on('pageerror',error=>fs.appendFileSync(path.join(dir,'pageerrors.log'),mascarar(error.message,ctx.segredos)+'\n'));});test.afterEach(async({page},info)=>{if(!ctx)return;const label=info.title.replace(/[^a-z0-9-]/gi,'_').slice(0,120)+'-'+Date.now();try{await capture(page,label);}catch{/* Login e pagina fechada nao sao capturados. */}const status=info.status==='passed'?'PASSOU':info.status==='skipped'?'PULOU':'FALHOU';fs.appendFileSync(path.join(dir,'resultados.jsonl'),JSON.stringify({scenario:info.title,status,error:mascarar(info.error?.message??'',ctx.segredos),evidence:label,at:new Date().toISOString()})+'\n');await inventory();guard();});}
+export function suite(){test.describe.configure({timeout:120000,retries:0});test.beforeAll(async()=>{await initialize();});test.beforeEach(async({page})=>{guard();await blockBrowser(page.context());page.setDefaultTimeout(15000);page.setDefaultNavigationTimeout(60000);page.on('pageerror',error=>fs.appendFileSync(path.join(dir,'pageerrors.log'),mascarar(error.message,ctx.segredos)+'\n'));});test.afterEach(async({page},info)=>{if(!ctx)return;const label=info.title.replace(/[^a-z0-9-]/gi,'_').slice(0,120)+'-'+Date.now();try{await capture(page,label);}catch{/* Login e pagina fechada nao sao capturados. */}let hookError;try{await inventory();guard();}catch(error){hookError=error;}const status=hookError?'FALHOU':info.status==='passed'?'PASSOU':info.status==='skipped'?'PULOU':'FALHOU';fs.appendFileSync(path.join(dir,'resultados.jsonl'),JSON.stringify({scenario:info.title,status,error:mascarar([info.error?.message,hookError?.message].filter(Boolean).join('\n'),ctx.segredos),hookError:hookError?true:undefined,evidence:label,at:new Date().toISOString()})+'\n');if(hookError)throw hookError;});}
 export async function draw(page,canvas){await expect(canvas).toBeVisible();const b=await canvas.boundingBox();assert(b&&b.width>0);await page.mouse.move(b.x+30,b.y+b.height/2);await page.mouse.down();for(let i=1;i<20;i++)await page.mouse.move(b.x+30+i*5,b.y+b.height/2+Math.sin(i)*15);await page.mouse.up();}

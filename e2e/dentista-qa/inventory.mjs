@@ -1,4 +1,4 @@
-﻿import assert from 'node:assert/strict';
+import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
@@ -16,15 +16,15 @@ export async function collectInventory({root,dir,patients,clinicId,patientNames,
  const data={},identity=new Map(),keys=new Map(),queue=[];
  try{
   await pg.connect();await pg.query('begin read only');
-  const pks=await pg.query(`select c.relname as table_name,array_agg(a.attname order by k.ordinality) as columns
+  const pks=await pg.query(`select c.relname as table_name,array_agg(a.attname::text order by k.ordinality) as columns
    from pg_index i join pg_class c on c.oid=i.indrelid join pg_namespace n on n.oid=c.relnamespace
    join lateral unnest(i.indkey) with ordinality k(attnum,ordinality) on true
    join pg_attribute a on a.attrelid=c.oid and a.attnum=k.attnum
    where n.nspname='public' and i.indisprimary group by c.relname`);
   for(const row of pks.rows)keys.set(row.table_name,row.columns);
   const fks=await pg.query(`select child.relname as child,parent.relname as parent,
-    array_agg(ca.attname order by k.ordinality) as child_columns,
-    array_agg(pa.attname order by k.ordinality) as parent_columns
+    array_agg(ca.attname::text order by k.ordinality) as child_columns,
+    array_agg(pa.attname::text order by k.ordinality) as parent_columns
    from pg_constraint fk join pg_class child on child.oid=fk.conrelid
    join pg_namespace cn on cn.oid=child.relnamespace join pg_class parent on parent.oid=fk.confrelid
    join pg_namespace pn on pn.oid=parent.relnamespace
@@ -69,11 +69,15 @@ export async function collectInventory({root,dir,patients,clinicId,patientNames,
   // Inclui órfãos de upload sob diretórios de pacientes próprios, sem baixar binários.
   const objects=(await pg.query(`select id,bucket_id,name from storage.objects
    where name=any($1::text[]) or string_to_array(name,'/') && $2::text[]`,[paths,patients])).rows;
+  const referencedPaths=new Set(references.map(reference=>reference.path));
+  const patientSet=new Set(patients);
+  const signatureObjects=objects.filter(object=>{const parts=object.name.split('/');return object.bucket_id==='fichas'&&parts.length===3&&parts[0]===clinicId&&patientSet.has(parts[1])&&/^assinatura_[0-9a-f-]{36}_(?:[0-9a-f-]{36}|[0-9]+)\.png$/i.test(parts[2]);});
+  const signatureSummary={total:signatureObjects.length,uuid:signatureObjects.filter(object=>/_[0-9a-f-]{36}\.png$/i.test(object.name)).length,orphans:signatureObjects.filter(object=>!referencedPaths.has(object.name)).map(object=>({id:object.id,bucket:object.bucket_id,path:object.name}))};
   const tables=Object.fromEntries(Object.entries(data).map(([table,records])=>{
    const columns=keys.get(table)??(records.length&&'id'in records[0]?['id']:[]);
    return [table,{columns,keys:records.map(row=>Object.fromEntries(columns.map(c=>[c,row[c]]))),count:records.length,cleanupBlocked:records.length>0&&columns.length===0}];
   }));
-  data._cleanup={patients,tables,storage:{objects:objects.map(o=>({id:o.id,bucket:o.bucket_id,path:o.name})),references},notificationRule:'Somente IDs enumerados por href de entidade própria ou nome completo da fixture FINAL01; não limpar por texto.',cleanupExecuted:false,warning:'Inventário não autoriza limpeza. Somente IDs/chaves compostas/paths enumerados, respeitando retenção e gatilhos. Nenhum DELETE/TRUNCATE/storage remove é executado.'};
+  data._cleanup={patients,tables,storage:{signatureSummary,objects:objects.map(o=>({id:o.id,bucket:o.bucket_id,path:o.name})),references},notificationRule:'Somente IDs enumerados por href de entidade própria ou nome completo da fixture FINAL02; não limpar por texto.',cleanupExecuted:false,warning:'Inventário não autoriza limpeza. Somente IDs/chaves compostas/paths enumerados, respeitando retenção e gatilhos. Nenhum DELETE/TRUNCATE/storage remove é executado.'};
   await pg.query('rollback');
   fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,'inventario-ids-exatos.json'),mascarar(JSON.stringify(data,null,2),secrets));
   return data;

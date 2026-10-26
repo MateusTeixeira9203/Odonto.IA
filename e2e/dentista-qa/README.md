@@ -13,13 +13,13 @@ Não há porta, commit, snapshot ou destino do vault fixados nos roteiros. Confi
 | `DENTISTA_QA_PORT` | Porta do snapshot registrado, dentro da faixa do runner; nunca3000 |
 | `DENTISTA_QA_EVIDENCE_DIR` | Caminho absoluto do diretório de evidências escolhido pelo operador no vault |
 | `DENTISTA_QA_READY` | Sete primeiros caracteres do SHA + `-odonto-qa` |
-| `DENTISTA_QA_WRITE` | `OWN-e026da01`, somente quando houver escrita autorizada |
+| `DENTISTA_QA_WRITE` | `OWN-e026da02`, somente quando houver escrita autorizada |
 
 Exemplo PowerShell para o opt-in, depois de definir SHA/snapshot/porta/evidências:
 
 ```powershell
 $env:DENTISTA_QA_READY=$env:DENTISTA_QA_COMMIT.Substring(0,7)+'-odonto-qa'
-$env:DENTISTA_QA_WRITE='OWN-e026da01'
+$env:DENTISTA_QA_WRITE='OWN-e026da02'
 ```
 
 `initialize()` roda no beforeAll (ou explicitamente nos preparadores); só então o guard verifica opt-in por versão, HEAD, registro da porta/snapshot/SHA e `git status --porcelain --untracked-files=all -- src`. As verificações continuam antes/depois dos testes. Importar support não lê ambiente/registro, não roda Git, não cria cliente/diretório nem conecta ao banco. Arquivos novos em src também bloqueiam. O ambiente vem somente do snapshot e passa por exigirHostQa. Credenciais ficam em memória; sem trace, vídeo, HAR, storageState ou captura de login.
@@ -44,7 +44,7 @@ Executar a rodada aprovada:
 
 `node node_modules/@playwright/test/cli.js test --config e2e/dentista-qa/playwright.config.mjs --workers=1 --retries=0`
 
-Faixa desta versão: **e026da01**, nomes FINAL01. Faixas e026da00 anteriores e e015e800/e015b300, ES, Paciente Exclusao QA e fixtures de outros agentes permanecem intocadas. Repetição de escrita persistida não é retry seguro; verificar evidência/estado primeiro.
+Faixa desta versão: **e026da02**, nomes FINAL02. Faixas e026da00 anteriores e e015e800/e015b300, ES, Paciente Exclusao QA e fixtures de outros agentes permanecem intocadas. Repetição de escrita persistida não é retry seguro; verificar evidência/estado primeiro.
 
 ## Casos
 
@@ -73,10 +73,21 @@ Destino vem de DENTISTA_QA_EVIDENCE_DIR. resultados.jsonl contém PASSOU/FALHOU/
 - começa na lista exata de pacientes e nas auditorias/cópias desses pacientes;
 - expande filhas pelas FKs EFETIVAS, incluindo compostas, até fechar os vínculos;
 - enumera PKs/IDs/chaves compostas de ficha_arquivos, ficha_evolucoes, atendimento_eventos, orcamento_eventos, orcamento_cobranca_itens, documentos e demais filhas;
-- enumera notificações por referências a entidades próprias ou nome completo FINAL01; guarda os IDs exatos, nunca autoriza DELETE por texto;
+- enumera notificações por referências a entidades próprias ou nome completo FINAL02; guarda os IDs exatos, nunca autoriza DELETE por texto;
 - enumera referências de assinatura/PDF/anexos e objetos Storage por id/bucket/path, incluindo órfãos nos diretórios exatos de pacientes próprios, sem baixar binários;
 - escreve inventario-ids-exatos.json com dados e `_cleanup`: chaves por tabela, objetos e referências; avisa/bloqueia limpeza sem PK. Nenhum DELETE, TRUNCATE ou storage remove é executado.
 
 A coleta lê QA_DB_URL via lerVariavel, sem carregar outras variáveis do arquivo compartilhado. Conexão validada por exigirHostQa. O manifesto NÃO autoriza cleanup: limpeza futura só com IDs/chaves/paths enumerados e respeito a retenção/gatilhos. Nunca prefixo, nome ou clínica como critério de exclusão.
 
 Fluxo por bug: evidência -> Dev -> revisão/commit LOCAL -> snapshot NOVO -> reteste. Rodada final de TODOS os roteiros no commit final fornecido pelo Orquestrador. Falhas anteriores do harness ficam no log da campanha, sem reproduzir gravação persistida nem esconder tentativa inválida.
+
+
+## Rodada limpa FINAL02 (após commit local pelo Revisor)
+
+A primeira execução e026da01 é HISTÓRICO, com triagem de13falhas no vault; não é veredito. Esta versão exige namespace e026da02 e WRITE=OWN-e026da02, preservando integralmente e026da00/e026da01. Produto continua no snapshot final aprovado; commit dos testes não muda o HEAD do produto servido.
+
+A ordem lexical dos13arquivos faz parte do contrato, com workers=1/retries=0: criação/aceite do orçamento -> pagamento/exports -> 04-pos-orcamento-estados-isolados; recepcao-01-fluxos -> recepcao-02-toque -> recepcao-03-mista-releitura. --list deve mostrar62corpos nessa ordem; não rodar preparadores e releituras fora da sequência numa faixa nova.
+
+As esperas de save exigem resposta completa e estados finais. A assinatura mista aguarda os dois autores antes do baseline; ordena registros por id para hashes estáveis. Seletores Sara incluem o nome completo FINAL02, distinguindo faixas antigas sem tocar nelas. O coletor usa arrays text[] do catálogo e falhas do inventário/guard entram no resultado FALHOU do hook, não como PASSOU prematuro.
+
+Config principal mantém62corpos. Dois complementos reais REC-03/04 estão em zz-final-assinaturas.spec.mjs e usam config separado: playwright-assinaturas.config.mjs. Executar depois dos62, sem retries; criam somente fichas109/111 e slot609 próprios da faixa02 e usam ficha103 própria para o dono. A prova REC-04 é chamada HTTP da Server Action com cookies Auth reais e PNG desenhado no canvas real; salvarAssinaturaConsulta não tem chamador UI no snapshot. Não descrever essa prova como um botão diário testado.
