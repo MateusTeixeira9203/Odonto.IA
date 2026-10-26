@@ -46,13 +46,15 @@ export async function atualizarPaciente(
     }
   }
 
-  const { error } = await supabase
+  const { data: afetados, error } = await supabase
     .from("pacientes")
     .update({ ...dados, updated_at: new Date().toISOString() })
     .eq("id", pacienteId)
-    .eq("clinica_id", clinicId);
+    .eq("clinica_id", clinicId)
+    .select("id");
 
   if (error) return { error: error.message };
+  if (!afetados?.length) return { error: "Registro nao encontrado." };
   revalidatePath(`/dashboard/pacientes/${pacienteId}`);
   return {};
 }

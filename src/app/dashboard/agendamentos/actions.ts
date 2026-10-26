@@ -487,13 +487,15 @@ export async function deletarAgendamento(id: string): Promise<{ error?: string }
     .eq("clinica_id", clinicId)
     .maybeSingle<{ google_event_id: string | null; dentista_id: string }>();
 
-  const { error } = await supabase
+  const { data: afetados, error } = await supabase
     .from("agendamentos")
     .delete()
     .eq("id", id)
-    .eq("clinica_id", clinicId);
+    .eq("clinica_id", clinicId)
+    .select("id");
 
   if (error) return { error: error.message };
+  if (!afetados?.length) return { error: "Registro nao encontrado." };
 
   if (agendamento?.google_event_id) {
     try {
@@ -627,13 +629,15 @@ export async function iniciarAtendimento(id: string): Promise<{ error?: string }
 export async function marcarNoShow(id: string): Promise<{ error?: string }> {
   const { supabase, clinicId } = await requireClinicContext();
 
-  const { error } = await supabase
+  const { data: afetados, error } = await supabase
     .from('agendamentos')
     .update({ status: 'no_show', updated_at: new Date().toISOString() })
     .eq('id', id)
-    .eq('clinica_id', clinicId);
+    .eq('clinica_id', clinicId)
+    .select('id');
 
   if (error) return { error: error.message };
+  if (!afetados?.length) return { error: 'Registro nao encontrado.' };
   revalidatePath('/dashboard/agendamentos');
   return {};
 }
@@ -663,13 +667,15 @@ export async function cancelarComMotivo(
     ? `[Cancelado: ${motivo}]${ag?.observacoes ? `\n${ag.observacoes}` : ''}`
     : (ag?.observacoes ?? null);
 
-  const { error } = await supabase
+  const { data: afetados, error } = await supabase
     .from('agendamentos')
     .update({ status: 'cancelled', observacoes: novasObs, updated_at: new Date().toISOString() })
     .eq('id', id)
-    .eq('clinica_id', clinicId);
+    .eq('clinica_id', clinicId)
+    .select('id');
 
   if (error) return { error: error.message };
+  if (!afetados?.length) return { error: 'Registro nao encontrado.' };
 
   if (ag?.google_event_id && ag.dentista_id) {
     try {
