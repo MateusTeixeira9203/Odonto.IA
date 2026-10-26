@@ -10,18 +10,19 @@ import { contexto, exigirHostQa, configPgQa, lerVariavel, mascarar, registros } 
 
 export { assert, expect };
 export const root = path.resolve(import.meta.dirname, '../..');
-const snapshotName = process.env.DENTISTA_D2_SNAPSHOT ?? 'dentistadev2';
+const snapshotName = process.env.DENTISTA_D2_SNAPSHOT ?? 'dentistadev2-final';
 assert.match(snapshotName, /^dentistadev2(?:-[a-z0-9-]+)?$/);
 export const runtime = path.resolve(root, `../Odonto.IA-${snapshotName}`);
-export const commit = process.env.DENTISTA_D2_COMMIT ?? '3d14edb231c318c4f005f57818a41233e8bab6ad';
+export const commit = process.env.DENTISTA_D2_COMMIT ?? '2da5469858ea84fb40971ad2edc1e8d4d5e7ef0e';
 assert.match(commit, /^[0-9a-f]{40}$/);
-export const prefix = process.env.DENTISTA_D2_PREFIX ?? 'd025d200';
+export const prefix = process.env.DENTISTA_D2_PREFIX ?? 'd025d201';
 assert.match(prefix, /^d025d2[0-9a-f]{2}$/);
-const port = process.env.DENTISTA_D2_PORT ?? '3013';
-assert.ok(['3013', '3015'].includes(port));
+const port = process.env.DENTISTA_D2_PORT ?? '3018';
+assert.ok(['3013', '3015', '3018'].includes(port));
 assert.ok(port !== '3015' || snapshotName === 'dentistadev2-iso', '3015 reservada ao reteste autorizado');
+assert.ok(port !== '3018' || (snapshotName === 'dentistadev2-final' && commit === '2da5469858ea84fb40971ad2edc1e8d4d5e7ef0e' && prefix === 'd025d201'), '3018 reservada ao snapshot final e faixa nova autorizados');
 export const base = `http://localhost:${port}`;
-export const dir = `C:/Users/mateu/Desktop/Nex Lab/Projetos/Odonto-IA/log/dentista-dev2-${commit.slice(0, 7)}${prefix === 'd025d200' ? '' : '-' + prefix}`;
+export const dir = `C:/Users/mateu/Desktop/Nex Lab/Projetos/Odonto-IA/log/dentista-dev2-${port === '3018' ? 'final-2da5469' : commit.slice(0, 7) + (prefix === 'd025d200' ? '' : '-' + prefix)}`;
 export const id = n => `${prefix}-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const suffix = prefix === 'd025d200' ? '' : ' ' + prefix;
 export const name = 'QA D2 Campanha Dentista' + suffix;

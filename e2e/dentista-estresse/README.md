@@ -1,3 +1,30 @@
+# Rodada final autorizada ? 2da5469
+
+Defaults atuais: snapshot `dentistadev2-final`, porta **3018**, SHA integral
+`2da5469858ea84fb40971ad2edc1e8d4d5e7ef0e`, faixa **d025d201**, agenda **2026-11-19**.
+3018 exige essa combina??o exata; 3017 ? do QA e ? recusada. Host, opt-in,
+HEAD antes/depois, src limpa e recusa de sobrescrita continuam obrigat?rios.
+Evid?ncias: `Projetos/Odonto-IA/log/dentista-dev2-final-2da5469/`.
+
+```powershell
+npm.cmd run qa:snapshot-up -- --nome dentistadev2-final --commit 2da5469858ea84fb40971ad2edc1e8d4d5e7ef0e --porta 3018
+$env:DENTISTA_D2_READY='2da5469-odonto-qa'
+node e2e/dentista-estresse/preparar.mjs
+node e2e/dentista-estresse/05-apagar.mjs
+node e2e/dentista-estresse/06-papeis.mjs
+node e2e/dentista-estresse/07-isolamento.mjs
+node e2e/dentista-estresse/07-positivos.mjs
+node e2e/dentista-estresse/08-agenda.mjs
+node e2e/dentista-estresse/09-estresse.mjs
+node e2e/dentista-estresse/inventario.mjs
+```
+
+N?o repetir escritas desta rodada. Scripts de releitura antigos s?o diagn?sticos
+de incidentes hist?ricos, n?o lotes novos. DQ-EMBED-02 segue decis?o do usu?rio,
+fora do envio. O hist?rico abaixo documenta os ambientes anteriores, n?o os defaults atuais.
+
+---
+
 # Campanha dentista · ALFA Dev 2 · lotes 5–9
 
 Playwright (`chromium`, canal Edge existente), sem instalação global, retries,

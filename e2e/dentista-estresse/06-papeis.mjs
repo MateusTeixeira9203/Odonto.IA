@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { start, id, name, base, dir, assert, rows } from './harness.mjs';
+import { start, id, name, base, dir, prefix, assert, rows } from './harness.mjs';
 const h = await start('06-papeis');
 const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jx1sAAAAASUVORK5CYII=';
 try {
@@ -50,7 +50,7 @@ try {
     await rows(h.db.from('odontograma_eventos').insert(data).select('id')); return { ids: data.map(x => x.id) };
   });
   await h.check('RPC recusa seleção mista de autores sem assinatura parcial', async () => {
-    const before = await h.ownState(); const r = await s.client.rpc('assinar_procedimentos', { p_evento_ids: [id(304), id(305)], p_assinado_por: name, p_assinatura_ref: 'qa/d025d200/misto-sem-binario.png' });
+    const before = await h.ownState(); const r = await s.client.rpc('assinar_procedimentos', { p_evento_ids: [id(304), id(305)], p_assinado_por: name, p_assinatura_ref: `qa/${prefix}/misto-sem-binario.png` });
     assert.match(r.error?.message ?? '', /autores_diferentes/); assert.deepEqual(await h.ownState(), before); return { codigo: r.error.code, mensagem: r.error.message, semEfeito: true };
   });
   await h.check('REC-4 recepção separa autores; encaminhado continua pendente, sem carimbo legado', async () => {

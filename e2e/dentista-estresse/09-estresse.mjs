@@ -15,7 +15,7 @@ try {
   }
   const visits = text => rows(h.db.from('ficha_evolucoes').select('id,atendimento_id,texto').eq('ficha_id', id(106)).eq('texto', text));
   await h.check('Rajada UI: dois cliques no mesmo Salvar produzem uma única visita', async () => {
-    const text = 'QA D2 DUPLO CLICK 3d14edb'; const region = await novo(p, text);
+    const text = 'QA D2 DUPLO CLICK FINAL'; const region = await novo(p, text);
     assert.equal((await visits(text)).length, 0);
     await region.getByRole('button', { name: 'Salvar atendimento', exact: true }).evaluate(el => { el.click(); el.click(); });
     await expect.poll(async () => (await visits(text)).length, { timeout: 30000 }).toBe(1);

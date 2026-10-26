@@ -1,6 +1,6 @@
 import { start, id, base, patientName, assert, expect, rows } from './harness.mjs';
 const h = await start('08-agenda');
-const day = process.env.DENTISTA_D2_AGENDA_DAY ?? '2026-11-17';
+const day = process.env.DENTISTA_D2_AGENDA_DAY ?? '2026-11-19';
 assert.match(day, /^2026-11-\d{2}$/);
 try {
   const a = await h.login('ANA'), p = a.page;

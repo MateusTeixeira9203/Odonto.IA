@@ -17,6 +17,10 @@ try {
       ['orcamento_itens', 'orcamento_id', [601, 602].map(id)],
       ['ficha_arquivos', 'ficha_id', [101, 102, 103, 104, 105, 106, 107].map(id)],
     ]) tables[table] = { column: 'id', ids: (await rows(h.db.from(table).select('id').in(parent, parentIds))).map(x => x.id) };
+    // Captura somente IDs retornados pelo caso pr?prio; nunca inventariar por t?tulo/cl?nica.
+    const positiveReport = JSON.parse(fs.readFileSync(path.join(dir, '07-positivos.json'), 'utf8'));
+    const notificationIds = positiveReport.casos.flatMap(c => c.evidencia?.notificacoes ?? []).map(n => n.id);
+    tables.notificacoes = { column: 'id', ids: notificationIds.length ? (await rows(h.db.from('notificacoes').select('id').in('id', notificationIds))).map(n => n.id) : [] };
     assert.ok(tables.pacientes.ids.every(value => patients.includes(value)));
     const manifest = { prefix, patients, tables, cleanupExecuted: false, aviso: 'Preservar reprodução. Limpeza futura exclusivamente WHERE chave IN(ids enumerados), respeitando dependências; não usar faixa/nome/clínica. Revisar vínculos compostos e logs próprios antes de executar. Auditoria/cópias têm retenção própria; não excluir automaticamente.' };
     fs.writeFileSync(path.join(dir, 'fixtures-proprias-ids-exatos.json'), JSON.stringify(manifest, null, 2));
