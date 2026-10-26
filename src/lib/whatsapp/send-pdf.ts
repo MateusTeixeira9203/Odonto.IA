@@ -162,7 +162,7 @@ export async function sendOrcamentoWhatsApp(
       id, created_at, validade_dias, status, condicoes_pagamento, total, valor_acordado, desconto,
       paciente:pacientes (nome, cpf, telefone),
       clinica:clinicas (nome, endereco, telefone),
-      dentista:dentistas (nome, cro),
+      dentista:dentistas!orcamentos_dentista_id_fkey (nome, cro),
       itens:orcamento_itens (id, descricao, dente, preco_unitario, preco_total, quantidade, aprovado),
       cobrancas:orcamento_cobrancas (desconto, situacao),
       pagamentos (valor, status)
