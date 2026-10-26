@@ -7,8 +7,12 @@ try {
   await b.page.goto(base + '/dashboard/agendamentos');
   for (const route of ['/dashboard/pacientes/' + id(1), '/dashboard/meu-dia', '/dashboard/agendamentos?d=2026-11-16', '/dashboard/pacientes', '/dashboard/orcamentos', '/dashboard/financeiro', '/dashboard/protetico']) {
     await h.check('Bruno UI não expõe dados da A: ' + route, async () => {
-      const r = await b.page.goto(base + route); await b.page.waitForLoadState('domcontentloaded');
+      const r = await b.page.goto(base + route, { waitUntil: 'domcontentloaded' }); await b.page.waitForLoadState('domcontentloaded');
       if (route.endsWith(id(1))) await expect(b.page.getByText('Página não encontrada', { exact: true })).toBeVisible();
+      if (route === '/dashboard/orcamentos') {
+        await expect(b.page).toHaveURL(base + '/dashboard/pacientes');
+        await expect(b.page.getByRole('heading', { name: 'Pacientes', exact: true })).toBeVisible();
+      }
       const text = await b.page.locator('body').innerText();
       for (const marker of [name, 'QA-D2-CLINICO-PRIVADO', 'QA D2 Ficha', 'QA D2 Procedimento', patientName(3)]) assert.ok(!text.includes(marker), 'Vazamento: ' + marker);
       if (route.endsWith(id(1))) assert.match(text, /404|não encontrad|não existe/i);

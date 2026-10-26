@@ -1,10 +1,10 @@
-# Rodada final autorizada ? 2da5469
+# Rodada final autorizada · 2da5469
 
 Defaults atuais: snapshot `dentistadev2-final`, porta **3018**, SHA integral
 `2da5469858ea84fb40971ad2edc1e8d4d5e7ef0e`, faixa **d025d201**, agenda **2026-11-19**.
-3018 exige essa combina??o exata; 3017 ? do QA e ? recusada. Host, opt-in,
-HEAD antes/depois, src limpa e recusa de sobrescrita continuam obrigat?rios.
-Evid?ncias: `Projetos/Odonto-IA/log/dentista-dev2-final-2da5469/`.
+3018 exige essa combinação exata; 3017 é do QA e é recusada. Host, opt-in,
+HEAD antes/depois, src limpa e recusa de sobrescrita continuam obrigatórios.
+Evidências: `Projetos/Odonto-IA/log/dentista-dev2-final-2da5469/`.
 
 ```powershell
 npm.cmd run qa:snapshot-up -- --nome dentistadev2-final --commit 2da5469858ea84fb40971ad2edc1e8d4d5e7ef0e --porta 3018
@@ -19,9 +19,16 @@ node e2e/dentista-estresse/09-estresse.mjs
 node e2e/dentista-estresse/inventario.mjs
 ```
 
-N?o repetir escritas desta rodada. Scripts de releitura antigos s?o diagn?sticos
-de incidentes hist?ricos, n?o lotes novos. DQ-EMBED-02 segue decis?o do usu?rio,
-fora do envio. O hist?rico abaixo documenta os ambientes anteriores, n?o os defaults atuais.
+Não repetir escritas desta rodada. Scripts de releitura antigos são diagnósticos
+de incidentes históricos, não lotes novos. DQ-EMBED-02 segue decisão do usuário,
+fora do envio. O histórico abaixo documenta os ambientes anteriores, não os defaults atuais.
+
+Incidente final: `07-isolamento.json #5` preserva ERR_ABORTED ao navegar para
+Orçamentos. Essa rota redireciona para Pacientes (R-153). Duas releituras com
+heading incorreto foram preservadas; a expectativa corrigida de destino, heading
+e ausência dos mesmos marcadores passou em `07-orcamentos-destino-validado`.
+Diagnóstico somente leitura: `node e2e/dentista-estresse/reler-orcamentos-final.mjs destino-validado`.
+Não repetir após gerar a evidência. Nenhuma mutação foi reenviada.
 
 ---
 
