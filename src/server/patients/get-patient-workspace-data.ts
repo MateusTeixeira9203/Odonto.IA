@@ -168,7 +168,7 @@ export async function getPatientWorkspaceData({
           ? supabase
               .from('fichas')
               .select(
-                'id, created_at, data_atendimento, queixa_principal, anotacoes, dentista:dentistas(nome)'
+                'id, created_at, data_atendimento, queixa_principal, anotacoes, dentista:dentistas!fichas_dentista_id_fkey(nome)'
               )
               .eq('paciente_id', patientId)
               .eq('clinica_id', clinicId)

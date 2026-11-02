@@ -36,7 +36,7 @@ export async function buscarPossiveisDuplicatas(
     telefone: string | null; cpf: string | null; fichas: { id: string }[] | null;
   };
 
-  const select = 'id, nome, data_nascimento, telefone, cpf, fichas(id)';
+  const select = 'id, nome, data_nascimento, telefone, cpf, fichas!fichas_paciente_id_fkey(id)';
 
   // Duas queries simples em vez de um `.or()` entre colunas diferentes — `cpf` pode
   // conter ponto e traço ("111.222.333-44"), e interpolar isso numa string de filtro do

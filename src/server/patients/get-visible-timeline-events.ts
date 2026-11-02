@@ -101,7 +101,7 @@ export async function getVisibleTimelineEvents({
             .from('fichas')
             // R-46c (I3) — `origem` decide o type/título; sem isso toda ficha vira
             // "Consulta realizada" hardcoded, mentindo sobre histórico transcrito (achado 3).
-            .select('id, data_atendimento, queixa_principal, origem, dentista:dentistas(nome)')
+            .select('id, data_atendimento, queixa_principal, origem, dentista:dentistas!fichas_dentista_id_fkey(nome)')
             .eq('paciente_id', patientId)
             .eq('clinica_id', clinicId)
             .order('data_atendimento', { ascending: false })

@@ -447,7 +447,7 @@ export async function atualizarAgendamento(
     const { data: agendamento } = await supabase
       .from("agendamentos")
       .select(
-        "google_event_id, dentista_id, data_hora, duracao_minutos, observacoes, paciente:pacientes(nome), dentista:dentistas!agendamentos_dentista_id_fkey(nome)"
+        "google_event_id, dentista_id, data_hora, duracao_minutos, observacoes, paciente:pacientes!agendamentos_paciente_id_fkey(nome), dentista:dentistas!agendamentos_dentista_id_fkey(nome)"
       )
       .eq("id", id)
       .maybeSingle<{
@@ -552,7 +552,7 @@ export async function fazerCheckIn(id: string): Promise<{ error?: string }> {
 
   const { data: ag } = await supabase
     .from('agendamentos')
-    .select('status, dentista_id, data_hora, paciente:pacientes(nome)')
+    .select('status, dentista_id, data_hora, paciente:pacientes!agendamentos_paciente_id_fkey(nome)')
     .eq('id', id)
     .eq('clinica_id', clinicId)
     .maybeSingle<{
@@ -648,7 +648,7 @@ export async function cancelarComMotivo(
 
   const { data: ag } = await supabase
     .from('agendamentos')
-    .select('google_event_id, dentista_id, data_hora, observacoes, paciente:pacientes(nome)')
+    .select('google_event_id, dentista_id, data_hora, observacoes, paciente:pacientes!agendamentos_paciente_id_fkey(nome)')
     .eq('id', id)
     .eq('clinica_id', clinicId)
     .maybeSingle<{

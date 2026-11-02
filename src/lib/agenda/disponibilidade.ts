@@ -145,7 +145,7 @@ export async function getDisponibilidadeSemana(params: {
         .eq('clinica_id', clinicaId)
         .eq('ativo', true),
       db.from('agendamentos')
-        .select('id, data_hora, duracao_minutos, paciente:pacientes(nome)')
+        .select('id, data_hora, duracao_minutos, paciente:pacientes!agendamentos_paciente_id_fkey(nome)')
         .eq('dentista_id', dentistaId)
         .eq('clinica_id', clinicaId)
         .neq('status', 'cancelled')

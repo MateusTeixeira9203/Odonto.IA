@@ -85,7 +85,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
     let agendamentosListQuery = supabase
       .from('agendamentos')
-      .select('data_hora, status, paciente:pacientes(nome)')
+      .select('data_hora, status, paciente:pacientes!agendamentos_paciente_id_fkey(nome)')
       .eq('clinica_id', dentista.clinica_id)
       .gte('data_hora', hojeInicio.toISOString())
       .lte('data_hora', hojeFim.toISOString())
@@ -103,7 +103,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
     let proximoQuery = supabase
       .from('agendamentos')
-      .select('id, data_hora, paciente:pacientes(nome)')
+      .select('id, data_hora, paciente:pacientes!agendamentos_paciente_id_fkey(nome)')
       .eq('clinica_id', dentista.clinica_id)
       .gte('data_hora', agora.toISOString())
       .lte('data_hora', hojeFim.toISOString())
